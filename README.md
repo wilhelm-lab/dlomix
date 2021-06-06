@@ -19,6 +19,24 @@
 
 
 
+**To-Do:**
+
+Functionality:
+- implement deepRT and prosit
+- extend pipeline for different types of models and backbones
+- extend pipeline to allow for fine-tuning with custom datasets
+- add residual plots to reporting, possibly other regression analysis tools
+- output reporting results as PDF
+- extend data representation to include modifications (based on discussions with Küster Lehrstuhl)
+
+Package structure:
+- Adopt a convention for private attributes of objects (datasets, models, etc...)
+- introduce a style guide (e.g. PEP)
+- integrate `deeplc.py` into `models.py`, preferably introduce a package structure (e.g. `models.retention_time`)
+- plan documentation (check sphinx and readthedocs)
+- add references for implemented models in the ReadMe
+ 
+
 
 
  
