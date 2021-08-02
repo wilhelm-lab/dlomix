@@ -1,6 +1,7 @@
 import tensorflow as tf
 from tensorflow.keras.layers.experimental import preprocessing
 from dlpro.constants import ALPHABET_UNMOD
+from dlpro.layers.attention import AttentionLayer
 
 
 class PrositRetentionTimePredictor(tf.keras.Model):
@@ -10,15 +11,16 @@ class PrositRetentionTimePredictor(tf.keras.Model):
 
         self.string_lookup = preprocessing.StringLookup(vocabulary=list(vocab_dict.keys()))
 
-        self.embedding = tf.keras.layers.Embedding(input_dim=embedding_input_dim, output_dim=embedding_output_dim,
+        self.embedding = tf.keras.layers.Embedding(input_dim=embedding_input_dim,
+                                                   output_dim=embedding_output_dim,
                                                    input_length=seq_length)
         self._build_encoder()
 
-        self.attention = tf.keras.layers.Attention()
+        self.attention = AttentionLayer()
 
         self.regressor = tf.keras.Sequential([
             tf.keras.layers.Dense(512, activation='relu'),
-            tf.keras.layers.LeakyReLU(alpha=0.3),
+            tf.keras.layers.LeakyReLU(),
             tf.keras.layers.Dropout(rate=0.1)
         ])
 
@@ -27,9 +29,9 @@ class PrositRetentionTimePredictor(tf.keras.Model):
     def _build_encoder(self):
         self.encoder = tf.keras.Sequential([
             tf.keras.layers.Bidirectional(tf.keras.layers.GRU(units=256, return_sequences=True)),
-            tf.keras.layers.Dropout(rate=0.1),
+            tf.keras.layers.Dropout(rate=0.5),
             tf.keras.layers.GRU(units=512, return_sequences=True),
-            tf.keras.layers.Dropout(rate=0.1)
+            tf.keras.layers.Dropout(rate=0.5)
         ])
 
     def call(self, inputs, **kwargs):
