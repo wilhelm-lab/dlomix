@@ -1,3 +1,4 @@
+
 from dlpro.eval.rt_eval import delta99_metric, delta95_metric
 from dlpro.models.prosit import PrositRetentionTimePredictor
 from dlpro.data.data import RetentionTimeDataset
@@ -5,7 +6,6 @@ import pickle
 import tensorflow as tf
 
 model = PrositRetentionTimePredictor()
-print(model.summary())
 
 reduceLR = tf.keras.callbacks.ReduceLROnPlateau(monitor='val_loss', factor=0.1, patience=10, verbose=1, min_lr=0)
 
