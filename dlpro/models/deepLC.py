@@ -1,28 +1,28 @@
 import tensorflow as tf
-from utils import ALPHABET_UNMOD
+from dlpro.constants import ALPHABET_UNMOD
 from tensorflow.keras.layers.experimental import preprocessing
 
 
 class DeepLC(tf.keras.Model):
 
-    def __init__(self, seq_length=60, vocab_dict=ALPHABET_UNMOD):
+    def __init__(self, seq_length=60, vocab_dict=ALPHABET_UNMOD, use_global_features=False):
         super(DeepLC, self).__init__()
         self.seq_length = seq_length
-        self.leaky_relu = tf.keras.layers.ReLU(max_value=20, negative_slope=0.1)
+        self._use_global_features = use_global_features
 
+        self.leaky_relu = tf.keras.layers.ReLU(max_value=20, negative_slope=0.1)
         self.string_lookup = preprocessing.StringLookup(vocabulary=list(vocab_dict.keys()))
 
         self._build_aminoacid_branch()
         self._build_diaminoacid_branch()
-        #self._build_global_features_branch()
         self._build_onehot_encoding_branch()
-
         self._build_regressor()
-
         self.output_layer = tf.keras.layers.Dense(1)
 
-    def _build_aminoacid_branch(self):
+        if self._use_global_features:
+            self._build_global_features_branch()
 
+    def _build_aminoacid_branch(self):
         self.aminoacid_branch = tf.keras.Sequential([
             self._build_conv_pool_block(n_filters=256, kernel=8, padding='same'),
             self._build_conv_pool_block(n_filters=128, kernel=8, padding='same'),
@@ -70,22 +70,19 @@ class DeepLC(tf.keras.Model):
 
         return block
 
-    def call(self, inputs):
+    def call(self, inputs, **kwargs):
+        outputs = {}
+
         integer_encoded = self.string_lookup(inputs['seq'])
         onehot_encoded = tf.one_hot(integer_encoded, depth=self.seq_length)
 
-        if inputs.get("global_features", 0):
-            global_features_output = self.global_features_branch(inputs['global_features'])
+        if self._use_global_features:
+            outputs['global_features_output'] = self.global_features_branch(inputs['global_features'])
 
-        onehot_branch_output = self.onehot_encoding_branch(onehot_encoded)
-        aminoacids_branch_output = self.aminoacid_branch(inputs['counts'])
-        diaminoacids_branch_output = self.diaminoacid_branch(inputs['di_counts'])
+        outputs['onehot_branch_output'] = self.onehot_encoding_branch(onehot_encoded)
+        outputs['aminoacids_branch_output'] = self.aminoacid_branch(inputs['counts'])
+        outputs['diaminoacids_branch_output'] = self.diaminoacid_branch(inputs['di_counts'])
 
-        #concatenated_output = tf.concat([global_features_output, onehot_branch_output,
-        #                                 aminoacids_branch_output, diaminoacids_branch_output])
-        concatenated_output = tf.concat([onehot_branch_output,
-                                         aminoacids_branch_output, diaminoacids_branch_output], axis=1)
-
-        output = self.regressor(concatenated_output)
-
-        return self.output_layer(output)
+        concatenated_output = tf.concat(outputs.values(), axis=1)
+        concatenated_output = self.regressor(concatenated_output)
+        return self.output_layer(concatenated_output)

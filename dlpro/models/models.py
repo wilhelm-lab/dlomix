@@ -1,12 +1,12 @@
 import tensorflow as tf
 from tensorflow.keras.layers.experimental import preprocessing
-from utils import ALPHABET_UNMOD
+from dlpro.constants import ALPHABET_UNMOD
 
 
-class RTPredictor(tf.keras.Model):
+class RetentionTimePredictor(tf.keras.Model):
 
     def __init__(self, embeddings_count, embedding_dim, seq_length=30, encoder="lstm", vocab_dict=ALPHABET_UNMOD):
-        super(RTPredictor, self).__init__()
+        super(RetentionTimePredictor, self).__init__()
 
         self.string_lookup = preprocessing.StringLookup(vocabulary=list(vocab_dict.keys()))
 
@@ -35,7 +35,7 @@ class RTPredictor(tf.keras.Model):
                 tf.keras.layers.LSTM(256)
             ])
 
-    def call(self, inputs):
+    def call(self, inputs, **kwargs):
         x = self.string_lookup(inputs)
         x = self.embedding(x)
         x = self.encoder(x)
@@ -44,6 +44,4 @@ class RTPredictor(tf.keras.Model):
         x = self.output_layer(x)
 
         return x
-
-
 

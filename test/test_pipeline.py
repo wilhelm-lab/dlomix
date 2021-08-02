@@ -1,6 +1,5 @@
-from data import RTDataset
-from eval_utils import delta95_metric
-from models import *
+from dlpro.data.data import RetentionTimeDataset
+from dlpro.eval.rt_eval import delta95_metric
 
 # data path
 DATAPATH = '/scratch/RT_raw/iRT_ProteomeTools_ReferenceSet.csv'
@@ -12,9 +11,9 @@ create dataset:
     - padds sequences to the specified length
     - performs train/val split if needed
 '''
-d = RTDataset(data_source=DATAPATH, sequence_col="sequence", target_col="irt",
-              pad_length=40, normalize_targets=True,
-              batch_size=128, val_ratio=0.2)
+d = RetentionTimeDataset(data_source=DATAPATH, sequence_col="sequence", target_col="irt",
+                         pad_length=40, normalize_targets=True,
+                         batch_size=128, val_ratio=0.2)
 
 
 '''
@@ -24,7 +23,7 @@ create Model:
     - model has three main parts (embedding, encoder, regressor) with some parametrization
     '''
 
-model = RTPredictor(embeddings_count=len(ALPHABET_UNMOD), embedding_dim=300, seq_length=40, encoder='lstm')
+model = RetentionTimePredictor(embeddings_count=len(ALPHABET_UNMOD), embedding_dim=300, seq_length=40, encoder='lstm')
 
 
 ''''

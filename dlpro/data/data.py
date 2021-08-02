@@ -3,17 +3,17 @@ import numpy as np
 import tensorflow as tf
 
 
-class RTDataset:
+class RetentionTimeDataset:
     TARGETS_MEAN, TARGETS_STD = 0, 1
     SEQ_LENGTH = 0
     ATOM_TABLE = None
 
     # if pad_length is 0 -> no padding
 
-    def __init__(self, data_source=None, sep=",", sequence_col="sequence", target_col="irt", feature_cols=[],
+    def __init__(self, data_source=None, sep=",", sequence_col="sequence", target_col="irt", feature_cols=None,
                  normalize_targets=True, pad_length=0, batch_size=32, val_ratio=0.2, seed=21,
                  test=False, path_aminoacid_atomcounts=None, sample_run=False):
-        super(RTDataset, self).__init__()
+        super(RetentionTimeDataset, self).__init__()
 
         np.random.seed(seed)
 
@@ -21,13 +21,16 @@ class RTDataset:
         self.sep = sep
         self.sequence_col = sequence_col.lower()
         self.target_col = target_col.lower()
-        self.feature_cols = [f.lower() for f in feature_cols]
+        if feature_cols:
+            self.feature_cols = [f.lower() for f in feature_cols]
+        else:
+            self.feature_cols = []
 
         self.normalize_targets = normalize_targets
         self.pad_length = pad_length
         self.sample_run = sample_run
 
-        RTDataset.SEQ_LENGTH = pad_length
+        RetentionTimeDataset.SEQ_LENGTH = pad_length
 
         self.batch_size = batch_size
         self.val_ratio = val_ratio
@@ -58,7 +61,7 @@ class RTDataset:
         keys_tensor = tf.constant(atom_counts['aa'].values)
         values_tensor = tf.constant(['_'.join(c) for c in list(atom_counts.iloc[:, 1:].values)])
         init = tf.lookup.KeyValueTensorInitializer(keys_tensor, values_tensor)
-        RTDataset.ATOM_TABLE = tf.lookup.StaticHashTable(init, default_value='0_0_0_0_0')
+        RetentionTimeDataset.ATOM_TABLE = tf.lookup.StaticHashTable(init, default_value='0_0_0_0_0')
 
     def load_data(self, data):
         self.data_source = data
@@ -85,7 +88,7 @@ class RTDataset:
         elif isinstance(self.data_source, np.ndarray):
             self.sequences = self.data_source
             self.targets = np.zeros(self.sequences.shape[0])
-            RTDataset.TARGETS_MEAN, RTDataset.TARGETS_STD = 0, 1
+            RetentionTimeDataset.TARGETS_MEAN, RetentionTimeDataset.TARGETS_STD = 0, 1
 
         elif isinstance(self.data_source, str):
             df = pd.read_csv(self.data_source)
@@ -96,7 +99,7 @@ class RTDataset:
             df.columns = [col_name.lower() for col_name in df.columns]
 
             self.sequences, self.targets = df[self.sequence_col].values, df[self.target_col].values
-            RTDataset.TARGETS_MEAN, RTDataset.TARGETS_STD = np.mean(self.targets), np.std(self.targets)
+            RetentionTimeDataset.TARGETS_MEAN, RetentionTimeDataset.TARGETS_STD = np.mean(self.targets), np.std(self.targets)
 
             self.features_df = df[self.feature_cols]
         else:
@@ -120,16 +123,16 @@ class RTDataset:
     def _preprocess_dataset(self):
         for split in self.tf_dataset.keys():
             if self.normalize_targets:
-                self.tf_dataset[split] = self.tf_dataset[split].map(RTDataset.normalize_target)
+                self.tf_dataset[split] = self.tf_dataset[split].map(RetentionTimeDataset.normalize_target)
 
-            self.tf_dataset[split] = self.tf_dataset[split].map(RTDataset.split_sequence).map(
-                RTDataset.pad_sequences)
+            self.tf_dataset[split] = self.tf_dataset[split].map(RetentionTimeDataset.split_sequence).map(
+                RetentionTimeDataset.pad_sequences)
 
             if self.include_count_features:
                 self.tf_dataset[split] = self.tf_dataset[split]\
-                    .map(RTDataset.convert_inputs_to_dict)\
-                    .map(RTDataset.generate_single_counts)\
-                    .map(RTDataset.generate_di_counts)
+                    .map(RetentionTimeDataset.convert_inputs_to_dict)\
+                    .map(RetentionTimeDataset.generate_single_counts)\
+                    .map(RetentionTimeDataset.generate_di_counts)
 
 
             self.tf_dataset[split] = self.tf_dataset[split].batch(self.batch_size)
@@ -142,20 +145,20 @@ class RTDataset:
         return self.targets[self.indicies_dict[split]]
 
     def denormalize_targets(self, targets):
-        return targets * RTDataset.TARGETS_STD + RTDataset.TARGETS_MEAN
+        return targets * RetentionTimeDataset.TARGETS_STD + RetentionTimeDataset.TARGETS_MEAN
 
     @staticmethod
     def pad_sequences(seq, target):
-        pad_len = tf.abs(RTDataset.SEQ_LENGTH - tf.size(seq))
+        pad_len = tf.abs(RetentionTimeDataset.SEQ_LENGTH - tf.size(seq))
         paddings = tf.concat([[0], [pad_len]], axis=0)
         seq = tf.pad(seq, [paddings], "CONSTANT")
-        seq.set_shape([RTDataset.SEQ_LENGTH])
+        seq.set_shape([RetentionTimeDataset.SEQ_LENGTH])
         return seq, target
 
     @staticmethod
     def normalize_target(seq, target):
 
-        target = tf.math.divide(tf.math.subtract(target, RTDataset.TARGETS_MEAN), RTDataset.TARGETS_STD)
+        target = tf.math.divide(tf.math.subtract(target, RetentionTimeDataset.TARGETS_MEAN), RetentionTimeDataset.TARGETS_STD)
 
         return seq, target
 
@@ -177,19 +180,19 @@ class RTDataset:
 
     @staticmethod
     def generate_single_counts(inputs, target):
-        inputs["counts"] = tf.map_fn(lambda x: RTDataset.ATOM_TABLE.lookup(x), inputs["seq"])
+        inputs["counts"] = tf.map_fn(lambda x: RetentionTimeDataset.ATOM_TABLE.lookup(x), inputs["seq"])
         inputs["counts"] = tf.map_fn(lambda x: tf.strings.split(x, sep='_'), inputs["counts"])
         inputs["counts"] = tf.strings.to_number(inputs["counts"])
-        inputs["counts"].set_shape([RTDataset.SEQ_LENGTH, 5])
+        inputs["counts"].set_shape([RetentionTimeDataset.SEQ_LENGTH, 5])
 
         return inputs, target
 
     @staticmethod
     def generate_di_counts(inputs, target):
         # add every two neighboring elements without overlap [0 0 1 1 2 2 .... pad_length/2 pad_length/2]
-        segments_to_add = [i // 2 for i in range(RTDataset.SEQ_LENGTH)]
+        segments_to_add = [i // 2 for i in range(RetentionTimeDataset.SEQ_LENGTH)]
         inputs["di_counts"] = tf.math.segment_sum(inputs["counts"], tf.constant(segments_to_add))
-        inputs["di_counts"].set_shape([RTDataset.SEQ_LENGTH // 2, 5])
+        inputs["di_counts"].set_shape([RetentionTimeDataset.SEQ_LENGTH // 2, 5])
 
         return inputs, target
 
