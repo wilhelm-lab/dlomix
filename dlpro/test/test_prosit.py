@@ -5,8 +5,6 @@ from dlpro.data.data import RetentionTimeDataset
 import pickle
 import tensorflow as tf
 
-import sys
-sys.path.append('../../')
 
 model = PrositRetentionTimePredictor()
 
