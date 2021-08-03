@@ -67,9 +67,10 @@ class RetentionTimeDataset:
         self.data_source = data
 
         self._read_data()
+        self._validate_sequence_length()
         self._split_data()
-        self._build_dataset()
-        self._preprocess_dataset()
+        self._build_tf_dataset()
+        self._preprocess_tf_dataset()
 
     '''
     numpy array --> either a tuple or a single array
@@ -106,6 +107,16 @@ class RetentionTimeDataset:
             raise ValueError('Data source has to be either a tuple of two numpy arrays, a single numpy array, '
                              'or a string path to a csv file.')
 
+    def _validate_sequence_length(self) -> None:
+        """
+        Validate if all sequences are shorter than the padding length, otherwise truncate them.
+        """
+        assert self.sequences.shape[0] > 0, "No sequences in the provided data."
+
+        limit = RetentionTimeDataset.SEQ_LENGTH
+        self.sequences = [s if len(s) <= limit else s[0:limit] for s in self.sequences]
+        self.sequences = np.array(self.sequences)
+
     def _split_data(self):
         n = len(self.targets)
 
@@ -115,12 +126,12 @@ class RetentionTimeDataset:
         else:
             self.indicies_dict[self.main_split] = np.arange(n)
 
-    def _build_dataset(self):
+    def _build_tf_dataset(self):
         for split in self.tf_dataset.keys():
-            self.tf_dataset[split] = tf.data.Dataset.from_tensor_slices(
-                (self.sequences[self.indicies_dict[split]], self.targets[self.indicies_dict[split]]))
+            self.tf_dataset[split] = tf.data.Dataset.from_tensor_slices((self.sequences[self.indicies_dict[split]],
+                                                                         self.targets[self.indicies_dict[split]]))
 
-    def _preprocess_dataset(self):
+    def _preprocess_tf_dataset(self):
         for split in self.tf_dataset.keys():
             if self.normalize_targets:
                 self.tf_dataset[split] = self.tf_dataset[split].map(RetentionTimeDataset.normalize_target)
@@ -133,7 +144,6 @@ class RetentionTimeDataset:
                     .map(RetentionTimeDataset.convert_inputs_to_dict)\
                     .map(RetentionTimeDataset.generate_single_counts)\
                     .map(RetentionTimeDataset.generate_di_counts)
-
 
             self.tf_dataset[split] = self.tf_dataset[split].batch(self.batch_size)
 
