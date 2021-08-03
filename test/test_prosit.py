@@ -5,6 +5,9 @@ from dlpro.data.data import RetentionTimeDataset
 import pickle
 import tensorflow as tf
 
+import sys
+sys.path.append('../')
+
 model = PrositRetentionTimePredictor()
 
 reduceLR = tf.keras.callbacks.ReduceLROnPlateau(monitor='val_loss', factor=0.1, patience=10, verbose=1, min_lr=0)
