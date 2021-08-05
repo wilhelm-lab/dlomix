@@ -3,10 +3,18 @@ import numpy as np
 import tensorflow as tf
 
 
+
+'''
+ TODO: check if it is better to abstract out a generic class for TF dataset wrapper, including:
+ - splitting data logic
+ - loading data logic
+ '''
+
 class RetentionTimeDataset:
     TARGETS_MEAN, TARGETS_STD = 0, 1
     SEQ_LENGTH = 0
     ATOM_TABLE = None
+    SPLIT_NAMES = ["train", "val", "test"]
 
     # if pad_length is 0 -> no padding
 
@@ -30,11 +38,15 @@ class RetentionTimeDataset:
         self.pad_length = pad_length
         self.sample_run = sample_run
 
+        self.seq_length = pad_length
         RetentionTimeDataset.SEQ_LENGTH = pad_length
+
+        self._data_mean = 0
+        self._data_std = 1
 
         self.batch_size = batch_size
         self.val_ratio = val_ratio
-        self.main_split = 'test' if test else 'train'
+        self.main_split = RetentionTimeDataset.SPLIT_NAMES[2] if test else RetentionTimeDataset.SPLIT_NAMES[0]
 
         self.sequences = None
         self.targets = None
@@ -67,7 +79,7 @@ class RetentionTimeDataset:
         self.data_source = data
 
         self._read_data()
-        self._validate_sequence_length()
+        self._validate_truncate_sequence_length()
         self._split_data()
         self._build_tf_dataset()
         self._preprocess_tf_dataset()
@@ -80,9 +92,13 @@ class RetentionTimeDataset:
 
     def _read_data(self):
         if isinstance(self.data_source, tuple):
-            if len(self.data_source) == 2 and isinstance(self.data_source[0], np.ndarray) and isinstance(self.data_source[1], np.ndarray):
-                self.sequences = self.data_source[0]
-                self.targets = self.data_source[1]
+            tuple_size_is_two = len(self.data_source) == 2
+            if tuple_size_is_two:
+                tuple_elements_are_ndarray = (isinstance(self.data_source[0], np.ndarray)
+                                              and isinstance(self.data_source[1], np.ndarray))
+                if tuple_elements_are_ndarray:
+                    self.sequences = self.data_source[0]
+                    self.targets = self.data_source[1]
             else:
                 raise ValueError('If a tuple is provided, it has to have a length of 2 and both elements should be numpy arrays.')
 
@@ -100,14 +116,17 @@ class RetentionTimeDataset:
             df.columns = [col_name.lower() for col_name in df.columns]
 
             self.sequences, self.targets = df[self.sequence_col].values, df[self.target_col].values
-            RetentionTimeDataset.TARGETS_MEAN, RetentionTimeDataset.TARGETS_STD = np.mean(self.targets), np.std(self.targets)
+            self._data_mean, self._data_std = np.mean(self.targets), np.std(self.targets)
+
+            RetentionTimeDataset.TARGETS_MEAN, RetentionTimeDataset.TARGETS_STD = np.mean(self.targets), np.std(
+                self.targets)
 
             self.features_df = df[self.feature_cols]
         else:
             raise ValueError('Data source has to be either a tuple of two numpy arrays, a single numpy array, '
                              'or a string path to a csv file.')
 
-    def _validate_sequence_length(self) -> None:
+    def _validate_truncate_sequence_length(self) -> None:
         """
         Validate if all sequences are shorter than the padding length, otherwise truncate them.
         """
@@ -134,16 +153,19 @@ class RetentionTimeDataset:
     def _preprocess_tf_dataset(self):
         for split in self.tf_dataset.keys():
             if self.normalize_targets:
-                self.tf_dataset[split] = self.tf_dataset[split].map(RetentionTimeDataset.normalize_target)
+                self.tf_dataset[split] = self.tf_dataset[split].map(lambda s, t: self._normalize_target(s, t))
 
-            self.tf_dataset[split] = self.tf_dataset[split].map(RetentionTimeDataset.split_sequence).map(
-                RetentionTimeDataset.pad_sequences)
+            self.tf_dataset[split] = (self.tf_dataset[split]
+                                        .map(lambda s, t: self._split_sequence(s, t))
+                                        .map(lambda s, t: self._pad_sequences(s, t))
+                                      )
 
             if self.include_count_features:
-                self.tf_dataset[split] = self.tf_dataset[split]\
-                    .map(RetentionTimeDataset.convert_inputs_to_dict)\
-                    .map(RetentionTimeDataset.generate_single_counts)\
+                self.tf_dataset[split] = (self.tf_dataset[split]
+                    .map(RetentionTimeDataset.convert_inputs_to_dict)
+                    .map(RetentionTimeDataset.generate_single_counts)
                     .map(RetentionTimeDataset.generate_di_counts)
+                )
 
             self.tf_dataset[split] = self.tf_dataset[split].batch(self.batch_size)
 
@@ -155,7 +177,8 @@ class RetentionTimeDataset:
         return self.targets[self.indicies_dict[split]]
 
     def denormalize_targets(self, targets):
-        return targets * RetentionTimeDataset.TARGETS_STD + RetentionTimeDataset.TARGETS_MEAN
+        return targets * self._data_std + self._data_mean
+        #return targets * RetentionTimeDataset.TARGETS_STD + RetentionTimeDataset.TARGETS_MEAN
 
     @staticmethod
     def pad_sequences(seq, target):
@@ -165,6 +188,13 @@ class RetentionTimeDataset:
         seq.set_shape([RetentionTimeDataset.SEQ_LENGTH])
         return seq, target
 
+    def _pad_sequences(self, seq, target):
+        pad_len = tf.abs(self.seq_length - tf.size(seq))
+        paddings = tf.concat([[0], [pad_len]], axis=0)
+        seq = tf.pad(seq, [paddings], "CONSTANT")
+        seq.set_shape([self.seq_length])
+        return seq, target
+
     @staticmethod
     def normalize_target(seq, target):
 
@@ -172,8 +202,21 @@ class RetentionTimeDataset:
 
         return seq, target
 
+
+    def _normalize_target(self, seq, target):
+
+        target = tf.math.divide(tf.math.subtract(target, self._data_mean),
+                                self._data_std)
+
+        return seq, target
+
     @staticmethod
     def split_sequence(seq, target):
+        splitted_seq = tf.strings.bytes_split(seq)
+
+        return splitted_seq, target
+
+    def _split_sequence(self, seq, target):
         splitted_seq = tf.strings.bytes_split(seq)
 
         return splitted_seq, target
@@ -207,6 +250,20 @@ class RetentionTimeDataset:
         return inputs, target
 
     def get_tf_dataset(self, split=None):
+        assert split in self.tf_dataset.keys(), (
+            f"Requested data split is not available, available splits are {self.tf_dataset.keys()}")
         if split in self.tf_dataset.keys():
             return self.tf_dataset[split]
         return self.tf_dataset
+
+    @property
+    def train_data(self):
+        return self.get_tf_dataset(RetentionTimeDataset.SPLIT_NAMES[0])
+
+    @property
+    def val_data(self):
+        return self.get_tf_dataset(RetentionTimeDataset.SPLIT_NAMES[1])
+
+    @property
+    def test_data(self):
+        return self.get_tf_dataset(RetentionTimeDataset.SPLIT_NAMES[2])
