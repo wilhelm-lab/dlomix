@@ -27,7 +27,6 @@ class AttentionLayer(tf.keras.layers.Layer):
         self.bias = bias
         self.context = context
         super(AttentionLayer, self).__init__(**kwargs)
-        print("{}_W".format(self.name))
 
     def build(self, input_shape):
         assert len(input_shape) == 3
