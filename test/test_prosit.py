@@ -7,8 +7,10 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
 
 from dlpro.eval.rt_eval import delta99_metric, delta95_metric
 from dlpro.models.prosit import PrositRetentionTimePredictor
-from dlpro.data.data import RetentionTimeDataset
+from dlpro.data.RetentionTimeDataset import RetentionTimeDataset
 
+
+# TODO: start from a saved model
 
 model = PrositRetentionTimePredictor()
 
@@ -28,5 +30,7 @@ history = model.fit(d.tf_dataset['train'], epochs=2, validation_data=d.tf_datase
 
 model.save_weights('./API-Overview/prosit_test_adam')
 
+# TODO: function to store and load history object
 with open("./history_prosit_test_adam.pkl", 'wb') as f:
     pickle.dump(history.history, f)
+

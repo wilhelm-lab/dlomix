@@ -1,8 +1,9 @@
 import numpy as np
 
 from dlpro.constants import retention_time_pipeline_parameters
-from dlpro.data.data import RetentionTimeDataset
-from dlpro.models.models import RetentionTimePredictor
+from dlpro.data.RetentionTimeDataset import RetentionTimeDataset
+from dlpro.models.base import RetentionTimePredictor
+
 
 class RetentionTimePipeline:
     def __init__(self):
@@ -26,8 +27,9 @@ class RetentionTimePipeline:
         if not (isinstance(data, str) or isinstance(data, np.ndarray)):
             raise ValueError("Dataset should be provided either as a numpy array or a string pointing to a file.")
 
-        self.dataset = RetentionTimeDataset(data, **retention_time_pipeline_parameters['data_params'], val_ratio=0, test=True)
-        RetentionTimeDataset.TARGETS_MEAN, RetentionTimeDataset.TARGETS_STD = retention_time_pipeline_parameters['trained_model_stats']
+        self.dataset = RetentionTimeDataset(data, **retention_time_pipeline_parameters['data_params'], val_ratio=0,
+                                            test=True)
+        self.dataset.data_mean, self.dataset.data_std = retention_time_pipeline_parameters['trained_model_stats']
 
         predictions = self.model.predict(self.dataset.get_tf_dataset('test'))
 
