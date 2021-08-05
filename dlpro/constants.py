@@ -16,6 +16,7 @@ retention_time_pipeline_parameters = {
 
 ALPHABET_UNMOD = {
     "A": 1,
+    "C": 2,
     "D": 3,
     "E": 4,
     "F": 5,
@@ -34,5 +35,4 @@ ALPHABET_UNMOD = {
     "V": 18,
     "W": 19,
     "Y": 20,
-    "C": 24
 }
