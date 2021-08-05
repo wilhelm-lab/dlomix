@@ -42,6 +42,7 @@ class RetentionTimeDataset:
         self.batch_size = batch_size
         self.val_ratio = val_ratio
         self.main_split = RetentionTimeDataset.SPLIT_NAMES[2] if test else RetentionTimeDataset.SPLIT_NAMES[0]
+        self.testing_mode = test
 
         self.sequences = None
         self.targets = None
@@ -132,7 +133,7 @@ class RetentionTimeDataset:
     def _split_data(self):
         n = len(self.targets)
 
-        if self.val_ratio != 0:
+        if self.val_ratio != 0 and (not self.testing_mode):
             self.indicies_dict['val'] = np.arange(n)[:int(n * self.val_ratio)]
             self.indicies_dict[self.main_split] = np.arange(n)[int(n * self.val_ratio):]
         else:
