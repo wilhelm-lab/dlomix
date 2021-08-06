@@ -54,4 +54,6 @@ class RetentionTimeReport(Report):
         plt.scatter(line_values,
                     line_values, alpha=1, s=2, color="w")
 
-        plt.savefig(join(self._output_path, 'result_' + str(portion) + self._figures_ext))
+        plt.show()
+
+        #plt.savefig(join(self._output_path, 'result_' + str(portion) + self._figures_ext))
