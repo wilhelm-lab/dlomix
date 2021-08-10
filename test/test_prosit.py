@@ -5,7 +5,7 @@ import tensorflow as tf
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
 
-from dlpro.eval.rt_eval import delta99_metric, delta95_metric
+from dlpro.eval.rt_eval import delta99_metric, delta95_metric, TimeDeltaMetric
 from dlpro.models.prosit import PrositRetentionTimePredictor
 from dlpro.data.RetentionTimeDataset import RetentionTimeDataset
 
@@ -18,13 +18,14 @@ reduceLR = tf.keras.callbacks.ReduceLROnPlateau(monitor='val_loss', factor=0.1, 
 
 optimizer = tf.keras.optimizers.Adam(lr=0.0001, decay=1e-7)
 
-model.compile(optimizer=optimizer,
-              loss='mse',
-              metrics=['mean_absolute_error', delta95_metric, delta99_metric])
-
 DATAPATH = '/scratch/RT_raw/iRT_ProteomeTools_ReferenceSet.csv'
 
 d = RetentionTimeDataset(data_source=DATAPATH, pad_length=30, batch_size=512, val_ratio=0.2)
+
+model.compile(optimizer=optimizer,
+              loss='mse',
+              metrics=['mean_absolute_error', delta95_metric, TimeDeltaMetric(d.data_mean, d.data_std)])
+
 
 history = model.fit(d.tf_dataset['train'], epochs=2, validation_data=d.tf_dataset['val'], callbacks=[reduceLR])
 

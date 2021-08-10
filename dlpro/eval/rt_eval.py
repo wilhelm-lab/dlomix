@@ -19,6 +19,30 @@ def delta99_metric(y_true, y_pred):
     return (delta * 2) / (norm_range)
 
 
+class TimeDeltaMetric(tf.keras.metrics.Metric):
+    def __init__(self, mean=0, std=1, percentage=0.95, name='delta-metric', **kwargs):
+        super(TimeDeltaMetric, self).__init__(name=name, **kwargs)
+        self.delta = self.add_weight(name='delta', initializer='zeros')
+        self.mean = mean
+        self.std = std
+        self.percentage = percentage
+
+    def update_state(self, y_true, y_pred, sample_weight=None):
+        y_true = y_true * self.std + self.mean
+        y_pred = y_pred * self.std + self.mean
+
+        mark = tf.cast(
+            tf.cast(tf.shape(y_true)[0], dtype=tf.float32) * self.percentage, dtype=tf.int32)
+        abs_error = K.abs(y_true - y_pred)
+        delta = tf.sort(abs_error)[mark - 1]
+        norm_range = K.max(y_true) - K.min(y_true)
+        value = (delta * 2) / (norm_range)
+        self.delta.assign_add(value)
+
+    def result(self):
+        return self.delta
+
+
 '''
 !! too slow due to iteration on the val data !! --> find a better solution
 '''
