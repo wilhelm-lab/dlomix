@@ -156,7 +156,8 @@ class RetentionTimeDataset:
 
     def _preprocess_tf_dataset(self):
         for split in self.tf_dataset.keys():
-            if self.normalize_targets:
+            # avoid normalizing targets for test data --> should not be needed
+            if self.normalize_targets and not self.testing_mode:
                 self.tf_dataset[split] = self.tf_dataset[split].map(lambda s, t: self._normalize_target(s, t))
 
             self.tf_dataset[split] = (self.tf_dataset[split]
