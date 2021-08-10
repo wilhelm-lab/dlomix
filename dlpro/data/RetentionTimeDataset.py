@@ -21,6 +21,7 @@ class RetentionTimeDataset:
         super(RetentionTimeDataset, self).__init__()
 
         np.random.seed(seed)
+        self.seed = seed
 
         self.data_source = data_source
         self.sep = sep
@@ -41,8 +42,9 @@ class RetentionTimeDataset:
 
         self.batch_size = batch_size
         self.val_ratio = val_ratio
-        self.main_split = RetentionTimeDataset.SPLIT_NAMES[2] if test else RetentionTimeDataset.SPLIT_NAMES[0]
         self.testing_mode = test
+
+        self.main_split = RetentionTimeDataset.SPLIT_NAMES[2] if self.testing_mode else RetentionTimeDataset.SPLIT_NAMES[0]
 
         self.sequences = None
         self.targets = None
@@ -55,8 +57,12 @@ class RetentionTimeDataset:
             self.aminoacid_atom_counts_csv_path = path_aminoacid_atomcounts  # "../lookups/aa_comp_rel.csv"
             self._init_atom_table()
 
-        self.tf_dataset = {self.main_split: None, 'val': None} if val_ratio != 0 else {self.main_split: None}
-        self.indicies_dict = {self.main_split: None, 'val': None} if val_ratio != 0 else {self.main_split: None}
+        # initialize TF Datasets dict
+        self.tf_dataset = ({self.main_split: None, RetentionTimeDataset.SPLIT_NAMES[1]: None} if val_ratio != 0
+                           else {self.main_split: None})
+
+        self.indicies_dict = ({self.main_split: None, RetentionTimeDataset.SPLIT_NAMES[1]: None} if val_ratio != 0
+                              else {self.main_split: None})
 
         # if data is provided with the constructor call --> load, otherwise --> done
         if self.data_source is not None:
@@ -75,7 +81,7 @@ class RetentionTimeDataset:
         self.data_source = data
 
         self._read_data()
-        self._validate_truncate_sequence_length()
+        self._validate_remove_long_sequences()
         self._split_data()
         self._build_tf_dataset()
         self._preprocess_tf_dataset()
@@ -84,6 +90,7 @@ class RetentionTimeDataset:
     numpy array --> either a tuple or a single array
         - Tuple --> means (sequences, targets)
         - single ndarray --> means sequences only, useful for test dataset
+    str --> path to csv file or compressed csv file
     '''
 
     def _read_data(self):
@@ -102,7 +109,7 @@ class RetentionTimeDataset:
         elif isinstance(self.data_source, np.ndarray):
             self.sequences = self.data_source
             self.targets = np.zeros(self.sequences.shape[0])
-            RetentionTimeDataset.TARGETS_MEAN, RetentionTimeDataset.TARGETS_STD = 0, 1
+            self._data_mean, self._data_std = 0, 1
 
         elif isinstance(self.data_source, str):
             df = pd.read_csv(self.data_source)
@@ -120,29 +127,32 @@ class RetentionTimeDataset:
             raise ValueError('Data source has to be either a tuple of two numpy arrays, a single numpy array, '
                              'or a string path to a csv file.')
 
-    def _validate_truncate_sequence_length(self) -> None:
+    def _validate_remove_long_sequences(self) -> None:
         """
-        Validate if all sequences are shorter than the padding length, otherwise truncate them.
+        Validate if all sequences are shorter than the padding length, otherwise drop them.
         """
         assert self.sequences.shape[0] > 0, "No sequences in the provided data."
+        assert len(self.sequences) == len(self.targets), "Count of examples does not match for sequences and targets."
 
         limit = self.seq_length
-        self.sequences = [s if len(s) <= limit else s[0:limit] for s in self.sequences]
-        self.sequences = np.array(self.sequences)
+        vectorized_len = np.vectorize(lambda x: len(x))
+        mask = vectorized_len(self.sequences) <= limit
+        self.sequences, self.targets = self.sequences[mask], self.targets[mask]
 
     def _split_data(self):
         n = len(self.targets)
 
         if self.val_ratio != 0 and (not self.testing_mode):
-            self.indicies_dict['val'] = np.arange(n)[:int(n * self.val_ratio)]
+            self.indicies_dict[RetentionTimeDataset.SPLIT_NAMES[1]] = np.arange(n)[:int(n * self.val_ratio)]
             self.indicies_dict[self.main_split] = np.arange(n)[int(n * self.val_ratio):]
         else:
             self.indicies_dict[self.main_split] = np.arange(n)
 
     def _build_tf_dataset(self):
         for split in self.tf_dataset.keys():
-            self.tf_dataset[split] = tf.data.Dataset.from_tensor_slices((self.sequences[self.indicies_dict[split]],
-                                                                         self.targets[self.indicies_dict[split]]))
+            self.tf_dataset[split] = tf.data.Dataset.from_tensor_slices(
+                (self.sequences[self.indicies_dict[split]], self.targets[self.indicies_dict[split]])
+            )
 
     def _preprocess_tf_dataset(self):
         for split in self.tf_dataset.keys():
