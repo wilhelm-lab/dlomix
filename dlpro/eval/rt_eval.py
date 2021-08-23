@@ -21,7 +21,7 @@ def delta99_metric(y_true, y_pred):
 
 
 class TimeDeltaMetric(tf.keras.metrics.Metric):
-    def __init__(self, mean=0, std=1, percentage=0.95, name='timedelta_metric', rescale_targets=True, **kwargs):
+    def __init__(self, mean=0, std=1, percentage=0.95, name='timedelta', rescale_targets=True, **kwargs):
         super(TimeDeltaMetric, self).__init__(name=name, **kwargs)
         self.delta = self.add_weight(name='delta', initializer='zeros')
         self.mean = mean
@@ -54,42 +54,3 @@ class TimeDeltaMetric(tf.keras.metrics.Metric):
 
     def reset_state(self):
         self.delta.assign(0.)
-
-
-'''
-!! too slow due to iteration on the val data !! --> find a better solution
-'''
-
-# class Delta95(K.callbacks.Callback):
-#
-#     def __init__(self, validation_data):
-#         super(Delta95).__init__()
-#         self.validation_data = validation_data
-#         self._data = []
-#
-#     def on_epoch_end(self, epoch, logs=None):
-#
-#         y_preds = []
-#         y_true = []
-#         for X_val, y_val in self.validation_data:
-#             y_preds.extend(np.asarray(self.model.predict(X_val)))
-#             y_true.extend(y_val)
-#
-#         print(y_true)
-#         print(y_preds)
-#         self._data.append(Delta95.delta_tr95(np.array(y_true), np.array(y_preds)))
-#
-#         return
-#
-#     def get_data(self):
-#         return self._data
-#
-# # adopted from https://github.com/horsepurve/DeepRTplus/blob/master/RTdata_emb.py
-#     @staticmethod
-#     def delta_t95(act, pred):
-#         num95 = np.array(np.ceil(len(act) * 0.95)).astype(np.int64)
-#         return 2 * np.array(sorted(np.abs(act - pred)))[num95 - 1]
-#
-#     @staticmethod
-#     def delta_tr95(act, pred):
-#         return Delta95.delta_t95(act, pred) / (np.max(act) - np.min(act))
