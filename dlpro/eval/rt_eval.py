@@ -24,13 +24,13 @@ class TimeDeltaMetric(tf.keras.metrics.Metric):
     def __init__(self, mean=0, std=1, percentage=0.95, name='timedelta', rescale_targets=True, **kwargs):
         super(TimeDeltaMetric, self).__init__(name=name, **kwargs)
         self.delta = self.add_weight(name='delta', initializer='zeros')
+        self.batch_count = self.add_weight(name='batch-count', initializer='zeros')
         self.mean = mean
         self.std = std
         self.percentage = percentage
         self.rescale_targets = rescale_targets
 
     def update_state(self, y_true, y_pred, sample_weight=None):
-
         # rescale
         if self.rescale_targets:
             y_true = y_true * self.std + self.mean
@@ -44,13 +44,18 @@ class TimeDeltaMetric(tf.keras.metrics.Metric):
 
         # compute residuals and sort
         abs_error = tf.abs(y_true - y_pred)
-        delta = tf.sort(abs_error)[mark - 1]
+        d = tf.sort(abs_error)[mark - 1]
 
         # two-sided delta
-        self.delta.assign(tf.reduce_sum(delta * 2))
+        d = d * 2
+
+        # update count of batches
+        self.batch_count.assign_add(1.0)
+
+        # update delta
+        self.delta.assign_add(tf.math.reduce_sum(d))
 
     def result(self):
-        return self.delta
-
-    def reset_state(self):
-        self.delta.assign(0.)
+        # this is simple averaging over the batches, more complex reduction can be added based on domain expertises
+        # Examples are: take max or min of both deltas (translates to a strict or a relaxed metric)
+        return tf.math.divide(self.delta, self.batch_count)
