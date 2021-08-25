@@ -43,6 +43,7 @@ test_rtdata = RetentionTimeDataset(data_source=TEST_DATAPATH,
 
 predictions = model.predict(test_rtdata.test_data)
 predictions = d.denormalize_targets(predictions)
+predictions = predictions.ravel()
 test_targets = test_rtdata.get_split_targets(split="test")
 
 report = RetentionTimeReport(output_path="./output", history=history)
