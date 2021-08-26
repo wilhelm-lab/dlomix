@@ -15,7 +15,7 @@ from dlpro.reports.RetentionTimeReport import RetentionTimeReport
 
 model = PrositRetentionTimePredictor(seq_length=30)
 
-#reduceLR = tf.keras.callbacks.ReduceLROnPlateau(monitor='val_loss', factor=0.1, patience=10, verbose=1, min_lr=0)
+decay = tf.keras.callbacks.ReduceLROnPlateau(monitor='val_loss', factor=0.1, patience=10, verbose=1, min_lr=0)
 
 optimizer = tf.keras.optimizers.Adam(lr=0.0001, decay=1e-7)
 
@@ -31,15 +31,15 @@ model.compile(optimizer=optimizer,
 
 weights_file = "./prosit_tmt_fullrun"
 checkpoint = tf.keras.callbacks.ModelCheckpoint(weights_file, save_best_only=True, save_weights_only=True)
-early_stop = tf.keras.callbacks.EarlyStopping(patience=10)
-decay = tf.keras.callbacks.ReduceLROnPlateau(patience=2, factor=0.2)
+early_stop = tf.keras.callbacks.EarlyStopping(patience=20)
+#decay = tf.keras.callbacks.ReduceLROnPlateau(patience=2, factor=0.2)
 callbacks = [checkpoint, early_stop, decay]
 
 
-history = model.fit(d.train_data, epochs=100, validation_data=d.val_data, callbacks=callbacks)
+history = model.fit(d.train_data, epochs=150, validation_data=d.val_data, callbacks=callbacks)
 
 test_rtdata = RetentionTimeDataset(data_source=TEST_DATAPATH,
-                              pad_length=30, batch_size=256, test=True)
+                              pad_length=30, batch_size=512, test=True)
 
 predictions = model.predict(test_rtdata.test_data)
 predictions = d.denormalize_targets(predictions)
@@ -48,11 +48,11 @@ test_targets = test_rtdata.get_split_targets(split="test")
 
 report = RetentionTimeReport(output_path="./output", history=history)
 
-print(report.calculate_r2(test_targets, predictions))
+print("R2: ", report.calculate_r2(test_targets, predictions))
 
 pd.DataFrame(
     {"sequence": test_rtdata.sequences, "irt": test_rtdata.targets, "predicted_irt": predictions}
-).to_csv("./predictions_prosit_fullrun.csv")
+).to_csv("./predictions_prosit_fullrun.csv", index=False)
 
 
 # TODO: function to store and load history object
