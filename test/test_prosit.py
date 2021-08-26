@@ -15,7 +15,6 @@ from dlpro.reports.RetentionTimeReport import RetentionTimeReport
 
 model = PrositRetentionTimePredictor(seq_length=30)
 
-decay = tf.keras.callbacks.ReduceLROnPlateau(monitor='val_loss', factor=0.1, patience=10, verbose=1, min_lr=0)
 
 optimizer = tf.keras.optimizers.Adam(lr=0.0001, decay=1e-7)
 
@@ -31,8 +30,8 @@ model.compile(optimizer=optimizer,
 
 weights_file = "./prosit_tmt_fullrun"
 checkpoint = tf.keras.callbacks.ModelCheckpoint(weights_file, save_best_only=True, save_weights_only=True)
+decay = tf.keras.callbacks.ReduceLROnPlateau(monitor='val_loss', factor=0.1, patience=10, verbose=1, min_lr=0)
 early_stop = tf.keras.callbacks.EarlyStopping(patience=20)
-#decay = tf.keras.callbacks.ReduceLROnPlateau(patience=2, factor=0.2)
 callbacks = [checkpoint, early_stop, decay]
 
 
