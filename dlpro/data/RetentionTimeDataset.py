@@ -12,6 +12,7 @@ import tensorflow as tf
 class RetentionTimeDataset:
     ATOM_TABLE = None
     SPLIT_NAMES = ["train", "val", "test"]
+    BATCHES_TO_PREFETCH = tf.data.AUTOTUNE
 
     # if pad_length is 0 -> no padding
 
@@ -158,21 +159,25 @@ class RetentionTimeDataset:
         for split in self.tf_dataset.keys():
             # avoid normalizing targets for test data --> should not be needed
             if self.normalize_targets and not self.testing_mode:
-                self.tf_dataset[split] = self.tf_dataset[split].map(lambda s, t: self._normalize_target(s, t))
+                self.tf_dataset[split] = self.tf_dataset[split].map(lambda s, t: self._normalize_target(s, t),
+                                                                    num_parallel_calls=tf.data.AUTOTUNE)
 
             self.tf_dataset[split] = (self.tf_dataset[split]
-                                      .map(lambda s, t: self._split_sequence(s, t))
-                                      .map(lambda s, t: self._pad_sequences(s, t))
+                                      .map(lambda s, t: self._split_sequence(s, t), num_parallel_calls=tf.data.AUTOTUNE)
+                                      .map(lambda s, t: self._pad_sequences(s, t), num_parallel_calls=tf.data.AUTOTUNE)
                                       )
 
             if self.include_count_features:
                 self.tf_dataset[split] = (self.tf_dataset[split]
-                                          .map(RetentionTimeDataset._convert_inputs_to_dict)
-                                          .map(lambda s, t: self._generate_single_counts(s, t))
-                                          .map(lambda s, t: self._generate_di_counts(s, t))
+                                          .map(RetentionTimeDataset._convert_inputs_to_dict, num_parallel_calls=tf.data.AUTOTUNE)
+                                          .map(lambda s, t: self._generate_single_counts(s, t), num_parallel_calls=tf.data.AUTOTUNE)
+                                          .map(lambda s, t: self._generate_di_counts(s, t), num_parallel_calls=tf.data.AUTOTUNE)
                                           )
 
-            self.tf_dataset[split] = self.tf_dataset[split].batch(self.batch_size)
+            self.tf_dataset[split] = (self.tf_dataset[split]
+                                      .batch(self.batch_size)
+                                      .prefetch(RetentionTimeDataset.BATCHES_TO_PREFETCH)
+                                      )
 
     def get_split_targets(self, split='val'):
         if split not in self.indicies_dict.keys():
