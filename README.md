@@ -22,21 +22,31 @@
 **To-Do:**
 
 Functionality:
-- implement deepRT and prosit
-- extend pipeline for different types of models and backbones
-- extend pipeline to allow for fine-tuning with custom datasets
-- add residual plots to reporting, possibly other regression analysis tools
-- output reporting results as PDF
-- extend data representation to include modifications (based on discussions with Küster Lehrstuhl)
+- [X] integrate prosit
+- [ ] extend pipeline for different types of models and backbones
+- [ ] extend pipeline to allow for fine-tuning with custom datasets
+- [ ] add residual plots to reporting, possibly other regression analysis tools
+- [ ] output reporting results as PDF
+- [ ] extend data representation to include modifications
 
 Package structure:
-- Adopt a convention for private attributes of objects (datasets, models, etc...)
-- introduce a style guide (e.g. PEP)
-- integrate `deeplc.py` into `models.py`, preferably introduce a package structure (e.g. `models.retention_time`)
-- plan documentation (check sphinx and readthedocs)
-- add references for implemented models in the ReadMe
+
+- [X] integrate `deeplc.py` into `models.py`, preferably introduce a package structure (e.g. `models.retention_time`)
+- [X] add references for implemented models in the ReadMe
+- [ ] introduce a style guide and checking (e.g. PEP)
+- [ ] plan documentation (sphinx and readthedocs)
+
+
  
 
 
+**References:**
 
+[Prosit]
+Gessulat, S., Schmidt, T., Zolg, D. P., Samaras, P., Schnatbaum, K., Zerweck, J., ... & Wilhelm, M. (2019). Prosit: proteome-wide prediction of peptide tandem mass spectra by deep learning. Nature methods, 16(6), 509-518.
+
+[DeepLC]
+DeepLC can predict retention times for peptides that carry as-yet unseen modifications
+Robbin Bouwmeester, Ralf Gabriels, Niels Hulstaert, Lennart Martens, Sven Degroeve
+bioRxiv 2020.03.28.013003; doi: 10.1101/2020.03.28.013003
  
