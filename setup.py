@@ -15,7 +15,7 @@ setuptools.setup(
      url="https://github.com/omsh/dlpro",
      packages=setuptools.find_packages(),
     install_requires=[
-          'pandas', 'numpy', 'tensorflow'],
+          'pandas', 'numpy', 'matplotlib', 'tensorflow'],
      classifiers=[
          "Programming Language :: Python :: 3",
          "License :: OSI Approved :: MIT License",
