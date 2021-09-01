@@ -5,7 +5,8 @@ from dlpro.constants import ALPHABET_UNMOD
 
 class RetentionTimePredictor(tf.keras.Model):
 
-    def __init__(self, embeddings_count, embedding_dim, seq_length=30, encoder="lstm", vocab_dict=ALPHABET_UNMOD):
+    def __init__(self, embeddings_count=len(ALPHABET_UNMOD), embedding_dim=16,
+                 seq_length=30, encoder="conv1d", vocab_dict=ALPHABET_UNMOD):
         super(RetentionTimePredictor, self).__init__()
 
         self.string_lookup = preprocessing.StringLookup(vocabulary=list(vocab_dict.keys()))
