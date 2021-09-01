@@ -5,13 +5,17 @@ from dlpro.constants import ALPHABET_UNMOD
 
 class RetentionTimePredictor(tf.keras.Model):
 
-    def __init__(self, embeddings_count=len(ALPHABET_UNMOD), embedding_dim=16,
-                 seq_length=30, encoder="conv1d", vocab_dict=ALPHABET_UNMOD):
+    def __init__(self, embedding_dim=16, seq_length=30,
+                 encoder="conv1d", vocab_dict=ALPHABET_UNMOD):
         super(RetentionTimePredictor, self).__init__()
+
+        # tie the count of embeddings to the size of the vocabulary (count of amino acids)
+        self.embeddings_count = len(vocab_dict) + 2
 
         self.string_lookup = preprocessing.StringLookup(vocabulary=list(vocab_dict.keys()))
 
-        self.embedding = tf.keras.layers.Embedding(input_dim=embeddings_count + 1, output_dim=embedding_dim,
+        self.embedding = tf.keras.layers.Embedding(input_dim=self.embeddings_count + 2,
+                                                   output_dim=embedding_dim,
                                                    input_length=seq_length)
 
         self._build_encoder(encoder)
