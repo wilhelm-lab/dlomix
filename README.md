@@ -2,6 +2,9 @@
 
 **dlpro** is a python framework for Deep Learning in Proteomics. Initially built ontop of TensorFlow/Keras, support for PyTorch can however be integrated once the main API is established.
 
+Experiment a simple retention time prediction use-case in Binder &nbsp;&nbsp; [![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/omsh/dlpro/HEAD?filepath=Example_RTModel_Walkthrough.ipynb)
+
+
 **General Overview:**
 - `data.py`: structures for modelling the input data, currently based on `TensorFlow.Dataset`
 - `models.py`: common model architectures for the relevant use-cases
