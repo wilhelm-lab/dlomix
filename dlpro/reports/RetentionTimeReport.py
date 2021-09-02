@@ -1,8 +1,8 @@
 from os.path import join
-
 from matplotlib import pyplot as plt
 from dlpro.reports.Report import Report
-
+import numpy as np
+import pandas as pd
 
 class RetentionTimeReport(Report):
     def __init__(self, output_path, history, figures_ext='pdf'):
@@ -22,10 +22,26 @@ class RetentionTimeReport(Report):
 
     def calculate_r2(self, targets, predictions):
         from sklearn.metrics import r2_score
-        import numpy as np
 
         r2 = r2_score(np.ravel(targets), np.ravel(predictions))
         return r2
+
+    '''
+    
+    Plot histogram of residuals
+    
+    '''
+
+    def plot_residuals(self, targets, predictions, xrange=(-10, 10)):
+        error = np.ravel(targets) - np.ravel(predictions)
+
+        bins = np.linspace(xrange[0], xrange[1], 200)
+
+        plt.hist(error, bins, alpha=0.5, color="orange")
+        plt.title("Historgram of Residuals")
+        plt.xlabel("Residual value")
+        plt.ylabel("Count")
+        plt.show()
 
     '''
     Plot results and highlight a portion of the data (e.g. 95%)  given true targets and predictions 
@@ -33,8 +49,6 @@ class RetentionTimeReport(Report):
 
     def plot_highlight_data_portion(self, targets, predictions, portion=0.95):
         # 95% percent of the data-points highlighted
-        import pandas as pd
-        import numpy as np
 
         df = pd.DataFrame({'preds': np.ravel(predictions), 'y': np.ravel(targets)})
         df['error'] = np.abs(df.preds - df.y)
