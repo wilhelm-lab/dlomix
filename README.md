@@ -9,12 +9,12 @@ Experiment a simple retention time prediction use-case:
 
 
 **General Overview:**
-- `data.py`: structures for modelling the input data, currently based on `TensorFlow.Dataset`
-- `models.py`: common model architectures for the relevant use-cases
+- `data.py`: structures for modelling the input data, currently based on `tf.Dataset`
+- `models.py`: common model architectures for the relevant use-cases based on `tf.keras.Model` to allow for using the Keras training API
 - `pipeline.py`: an exemplary high-level pipeline implementation
 -  `eval.py`: classes for evaluating models and reporting results
 -  `eval_utils.py`: custom evaluation metrics implemented in TensorFlow/Keras
--  `constants.py`: configuration values needs for the `pipeline` class.
+-  `constants.py`: constants and configuration values needs for the `pipeline` class.
 
 
 
