@@ -3,8 +3,7 @@
 **MLOmix** is a python framework for Deep Learning in Proteomics. Initially built ontop of TensorFlow/Keras, support for PyTorch can however be integrated once the main API is established.
 
 Experiment a simple retention time prediction use-case:
-- using Binder &nbsp;&nbsp; [![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/omsh/dlpro/HEAD?urlpath=lab/tree/notebooks/)
-- using Google Colab &nbsp;&nbsp; [![Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/omsh/dlpro/blob/develop/notebooks/Example_RTModel_Walkthrough_colab.ipynb)
+- using Google Colab &nbsp;&nbsp; [![Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/wilhelm-lab/mlomix/blob/develop/notebooks/Example_RTModel_Walkthrough_colab.ipynb)
 
 
 
