@@ -4,9 +4,9 @@ import tensorflow as tf
 
 from dlpro.data.RetentionTimeDataset import RetentionTimeDataset
 from dlpro.eval.rt_eval import delta99_metric, delta95_metric
-from dlpro.models.deepLC import DeepLC
+from dlpro.models.deepLC import DeepLCRetentionTimePredictor
 
-model = DeepLC(seq_length=50)
+model = DeepLCRetentionTimePredictor(seq_length=50)
 opt = tf.keras.optimizers.SGD(learning_rate=1e-4, momentum=0.9)
 
 model.compile(optimizer=opt,

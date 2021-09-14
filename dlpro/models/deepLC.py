@@ -3,10 +3,10 @@ from dlpro.constants import ALPHABET_UNMOD
 from tensorflow.keras.layers.experimental import preprocessing
 
 
-class DeepLC(tf.keras.Model):
+class DeepLCRetentionTimePredictor(tf.keras.Model):
 
     def __init__(self, seq_length=60, vocab_dict=ALPHABET_UNMOD, use_global_features=False):
-        super(DeepLC, self).__init__()
+        super(DeepLCRetentionTimePredictor, self).__init__()
         self.seq_length = seq_length
         self._use_global_features = use_global_features
 
