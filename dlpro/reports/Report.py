@@ -22,6 +22,7 @@ class Report(abc.ABC):
         self._set_figures_format(figures_ext)
 
     def _set_history_object(self, history):
+        # TODO: accept dictionary as well --> infer
         if not isinstance(history, tf.keras.callbacks.History):
             raise ValueError(
                 'Reporting requires a History object (tf.keras.callbacks.History), which is returned from a call to '
