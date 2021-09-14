@@ -14,14 +14,12 @@ class RetentionTimeDataset:
     SPLIT_NAMES = ["train", "val", "test"]
     BATCHES_TO_PREFETCH = tf.data.AUTOTUNE
 
-    # if pad_length is 0 -> no padding
 
-    # TODO: change pad_length to seq_length?
 
     # TODO: For test dataset --> examples with longer sequences --> do not drop, add NaN for prediction
 
     def __init__(self, data_source=None, sep=",", sequence_col="sequence", target_col="irt", feature_cols=None,
-                 normalize_targets=True, pad_length=0, batch_size=32, val_ratio=0, seed=21,
+                 normalize_targets=False, seq_length=0, batch_size=32, val_ratio=0, seed=21,
                  test=False, path_aminoacid_atomcounts=None, sample_run=False):
         super(RetentionTimeDataset, self).__init__()
 
@@ -40,7 +38,8 @@ class RetentionTimeDataset:
         self.normalize_targets = normalize_targets
         self.sample_run = sample_run
 
-        self.seq_length = pad_length
+        # if seq_length is 0 (default) -> no padding
+        self.seq_length = seq_length
 
         self._data_mean = 0
         self._data_std = 1

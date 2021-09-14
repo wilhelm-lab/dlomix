@@ -22,7 +22,7 @@ TRAIN_DATAPATH = '/scratch/TMT/tmt_train_data.csv'
 TEST_DATAPATH = '/scratch/TMT/tmt_test_data.csv'
 #DATAPATH = '/scratch/RT_raw/iRT_ProteomeTools_ReferenceSet.csv'
 
-d = RetentionTimeDataset(data_source=TRAIN_DATAPATH, pad_length=30, batch_size=512, val_ratio=0.2)
+d = RetentionTimeDataset(data_source=TRAIN_DATAPATH, seq_length=30, batch_size=512, val_ratio=0.2)
 
 model.compile(optimizer=optimizer,
               loss='mse',
@@ -38,7 +38,7 @@ callbacks = [checkpoint, early_stop, decay]
 history = model.fit(d.train_data, epochs=150, validation_data=d.val_data, callbacks=callbacks)
 
 test_rtdata = RetentionTimeDataset(data_source=TEST_DATAPATH,
-                              pad_length=30, batch_size=512, test=True)
+                                   seq_length=30, batch_size=512, test=True)
 
 predictions = model.predict(test_rtdata.test_data)
 predictions = d.denormalize_targets(predictions)

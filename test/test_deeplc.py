@@ -16,7 +16,7 @@ model.compile(optimizer=opt,
 
 DATAPATH = '/scratch/RT_raw/iRT_ProteomeTools_ReferenceSet.csv'
 
-d = RetentionTimeDataset(data_source=DATAPATH, pad_length=50, batch_size=512, val_ratio=0.2,
+d = RetentionTimeDataset(data_source=DATAPATH, seq_length=50, batch_size=512, val_ratio=0.2,
                          path_aminoacid_atomcounts="./lookups/aa_comp_rel.csv")
 
 history = model.fit(d.tf_dataset['train'], epochs=3, validation_data=d.tf_dataset['val'])

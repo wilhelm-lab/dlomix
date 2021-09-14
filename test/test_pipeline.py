@@ -15,7 +15,7 @@ create dataset:
     - performs train/val split if needed
 '''
 d = RetentionTimeDataset(data_source=DATAPATH, sequence_col="sequence", target_col="irt",
-                         pad_length=40, normalize_targets=True,
+                         seq_length=40, normalize_targets=True,
                          batch_size=128, val_ratio=0.2)
 
 
