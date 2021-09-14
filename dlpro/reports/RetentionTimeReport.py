@@ -68,6 +68,9 @@ class RetentionTimeReport(Report):
         plt.scatter(line_values,
                     line_values, alpha=1, s=2, color="w")
 
+        plt.title("Predicted vs. observed (experimental) iRT - Highlight 95%")
+        plt.xlabel("Observed iRT")
+        plt.ylabel("Predicted iRT")
         plt.show()
 
         #plt.savefig(join(self._output_path, 'result_' + str(portion) + self._figures_ext))
