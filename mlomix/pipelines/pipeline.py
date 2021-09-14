@@ -1,8 +1,8 @@
 import numpy as np
 
-from dlpro.constants import retention_time_pipeline_parameters
-from dlpro.data.RetentionTimeDataset import RetentionTimeDataset
-from dlpro.models.base import RetentionTimePredictor
+from mlomix.constants import retention_time_pipeline_parameters
+from mlomix.data.RetentionTimeDataset import RetentionTimeDataset
+from mlomix.models.base import RetentionTimePredictor
 
 
 class RetentionTimePipeline:

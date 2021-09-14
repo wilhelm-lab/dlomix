@@ -1,9 +1,9 @@
-from dlpro.constants import ALPHABET_UNMOD
-from dlpro.data.RetentionTimeDataset import RetentionTimeDataset
-from dlpro.eval.rt_eval import delta95_metric
+from mlomix.constants import ALPHABET_UNMOD
+from mlomix.data.RetentionTimeDataset import RetentionTimeDataset
+from mlomix.eval.rt_eval import delta95_metric
 
 # data path
-from dlpro.models.base import RetentionTimePredictor
+from mlomix.models.base import RetentionTimePredictor
 
 DATAPATH = '/scratch/RT_raw/iRT_ProteomeTools_ReferenceSet.csv'
 

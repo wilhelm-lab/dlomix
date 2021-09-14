@@ -6,10 +6,10 @@ import pandas as pd
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
 
-from dlpro.eval.rt_eval import TimeDeltaMetric
-from dlpro.models.prosit import PrositRetentionTimePredictor
-from dlpro.data.RetentionTimeDataset import RetentionTimeDataset
-from dlpro.reports.RetentionTimeReport import RetentionTimeReport
+from mlomix.eval.rt_eval import TimeDeltaMetric
+from mlomix.models.prosit import PrositRetentionTimePredictor
+from mlomix.data.RetentionTimeDataset import RetentionTimeDataset
+from mlomix.reports.RetentionTimeReport import RetentionTimeReport
 
 # TODO: start from a saved model
 

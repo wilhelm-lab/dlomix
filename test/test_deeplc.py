@@ -2,9 +2,9 @@ import pickle
 
 import tensorflow as tf
 
-from dlpro.data.RetentionTimeDataset import RetentionTimeDataset
-from dlpro.eval.rt_eval import delta99_metric, delta95_metric
-from dlpro.models.deepLC import DeepLCRetentionTimePredictor
+from mlomix.data.RetentionTimeDataset import RetentionTimeDataset
+from mlomix.eval.rt_eval import delta99_metric, delta95_metric
+from mlomix.models.deepLC import DeepLCRetentionTimePredictor
 
 model = DeepLCRetentionTimePredictor(seq_length=50)
 opt = tf.keras.optimizers.SGD(learning_rate=1e-4, momentum=0.9)

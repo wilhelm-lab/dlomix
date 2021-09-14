@@ -1,6 +1,6 @@
-# dlpro
+# MLOmix
 
-**dlpro** is a python framework for Deep Learning in Proteomics. Initially built ontop of TensorFlow/Keras, support for PyTorch can however be integrated once the main API is established.
+**MLOmix** is a python framework for Deep Learning in Proteomics. Initially built ontop of TensorFlow/Keras, support for PyTorch can however be integrated once the main API is established.
 
 Experiment a simple retention time prediction use-case:
 - using Binder &nbsp;&nbsp; [![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/omsh/dlpro/HEAD?urlpath=lab/tree/notebooks/)

@@ -5,14 +5,14 @@ with open("README.md", "r") as fh:
 
 
 setuptools.setup(
-     name='dlpro',
+     name='mlomix',
      version='0.1',
      author="Omar Shouman",
-     author_email="omar.shouman@gmail.com",
-     description="Deep Learning in Proteomics",
+     author_email="omar.shouman@tum.de",
+     description="Deep Learning for Proteomics",
      long_description=long_description,
    long_description_content_type="text/markdown",
-     url="https://github.com/omsh/dlpro",
+     url="https://github.com/omsh/mlomix",
      packages=setuptools.find_packages(),
     install_requires=[
           'pandas', 'numpy', 'matplotlib', 'scikit-learn', 'tensorflow'],
