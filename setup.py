@@ -5,14 +5,14 @@ with open("README.md", "r") as fh:
 
 
 setuptools.setup(
-     name='mlomix',
+     name='dlomix',
      version='0.1',
      author="Omar Shouman",
      author_email="omar.shouman@tum.de",
      description="Deep Learning for Proteomics",
      long_description=long_description,
    long_description_content_type="text/markdown",
-     url="https://github.com/omsh/mlomix",
+     url="https://github.com/wilhelm-lab/dlomix",
      packages=setuptools.find_packages(),
     install_requires=[
           'pandas', 'numpy', 'matplotlib', 'scikit-learn', 'tensorflow'],

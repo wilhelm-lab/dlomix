@@ -1,5 +1,5 @@
 import tensorflow as tf
-from mlomix.constants import ALPHABET_UNMOD
+from dlomix.constants import ALPHABET_UNMOD
 from tensorflow.keras.layers.experimental import preprocessing
 
 

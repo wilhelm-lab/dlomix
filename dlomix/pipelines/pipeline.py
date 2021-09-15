@@ -1,8 +1,8 @@
 import numpy as np
 
-from mlomix.constants import retention_time_pipeline_parameters
-from mlomix.data.RetentionTimeDataset import RetentionTimeDataset
-from mlomix.models.base import RetentionTimePredictor
+from dlomix.constants import retention_time_pipeline_parameters
+from dlomix.data.RetentionTimeDataset import RetentionTimeDataset
+from dlomix.models.base import RetentionTimePredictor
 
 
 class RetentionTimePipeline:
@@ -31,7 +31,7 @@ class RetentionTimePipeline:
                                             test=True)
         self.dataset.data_mean, self.dataset.data_std = retention_time_pipeline_parameters['trained_model_stats']
 
-        predictions = self.model.predict(self.dataset.get_tf_dataset('test'))
+        predictions = self.model.predict(self.dataset.get_tf_dataset('test_scripts'))
 
         predictions = self.dataset.denormalize_targets(predictions)
 

@@ -1,7 +1,7 @@
 import tensorflow as tf
 from tensorflow.keras.layers.experimental import preprocessing
-from mlomix.constants import ALPHABET_UNMOD
-from mlomix.layers.attention import AttentionLayer
+from dlomix.constants import ALPHABET_UNMOD
+from dlomix.layers.attention import AttentionLayer
 
 
 class PrositRetentionTimePredictor(tf.keras.Model):

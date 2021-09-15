@@ -1,6 +1,6 @@
 import tensorflow as tf
 from tensorflow.keras.layers.experimental import preprocessing
-from mlomix.constants import ALPHABET_UNMOD
+from dlomix.constants import ALPHABET_UNMOD
 
 
 class RetentionTimePredictor(tf.keras.Model):

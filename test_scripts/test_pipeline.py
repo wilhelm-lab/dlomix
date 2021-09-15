@@ -1,11 +1,11 @@
-from mlomix.constants import ALPHABET_UNMOD
-from mlomix.data.RetentionTimeDataset import RetentionTimeDataset
-from mlomix.eval.rt_eval import delta95_metric
+from dlomix.constants import ALPHABET_UNMOD
+from dlomix.data import RetentionTimeDataset
+from dlomix.eval import TimeDeltaMetric
 
 # data path
-from mlomix.models.base import RetentionTimePredictor
+from dlomix.models import RetentionTimePredictor
 
-DATAPATH = '/scratch/RT_raw/iRT_ProteomeTools_ReferenceSet.csv'
+DATAPATH = '../example_dataset/proteomTools_train_val.csv'
 
 '''
 create dataset:
@@ -26,7 +26,7 @@ create Model:
     - model has three main parts (embedding, encoder, regressor) with some parametrization
     '''
 
-model = RetentionTimePredictor(embeddings_count=len(ALPHABET_UNMOD), embedding_dim=300, seq_length=40, encoder='lstm')
+model = RetentionTimePredictor(embedding_dim=50, seq_length=40, encoder='lstm')
 
 
 ''''
@@ -38,9 +38,9 @@ can write their own custom training loops since the model extends tf.keras.Model
 
 model.compile(optimizer='adam',
               loss='mse',
-              metrics=['mean_absolute_error', delta95_metric])
+              metrics=['mean_absolute_error', TimeDeltaMetric()])
 
-history = model.fit(d.get_tf_dataset('train'), epochs=15, validation_data=d.get_tf_dataset('val'))
+history = model.fit(d.train_data, epochs=15, validation_data=d.val_data)
 
 '''
 

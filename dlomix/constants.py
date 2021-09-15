@@ -9,7 +9,7 @@ retention_time_pipeline_parameters = {
       'pad_length': 40,
     },
 
-    'trained_model_path': '/data/jupyter/RT/API-Overview/test',
+    'trained_model_path': './',
 
     'trained_model_stats': [60.029, 45.965]
 }

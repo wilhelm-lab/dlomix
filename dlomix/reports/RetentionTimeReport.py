@@ -1,6 +1,6 @@
 from os.path import join
 from matplotlib import pyplot as plt
-from mlomix.reports.Report import Report
+from dlomix.reports.Report import Report
 import numpy as np
 import pandas as pd
 
