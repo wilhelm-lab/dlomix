@@ -14,7 +14,7 @@ class RetentionTimePredictor(tf.keras.Model):
 
         self.string_lookup = preprocessing.StringLookup(vocabulary=list(vocab_dict.keys()))
 
-        self.embedding = tf.keras.layers.Embedding(input_dim=self.embeddings_count + 2,
+        self.embedding = tf.keras.layers.Embedding(input_dim=self.embeddings_count,
                                                    output_dim=embedding_dim,
                                                    input_length=seq_length)
 
