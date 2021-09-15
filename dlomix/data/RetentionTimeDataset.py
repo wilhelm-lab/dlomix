@@ -11,7 +11,7 @@ import tensorflow as tf
 
 class RetentionTimeDataset:
     ATOM_TABLE = None
-    SPLIT_NAMES = ["train", "val", "test_scripts"]
+    SPLIT_NAMES = ["train", "val", "test"]
     BATCHES_TO_PREFETCH = tf.data.AUTOTUNE
 
     # TODO: For test dataset --> examples with longer sequences --> do not drop, add NaN for prediction
@@ -92,7 +92,7 @@ class RetentionTimeDataset:
     '''
     numpy array --> either a tuple or a single array
         - Tuple --> means (sequences, targets)
-        - single ndarray --> means sequences only, useful for test_scripts dataset
+        - single ndarray --> means sequences only, useful for test dataset
     str --> path to csv file or compressed csv file
     '''
 
@@ -159,7 +159,7 @@ class RetentionTimeDataset:
 
     def _preprocess_tf_dataset(self):
         for split in self.tf_dataset.keys():
-            # avoid normalizing targets for test_scripts data --> should not be needed
+            # avoid normalizing targets for test data --> should not be needed
             if self.normalize_targets and not self.testing_mode:
                 self.tf_dataset[split] = self.tf_dataset[split].map(lambda s, t: self._normalize_target(s, t),
                                                                     num_parallel_calls=tf.data.AUTOTUNE)

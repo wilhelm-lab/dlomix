@@ -31,7 +31,7 @@ class RetentionTimePipeline:
                                             test=True)
         self.dataset.data_mean, self.dataset.data_std = retention_time_pipeline_parameters['trained_model_stats']
 
-        predictions = self.model.predict(self.dataset.get_tf_dataset('test_scripts'))
+        predictions = self.model.predict(self.dataset.get_tf_dataset('test'))
 
         predictions = self.dataset.denormalize_targets(predictions)
 
