@@ -13,7 +13,6 @@ setuptools.setup(
     long_description_content_type="text/markdown",
     url="https://github.com/wilhelm-lab/dlomix",
     packages=setuptools.find_packages(),
-    package_dir={'': 'dlomix'},
     install_requires=[
         'pandas', 'numpy', 'matplotlib', 'scikit-learn', 'tensorflow'],
     classifiers=[
