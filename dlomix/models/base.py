@@ -37,7 +37,7 @@ class RetentionTimePredictor(tf.keras.Model):
         else:
             self.encoder = tf.keras.Sequential([
                 tf.keras.layers.LSTM(256, return_sequences=True),
-                tf.keras.layers.LSTM(512)
+                tf.keras.layers.LSTM(256)
             ])
 
     def call(self, inputs, **kwargs):
