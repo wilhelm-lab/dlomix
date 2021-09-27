@@ -36,7 +36,7 @@ class RetentionTimePredictor(tf.keras.Model):
                 tf.keras.layers.MaxPooling1D(pool_size=2)])
         else:
             self.encoder = tf.keras.Sequential([
-                tf.keras.layers.LSTM(256, return_sequences=True),
+                tf.keras.layers.LSTM(512, return_sequences=True),
                 tf.keras.layers.LSTM(512)
             ])
 
