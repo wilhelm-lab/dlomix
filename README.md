@@ -1,5 +1,7 @@
 # DLOmix
 
+[![Docs](https://readthedocs.org/projects/docs/badge/?version=latest)](https://dlomix.readthedocs.io/en/latest/?badge=latest)
+
 **DLOmix** is a python framework for Deep Learning in Proteomics. Initially built ontop of TensorFlow/Keras, support for PyTorch can however be integrated once the main API is established.
 
 ## Usage
