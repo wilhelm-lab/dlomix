@@ -5,16 +5,17 @@
 ## Usage
 Experiment a simple retention time prediction use-case using Google Colab &nbsp;&nbsp; [![Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/wilhelm-lab/dlomix/blob/develop/notebooks/Example_RTModel_Walkthrough_colab.ipynb)
 
+**Resources Repository:**
+
+More learning resources can be found in the [dlomix-resources](https://github.com/wilhelm-lab/dlomix-resources) repository.
+
 ## Installation
 Run the following to install:
 ```bash
 $ pip install dlomix
-```
-## Further Resources:
-For example Jupyter notebooks with some sample datasets, please see the [DLOmix resources repository](https://github.com/wilhelm-lab/dlomix-resources). 
+``` 
 
-
-## Package Structure:
+**General Overview:**
 - `data.py`: structures for modelling the input data, currently based on `tf.Dataset`
 - `models.py`: common model architectures for the relevant use-cases based on `tf.keras.Model` to allow for using the Keras training API
 - `pipeline.py`: an exemplary high-level pipeline implementation
@@ -22,13 +23,16 @@ For example Jupyter notebooks with some sample datasets, please see the [DLOmix 
 -  `eval_utils.py`: custom evaluation metrics implemented in TensorFlow/Keras
 -  `constants.py`: constants and configuration values needs for the `pipeline` class.
 
-## Use-cases:
 
-- Retention Time Prediction (indexed retention time): 
+
+**Use-cases:**
+
+- Retention Time Prediction: 
     - a regression problem where the the retention time of a peptide sequence is to be predicted. 
 
 
-## To-Do:
+
+**To-Do:**
 
 Functionality:
 - [X] integrate prosit
@@ -51,7 +55,9 @@ To install dlomix, along with the the tools needed to develop and run tests, run
 ```bash
 $ pip install -e .[dev]
 ```
-## References:
+
+
+**References:**
 
 [**Prosit**]
 
