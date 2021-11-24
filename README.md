@@ -2,12 +2,19 @@
 
 **DLOmix** is a python framework for Deep Learning in Proteomics. Initially built ontop of TensorFlow/Keras, support for PyTorch can however be integrated once the main API is established.
 
-Experiment a simple retention time prediction use-case:
-- using Google Colab &nbsp;&nbsp; [![Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/wilhelm-lab/dlomix/blob/develop/notebooks/Example_RTModel_Walkthrough_colab.ipynb)
+## Usage
+Experiment a simple retention time prediction use-case using Google Colab &nbsp;&nbsp; [![Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/wilhelm-lab/dlomix/blob/develop/notebooks/Example_RTModel_Walkthrough_colab.ipynb)
+
+## Installation
+Run the following to install:
+```bash
+$ pip install dlomix
+```
+## Further Resources:
+For example Jupyter notebooks with some sample datasets, please see the [DLOmix resources repository](https://github.com/wilhelm-lab/dlomix-resources). 
 
 
-
-**General Overview:**
+## Package Structure:
 - `data.py`: structures for modelling the input data, currently based on `tf.Dataset`
 - `models.py`: common model architectures for the relevant use-cases based on `tf.keras.Model` to allow for using the Keras training API
 - `pipeline.py`: an exemplary high-level pipeline implementation
@@ -15,22 +22,19 @@ Experiment a simple retention time prediction use-case:
 -  `eval_utils.py`: custom evaluation metrics implemented in TensorFlow/Keras
 -  `constants.py`: constants and configuration values needs for the `pipeline` class.
 
+## Use-cases:
 
-
-**Use-cases:**
-
-- Retention Time Prediction: 
+- Retention Time Prediction (indexed retention time): 
     - a regression problem where the the retention time of a peptide sequence is to be predicted. 
 
 
-
-**To-Do:**
+## To-Do:
 
 Functionality:
 - [X] integrate prosit
 - [ ] extend pipeline for different types of models and backbones
 - [ ] extend pipeline to allow for fine-tuning with custom datasets
-- [ ] add residual plots to reporting, possibly other regression analysis tools
+- [X] add residual plots to reporting, possibly other regression analysis tools
 - [ ] output reporting results as PDF
 - [ ] extend data representation to include modifications
 
@@ -42,16 +46,22 @@ Package structure:
 - [ ] plan documentation (sphinx and readthedocs)
 
 
- 
+## Developing DLOmix
+To install dlomix, along with the the tools needed to develop and run tests, run the following command in your virtualenv:
+```bash
+$ pip install -e .[dev]
+```
+## References:
 
+[**Prosit**]
 
-**References:**
+[1] Gessulat, S., Schmidt, T., Zolg, D. P., Samaras, P., Schnatbaum, K., Zerweck, J., ... & Wilhelm, M. (2019). Prosit: proteome-wide prediction of peptide tandem mass spectra by deep learning. Nature methods, 16(6), 509-518.
 
-[Prosit]
-Gessulat, S., Schmidt, T., Zolg, D. P., Samaras, P., Schnatbaum, K., Zerweck, J., ... & Wilhelm, M. (2019). Prosit: proteome-wide prediction of peptide tandem mass spectra by deep learning. Nature methods, 16(6), 509-518.
+[**DeepLC**]
 
-[DeepLC]
-DeepLC can predict retention times for peptides that carry as-yet unseen modifications
+[2] DeepLC can predict retention times for peptides that carry as-yet unseen modifications
 Robbin Bouwmeester, Ralf Gabriels, Niels Hulstaert, Lennart Martens, Sven Degroeve
 bioRxiv 2020.03.28.013003; doi: 10.1101/2020.03.28.013003
+
+[3] Bouwmeester, R., Gabriels, R., Hulstaert, N. et al. DeepLC can predict retention times for peptides that carry as-yet unseen modifications. Nat Methods 18, 1363–1369 (2021). https://doi.org/10.1038/s41592-021-01301-5
  
