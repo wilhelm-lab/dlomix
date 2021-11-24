@@ -5,6 +5,8 @@
 
 Welcome to DLOmix's documentation!
 ==================================
+.. automodule:: dlomix
+    :members:
 
 .. toctree::
    :maxdepth: 2
