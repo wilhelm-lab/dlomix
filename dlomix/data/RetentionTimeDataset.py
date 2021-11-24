@@ -10,6 +10,7 @@ import tensorflow as tf
 
 
 class RetentionTimeDataset:
+    """A dataset class for Retention Time prediction tasks"""
     ATOM_TABLE = None
     SPLIT_NAMES = ["train", "val", "test"]
     BATCHES_TO_PREFETCH = tf.data.AUTOTUNE
@@ -19,6 +20,21 @@ class RetentionTimeDataset:
     def __init__(self, data_source=None, sep=",", sequence_col="sequence", target_col="irt", feature_cols=None,
                  normalize_targets=False, seq_length=0, batch_size=32, val_ratio=0, seed=21,
                  test=False, path_aminoacid_atomcounts=None, sample_run=False):
+        """ Initialize a dataset object wrapping tf.Dataset and preprocessing steps
+        :param data_source:
+        :param sep:
+        :param sequence_col:
+        :param target_col:
+        :param feature_cols:
+        :param normalize_targets:
+        :param seq_length:
+        :param batch_size:
+        :param val_ratio:
+        :param seed:
+        :param test:
+        :param path_aminoacid_atomcounts:
+        :param sample_run:
+        """
         super(RetentionTimeDataset, self).__init__()
 
         np.random.seed(seed)
@@ -47,7 +63,7 @@ class RetentionTimeDataset:
         self.testing_mode = test
 
         self.main_split = RetentionTimeDataset.SPLIT_NAMES[2] if self.testing_mode else \
-        RetentionTimeDataset.SPLIT_NAMES[0]
+            RetentionTimeDataset.SPLIT_NAMES[0]
 
         self.sequences = None
         self.targets = None
@@ -81,6 +97,15 @@ class RetentionTimeDataset:
         RetentionTimeDataset.ATOM_TABLE = tf.lookup.StaticHashTable(init, default_value='0_0_0_0_0')
 
     def load_data(self, data):
+        """ Load data into the dataset object, can be used to load data at a later point after initialization.
+        This function triggers the whole pipeline of: data loading, validation (against sequence length), splitting, building TensorFlow dataset objects, and apply preprocessing.
+
+        :param data: can be:
+                        - tuple of two arrays (sequences, targets)
+                        - single array (sequences), useful for test data
+                        _ str with a file path toa csv file
+        :return: None
+        """
         self.data_source = data
 
         self._read_data()
