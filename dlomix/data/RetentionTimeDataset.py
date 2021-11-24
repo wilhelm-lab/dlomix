@@ -100,10 +100,7 @@ class RetentionTimeDataset:
         """ Load data into the dataset object, can be used to load data at a later point after initialization.
         This function triggers the whole pipeline of: data loading, validation (against sequence length), splitting, building TensorFlow dataset objects, and apply preprocessing.
 
-        :param data: can be:
-                        - tuple of two arrays (sequences, targets)
-                        - single array (sequences), useful for test data
-                        _ str with a file path toa csv file
+        :param data: can be: tuple of two arrays (sequences, targets), single array (sequences), useful for test data, or a `str` with a file path toa csv file
         :return: None
         """
         self.data_source = data
