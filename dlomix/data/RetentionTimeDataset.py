@@ -21,7 +21,7 @@ class RetentionTimeDataset:
                  normalize_targets=False, seq_length=0, batch_size=32, val_ratio=0, seed=21,
                  test=False, path_aminoacid_atomcounts=None, sample_run=False):
         """ Initialize a dataset object wrapping tf.Dataset and preprocessing steps
-        :param data_source:
+        :param data_source: source can be a tuple of two arrays (sequences, targets), single array (sequences), useful for test data, or a str with a file path to a csv file
         :param sep:
         :param sequence_col:
         :param target_col:
