@@ -5,6 +5,14 @@ from dlomix.data.RetentionTimeDataset import RetentionTimeDataset
 from dlomix.models.base import RetentionTimePredictor
 
 
+# pipelines can be used to train the model further or from scratch given a dataset
+# add string arguments (e.g. prosit to create the model, data source to create the dataset)
+
+# if neither  train nor test are provided --> use toy datasets to (train if necessary or load pre-trained weights), predict on test, and generate report
+# if test only --> load pre-trained weights, predict and generate report
+# if train and test --> do what you have to do
+
+
 class RetentionTimePipeline:
     def __init__(self):
         super(RetentionTimePipeline, self).__init__()

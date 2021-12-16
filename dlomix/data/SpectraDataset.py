@@ -8,15 +8,12 @@ import tensorflow as tf
  - loading data logic
  '''
 
-# take into consideration if the pandas dataframe is pickled or not and then call read_pickle instead of read_csv
 # allow the possiblity to have three different dataset objects, one for train, val, and test
 
 # for intensity model, the output of a vector
 
 
-
-
-class RetentionTimeDataset:
+class SpectraDataset:
     """A dataset class for Retention Time prediction tasks"""
     ATOM_TABLE = None
     SPLIT_NAMES = ["train", "val", "test"]
