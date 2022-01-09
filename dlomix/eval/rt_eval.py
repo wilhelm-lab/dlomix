@@ -2,7 +2,7 @@ import tensorflow as tf
 import tensorflow.keras.backend as K
 
 class TimeDeltaMetric(tf.keras.metrics.Metric):
-    """[Implementation of the time delta metric as a Keras Metric]
+    r"""Implementation of the time delta metric as a Keras Metric
 
         Parameters
         ----------

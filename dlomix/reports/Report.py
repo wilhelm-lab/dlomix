@@ -1,6 +1,7 @@
 from matplotlib import pyplot as plt
 from os.path import join
 from os import makedirs
+from numpy.lib.npyio import save
 import tensorflow as tf
 import warnings
 import abc
@@ -18,7 +19,7 @@ class Report(abc.ABC):
 
     VALID_FIGURE_FORMATS = ['pdf', 'jpeg', 'jpg', 'png']
 
-    def __init__(self, output_path, history, figures_ext='pdf'):
+    def __init__(self, output_path, history, figures_ext):
         self._output_path = output_path
         makedirs(self._output_path, exist_ok=True)
 
@@ -52,15 +53,17 @@ class Report(abc.ABC):
             raise ValueError("Allowed figure formats are: {}", Report.VALID_FIGURE_FORMATS)
         self._figures_ext = figures_ext
 
- 
-    def plot_keras_metric(self, metric_name):
-        """Plot a keras metric given its name and the history object returned by model.fit()
 
-        Arguments
-        ---------
-            metric_name ([type]): String with the name of the metric.
+    def plot_keras_metric(self, metric_name, save_plot=True):
+        r"""Plot a keras metric given its name and the history object returned by model.fit()
+
+                Arguments
+                ---------
+                    metric_name ([type]): String with the name of the metric.
+                    save_plot (bool, optional): whether to save plot to disk or not. Defaults to True.
         """
-
+        
+        
         # add some checks on dict keys for the metrics, losses, etc...
         # otherwise throw an exception displaying available metrics
 
@@ -71,6 +74,9 @@ class Report(abc.ABC):
         plt.xlabel('epoch')
         plt.legend(['train', 'val'], loc='upper left')
         plt.show()
+        if save_plot:
+            plt.savefig(join(self._output_path, metric_name + self._figures_ext))
+        plt.close()
 
         # TODO: check saving in terms of file size and format
         #plt.savefig(join(self._output_path, metric_name + '.' + self._figures_ext))

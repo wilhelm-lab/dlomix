@@ -13,16 +13,19 @@ class RetentionTimeReport(Report):
     TARGETS_LABEL = "iRT (measured)"
     PREDICTIONS_LABEL = "iRT (predicted)"
 
-    def __init__(self, output_path, history, figures_ext='pdf'):
+    def __init__(self, output_path, history, figures_ext="png"):
         super(RetentionTimeReport, self).__init__(output_path, history, figures_ext)
 
     def generate_report(self, targets, predictions, **kwargs):
         r2 = self.calculate_r2(targets, predictions)
         self.plot_all_metrics()
-        self.plot_highlight_data_portion(targets, predictions)
+        self.plot_residuals(targets, predictions)
+        self.plot_density(targets, predictions)
 
-        # TODO: find best way to export a document or a txt file with all the results or combine with figures
-        # in a pdf or something similar
+        #self.plot_highlight_data_portion(targets, predictions)
+
+        # to generate pdf file
+
 
 
     def calculate_r2(self, targets, predictions):
@@ -60,6 +63,8 @@ class RetentionTimeReport(Report):
         plt.xlabel("Residual value")
         plt.ylabel("Count")
         plt.show()
+        plt.savefig(join(self._output_path, 'histogram_residuals' + self._figures_ext))
+        plt.close()
 
 
     def plot_highlight_data_portion(self, targets, predictions, portion=0.95):
@@ -83,7 +88,7 @@ class RetentionTimeReport(Report):
 
         plt.title("Predicted vs. observed (experimental) iRT - Highlight 95%")
         plt.xlabel(RetentionTimeReport.TARGETS_LABEL)
-        plt.ylabel(RetentionTimeReport.PREDICTIONS_LABELs)
+        plt.ylabel(RetentionTimeReport.PREDICTIONS_LABEL)
         plt.show()
 
         #plt.savefig(join(self._output_path, 'result_' + str(portion) + self._figures_ext))
@@ -132,3 +137,5 @@ class RetentionTimeReport(Report):
         cbar.ax.tick_params(labelsize=font_size)
         cbar.ax.minorticks_on()
         plt.show()
+        plt.savefig(join(self._output_path, 'density_plot' + self._figures_ext))
+        plt.close()
