@@ -11,16 +11,14 @@ import tensorflow as tf
 # take into consideration if the pandas dataframe is pickled or not and then call read_pickle instead of read_csv
 # allow the possiblity to have three different dataset objects, one for train, val, and test
 
-# for intensity model, the output of a vector
-
-
-
 
 class RetentionTimeDataset:
     """A dataset class for Retention Time prediction tasks"""
     ATOM_TABLE = None
     SPLIT_NAMES = ["train", "val", "test"]
     BATCHES_TO_PREFETCH = tf.data.AUTOTUNE
+
+    SAMPLE_RUN_N = 100
 
     # TODO: For test dataset --> examples with longer sequences --> do not drop, add NaN for prediction
 
@@ -30,18 +28,18 @@ class RetentionTimeDataset:
         """ Initialize a dataset object wrapping tf.Dataset and preprocessing steps
         :param data_source: source can be a tuple of two arrays (sequences, targets), single array (sequences), useful for test data,
                 or a str with a file path to a csv file
-        :param sep:
-        :param sequence_col:
-        :param target_col:
-        :param feature_cols:
-        :param normalize_targets:
-        :param seq_length:
-        :param batch_size:
-        :param val_ratio:
-        :param seed:
-        :param test:
-        :param path_aminoacid_atomcounts:
-        :param sample_run:
+        :param sep: separator to be used if the data source is a CSV file
+        :param sequence_col: name of the column containing the sequences in the provided CSV
+        :param target_col: name of the column containing the targets (indexed retention time)
+        :param feature_cols: a list of columns containing other features that can be used later as inputs to a model
+        :param normalize_targets: a boolean whether to normalize the targets or not (subtract mean and divied by standard deviation)
+        :param seq_length: the sequence length to be used, where all sequences will be padded to this length, longer sequences will be removed and not truncated
+        :param batch_size: the batch size to be used for consuming the dataset in training a model
+        :param val_ratio: a fraction to determine the size of the validation data (0.2 = 20%)
+        :param seed: a seed to use for splitting the data to allow for a reproducible split
+        :param test: a boolean whether the dataset is a test dataset or not 
+        :param path_aminoacid_atomcounts: a string with a path to a CSV table with the atom counts of the different amino acids (can be used for feature extraction)
+        :param sample_run: a boolean to limit the number of examples to a small number, SAMPLE_RUN_N, for testing and debugging purposes.
         """
         super(RetentionTimeDataset, self).__init__()
 
@@ -76,6 +74,7 @@ class RetentionTimeDataset:
         self.sequences = None
         self.targets = None
         self.features_df = None
+        self.example_id = None
 
         # if path to counts lookup table is provided, include count features, otherwise not
         self.include_count_features = True if path_aminoacid_atomcounts else False
@@ -146,8 +145,10 @@ class RetentionTimeDataset:
 
         elif isinstance(self.data_source, str):
             df = pd.read_csv(self.data_source)
+            
+            # used only for testing with a smaller sample from a csv file
             if self.sample_run:
-                df = df.head(100)
+                df = df.head(RetentionTimeDataset.SAMPLE_RUN_N)
 
             # lower all column names
             df.columns = [col_name.lower() for col_name in df.columns]
@@ -159,10 +160,13 @@ class RetentionTimeDataset:
         else:
             raise ValueError('Data source has to be either a tuple of two numpy arrays, a single numpy array, '
                              'or a string path to a csv file.')
+        
+        # give the index of the element as an ID for later reference if needed
+        self.example_id = list(range(len(self.sequences)))
 
     def _validate_remove_long_sequences(self) -> None:
         """
-        Validate if all sequences are shorter than the padding length, otherwise drop them.
+        Validate if all sequences are shorter than the padding length, otherwise drop them. 
         """
         assert self.sequences.shape[0] > 0, "No sequences in the provided data."
         assert len(self.sequences) == len(self.targets), "Count of examples does not match for sequences and targets."
@@ -171,7 +175,7 @@ class RetentionTimeDataset:
         vectorized_len = np.vectorize(lambda x: len(x))
         mask = vectorized_len(self.sequences) <= limit
         self.sequences, self.targets = self.sequences[mask], self.targets[mask]
-        # apply the mask to the feature columns (subset the dataframe as well)
+        # once feature columns are introduced, apply the mask to the feature columns (subset the dataframe as well)
 
     def _split_data(self):
         n = len(self.targets)
@@ -219,12 +223,20 @@ class RetentionTimeDataset:
                                       )
 
     def get_split_targets(self, split='val'):
+        """ Retrieve all targets (original labels) for a specific split 
+        :param split: a string specifiying the split name (train, val, test)
+        :return: nd.array with the targets
+        """
         if split not in self.indicies_dict.keys():
             raise ValueError('requested split does not exist, availabe splits are: ' + list(self.indicies_dict.keys()))
 
         return self.targets[self.indicies_dict[split]]
 
     def denormalize_targets(self, targets):
+        """ Denormalize the given targets (can also be predictions) by multiplying the standard deviation and adding the mean 
+        :param targets: an nd.array with targets or predictions
+        :return: a denormalized nd.array with the targets or the predictions
+        """
         return targets * self._data_std + self._data_mean
 
     def _pad_sequences(self, seq, target):
@@ -269,8 +281,7 @@ class RetentionTimeDataset:
 
         return inputs, target
 
-    # change this to private
-    def get_tf_dataset(self, split=None):
+    def _get_tf_dataset(self, split=None):
         assert split in self.tf_dataset.keys(), (
             f"Requested data split is not available, available splits are {self.tf_dataset.keys()}")
         if split in self.tf_dataset.keys():
@@ -279,22 +290,27 @@ class RetentionTimeDataset:
 
     @property
     def train_data(self):
-        return self.get_tf_dataset(RetentionTimeDataset.SPLIT_NAMES[0])
+        """TensorFlow Dataset object for the training data"""
+        return self._get_tf_dataset(RetentionTimeDataset.SPLIT_NAMES[0])
 
     @property
     def val_data(self):
-        return self.get_tf_dataset(RetentionTimeDataset.SPLIT_NAMES[1])
+        """TensorFlow Dataset object for the validation data"""
+        return self._get_tf_dataset(RetentionTimeDataset.SPLIT_NAMES[1])
 
     @property
     def test_data(self):
-        return self.get_tf_dataset(RetentionTimeDataset.SPLIT_NAMES[2])
+        """TensorFlow Dataset object for the test data"""
+        return self._get_tf_dataset(RetentionTimeDataset.SPLIT_NAMES[2])
 
     @property
     def data_mean(self):
+        """Mean value of the targets"""
         return self._data_mean
 
     @property
     def data_std(self):
+        """Standard deviation value of the targets"""
         return self._data_std
 
     @data_mean.setter
