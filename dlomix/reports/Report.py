@@ -5,13 +5,17 @@ import tensorflow as tf
 import warnings
 import abc
 
-'''
-    Base class for reports:
-        - child classes should implement the abstract method generate_report 
-'''
-
 
 class Report(abc.ABC):
+    r"""Base class for reports, child classes should implement the abstract method generate_report. 
+
+        Parameters
+        ----------
+            output_path ([type]): path to save output files and figures.
+            history ([type]): reference to a Keras History object. 
+            figures_ext (str, optional): File extension and format for saving figures. Defaults to 'pdf'.
+    """
+
     VALID_FIGURE_FORMATS = ['pdf', 'jpeg', 'jpg', 'png']
 
     def __init__(self, output_path, history, figures_ext='pdf'):
@@ -48,11 +52,14 @@ class Report(abc.ABC):
             raise ValueError("Allowed figure formats are: {}", Report.VALID_FIGURE_FORMATS)
         self._figures_ext = figures_ext
 
-    '''
-        Plot a keras metric given its name and the history object returned by model.fit() 
-    '''
-
+ 
     def plot_keras_metric(self, metric_name):
+        """Plot a keras metric given its name and the history object returned by model.fit()
+
+        Arguments
+        ---------
+            metric_name ([type]): String with the name of the metric.
+        """
 
         # add some checks on dict keys for the metrics, losses, etc...
         # otherwise throw an exception displaying available metrics
@@ -69,6 +76,8 @@ class Report(abc.ABC):
         #plt.savefig(join(self._output_path, metric_name + '.' + self._figures_ext))
 
     def plot_all_metrics(self):
+        """Plot all available Keras metrics in the History object.
+        """
         metrics = self._history.history.keys()
         metrics = filter(lambda x: x.startswith("val_"), metrics)
         for metric in metrics:
@@ -76,6 +85,12 @@ class Report(abc.ABC):
 
     @abc.abstractmethod
     def generate_report(self, targets, predictions, **kwargs):
+        """Abstract method to generate a complete report. Child classes need to implement this method.
+
+        Args:
+            targets ([type]): Array with target values.
+            predictions ([type]): Array with prediction values.
+        """
         pass
 
 

@@ -7,6 +7,8 @@ from matplotlib.colors import LogNorm
 from matplotlib.ticker import LogLocator
 
 class RetentionTimeReport(Report):
+    """Report generation for Retention Time Prediction tasks.
+    """
 
     TARGETS_LABEL = "iRT (measured)"
     PREDICTIONS_LABEL = "iRT (predicted)"
@@ -22,23 +24,33 @@ class RetentionTimeReport(Report):
         # TODO: find best way to export a document or a txt file with all the results or combine with figures
         # in a pdf or something similar
 
-    '''
-    Calculate R-squared using sklearn given true targets and predictions 
-    '''
 
     def calculate_r2(self, targets, predictions):
+        r"""Calculate R-squared using sklearn given true targets and predictions 
+
+        Arguments
+        ---------
+            targets ([type]): Array with target values
+            predictions ([type]): Array with prediction values
+
+        Returns:
+            r_squared ([float]): float value of R squared
+        """
         from sklearn.metrics import r2_score
 
         r2 = r2_score(np.ravel(targets), np.ravel(predictions))
         return r2
 
-    '''
     
-    Plot histogram of residuals
-    
-    '''
-
     def plot_residuals(self, targets, predictions, xrange=(-10, 10)):
+        r"""Plot histogram of residuals
+
+        Argsuments
+        ----------
+            targets ([type]): Array with target values
+            predictions ([type]): Array with prediction values
+            xrange (tuple, optional): X-axis range for plotting the histogram. Defaults to (-10, 10).
+        """
         error = np.ravel(targets) - np.ravel(predictions)
 
         bins = np.linspace(xrange[0], xrange[1], 200)
@@ -49,9 +61,6 @@ class RetentionTimeReport(Report):
         plt.ylabel("Count")
         plt.show()
 
-    '''
-    Plot results and highlight a portion of the data (e.g. 95%)  given true targets and predictions 
-    '''
 
     def plot_highlight_data_portion(self, targets, predictions, portion=0.95):
         # 95% percent of the data-points highlighted
@@ -81,6 +90,16 @@ class RetentionTimeReport(Report):
 
     def plot_density(self, targets, predictions, irt_delta95=5, palette='Reds_r', delta95_line_color='#36479E',
                                 nbins=1000):
+        """Create density plot
+
+        Args:
+            targets ([type]):  Array with target values
+            predictions ([type]):  Array with prediction values
+            irt_delta95 (int, optional): iRT Value of the delta 95% . Defaults to 5.
+            palette (str, optional): Color palette from matplotlib. Defaults to 'Reds_r'.
+            delta95_line_color (str, optional): Color for the delta 95% line. Defaults to '#36479E'.
+            nbins (int, optional): Number of bins to use for creating the 2D histogram. Defaults to 1000.
+        """
 
         H, xedges, yedges = np.histogram2d(targets, predictions, bins=nbins)
 

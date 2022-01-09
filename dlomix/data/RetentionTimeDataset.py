@@ -17,19 +17,19 @@ class RetentionTimeDataset:
     
     Parameters
     ----------
-    data_source: source can be a tuple of two arrays (sequences, targets), single array (sequences), useful for test data, or a str with a file path to a csv file
-    sep: separator to be used if the data source is a CSV file
-    sequence_col: name of the column containing the sequences in the provided CSV
-    target_col: name of the column containing the targets (indexed retention time)
-    feature_cols: a list of columns containing other features that can be used later as inputs to a model
-    normalize_targets: a boolean whether to normalize the targets or not (subtract mean and divied by standard deviation)
-    seq_length: the sequence length to be used, where all sequences will be padded to this length, longer sequences will be removed and not truncated
-    batch_size: the batch size to be used for consuming the dataset in training a model
-    val_ratio: a fraction to determine the size of the validation data (0.2 = 20%)
-    seed: a seed to use for splitting the data to allow for a reproducible split
-    test: a boolean whether the dataset is a test dataset or not 
-    path_aminoacid_atomcounts: a string with a path to a CSV table with the atom counts of the different amino acids (can be used for feature extraction)
-    sample_run: a boolean to limit the number of examples to a small number, SAMPLE_RUN_N, for testing and debugging purposes.
+        data_source: source can be a tuple of two arrays (sequences, targets), single array (sequences), useful for test data, or a str with a file path to a csv file
+        sep: separator to be used if the data source is a CSV file
+        sequence_col: name of the column containing the sequences in the provided CSV
+        target_col: name of the column containing the targets (indexed retention time)
+        feature_cols: a list of columns containing other features that can be used later as inputs to a model
+        normalize_targets: a boolean whether to normalize the targets or not (subtract mean and divied by standard deviation)
+        seq_length: the sequence length to be used, where all sequences will be padded to this length, longer sequences will be removed and not truncated
+        batch_size: the batch size to be used for consuming the dataset in training a model
+        val_ratio: a fraction to determine the size of the validation data (0.2 = 20%)
+        seed: a seed to use for splitting the data to allow for a reproducible split
+        test: a boolean whether the dataset is a test dataset or not 
+        path_aminoacid_atomcounts: a string with a path to a CSV table with the atom counts of the different amino acids (can be used for feature extraction)
+        sample_run: a boolean to limit the number of examples to a small number, SAMPLE_RUN_N, for testing and debugging purposes.
     """
     ATOM_TABLE = None
     SPLIT_NAMES = ["train", "val", "test"]
