@@ -28,7 +28,7 @@ class Report(abc.ABC):
         self._set_figures_format(figures_ext)
 
         # an empty dict to use to list the report resources
-        self._report_resources = {}
+        self._init_report_resources()
 
     def _set_history_dict(self, history):
         if isinstance(history, dict):
@@ -66,6 +66,9 @@ class Report(abc.ABC):
 
     def _add_report_resource(self, key, title, paragraph_text, value):
         self._report_resources[key] = (title, paragraph_text, value)
+
+    def _init_report_resources(self):
+        self._report_resources = {}
 
     def _compile_report_resources_add_pdf_pages(self):
         for key, resource in self._report_resources.items():
