@@ -14,6 +14,7 @@ setuptools.setup(
     url="https://github.com/wilhelm-lab/dlomix",
     packages=setuptools.find_packages(),
     install_requires=[
+        'fpdf',
         'pandas',
         'numpy',
         'matplotlib',
