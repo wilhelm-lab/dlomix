@@ -17,8 +17,10 @@ class RetentionTimeDataset:
 
     Parameters
     -----------
-    data_source (str, tuple of two numpy.ndarray, numpy.ndarray, optional): source can be a tuple of two arrays (sequences, targets), single array (sequences), useful for test data, or a str with a file path to a csv file. Defaults to None.
-    sep (str, optional): separator to be used if the data source is a CSV file. Defaults to ",".
+    data_source : (str, tuple of two numpy.ndarray, numpy.ndarray, optional) 
+        source can be a tuple of two arrays (sequences, targets), single array (sequences), useful for test data, or a str with a file path to a csv file. Defaults to None.
+    sep : (str, optional)
+        separator to be used if the data source is a CSV file. Defaults to ",".
     sequence_col (str, optional): name of the column containing the sequences in the provided CSV. Defaults to "sequence".
     target_col (str, optional): name of the column containing the targets (indexed retention time). Defaults to "irt".
     feature_cols (list, optional): a list of columns containing other features that can be used later as inputs to a model. Defaults to None.
