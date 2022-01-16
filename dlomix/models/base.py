@@ -4,14 +4,14 @@ from dlomix.constants import ALPHABET_UNMOD
 
 
 class RetentionTimePredictor(tf.keras.Model):
-    r"""A simple class for Retention Time prediction models.
+    """A simple class for Retention Time prediction models.
 
     Parameters
     ----------
         embedding_dim (int, optional): Dimensionality of the embeddings to be used for representing the Amino Acids. Defaults to 16.
         seq_length (int, optional): Sequence length of the peptide sequences. Defaults to 30.
         encoder (str, optional): String for specifying the decoder to use, either based on 1D conv-layers or LSTMs. Defaults to "conv1d".
-        vocab_dict ([type], optional): Dictionary mapping for the vocabulary (the amino acids in this case). Defaults to ALPHABET_UNMOD.
+        vocab_dict (dict, optional): Dictionary mapping for the vocabulary (the amino acids in this case). Defaults to ALPHABET_UNMOD.
     """
     def __init__(self, embedding_dim=16, seq_length=30,
                  encoder="conv1d", vocab_dict=ALPHABET_UNMOD):
