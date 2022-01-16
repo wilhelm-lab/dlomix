@@ -13,7 +13,7 @@ import tensorflow as tf
 
 
 class RetentionTimeDataset:
-    """A dataset class for Retention Time prediction tasks. It initialize a dataset object wrapping tf.Dataset and some relevant preprocessing steps.
+    r"""A dataset class for Retention Time prediction tasks. It initialize a dataset object wrapping tf.Dataset and some relevant preprocessing steps.
 
     Parameters
     -----------
