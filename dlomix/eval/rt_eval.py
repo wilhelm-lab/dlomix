@@ -1,26 +1,36 @@
 import tensorflow as tf
 import tensorflow.keras.backend as K
 
+
 class TimeDeltaMetric(tf.keras.metrics.Metric):
     """Implementation of the time delta metric as a Keras Metric.
 
-        Parameters
-        ----------
-            mean (int, optional): Mean value of the targets in case normalization was performed. Defaults to 0.
-            std (int, optional): Standard deviation value of the targets in case normalization was performed. Defaults to 1.
-            percentage (float, optional): What percentage of the data points to consider, this is specific to the conmputation of the metric. Defaults to 0.95 which corresponds to 95% of the datapoints and is the mostly used value in papers.
-            name (str, optional): Name of the metric so that it can be reported and used later in Keras History objects. Defaults to 'timedelta'.
-            rescale_targets (bool, optional): Whether to rescale (denormalize) targets or not. Defaults to False.
-            rescale_predictions (bool, optional): Whether to rescale (denormalize) predictions or not. Defaults to False.
-            double_delta (bool, optional): Whether to multiple the computed delta by 2 in order to make it two-sided or not. Defaults to False.
-        """
-    def __init__(self, mean=0, std=1, percentage=0.95, name='timedelta',
-                 rescale_targets=False, rescale_predictions=False,
-                 double_delta=False, **kwargs):
-        
+    Parameters
+    ----------
+        mean (int, optional): Mean value of the targets in case normalization was performed. Defaults to 0.
+        std (int, optional): Standard deviation value of the targets in case normalization was performed. Defaults to 1.
+        percentage (float, optional): What percentage of the data points to consider, this is specific to the conmputation of the metric. Defaults to 0.95 which corresponds to 95% of the datapoints and is the mostly used value in papers.
+        name (str, optional): Name of the metric so that it can be reported and used later in Keras History objects. Defaults to 'timedelta'.
+        rescale_targets (bool, optional): Whether to rescale (denormalize) targets or not. Defaults to False.
+        rescale_predictions (bool, optional): Whether to rescale (denormalize) predictions or not. Defaults to False.
+        double_delta (bool, optional): Whether to multiple the computed delta by 2 in order to make it two-sided or not. Defaults to False.
+    """
+
+    def __init__(
+        self,
+        mean=0,
+        std=1,
+        percentage=0.95,
+        name="timedelta",
+        rescale_targets=False,
+        rescale_predictions=False,
+        double_delta=False,
+        **kwargs
+    ):
+
         super(TimeDeltaMetric, self).__init__(name=name, **kwargs)
-        self.delta = self.add_weight(name='delta', initializer='zeros')
-        self.batch_count = self.add_weight(name='batch-count', initializer='zeros')
+        self.delta = self.add_weight(name="delta", initializer="zeros")
+        self.batch_count = self.add_weight(name="batch-count", initializer="zeros")
         self.mean = mean
         self.std = std
         self.percentage = percentage
@@ -65,10 +75,9 @@ class TimeDeltaMetric(tf.keras.metrics.Metric):
 # https://github.com/horsepurve/DeepRTplus/blob/cde829ef4bd8b38a216d668cf79757c07133b34b/RTdata_emb.py
 def delta95_metric(y_true, y_pred):
     mark95 = tf.cast(
-        tf.cast(tf.shape(y_true)[0], dtype=tf.float32) * 0.95, dtype=tf.int32)
+        tf.cast(tf.shape(y_true)[0], dtype=tf.float32) * 0.95, dtype=tf.int32
+    )
     abs_error = K.abs(y_true - y_pred)
     delta = tf.sort(abs_error)[mark95 - 1]
     norm_range = K.max(y_true) - K.min(y_true)
     return (delta * 2) / (norm_range)
-
-

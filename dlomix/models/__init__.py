@@ -5,5 +5,5 @@ from .deepLC import DeepLCRetentionTimePredictor
 __all__ = [
     RetentionTimePredictor,
     PrositRetentionTimePredictor,
-    DeepLCRetentionTimePredictor
+    DeepLCRetentionTimePredictor,
 ]

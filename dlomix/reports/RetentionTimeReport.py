@@ -6,9 +6,9 @@ import pandas as pd
 from matplotlib.colors import LogNorm
 from matplotlib.ticker import LogLocator
 
+
 class RetentionTimeReport(Report):
-    """Report generation for Retention Time Prediction tasks.
-    """
+    """Report generation for Retention Time Prediction tasks."""
 
     TARGETS_LABEL = "iRT (measured)"
     PREDICTIONS_LABEL = "iRT (predicted)"
@@ -20,7 +20,7 @@ class RetentionTimeReport(Report):
 
     def generate_report(self, targets, predictions, **kwargs):
         self._init_report_resources()
-        
+
         r2 = self.calculate_r2(targets, predictions)
         self.plot_all_metrics()
         self.plot_residuals(targets, predictions)
@@ -28,10 +28,10 @@ class RetentionTimeReport(Report):
 
         self._compile_report_resources_add_pdf_pages()
 
-        self.pdf_file.output(join(self._output_path, "iRT_Report.pdf"), 'F')
+        self.pdf_file.output(join(self._output_path, "iRT_Report.pdf"), "F")
 
     def calculate_r2(self, targets, predictions):
-        """Calculate R-squared using sklearn given true targets and predictions 
+        """Calculate R-squared using sklearn given true targets and predictions
 
         Arguments
         ---------
@@ -45,11 +45,15 @@ class RetentionTimeReport(Report):
 
         r2 = r2_score(np.ravel(targets), np.ravel(predictions))
 
-        self._add_report_resource("r2", "R-Squared", f"The R-squared value for the predictions is {round(r2, 4)}", r2)
+        self._add_report_resource(
+            "r2",
+            "R-Squared",
+            f"The R-squared value for the predictions is {round(r2, 4)}",
+            r2,
+        )
 
         return r2
 
-    
     def plot_residuals(self, targets, predictions, xrange=(-10, 10)):
         """Plot histogram of residuals
 
@@ -67,16 +71,27 @@ class RetentionTimeReport(Report):
         plt.title("Historgram of Residuals")
         plt.xlabel("Residual value")
         plt.ylabel("Count")
-        save_path = join(self._output_path, 'histogram_residuals' + self._figures_ext)
+        save_path = join(self._output_path, "histogram_residuals" + self._figures_ext)
         plt.savefig(save_path)
         plt.show()
         plt.close()
 
-        self._add_report_resource("residuals_plot", "Error Residuals", "The following plot shows a historgram of residuals for the test data.", save_path)
+        self._add_report_resource(
+            "residuals_plot",
+            "Error Residuals",
+            "The following plot shows a historgram of residuals for the test data.",
+            save_path,
+        )
 
-
-    def plot_density(self, targets, predictions, irt_delta95=5, palette='Reds_r', delta95_line_color='#36479E',
-                                nbins=1000):
+    def plot_density(
+        self,
+        targets,
+        predictions,
+        irt_delta95=5,
+        palette="Reds_r",
+        delta95_line_color="#36479E",
+        nbins=1000,
+    ):
         """Create density plot
 
         Arguments
@@ -103,25 +118,39 @@ class RetentionTimeReport(Report):
 
         # Plot 2D histogram using pcolor
         cm = plt.cm.get_cmap(palette)
-        plt.pcolormesh(xedges, yedges, Hmasked, cmap=cm,
-                       norm=LogNorm(vmin=1e0, vmax=1e2))
+        plt.pcolormesh(
+            xedges, yedges, Hmasked, cmap=cm, norm=LogNorm(vmin=1e0, vmax=1e2)
+        )
 
         plt.xlabel(RetentionTimeReport.TARGETS_LABEL, fontsize=18)
         plt.ylabel(RetentionTimeReport.PREDICTIONS_LABEL, fontsize=18)
 
         cbar = plt.colorbar(ticks=LogLocator(subs=range(5)))
-        cbar.ax.set_ylabel('Counts', fontsize=14)
+        cbar.ax.set_ylabel("Counts", fontsize=14)
 
         plt.plot([x_min, x_max], [x_min, x_max], c="black")
-        plt.plot([x_min, x_max], [x_min - irt_delta95, x_max - irt_delta95], color=delta95_line_color)
-        plt.plot([x_min, x_max], [x_min + irt_delta95, x_max + irt_delta95], color=delta95_line_color)
+        plt.plot(
+            [x_min, x_max],
+            [x_min - irt_delta95, x_max - irt_delta95],
+            color=delta95_line_color,
+        )
+        plt.plot(
+            [x_min, x_max],
+            [x_min + irt_delta95, x_max + irt_delta95],
+            color=delta95_line_color,
+        )
 
         font_size = 14  # Adjust as appropriate.
         cbar.ax.tick_params(labelsize=font_size)
         cbar.ax.minorticks_on()
-        save_path = join(self._output_path, 'density_plot' + self._figures_ext)
+        save_path = join(self._output_path, "density_plot" + self._figures_ext)
         plt.savefig(save_path)
         plt.show()
         plt.close()
 
-        self._add_report_resource("density_plot", "Density Plot", "The following figure shows the density plot with the delta-95 highlighted for the test data.", save_path)
+        self._add_report_resource(
+            "density_plot",
+            "Density Plot",
+            "The following figure shows the density plot with the delta-95 highlighted for the test data.",
+            save_path,
+        )
