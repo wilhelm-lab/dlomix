@@ -4,9 +4,6 @@ on:
   push:
     branches:
       - main
-  
-  release:
-    types: [published]
 
 jobs:
   deploy:
@@ -28,3 +25,7 @@ jobs:
         with:
           user: __token__
           password: ${{ secrets.SECRET_PYPI }}
+      - name: Create Github release
+        run: |
+          VERSION=$(python -c "from dlomix import __version__; print(__version__);")
+          gh release create v$VERSION --title $VERSION --generate-notes
