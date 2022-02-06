@@ -1,8 +1,11 @@
-name: Upload Python Package
+name: PyPI
 
 on:
-  release:
-    types: [published]
+  pull_request:
+    types:
+      - closed
+    branches:    
+      - main
 
 jobs:
   deploy:
