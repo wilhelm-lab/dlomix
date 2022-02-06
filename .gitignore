@@ -6,6 +6,9 @@ __pycache__/
 # C extensions
 *.so
 
+# junit reports
+junit/*
+
 # Distribution / packaging
 .Python
 build/
@@ -127,3 +130,10 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+.vscode/settings.json
+
+# test notebooks are stored in /notebooks/ and named with a leading underscore
+notebooks/_*
+
+# output folder
+/notebooks/output/
