@@ -135,5 +135,5 @@ dmypy.json
 # test notebooks are stored in /notebooks/ and named with a leading underscore
 notebooks/_*
 
-# output folder
-/notebooks/output/
+# output folders
+/notebooks/output*/
