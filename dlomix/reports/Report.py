@@ -24,7 +24,13 @@ class Report(abc.ABC):
         self._output_path = output_path
         makedirs(self._output_path, exist_ok=True)
 
-        self._set_history_dict(history)
+        if history is None:
+            warnings.warn(
+                "The passed History object is None, no training/validation data can be reported."
+            )
+            self._history_dict = {}
+        else:
+            self._set_history_dict(history)
         self._set_figures_format(figures_ext)
 
         # an empty dict to use to list the report resources
@@ -60,11 +66,9 @@ class Report(abc.ABC):
                 "Allowed figure formats are: {}", Report.VALID_FIGURE_FORMATS
             )
         self._figures_ext = "." + figures_ext
-        print(self._figures_ext)
 
     def _get_all_saved_plots(self):
         all_plots = glob.glob(join(self._output_path, "*" + self._figures_ext))
-        print(all_plots)
         return all_plots
 
     def _add_report_resource(self, key, title, paragraph_text, value):

@@ -2,7 +2,6 @@ from os.path import join
 from matplotlib import pyplot as plt
 from dlomix.reports.Report import PDFFile, Report
 import numpy as np
-import pandas as pd
 from matplotlib.colors import LogNorm
 from matplotlib.ticker import LogLocator
 
