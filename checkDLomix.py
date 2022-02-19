@@ -1,6 +1,13 @@
 #!python -m pip install -q git+https:/hub.com/wilhelm-lab/dlomix
-#script version of https://colab.research.google.com/github/wilhelm-lab/dlomix-resources/blob/main/notebooks/Example_RTModel_Walkthrough_colab.ipynb 
-#USAGE: python dlomixRT.py <train.csv> <test.csv file>
+#awk -F '\t' '{if($7="Unmodified"){sep=",";print $4,sep,$39}}' /home/ash022/PD/TIMSTOF/LARS/2021/Oktober/211013_Shengdong/combined/txt/msms.txt > SD.csv 
+#sed 's/Sequence/sequence/'  SD.csv > SD2.csv
+#sed 's/Retention\ time/irt/' SD2.csv > SD.csv 
+#sed 's/ //g' SD.csv > SD2.csv 
+#awk -F '\t' '{if($7="Unmodified"){sep=",";print $4,sep,$30}}'  /home/ash022/PD/TIMSTOF/LARS/2022/februar/AndersS/saga/combined/txt/msms.txt > anderS.csv
+#sed 's/Sequence/sequence/' anderS.csv > anderS2.csv 
+#sed 's/Retention\ time/irt/' anderS2.csv  > anderS.csv
+#sed 's/ //g' anderS.csv t   > anderS2.csv  
+#python dlomixRT.py   SD2.csv anderS2.csv 
 import sys
 import numpy as np
 import pandas as pd
@@ -8,6 +15,7 @@ import dlomix
 from dlomix import constants, data, eval, layers, models, pipelines, reports, utils
 print([x for x in dir(dlomix) if not x.startswith("_")])
 from dlomix.data import RetentionTimeDataset
+#TRAIN_DATAPATH = 'https://raw.githubusercontent.com/wilhelm-lab/dlomix/develop/example_dataset/proteomTools_train_val.csv'
 TRAIN_DATAPATH = sys.argv[1]#'proteomTools_train_val.csv'
 BATCH_SIZE = 64
 rtdata = RetentionTimeDataset(data_source=TRAIN_DATAPATH,seq_length=30, batch_size=BATCH_SIZE, val_ratio=0.2, test=False)
@@ -18,6 +26,7 @@ model = RetentionTimePredictor(seq_length=30)
 from dlomix.eval import TimeDeltaMetric
 model.compile(optimizer='adam',loss='mse',metrics=['mean_absolute_error', TimeDeltaMetric()])
 history = model.fit(rtdata.train_data,validation_data=rtdata.val_data,epochs=20)
+#TEST_DATAPATH = 'https://raw.githubusercontent.com/wilhelm-lab/dlomix/develop/example_dataset/proteomTools_test.csv'
 TEST_DATAPATH = sys.argv[2]#'proteomTools_test.csv'
 test_rtdata = RetentionTimeDataset(data_source=TEST_DATAPATH,seq_length=30, batch_size=32, test=True)
 predictions = model.predict(test_rtdata.test_data)
