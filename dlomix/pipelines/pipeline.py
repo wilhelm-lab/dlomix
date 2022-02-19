@@ -1,9 +1,9 @@
 import numpy as np
-
 from dlomix.constants import retention_time_pipeline_parameters
 from dlomix.data.RetentionTimeDataset import RetentionTimeDataset
 from dlomix.models.base import RetentionTimePredictor
-
+from dlomix.reports import RetentionTimeReport
+from os.path import join
 
 # pipelines can be used to train the model further or from scratch given a dataset
 # add string arguments (e.g. prosit to create the model, data source to create the dataset)
@@ -14,10 +14,11 @@ from dlomix.models.base import RetentionTimePredictor
 
 
 class RetentionTimePipeline:
-    def __init__(self):
+    def __init__(self, pre_trained=True):
         super(RetentionTimePipeline, self).__init__()
         self.model = None
-        self.dataset = None
+        self.test_dataset = None
+        self.pre_trained = pre_trained
 
         self._build_model()
 
@@ -25,9 +26,11 @@ class RetentionTimePipeline:
         self.model = RetentionTimePredictor(
             **retention_time_pipeline_parameters["model_params"]
         )
-        self.model.load_weights(
-            retention_time_pipeline_parameters["trained_model_path"]
-        )
+
+        if self.pre_trained:
+            self.model.load_weights(
+                retention_time_pipeline_parameters["trained_model_path"]
+            )
 
     """
     
@@ -41,21 +44,30 @@ class RetentionTimePipeline:
                 "Dataset should be provided either as a numpy array or a string pointing to a file."
             )
 
-        self.dataset = RetentionTimeDataset(
+        self.test_dataset = RetentionTimeDataset(
             data,
             **retention_time_pipeline_parameters["data_params"],
             val_ratio=0,
             test=True
         )
         (
-            self.dataset.data_mean,
-            self.dataset.data_std,
+            self.test_dataset.data_mean,
+            self.test_dataset.data_std,
         ) = retention_time_pipeline_parameters["trained_model_stats"]
 
-        predictions = self.model.predict(self.dataset.test_data)
-
-        predictions = self.dataset.denormalize_targets(predictions)
-
-        # here more reporting of results using the RTReport class
+        predictions = self.model.predict(self.test_dataset.test_data)
+        predictions = self.test_dataset.denormalize_targets(predictions)
+        predictions = predictions.ravel()
 
         return predictions
+
+    
+    def predict_report(self, data, output_path="./") -> None:
+        predictions = self.predict(data)
+        report = RetentionTimeReport(output_path=output_path, history=None)
+
+        test_targets = self.test_dataset.get_split_targets(split="test")
+        report.generate_report(test_targets, predictions)
+
+
+
