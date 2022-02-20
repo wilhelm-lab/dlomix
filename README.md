@@ -43,7 +43,7 @@ Functionality:
 - [ ] extend pipeline for different types of models and backbones
 - [ ] extend pipeline to allow for fine-tuning with custom datasets
 - [X] add residual plots to reporting, possibly other regression analysis tools
-- [ ] output reporting results as PDF
+- [X] output reporting results as PDF
 - [ ] extend data representation to include modifications
 
 Package structure:
@@ -51,7 +51,7 @@ Package structure:
 - [X] integrate `deeplc.py` into `models.py`, preferably introduce a package structure (e.g. `models.retention_time`)
 - [X] add references for implemented models in the ReadMe
 - [ ] introduce a style guide and checking (e.g. PEP)
-- [ ] plan documentation (sphinx and readthedocs)
+- [X] plan documentation (sphinx and readthedocs)
 
 
 ## Developing DLOmix
