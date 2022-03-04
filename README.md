@@ -9,7 +9,7 @@
 ## Usage
 Experiment a simple retention time prediction use-case using Google Colab &nbsp;&nbsp; [![Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/wilhelm-lab/dlomix/blob/develop/notebooks/Example_RTModel_Walkthrough_colab.ipynb)
 
-**Resources Repository:**
+**Resources Repository**
 
 More learning resources can be found in the [dlomix-resources](https://github.com/wilhelm-lab/dlomix-resources) repository.
 
@@ -19,7 +19,7 @@ Run the following to install:
 $ pip install dlomix
 ``` 
 
-**General Overview:**
+**General Overview**
 - `data.py`: structures for modelling the input data, currently based on `tf.Dataset`
 - `models.py`: common model architectures for the relevant use-cases based on `tf.keras.Model` to allow for using the Keras training API
 - `pipeline.py`: an exemplary high-level pipeline implementation
@@ -29,14 +29,14 @@ $ pip install dlomix
 
 
 
-**Use-cases:**
+**Use-cases**
 
 - Retention Time Prediction: 
     - a regression problem where the the retention time of a peptide sequence is to be predicted. 
 
 
 
-**To-Do:**
+**To-Do**
 
 Functionality:
 - [X] integrate prosit
