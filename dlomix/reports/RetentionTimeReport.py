@@ -53,7 +53,7 @@ class RetentionTimeReport(Report):
 
         return r2
 
-    def plot_residuals(self, targets, predictions, xrange=(-10, 10)):
+    def plot_residuals(self, targets, predictions, xrange=(0, 0)):
         """Plot histogram of residuals
 
         Argsuments
@@ -64,7 +64,13 @@ class RetentionTimeReport(Report):
         """
         error = np.ravel(targets) - np.ravel(predictions)
 
-        bins = np.linspace(xrange[0], xrange[1], 200)
+
+        x_min, x_max = xrange
+        if xrange == (0,0):
+            mean, std_dev = np.mean(error), np.std(error)
+            x_min, x_max = mean - (3*std_dev), mean + (3*std_dev)
+
+        bins = np.linspace(x_min, x_max, 200)
 
         plt.hist(error, bins, alpha=0.5, color="orange")
         plt.title("Historgram of Residuals")
