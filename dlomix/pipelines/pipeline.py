@@ -3,7 +3,7 @@ from dlomix.constants import retention_time_pipeline_parameters
 from dlomix.data.RetentionTimeDataset import RetentionTimeDataset
 from dlomix.models.base import RetentionTimePredictor
 from dlomix.reports import RetentionTimeReport
-from os.path import join, dirname
+from os.path import join, dirname, splitext
 from os import makedirs
 import requests
 import zipfile
@@ -34,13 +34,13 @@ class RetentionTimePipeline:
         )
 
         if self.pre_trained:
-            self._download_pretrained_model(
+            self._download_unzip_pretrained_model(
                 retention_time_pipeline_parameters["trained_model_url"],
                 retention_time_pipeline_parameters["trained_model_path"] + retention_time_pipeline_parameters["trained_model_zipfile_name"]
             )
 
             self.model.load_weights(
-                retention_time_pipeline_parameters["trained_model_path"]
+                retention_time_pipeline_parameters["trained_model_path"] + splitext(retention_time_pipeline_parameters["trained_model_zipfile_name"])[0]
             )
 
     
