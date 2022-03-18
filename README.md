@@ -6,6 +6,23 @@
 
 **DLOmix** is a python framework for Deep Learning in Proteomics. Initially built ontop of TensorFlow/Keras, support for PyTorch can however be integrated once the main API is established.
 
+## Quickstart with [Docker](https://docs.docker.com/get-docker/) 
+```bash
+docker pull animesh1977/dlomix
+docker run -it --rm animesh1977/dlomix bash
+curl https://raw.githubusercontent.com/animesh/dlomix/master/checkDLomix.py > checkDLomix.py
+curl https://raw.githubusercontent.com/wilhelm-lab/dlomix/develop/example_dataset/proteomTools_train_val.csv > train.csv
+curl https://raw.githubusercontent.com/wilhelm-lab/dlomix/develop/example_dataset/proteomTools_test.csv > test.csv
+python checkDLomix.py train.csv test.csv
+
+```
+
+#### Building the Docker image locally:
+- download the repo `git clone http://github.com/animesh/dlomix`
+- move into the cloned directory: `cd dlomix`
+- create image with CMD:  `docker build --no-cache .` (please note the "." in the end)
+
+
 ## Usage
 Experiment a simple retention time prediction use-case using Google Colab &nbsp;&nbsp; [![Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/wilhelm-lab/dlomix/blob/develop/notebooks/Example_RTModel_Walkthrough_colab.ipynb)
 
