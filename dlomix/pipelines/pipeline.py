@@ -3,7 +3,10 @@ from dlomix.constants import retention_time_pipeline_parameters
 from dlomix.data.RetentionTimeDataset import RetentionTimeDataset
 from dlomix.models.base import RetentionTimePredictor
 from dlomix.reports import RetentionTimeReport
-from os.path import join
+from os.path import join, dirname
+from os import makedirs
+import requests
+import zipfile
 
 # pipelines can be used to train the model further or from scratch given a dataset
 # add string arguments (e.g. prosit to create the model, data source to create the dataset)
@@ -20,6 +23,9 @@ class RetentionTimePipeline:
         self.test_dataset = None
         self.pre_trained = pre_trained
 
+        # pass the config in the constructor
+        # refactor to have a base class Pipeline
+
         self._build_model()
 
     def _build_model(self):
@@ -28,10 +34,36 @@ class RetentionTimePipeline:
         )
 
         if self.pre_trained:
+            self._download_pretrained_model(
+                retention_time_pipeline_parameters["trained_model_url"],
+                retention_time_pipeline_parameters["trained_model_path"] + retention_time_pipeline_parameters["trained_model_zipfile_name"]
+            )
+
             self.model.load_weights(
                 retention_time_pipeline_parameters["trained_model_path"]
             )
 
+    
+    def _download_unzip_pretrained_model(self, model_url, save_path):
+        makedirs(model_url)
+        r = requests.get(model_url)
+
+        with open(save_path, 'wb') as f:
+            f.write(r.content)
+        
+        self._unzip_model(save_path)
+    
+    def _unzip_model(self, model_zipfile_path):
+        zip_ref = zipfile.ZipFile(model_zipfile_path)
+        model_folder = dirname(model_zipfile_path)
+        zip_ref.extractall(model_folder) 
+        zip_ref.close()
+        
+
+
+
+
+    
     """
     
     Predict retention times given data either as numpy array of sequences or a filepath to a csv file
