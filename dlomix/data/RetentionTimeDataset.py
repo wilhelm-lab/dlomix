@@ -231,7 +231,7 @@ class RetentionTimeDataset:
         # once feature columns are introduced, apply the mask to the feature columns (subset the dataframe as well)
 
     def _split_data(self):
-        n = len(self.targets)
+        n = len(self.sequences)
 
         if self.val_ratio != 0 and (not self.testing_mode):
             # add randomization for now and later consider the splitting logic
