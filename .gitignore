@@ -137,3 +137,6 @@ notebooks/_*
 
 # output folders
 /notebooks/output*/
+
+# local to do file if exists :)
+todo.txt
