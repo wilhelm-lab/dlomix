@@ -1,7 +1,10 @@
 from dlomix.data import RetentionTimeDataset, IntensityDataset
 import numpy as np
 
-def test_empty_rtdataset():#
+
+INTENSITY_CSV_EXAMPLE_URL = 'https://raw.githubusercontent.com/wilhelm-lab/dlomix/develop/example_dataset/intensity/intensity_data.csv'
+
+def test_empty_rtdataset():
     rtdataset = RetentionTimeDataset()
     assert rtdataset.sequences is None
     assert rtdataset.targets is None
@@ -36,7 +39,7 @@ def test_simple_intensitydataset():
     assert intensity_dataset.main_split is IntensityDataset.SPLIT_NAMES[0]
 
 def test_csv_intensitydataset():
-    intensity_dataset = IntensityDataset(data_source='../example_dataset/intensity/intensity_data.csv')
+    intensity_dataset = IntensityDataset(data_source=INTENSITY_CSV_EXAMPLE_URL)
     
     assert intensity_dataset.sequences is not None
     assert intensity_dataset.collision_energy is not None
