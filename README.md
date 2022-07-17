@@ -20,12 +20,15 @@ $ pip install dlomix
 ``` 
 
 **General Overview**
-- `data.py`: structures for modelling the input data, currently based on `tf.Dataset`
-- `models.py`: common model architectures for the relevant use-cases based on `tf.keras.Model` to allow for using the Keras training API
-- `pipeline.py`: an exemplary high-level pipeline implementation
--  `eval.py`: classes for evaluating models and reporting results
--  `eval_utils.py`: custom evaluation metrics implemented in TensorFlow/Keras
--  `constants.py`: constants and configuration values needs for the `pipeline` class.
+-  `data`: structures for modelling the input data, currently based on `tf.Dataset`
+-  `eval`: classes for evaluating models and reporting results
+-  `layers`: custom layers used for building models, based on `tf.keras.layers.Layer`
+-  `losses`: custom losses to be use for training with `model.fit()`
+- `models`: common model architectures for the relevant use-cases based on `tf.keras.Model` to allow for using the Keras training API
+-  `pipelines`: an exemplary high-level pipeline implementation
+-  `reports`: classes for generating reports related to the different tasks
+-  `constants.py`: constants and configuration values
+-  `utils.py`: utility functions
 
 
 
