@@ -6,7 +6,7 @@ install-dev:
 
 .PHONY: test
 test:
-	python -m pytest ./test/*.py --doctest-modules --junitxml=junit/test-results.xml --cov=dlomix --cov-report=xml --cov-report=html
+	python -m pytest --doctest-modules --junitxml=junit/test-results.xml --cov=dlomix --cov-report=xml --cov-report=html
 
 format:
 	black ./dlomix/*

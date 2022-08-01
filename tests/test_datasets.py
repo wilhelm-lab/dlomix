@@ -3,6 +3,7 @@ import numpy as np
 
 
 INTENSITY_CSV_EXAMPLE_URL = 'https://raw.githubusercontent.com/wilhelm-lab/dlomix/develop/example_dataset/intensity/intensity_data.csv'
+INTENSITY_PARQUET_EXAMPLE_URL = 'https://zenodo.org/record/6602020/files/TUM_missing_first_meta_data.parquet?download=1'
 
 def test_empty_rtdataset():
     rtdataset = RetentionTimeDataset()
@@ -15,6 +16,13 @@ def test_simple_rtdataset():
     assert rtdataset.sequences is not None
     assert rtdataset.targets is not None
     assert rtdataset.main_split is RetentionTimeDataset.SPLIT_NAMES[0]
+
+def test_parquet_rtdataset():
+    rtdataset = RetentionTimeDataset(data_source=INTENSITY_PARQUET_EXAMPLE_URL,
+                sequence_col='modified_sequence', target_col='indexed_retention_time')
+    assert rtdataset.sequences is not None
+    assert rtdataset.targets is not None
+    assert rtdataset.main_split is RetentionTimeDataset.SPLIT_NAMES[0]    
 
 def test_empty_intensitydataset():
     intensity_dataset = IntensityDataset()
