@@ -1,7 +1,7 @@
 import pandas as pd
 import numpy as np
 import tensorflow as tf
-
+from constants import DEFAULT_PARQUET_ENGINE
 """
  TODO: check if it is better to abstract out a generic class for TF dataset wrapper, including:
  - splitting data logic (e.g. include task-specific stratification based on sequence length, iRT values)
@@ -18,7 +18,7 @@ class RetentionTimeDataset:
     Parameters
     -----------
     data_source : str, tuple of two numpy.ndarray, numpy.ndarray, optional
-        source can be a tuple of two arrays (sequences, targets), single array (sequences), useful for test data, or a str with a file path to a csv file. Defaults to None.
+        source can be a tuple of two arrays (sequences, targets), single array (sequences), useful for test data, or a str with a file path to a csv/parquet file. Defaults to None.
     sep : str, optional
         separator to be used if the data source is a CSV file. Defaults to ",".
     sequence_col :  str, optional
@@ -188,7 +188,18 @@ class RetentionTimeDataset:
             self._data_mean, self._data_std = 0, 1
 
         elif isinstance(self.data_source, str):
-            df = pd.read_csv(self.data_source)
+            is_parquet_url = '.parquet' in self.data_source and self.data_source.startswith('http')
+            is_parquet_file = self.data_source.endswith('.parquet')
+
+            if is_parquet_url or is_parquet_file:
+                try:
+                    df = pd.read_parquet(self.data_source,
+                                        engine=RetentionTimeDataset.DEFAULT_PARQUET_ENGINE)
+                except ImportError:
+                    raise ImportError('Parquet engine is missing, please install fastparquet using pip or conda.')
+
+            else:
+                df = pd.read_csv(self.data_source)
 
             # used only for testing with a smaller sample from a csv file
             if self.sample_run:

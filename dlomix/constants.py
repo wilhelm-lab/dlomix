@@ -37,3 +37,5 @@ ALPHABET_UNMOD = {
     "W": 19,
     "Y": 20,
 }
+
+DEFAULT_PARQUET_ENGINE = 'fastparquet'

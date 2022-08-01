@@ -2,7 +2,7 @@ import pandas as pd
 import numpy as np
 import tensorflow as tf
 from dlomix.utils import convert_nested_list_to_numpy_array
-
+from constants import DEFAULT_PARQUET_ENGINE
 
 # take into consideration if the pandas dataframe is pickled or not and then call read_pickle instead of read_csv
 # allow the possiblity to have three different dataset objects, one for train, val, and test
@@ -193,7 +193,17 @@ class IntensityDataset:
                     "If a tuple is provided, it has to have a length of 4 and all elements should be numpy arrays."
                 )
         elif isinstance(self.data_source, str):
-            df = pd.read_csv(self.data_source)
+            is_parquet_url = '.parquet' in self.data_source and self.data_source.startswith('http')
+            is_parquet_file = self.data_source.endswith('.parquet')
+            if is_parquet_url or is_parquet_file:
+                try:
+                    df = pd.read_parquet(self.data_source,
+                                        engine=IntensityDataset.DEFAULT_PARQUET_ENGINE)
+                except ImportError:
+                    raise ImportError('Parquet engine is missing, please install fastparquet using pip or conda.')
+
+            else:
+                df = pd.read_csv(self.data_source)
 
             # used only for testing with a smaller sample from a csv file
             if self.sample_run:
@@ -223,8 +233,6 @@ class IntensityDataset:
             # for concatenation later, we expand dimensions
             self.collision_energy = self.collision_energy.values.reshape(-1, 1)
 
-            print(type(self.precursor_charge))
-            print(self.precursor_charge)
             self.precursor_charge = convert_nested_list_to_numpy_array(self.precursor_charge.values, dtype=np.float64)
             self.intensities = convert_nested_list_to_numpy_array(self.intensities.values)
 
