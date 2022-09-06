@@ -134,7 +134,7 @@ class Report(abc.ABC):
     def plot_all_metrics(self):
         """Plot all available Keras metrics in the History object."""
         metrics = self._history_dict.keys()
-        metrics = filter(lambda x: not x.startswith("val_"), metrics)
+        metrics = filter(lambda x: not x.startswith(tuple(["val_", "_"])), metrics)
         for metric in metrics:
             self.plot_keras_metric(metric)
 

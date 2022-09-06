@@ -141,5 +141,8 @@ notebooks/wandb
 # output folders
 /notebooks/output*/
 
+# wandb in notebooks
+/notebooks/wandb/
+
 # local to do file if exists :)
 todo.txt
