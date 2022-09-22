@@ -2,7 +2,7 @@ import pandas as pd
 import numpy as np
 import tensorflow as tf
 from dlomix.utils import convert_nested_list_to_numpy_array
-from constants import DEFAULT_PARQUET_ENGINE
+from dlomix.constants import DEFAULT_PARQUET_ENGINE
 
 # take into consideration if the pandas dataframe is pickled or not and then call read_pickle instead of read_csv
 # allow the possiblity to have three different dataset objects, one for train, val, and test

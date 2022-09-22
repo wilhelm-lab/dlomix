@@ -20,15 +20,20 @@ class RetentionTimePredictor(tf.keras.Model):
         seq_length=30,
         encoder="conv1d",
         vocab_dict=ALPHABET_UNMOD,
+        vocab_size=0,
     ):
         super(RetentionTimePredictor, self).__init__()
 
-        # tie the count of embeddings to the size of the vocabulary (count of amino acids)
-        self.embeddings_count = len(vocab_dict) + 2
+        self.embeddings_count = vocab_size
+        self.string_lookup = None
 
-        self.string_lookup = preprocessing.StringLookup(
-            vocabulary=list(vocab_dict.keys())
-        )
+        if vocab_dict:
+            # tie the count of embeddings to the size of the vocabulary (count of amino acids)
+            self.embeddings_count = len(vocab_dict) + 2
+
+            self.string_lookup = preprocessing.StringLookup(
+                vocabulary=list(vocab_dict.keys())
+            )
 
         self.embedding = tf.keras.layers.Embedding(
             input_dim=self.embeddings_count,
@@ -70,7 +75,11 @@ class RetentionTimePredictor(tf.keras.Model):
             )
 
     def call(self, inputs, **kwargs):
-        x = self.string_lookup(inputs)
+        x = inputs
+
+        if self.string_lookup:
+            x = self.string_lookup(x)
+
         x = self.embedding(x)
         x = self.encoder(x)
         x = self.flatten(x)

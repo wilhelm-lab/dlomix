@@ -38,4 +38,4 @@ ALPHABET_UNMOD = {
     "Y": 20,
 }
 
-DEFAULT_PARQUET_ENGINE = 'fastparquet'
+DEFAULT_PARQUET_ENGINE = 'pyarrow'

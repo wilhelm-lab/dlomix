@@ -1,7 +1,9 @@
 import pandas as pd
 import numpy as np
 import tensorflow as tf
-from constants import DEFAULT_PARQUET_ENGINE
+from dlomix.constants import DEFAULT_PARQUET_ENGINE
+from dlomix.encoding import SequenceEncoder
+
 """
  TODO: check if it is better to abstract out a generic class for TF dataset wrapper, including:
  - splitting data logic (e.g. include task-specific stratification based on sequence length, iRT values)
@@ -67,6 +69,7 @@ class RetentionTimeDataset:
         test=False,
         path_aminoacid_atomcounts=None,
         sample_run=False,
+        sequence_encoder=None
     ):
         super(RetentionTimeDataset, self).__init__()
 
@@ -115,6 +118,15 @@ class RetentionTimeDataset:
             )
             self._init_atom_table()
 
+        
+        # use sequence encoding
+        self.use_sequence_encoder = True if sequence_encoder else False
+        
+        if self.use_sequence_encoder:
+            from dlomix.constants import ALPHABET_UNMOD
+            # other options should be availalbe, can be string argument
+            self.sequence_encoder = SequenceEncoder(ALPHABET_UNMOD)
+        
         # initialize TF Datasets dict
         self.tf_dataset = (
             {self.main_split: None, RetentionTimeDataset.SPLIT_NAMES[1]: None}
@@ -155,6 +167,7 @@ class RetentionTimeDataset:
         self.data_source = data
 
         self._read_data()
+        self._encode_sequences()
         self._validate_remove_long_sequences()
         self._split_data()
         self._build_tf_dataset()
@@ -226,6 +239,20 @@ class RetentionTimeDataset:
         # give the index of the element as an ID for later reference if needed
         self.example_id = list(range(len(self.sequences)))
 
+    def _encode_sequences(self) -> None:
+        """
+        apply encoding if a sequence encoder was passed
+        """
+        if not self.use_sequence_encoder:
+            return
+        
+        self.sequences = self.sequence_encoder.encode(self.sequences)
+
+        return True
+        
+
+
+
     def _validate_remove_long_sequences(self) -> None:
         """
         Validate if all sequences are shorter than the padding length, otherwise drop them.
@@ -255,6 +282,9 @@ class RetentionTimeDataset:
         else:
             self.indicies_dict[self.main_split] = np.arange(n)
 
+    # ToDo: move to from_generator https://www.tensorflow.org/api_docs/python/tf/data/Dataset#from_generator
+    
+
     def _build_tf_dataset(self):
         # consider adding the feature columns or extra inputs
         for split in self.tf_dataset.keys():
@@ -274,17 +304,22 @@ class RetentionTimeDataset:
                     num_parallel_calls=tf.data.AUTOTUNE,
                 )
 
+            if not self.use_sequence_encoder:
+                self.tf_dataset[split] = (
+                    self.tf_dataset[split]
+                    .map(
+                        lambda s, t: self._split_sequence(s, t),
+                        num_parallel_calls=tf.data.AUTOTUNE,
+                    )
+                )
+            
+            # pad sequences in all cases
             self.tf_dataset[split] = (
-                self.tf_dataset[split]
-                .map(
-                    lambda s, t: self._split_sequence(s, t),
-                    num_parallel_calls=tf.data.AUTOTUNE,
+                    self.tf_dataset[split].map(
+                        lambda s, t: self._pad_sequences(s, t),
+                        num_parallel_calls=tf.data.AUTOTUNE,
+                    )
                 )
-                .map(
-                    lambda s, t: self._pad_sequences(s, t),
-                    num_parallel_calls=tf.data.AUTOTUNE,
-                )
-            )
 
             if self.include_count_features:
                 self.tf_dataset[split] = (
