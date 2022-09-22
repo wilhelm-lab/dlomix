@@ -135,11 +135,18 @@ dmypy.json
 # test notebooks are stored in /notebooks/ and named with a leading underscore
 notebooks/_*
 
+# wand outputs
+notebooks/wandb
+
 # output folders
 /notebooks/output*/
 
 # wandb in notebooks
 /notebooks/wandb/
+
+# all data files under notebooks
+/notebooks/data
+/notebooks/data*
 
 # local to do file if exists :)
 todo.txt
