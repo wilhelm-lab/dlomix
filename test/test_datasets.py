@@ -3,6 +3,7 @@ import numpy as np
 
 
 INTENSITY_CSV_EXAMPLE_URL = 'https://raw.githubusercontent.com/wilhelm-lab/dlomix/develop/example_dataset/intensity/intensity_data.csv'
+TEST_DATA_PARQUET = ""
 
 def test_empty_rtdataset():
     rtdataset = RetentionTimeDataset()
@@ -12,6 +13,22 @@ def test_empty_rtdataset():
 
 def test_simple_rtdataset():
     rtdataset = RetentionTimeDataset(data_source=(np.array(['AAA', 'BBB']), np.array([21.5, 26.5])))
+    assert rtdataset.sequences is not None
+    assert rtdataset.targets is not None
+    assert rtdataset.main_split is RetentionTimeDataset.SPLIT_NAMES[0]
+
+def test_dict_rtdataset():
+    test_data_dict = {
+        "metadata": TEST_DATA_PARQUET,
+        "annotations": {},
+        "parameters": {
+            "target_column_key": "linear rt"
+        }
+    }
+
+    rtdataset = RetentionTimeDataset(data_source=test_data_dict, seq_length=30)
+    print(rtdataset.sequences)
+    print(rtdataset.targets)
     assert rtdataset.sequences is not None
     assert rtdataset.targets is not None
     assert rtdataset.main_split is RetentionTimeDataset.SPLIT_NAMES[0]

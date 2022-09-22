@@ -150,3 +150,4 @@ notebooks/wandb
 
 # local to do file if exists :)
 todo.txt
+.DS_Store

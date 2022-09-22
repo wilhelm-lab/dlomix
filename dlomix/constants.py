@@ -1,3 +1,5 @@
+DEFAULT_PARQUET_ENGINE = 'pyarrow'
+
 retention_time_pipeline_parameters = {
     "model_params": {"seq_length": 30},
     "data_params": {
