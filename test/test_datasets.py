@@ -1,9 +1,10 @@
 from dlomix.data import RetentionTimeDataset, IntensityDataset
 import numpy as np
+import pandas as pd
 
 
 INTENSITY_CSV_EXAMPLE_URL = 'https://raw.githubusercontent.com/wilhelm-lab/dlomix/develop/example_dataset/intensity/intensity_data.csv'
-TEST_DATA_PARQUET = ""
+TEST_DATA_PARQUET = "metadata.parquet"
 
 def test_empty_rtdataset():
     rtdataset = RetentionTimeDataset()
@@ -17,8 +18,21 @@ def test_simple_rtdataset():
     assert rtdataset.targets is not None
     assert rtdataset.main_split is RetentionTimeDataset.SPLIT_NAMES[0]
 
-def test_dict_rtdataset():
+def test_json_dict_rtdataset():
     test_data_dict = {
+        "metadata": {
+            "linear rt" : [1,2,3],
+            "modified_sequence": ["ABC", "ABC", "ABC"]
+        },
+        "annotations": {},
+        "parameters": {
+            "target_column_key": "linear rt"
+        }
+    }
+
+    pd.DataFrame(test_data_dict["metadata"]).to_parquet(TEST_DATA_PARQUET)
+
+    test_data_dict_file = {
         "metadata": TEST_DATA_PARQUET,
         "annotations": {},
         "parameters": {
@@ -26,12 +40,8 @@ def test_dict_rtdataset():
         }
     }
 
-    rtdataset = RetentionTimeDataset(data_source=test_data_dict, seq_length=30)
-    print(rtdataset.sequences)
-    print(rtdataset.targets)
-    assert rtdataset.sequences is not None
-    assert rtdataset.targets is not None
-    assert rtdataset.main_split is RetentionTimeDataset.SPLIT_NAMES[0]
+    rtdataset = RetentionTimeDataset(data_source=test_data_dict, seq_length=20)
+    rtdataset_filebased = RetentionTimeDataset(data_source=test_data_dict_file, seq_length=20)
 
 def test_empty_intensitydataset():
     intensity_dataset = IntensityDataset()

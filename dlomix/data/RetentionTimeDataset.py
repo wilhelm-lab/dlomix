@@ -174,8 +174,7 @@ class RetentionTimeDataset:
 
     def _read_data(self):
         if isinstance(self.data_source, dict):
-            d = self.data_source.copy()
-            self._update_data_loading_for_json_format(d)
+            self._update_data_loading_for_json_format()
 
         if isinstance(self.data_source, tuple):
             tuple_size_is_two = len(self.data_source) == 2
@@ -196,8 +195,13 @@ class RetentionTimeDataset:
             self.targets = np.zeros(self.sequences.shape[0])
             self._data_mean, self._data_std = 0, 1
 
-        elif isinstance(self.data_source, str):
-            df = self._resolve_string_data_path()
+        elif isinstance(self.data_source, (str, dict)):
+            if isinstance(self.data_source, dict):
+                #  a dict is passed via the json
+                df = pd.DataFrame(self.data_source)
+            else:
+                # a string path is passed via the json or as a constructor argument
+                df = self._resolve_string_data_path()
 
             # used only for testing with a smaller sample from a csv file
             if self.sample_run:
@@ -205,8 +209,6 @@ class RetentionTimeDataset:
 
             # lower all column names
             df.columns = [col_name.lower() for col_name in df.columns]
-            print("dataframe columns: ", df.columns)
-            print("dataframe: ", df)
 
             self.sequences, self.targets = (
                 df[self.sequence_col].values,
@@ -220,11 +222,20 @@ class RetentionTimeDataset:
         else:
             raise ValueError(
                 "Data source has to be either a tuple of two numpy arrays, a single numpy array, "
-                "or a string path to a csv file."
+                "or a string with a path to a csv/parquet/json file."
             )
 
         # give the index of the element as an ID for later reference if needed
         self.example_id = list(range(len(self.sequences)))
+
+    def _update_data_loading_for_json_format(self):
+        json_dict  = self.data_source
+        
+        self.data_source = json_dict.get(RetentionTimeDataset.METADATA_KEY, "")
+        self.target_col = (json_dict.get(RetentionTimeDataset.PARAMS_KEY, {})
+                                    .get(RetentionTimeDataset.TARGET_NAME_KEY, self.target_col))
+        # ToDo: make dynamic based on parameters
+        self.sequence_col = "modified_sequence"
 
     def _resolve_string_data_path(self):
         is_json_file = self.data_source.endswith('.json')
@@ -249,14 +260,7 @@ class RetentionTimeDataset:
                 "or a json file."
             )
 
-    def _update_data_loading_for_json_format(self, json_dict):
-        print(json_dict)
-        self.data_source = json_dict.get(RetentionTimeDataset.METADATA_KEY, "")
-        self.target_col = (json_dict.get(RetentionTimeDataset.PARAMS_KEY, {})
-                                    .get(RetentionTimeDataset.TARGET_NAME_KEY, self.target_col))
-        # to make dynamic based on parameters
-        self.sequence_col = "modified_sequence"
-        print(self.data_source, self.target_col, self.sequence_col) 
+    
 
     def _validate_remove_long_sequences(self) -> None:
         """
@@ -469,7 +473,20 @@ def read_json_file(filepath):
 
 if __name__== "__main__":
     test_data_dict = {
-        "metadata": "./notebooks/data/metadata.parquet",
+        "metadata": {
+            "linear rt" : [1,2,3],
+            "modified_sequence": ["ABC", "ABC", "ABC"]
+        },
+        "annotations": {},
+        "parameters": {
+            "target_column_key": "linear rt"
+        }
+    }
+
+    pd.DataFrame(test_data_dict["metadata"]).to_parquet("metadata.parquet")
+
+    test_data_dict_file = {
+        "metadata": "metadata.parquet",
         "annotations": {},
         "parameters": {
             "target_column_key": "linear rt"
@@ -477,5 +494,9 @@ if __name__== "__main__":
     }
 
     rtdataset = RetentionTimeDataset(data_source=test_data_dict, seq_length=20)
+    print(rtdataset.sequences)
+    print(rtdataset.targets)
+
+    rtdataset = RetentionTimeDataset(data_source=test_data_dict_file, seq_length=20)
     print(rtdataset.sequences)
     print(rtdataset.targets)
