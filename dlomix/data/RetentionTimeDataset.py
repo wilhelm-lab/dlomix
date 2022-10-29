@@ -229,25 +229,28 @@ class RetentionTimeDataset:
         self.example_id = list(range(len(self.sequences)))
 
     def _update_data_loading_for_json_format(self):
-        json_dict  = self.data_source
-        
+        json_dict = self.data_source
+
         self.data_source = json_dict.get(RetentionTimeDataset.METADATA_KEY, "")
-        self.target_col = (json_dict.get(RetentionTimeDataset.PARAMS_KEY, {})
-                                    .get(RetentionTimeDataset.TARGET_NAME_KEY, self.target_col))
+        self.target_col = json_dict.get(RetentionTimeDataset.PARAMS_KEY, {}).get(
+            RetentionTimeDataset.TARGET_NAME_KEY, self.target_col
+        )
         # ToDo: make dynamic based on parameters
         self.sequence_col = "modified_sequence"
 
     def _resolve_string_data_path(self):
-        is_json_file = self.data_source.endswith('.json')
+        is_json_file = self.data_source.endswith(".json")
 
         if is_json_file:
             json_dict = read_json_file(self.data_source)
             self._update_data_loading_for_json_format(json_dict)
-        
-        is_parquet_url = '.parquet' in self.data_source and self.data_source.startswith('http')
-        is_parquet_file = self.data_source.endswith('.parquet')
-        is_csv_file = self.data_source.endswith('.csv')
- 
+
+        is_parquet_url = ".parquet" in self.data_source and self.data_source.startswith(
+            "http"
+        )
+        is_parquet_file = self.data_source.endswith(".parquet")
+        is_csv_file = self.data_source.endswith(".csv")
+
         if is_parquet_url or is_parquet_file:
             df = read_parquet_file_pandas(self.data_source, DEFAULT_PARQUET_ENGINE)
             return df
@@ -259,8 +262,6 @@ class RetentionTimeDataset:
                 "Invalid data source provided as a string, please provide a path to a csv, parquet, or "
                 "or a json file."
             )
-
-    
 
     def _validate_remove_long_sequences(self) -> None:
         """
@@ -457,30 +458,34 @@ class RetentionTimeDataset:
     def data_std(self, value):
         self._data_std = value
 
+
 # to go to reader classes or reader utils
+
 
 def read_parquet_file_pandas(filepath, parquet_engine):
     try:
         df = pd.read_parquet(filepath, engine=parquet_engine)
     except ImportError:
-        raise ImportError('Parquet engine is missing, please install fastparquet using pip or conda.')
+        raise ImportError(
+            "Parquet engine is missing, please install fastparquet using pip or conda."
+        )
     return df
 
+
 def read_json_file(filepath):
-    with open(filepath, 'r') as j:
+    with open(filepath, "r") as j:
         json_dict = json.loads(j.read())
     return json_dict
 
-if __name__== "__main__":
+
+if __name__ == "__main__":
     test_data_dict = {
         "metadata": {
-            "linear rt" : [1,2,3],
-            "modified_sequence": ["ABC", "ABC", "ABC"]
+            "linear rt": [1, 2, 3],
+            "modified_sequence": ["ABC", "ABC", "ABC"],
         },
         "annotations": {},
-        "parameters": {
-            "target_column_key": "linear rt"
-        }
+        "parameters": {"target_column_key": "linear rt"},
     }
 
     pd.DataFrame(test_data_dict["metadata"]).to_parquet("metadata.parquet")
@@ -488,9 +493,7 @@ if __name__== "__main__":
     test_data_dict_file = {
         "metadata": "metadata.parquet",
         "annotations": {},
-        "parameters": {
-            "target_column_key": "linear rt"
-        }
+        "parameters": {"target_column_key": "linear rt"},
     }
 
     rtdataset = RetentionTimeDataset(data_source=test_data_dict, seq_length=20)

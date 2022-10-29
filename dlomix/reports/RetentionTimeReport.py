@@ -64,11 +64,10 @@ class RetentionTimeReport(Report):
         """
         error = np.ravel(targets) - np.ravel(predictions)
 
-
         x_min, x_max = xrange
-        if xrange == (0,0):
+        if xrange == (0, 0):
             mean, std_dev = np.mean(error), np.std(error)
-            x_min, x_max = mean - (3*std_dev), mean + (3*std_dev)
+            x_min, x_max = mean - (3 * std_dev), mean + (3 * std_dev)
 
         bins = np.linspace(x_min, x_max, 200)
 

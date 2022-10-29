@@ -107,7 +107,6 @@ class IntensityDataset:
         self.precursor_charge = None
         self.intensities = None
 
-
         self.features_df = None
         self.example_id = None
 
@@ -174,13 +173,17 @@ class IntensityDataset:
 
     def _read_data(self):
         if isinstance(self.data_source, tuple):
-            tuple_size_is_three_or_four = len(self.data_source) == 3 or len(self.data_source) == 4
+            tuple_size_is_three_or_four = (
+                len(self.data_source) == 3 or len(self.data_source) == 4
+            )
             if tuple_size_is_three_or_four:
-                tuple_elements_are_ndarray = all([isinstance(x, np.ndarray) for x in self.data_source])
+                tuple_elements_are_ndarray = all(
+                    [isinstance(x, np.ndarray) for x in self.data_source]
+                )
                 if tuple_elements_are_ndarray:
                     self.sequences = self.data_source[0]
                     self.collision_energy = self.data_source[1]
-                    self.precursor_charge =  self.data_source[2]
+                    self.precursor_charge = self.data_source[2]
                     if len(self.data_source) == 4:
                         self.intensities = self.data_source[3]
                         self.no_intensities = False
@@ -208,14 +211,13 @@ class IntensityDataset:
             self.precursor_charge = df[self.precursor_charge_col]
             self.intensities = df[self.intensities_col]
 
-            
             # parse strings into lists, for precursor charge and intensities
             if isinstance(self.precursor_charge.iloc[0], str):
                 self.precursor_charge = self.precursor_charge.apply(eval)
-            
+
             if isinstance(self.intensities.iloc[0], str):
                 self.intensities = self.intensities.apply(eval)
-            
+
             # get numpy arrays with .values() for all inputs and intensities
 
             self.sequences = self.sequences.values
@@ -225,8 +227,12 @@ class IntensityDataset:
 
             print(type(self.precursor_charge))
             print(self.precursor_charge)
-            self.precursor_charge = convert_nested_list_to_numpy_array(self.precursor_charge.values, dtype=np.float64)
-            self.intensities = convert_nested_list_to_numpy_array(self.intensities.values)
+            self.precursor_charge = convert_nested_list_to_numpy_array(
+                self.precursor_charge.values, dtype=np.float64
+            )
+            self.intensities = convert_nested_list_to_numpy_array(
+                self.intensities.values
+            )
 
             self.features_df = df[self.feature_cols]
         else:
@@ -237,10 +243,6 @@ class IntensityDataset:
 
         # give the index of the element as an ID for later reference if needed
         self.example_id = list(range(len(self.sequences)))
-    
-
-
-
 
     def _validate_remove_long_sequences(self) -> None:
         """
@@ -248,13 +250,18 @@ class IntensityDataset:
         """
         assert self.sequences.shape[0] > 0, "No sequences in the provided data."
 
-        
         # check if count of examples matches for all provided inputs
-        lengths = [len(self.sequences), len(self.collision_energy), len(self.precursor_charge)]
+        lengths = [
+            len(self.sequences),
+            len(self.collision_energy),
+            len(self.precursor_charge),
+        ]
         if not self.no_intensities:
             lengths = lengths + [len(self.intensities)]
-        
-        assert np.all(lengths == np.array(lengths[0])), "Count of examples does not match for sequences and targets."
+
+        assert np.all(
+            lengths == np.array(lengths[0])
+        ), "Count of examples does not match for sequences and targets."
 
         limit = self.seq_length
         vectorized_len = np.vectorize(lambda x: len(x))
@@ -288,20 +295,19 @@ class IntensityDataset:
                     self.sequences[self.indicies_dict[split]],
                     self.collision_energy[self.indicies_dict[split]],
                     self.precursor_charge[self.indicies_dict[split]],
-                    self.intensities[self.indicies_dict[split]]
+                    self.intensities[self.indicies_dict[split]],
                 )
             )
 
     def _preprocess_tf_dataset(self):
         # ToDo: convert input to dict and assume this as the general case --> abstract out in parent class
-        
-        
+
         for split in self.tf_dataset.keys():
             self.tf_dataset[split] = (
                 self.tf_dataset[split]
                 .map(
-                        IntensityDataset._convert_inputs_to_dict,
-                        num_parallel_calls=tf.data.AUTOTUNE,
+                    IntensityDataset._convert_inputs_to_dict,
+                    num_parallel_calls=tf.data.AUTOTUNE,
                 )
                 .map(
                     lambda i, t: self._split_sequence(i, t),
@@ -357,10 +363,10 @@ class IntensityDataset:
         )
         return seq, target
 
-    def _split_sequence(self, inputs,  target):
+    def _split_sequence(self, inputs, target):
 
         inputs["sequence"] = tf.strings.bytes_split(inputs["sequence"])
-        
+
         return inputs, target
 
     """
@@ -369,7 +375,11 @@ class IntensityDataset:
 
     @staticmethod
     def _convert_inputs_to_dict(seq, collision, precursor, target):
-        inputs_dict = {"sequence": seq, "collision_energy": collision, "precursor_charge": precursor}
+        inputs_dict = {
+            "sequence": seq,
+            "collision_energy": collision,
+            "precursor_charge": precursor,
+        }
         return inputs_dict, target
 
     def _generate_single_counts(self, inputs, target):

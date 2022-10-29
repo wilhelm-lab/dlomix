@@ -1,4 +1,4 @@
-DEFAULT_PARQUET_ENGINE = 'pyarrow'
+DEFAULT_PARQUET_ENGINE = "pyarrow"
 
 retention_time_pipeline_parameters = {
     "model_params": {"seq_length": 30},
@@ -10,10 +10,11 @@ retention_time_pipeline_parameters = {
     "trained_model_stats": [0.0, 1.0],
 }
 
-retention_time_pipeline_parameters.update( 
+retention_time_pipeline_parameters.update(
     {
-    "trained_model_url":
-        "https://raw.githubusercontent.com/wilhelm-lab/dlomix/develop" + retention_time_pipeline_parameters['trained_model_path'].strip("..") + retention_time_pipeline_parameters['trained_model_zipfile_name']
+        "trained_model_url": "https://raw.githubusercontent.com/wilhelm-lab/dlomix/develop"
+        + retention_time_pipeline_parameters["trained_model_path"].strip("..")
+        + retention_time_pipeline_parameters["trained_model_zipfile_name"]
     }
 )
 

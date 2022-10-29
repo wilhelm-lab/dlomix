@@ -36,34 +36,32 @@ class RetentionTimePipeline:
         if self.pre_trained:
             self._download_unzip_pretrained_model(
                 retention_time_pipeline_parameters["trained_model_url"],
-                retention_time_pipeline_parameters["trained_model_path"] + retention_time_pipeline_parameters["trained_model_zipfile_name"]
+                retention_time_pipeline_parameters["trained_model_path"]
+                + retention_time_pipeline_parameters["trained_model_zipfile_name"],
             )
 
             self.model.load_weights(
-                retention_time_pipeline_parameters["trained_model_path"] + splitext(retention_time_pipeline_parameters["trained_model_zipfile_name"])[0]
+                retention_time_pipeline_parameters["trained_model_path"]
+                + splitext(
+                    retention_time_pipeline_parameters["trained_model_zipfile_name"]
+                )[0]
             )
 
-    
     def _download_unzip_pretrained_model(self, model_url, save_path):
         makedirs(model_url)
         r = requests.get(model_url)
 
-        with open(save_path, 'wb') as f:
+        with open(save_path, "wb") as f:
             f.write(r.content)
-        
+
         self._unzip_model(save_path)
-    
+
     def _unzip_model(self, model_zipfile_path):
         zip_ref = zipfile.ZipFile(model_zipfile_path)
         model_folder = dirname(model_zipfile_path)
-        zip_ref.extractall(model_folder) 
+        zip_ref.extractall(model_folder)
         zip_ref.close()
-        
 
-
-
-
-    
     """
     
     Predict retention times given data either as numpy array of sequences or a filepath to a csv file
@@ -93,13 +91,9 @@ class RetentionTimePipeline:
 
         return predictions
 
-    
     def predict_report(self, data, output_path="./") -> None:
         predictions = self.predict(data)
         report = RetentionTimeReport(output_path=output_path, history=None)
 
         test_targets = self.test_dataset.get_split_targets(split="test")
         report.generate_report(test_targets, predictions)
-
-
-
