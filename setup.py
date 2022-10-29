@@ -23,7 +23,8 @@ setuptools.setup(
         'numpy',
         'matplotlib',
         'scikit-learn',
-        'tensorflow'],
+        'tensorflow',
+        'pyarrow'],
     extras_require={
         "dev": [
             "pytest >= 3.7",
