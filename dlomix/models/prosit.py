@@ -3,6 +3,7 @@ from tensorflow.keras.layers.experimental import preprocessing
 from dlomix.constants import ALPHABET_UNMOD
 from dlomix.layers.attention import AttentionLayer, DecoderAttentionLayer
 
+
 class PrositRetentionTimePredictor(tf.keras.Model):
     """Implementation of the Prosit model for retention time prediction.
 
@@ -85,7 +86,6 @@ class PrositRetentionTimePredictor(tf.keras.Model):
         return x
 
 
-
 class PrositIntensityPredictor(tf.keras.Model):
     """Implementation of the Prosit model for intensity prediction.
 
@@ -109,7 +109,8 @@ class PrositIntensityPredictor(tf.keras.Model):
         dropout_rate=0.2,
         latent_dropout_rate=0.1,
         recurrent_layers_sizes=(256, 512),
-        regressor_layer_size=512):
+        regressor_layer_size=512,
+    ):
         super(PrositIntensityPredictor, self).__init__()
 
         # tie the count of embeddings to the size of the vocabulary (count of amino acids)
@@ -138,30 +139,36 @@ class PrositIntensityPredictor(tf.keras.Model):
         self._build_encoders()
         self._build_decoder()
 
-        self.attention = AttentionLayer(name='encoder_att')
+        self.attention = AttentionLayer(name="encoder_att")
 
-        self.fusion_layer = tf.keras.Sequential([
-            tf.keras.layers.Multiply(name='add_meta'),
-            tf.keras.layers.RepeatVector(self.max_ion, name="repeat")
-        ]) 
+        self.fusion_layer = tf.keras.Sequential(
+            [
+                tf.keras.layers.Multiply(name="add_meta"),
+                tf.keras.layers.RepeatVector(self.max_ion, name="repeat"),
+            ]
+        )
 
-
-        
         self.regressor = tf.keras.Sequential(
             [
-                tf.keras.layers.TimeDistributed(tf.keras.layers.Dense(self.len_fion), name='time_dense'),
-                tf.keras.layers.LeakyReLU(name='activation'),
-                tf.keras.layers.Flatten(name="out")
+                tf.keras.layers.TimeDistributed(
+                    tf.keras.layers.Dense(self.len_fion), name="time_dense"
+                ),
+                tf.keras.layers.LeakyReLU(name="activation"),
+                tf.keras.layers.Flatten(name="out"),
             ]
         )
 
     def _build_encoders(self):
-        
-        self.meta_encoder = tf.keras.Sequential([
-            tf.keras.layers.Concatenate(name="meta_in"),
-            tf.keras.layers.Dense(self.recurrent_layers_sizes[1], name='meta_dense'),
-            tf.keras.layers.Dropout(self.dropout_rate, name='meta_dense_do')
-        ])
+
+        self.meta_encoder = tf.keras.Sequential(
+            [
+                tf.keras.layers.Concatenate(name="meta_in"),
+                tf.keras.layers.Dense(
+                    self.recurrent_layers_sizes[1], name="meta_dense"
+                ),
+                tf.keras.layers.Dropout(self.dropout_rate, name="meta_dense_do"),
+            ]
+        )
 
         self.sequence_encoder = tf.keras.Sequential(
             [
@@ -182,10 +189,12 @@ class PrositIntensityPredictor(tf.keras.Model):
         self.decoder = tf.keras.Sequential(
             [
                 tf.keras.layers.GRU(
-                    units=self.recurrent_layers_sizes[1], return_sequences=True, name="decoder"
+                    units=self.recurrent_layers_sizes[1],
+                    return_sequences=True,
+                    name="decoder",
                 ),
                 tf.keras.layers.Dropout(rate=self.dropout_rate),
-                DecoderAttentionLayer(self.max_ion)
+                DecoderAttentionLayer(self.max_ion),
             ]
         )
 
@@ -194,15 +203,10 @@ class PrositIntensityPredictor(tf.keras.Model):
         collision_energy_in = inputs["collision_energy"]
         precursor_charge_in = inputs["precursor_charge"]
 
-        encoded_meta = self.meta_encoder([
-            collision_energy_in,
-            precursor_charge_in
-
-            ]
-        )
+        encoded_meta = self.meta_encoder([collision_energy_in, precursor_charge_in])
 
         x = self.string_lookup(peptides_in)
-        print('encoded sequence: ', x)
+        print("encoded sequence: ", x)
         x = self.embedding(x)
         x = self.sequence_encoder(x)
         x = self.attention(x)
@@ -213,4 +217,4 @@ class PrositIntensityPredictor(tf.keras.Model):
 
         x = self.regressor(x)
 
-        return x        
+        return x

@@ -150,3 +150,13 @@ notebooks/wandb
 
 # local to do file if exists :)
 todo.txt
+
+.DS_Store
+
+# model checkpoints in the run scripts directory
+run_scripts/checkpoint*
+run_scripts/*.index
+run_scripts/*.data-*
+
+# testing metadata
+metadata.parquet
