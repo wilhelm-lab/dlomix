@@ -1,9 +1,10 @@
-from .prosit import PrositRetentionTimePredictor
-from .base import RetentionTimePredictor
-from .deepLC import DeepLCRetentionTimePredictor
+from .base import *
+from .deepLC import *
+from .prosit import *
 
 __all__ = [
-    RetentionTimePredictor,
-    PrositRetentionTimePredictor,
-    DeepLCRetentionTimePredictor,
+    "RetentionTimePredictor",
+    "PrositRetentionTimePredictor",
+    "DeepLCRetentionTimePredictor",
+    "PrositIntensityPredictor",
 ]

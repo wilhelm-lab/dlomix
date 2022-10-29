@@ -2,13 +2,16 @@
 
 [![Docs](https://readthedocs.org/projects/docs/badge/?version=latest)](https://dlomix.readthedocs.io/en/latest/?badge=latest)
 [![Build](https://github.com/wilhelm-lab/dlomix/actions/workflows/build.yaml/badge.svg)](https://github.com/wilhelm-lab/dlomix/actions/workflows/build.yaml)
+[![PyPI](https://github.com/wilhelm-lab/dlomix/actions/workflows/pypi.yaml/badge.svg)](https://github.com/wilhelm-lab/dlomix/actions/workflows/pypi.yaml)
 
 **DLOmix** is a python framework for Deep Learning in Proteomics. Initially built ontop of TensorFlow/Keras, support for PyTorch can however be integrated once the main API is established.
 
 ## Usage
 Experiment a simple retention time prediction use-case using Google Colab &nbsp;&nbsp; [![Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/wilhelm-lab/dlomix/blob/develop/notebooks/Example_RTModel_Walkthrough_colab.ipynb)
 
-**Resources Repository:**
+A version that includes experiment tracking with [Weights and Biases](https://www.wandb.ai) is available here &nbsp;&nbsp; [![Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/wilhelm-lab/dlomix/blob/develop/notebooks/Example_RTModel_Walkthrough_colab-weights-and-biases.ipynb)
+
+**Resources Repository**
 
 More learning resources can be found in the [dlomix-resources](https://github.com/wilhelm-lab/dlomix-resources) repository.
 
@@ -18,31 +21,34 @@ Run the following to install:
 $ pip install dlomix
 ``` 
 
-**General Overview:**
-- `data.py`: structures for modelling the input data, currently based on `tf.Dataset`
-- `models.py`: common model architectures for the relevant use-cases based on `tf.keras.Model` to allow for using the Keras training API
-- `pipeline.py`: an exemplary high-level pipeline implementation
--  `eval.py`: classes for evaluating models and reporting results
--  `eval_utils.py`: custom evaluation metrics implemented in TensorFlow/Keras
--  `constants.py`: constants and configuration values needs for the `pipeline` class.
+**General Overview**
+-  `data`: structures for modelling the input data, currently based on `tf.Dataset`
+-  `eval`: classes for evaluating models and reporting results
+-  `layers`: custom layers used for building models, based on `tf.keras.layers.Layer`
+-  `losses`: custom losses to be use for training with `model.fit()`
+- `models`: common model architectures for the relevant use-cases based on `tf.keras.Model` to allow for using the Keras training API
+-  `pipelines`: an exemplary high-level pipeline implementation
+-  `reports`: classes for generating reports related to the different tasks
+-  `constants.py`: constants and configuration values
+-  `utils.py`: utility functions
 
 
 
-**Use-cases:**
+**Use-cases**
 
 - Retention Time Prediction: 
     - a regression problem where the the retention time of a peptide sequence is to be predicted. 
 
 
 
-**To-Do:**
+**To-Do**
 
 Functionality:
 - [X] integrate prosit
 - [ ] extend pipeline for different types of models and backbones
 - [ ] extend pipeline to allow for fine-tuning with custom datasets
 - [X] add residual plots to reporting, possibly other regression analysis tools
-- [ ] output reporting results as PDF
+- [X] output reporting results as PDF
 - [ ] extend data representation to include modifications
 
 Package structure:
@@ -50,7 +56,7 @@ Package structure:
 - [X] integrate `deeplc.py` into `models.py`, preferably introduce a package structure (e.g. `models.retention_time`)
 - [X] add references for implemented models in the ReadMe
 - [ ] introduce a style guide and checking (e.g. PEP)
-- [ ] plan documentation (sphinx and readthedocs)
+- [X] plan documentation (sphinx and readthedocs)
 
 
 ## Developing DLOmix

@@ -3,6 +3,24 @@ import tensorflow.keras.backend as K
 from tensorflow.keras import regularizers, constraints, initializers, activations
 
 
+class DecoderAttentionLayer(tf.keras.layers.Layer):
+    def __init__(self, time_steps):
+        super(DecoderAttentionLayer, self).__init__()
+        self.time_steps = time_steps
+
+    def build(self, input_shape):
+        self.permute = tf.keras.layers.Permute((2, 1))
+        self.dense = tf.keras.layers.Dense(self.time_steps, activation="softmax")
+        self.multiply = tf.keras.layers.Multiply()
+
+    def call(self, inputs):
+        x = self.permute(inputs)
+        x = self.dense(x)
+        x = self.permute(x)
+        x = self.multiply([inputs, x])
+        return x
+
+
 class AttentionLayer(tf.keras.layers.Layer):
     def __init__(
         self,
