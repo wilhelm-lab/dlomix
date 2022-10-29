@@ -157,3 +157,6 @@ todo.txt
 run_scripts/checkpoint*
 run_scripts/*.index
 run_scripts/*.data-*
+
+# testing metadata
+metadata.parquet
