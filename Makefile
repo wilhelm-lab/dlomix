@@ -6,7 +6,8 @@ install-dev:
 
 .PHONY: test
 test:
-	python -m pytest --junitxml=junit/test-results.xml --cov=dlomix --cov-report=xml --cov-report=html
+	mkdir cov/
+	python -m pytest tests/ --junitxml=junit/test-results.xml --cov=dlomix --cov-report html:cov/cov_html --cov-report xml:cov/cov.xml --cov-report lcov:cov/cov.info --cov-report annotate:cov/cov_annotate
 
 format:
 	black ./dlomix/*
