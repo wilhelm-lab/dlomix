@@ -15,12 +15,22 @@ from dlomix.reports import RetentionTimeReport
 
 model = PrositRetentionTimePredictor(seq_length=30)
 
-optimizer = tf.keras.optimizers.Adam(lr=0.0001, decay=1e-7)
+optimizer = tf.keras.optimizers.Adam(learning_rate=0.0001)
 
 TRAIN_DATAPATH = '../example_dataset/proteomTools_train_val.csv'
 TEST_DATAPATH = '../example_dataset/proteomTools_test.csv'
 
-d = RetentionTimeDataset(data_source=TRAIN_DATAPATH, seq_length=30, batch_size=512, val_ratio=0.2)
+d = RetentionTimeDataset(data_source=TRAIN_DATAPATH, seq_length=30, batch_size=4, val_ratio=0.2, sample_run=False)
+
+for x,y in d.train_data:
+    print(x)
+    print(y)
+    break
+
+for x,y in d.val_data:
+    print(x)
+    print(y)
+    break
 
 model.compile(optimizer=optimizer,
               loss='mse',
@@ -33,13 +43,20 @@ early_stop = tf.keras.callbacks.EarlyStopping(patience=20)
 callbacks = [checkpoint, early_stop, decay]
 
 
-history = model.fit(d.train_data, epochs=150, validation_data=d.val_data, callbacks=callbacks)
+history = model.fit(d.train_data, epochs=1, validation_data=d.val_data, callbacks=callbacks)
 
 test_rtdata = RetentionTimeDataset(data_source=TEST_DATAPATH,
-                                   seq_length=30, batch_size=512, test=True)
+                                   seq_length=30, batch_size=4, test=True)
+
+for x,y in test_rtdata.test_data:
+    print(x)
+    print(y)
+    break
+print(1/0)
+
 
 predictions = model.predict(test_rtdata.test_data)
-predictions = d.denormalize_targets(predictions)
+#predictions = d.denormalize_targets(predictions)
 predictions = predictions.ravel()
 test_targets = test_rtdata.get_split_targets(split="test")
 

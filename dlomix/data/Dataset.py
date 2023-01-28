@@ -1,3 +1,4 @@
+# deprecated
 
 import abc
 import json
@@ -45,6 +46,7 @@ class Dataset(abc.ABC):
     METADATA_KEY = "metadata"
     PARAMS_KEY = "parameters"
     TARGET_NAME_KEY = "target_column_key"
+    SEQUENCE_COLUMN_KEY = "sequence_column_key"
 
     def __init__(
         self,
@@ -70,7 +72,7 @@ class Dataset(abc.ABC):
         self.sequence_col = sequence_col.lower()
         self.target_col = target_col.lower()
         if feature_cols:
-            self.feature_cols = [f.lower() for f in feature_cols]
+            self.feature_cols = lower_and_trim_strings(feature_cols)
         else:
             self.feature_cols = []
 
@@ -86,12 +88,14 @@ class Dataset(abc.ABC):
         self.val_ratio = val_ratio
         self.testing_mode = test
 
+        # main split is "train" if not in testing mode, otherwise "test"
         self.main_split = (
-            Dataset.SPLIT_NAMES[2]
-            if self.testing_mode
-            else Dataset.SPLIT_NAMES[0]
+            Dataset.SPLIT_NAMES[0]
+            if not self.testing_mode
+            else Dataset.SPLIT_NAMES[2]
         )
 
+        # initialize sequences, targets, features, and identifiers
         self.sequences = None
         self.targets = None
         self.features_df = None
@@ -119,6 +123,11 @@ class Dataset(abc.ABC):
         """
         self.data_source = data
 
+        if isinstance(self.data_source, dict):
+            # source is dict
+            self._update_data_loading_for_json_format()
+
+
         self._read_data() # refactor into methods, all stays in abstract
         self._validate_remove_long_sequences() # stays in abstract
         self._split_data() # random split in base class, other options in child classes
@@ -133,66 +142,73 @@ class Dataset(abc.ABC):
     """
 
     def _read_data(self):
-        if isinstance(self.data_source, dict):
-            # source id dict
-            self._update_data_loading_for_json_format()
-
-        if isinstance(self.data_source, tuple):
-            # source is tuple
-            tuple_size_is_two = len(self.data_source) == 2
-            if tuple_size_is_two:
-                tuple_elements_are_ndarray = isinstance(
-                    self.data_source[0], np.ndarray
-                ) and isinstance(self.data_source[1], np.ndarray)
-                if tuple_elements_are_ndarray:
-                    self.sequences = self.data_source[0]
-                    self.targets = self.data_source[1]
-            else:
-                raise ValueError(
-                    "If a tuple is provided, it has to have a length of 2 and both elements should be numpy arrays."
-                )
-
-        elif isinstance(self.data_source, np.ndarray):
-            # source is numpy array
-            self.sequences = self.data_source
-            self.targets = np.zeros(self.sequences.shape[0])
-            self._data_mean, self._data_std = 0, 1
-
-        elif isinstance(self.data_source, (str, dict)):
-            # source is string or dict
-            if isinstance(self.data_source, dict):
-                #  a dict is passed via the json
-                df = pd.DataFrame(self.data_source)
-            else:
-                # a string path is passed via the json or as a constructor argument
-                df = self._resolve_string_data_path()
-
-            # used only for testing with a smaller sample from a csv file
-            if self.sample_run:
-                df = df.head(Dataset.SAMPLE_RUN_N)
-
-            # lower all column names
-            df.columns = [col_name.lower() for col_name in df.columns]
-
-            self.sequences, self.targets = (
-                df[self.sequence_col].values,
-                df[self.target_col].values,
-            )
-            self._data_mean, self._data_std = np.mean(self.targets), np.std(
-                self.targets
-            )
-
-            self.features_df = df[self.feature_cols]
-        else:
-            # Raise error, exhausted all options
+        if not isinstance(self.data_source, (tuple, np.ndarray, str, dict)):
+            # Raise error, not a valid input
             raise ValueError(
-                "Data source has to be either a tuple of two numpy arrays, a single numpy array, "
+                "Data source has to be either a tuple of two numpy arrays, a single numpy array, an in-memory dict,"
                 "or a string with a path to a csv/parquet/json file."
             )
+        elif isinstance(self.data_source, tuple):
+            self._read_tuple_data_source(self)
 
+        elif isinstance(self.data_source, np.ndarray):
+            self._read_array_data_source(self)
+
+        else:
+            self._read_string_or_dict_data_source(self)
+            
         # give the index of the element as an ID for later reference if needed
         self.example_id = list(range(len(self.sequences)))
 
+    def _read_tuple_data_source(self):
+        # source is tuple
+        tuple_size_is_two = len(self.data_source) == 2
+        if tuple_size_is_two:
+            tuple_elements_are_ndarray = isinstance(
+                self.data_source[0], np.ndarray
+            ) and isinstance(self.data_source[1], np.ndarray)
+            if tuple_elements_are_ndarray:
+                self.sequences = self.data_source[0]
+                self.targets = self.data_source[1]
+        else:
+            raise ValueError(
+                "If a tuple is provided, it has to have a length of 2 and both elements should be numpy arrays."
+            )
+
+    def _read_array_data_source(self):
+        # source is numpy array
+        # only sequences are provided
+        self.sequences = self.data_source
+        self.targets = np.zeros(self.sequences.shape[0])
+        self._data_mean, self._data_std = 0, 1
+
+    def _read_string_or_dict_data_source(self):
+        # source is string or dict
+        if isinstance(self.data_source, dict):
+            #  a dict is passed via the json
+            df = pd.DataFrame(self.data_source)
+        else:
+            # a string path is passed via the json or as a constructor argument
+            df = self._resolve_string_data_path()
+
+        # used only for testing with a smaller sample from a csv file
+        if self.sample_run:
+            df = df.head(Dataset.SAMPLE_RUN_N)
+
+        # lower all column names
+        df.columns = lower_and_trim_strings(df.columns)
+
+        self.sequences, self.targets = (
+            df[self.sequence_col].values,
+            df[self.target_col].values,
+        )
+        self._data_mean, self._data_std = np.mean(self.targets), np.std(
+            self.targets
+        )
+
+        self.features_df = df[self.feature_cols]
+    
+    
     def _update_data_loading_for_json_format(self):
         json_dict = self.data_source
 
@@ -200,8 +216,10 @@ class Dataset(abc.ABC):
         self.target_col = json_dict.get(Dataset.PARAMS_KEY, {}).get(
             Dataset.TARGET_NAME_KEY, self.target_col
         )
-        # ToDo: make dynamic based on parameters
-        self.sequence_col = "modified_sequence"
+        
+        self.sequence_col = json_dict.get(Dataset.PARAMS_KEY, {}).get(
+            Dataset.SEQUENCE_COLUMN_KEY, self.sequence_col
+        )
 
     def _resolve_string_data_path(self):
         is_json_file = self.data_source.endswith(".json")
@@ -248,7 +266,7 @@ class Dataset(abc.ABC):
 
         if self.val_ratio != 0 and (not self.testing_mode):
             # add randomization for now and later consider the splitting logic
-            self.indicies_dict[RetentionTimeDataset.SPLIT_NAMES[1]] = np.arange(n)[
+            self.indicies_dict[Dataset.SPLIT_NAMES[1]] = np.arange(n)[
                 : int(n * self.val_ratio)
             ]
             self.indicies_dict[self.main_split] = np.arange(n)[
@@ -292,7 +310,7 @@ class Dataset(abc.ABC):
                 self.tf_dataset[split] = (
                     self.tf_dataset[split]
                     .map(
-                        RetentionTimeDataset._convert_inputs_to_dict,
+                        Dataset._convert_inputs_to_dict,
                         num_parallel_calls=tf.data.AUTOTUNE,
                     )
                     .map(
@@ -308,7 +326,7 @@ class Dataset(abc.ABC):
             self.tf_dataset[split] = (
                 self.tf_dataset[split]
                 .batch(self.batch_size)
-                .prefetch(RetentionTimeDataset.BATCHES_TO_PREFETCH)
+                .prefetch(Dataset.BATCHES_TO_PREFETCH)
             )
 
     def get_split_targets(self, split="val"):
@@ -362,7 +380,7 @@ class Dataset(abc.ABC):
 
     def _generate_single_counts(self, inputs, target):
         inputs["counts"] = tf.map_fn(
-            lambda x: RetentionTimeDataset.ATOM_TABLE.lookup(x), inputs["seq"]
+            lambda x: Dataset.ATOM_TABLE.lookup(x), inputs["seq"]
         )
         inputs["counts"] = tf.map_fn(
             lambda x: tf.strings.split(x, sep="_"), inputs["counts"]
@@ -393,17 +411,17 @@ class Dataset(abc.ABC):
     @property
     def train_data(self):
         """TensorFlow Dataset object for the training data"""
-        return self._get_tf_dataset(RetentionTimeDataset.SPLIT_NAMES[0])
+        return self._get_tf_dataset(Dataset.SPLIT_NAMES[0])
 
     @property
     def val_data(self):
         """TensorFlow Dataset object for the validation data"""
-        return self._get_tf_dataset(RetentionTimeDataset.SPLIT_NAMES[1])
+        return self._get_tf_dataset(Dataset.SPLIT_NAMES[1])
 
     @property
     def test_data(self):
         """TensorFlow Dataset object for the test data"""
-        return self._get_tf_dataset(RetentionTimeDataset.SPLIT_NAMES[2])
+        return self._get_tf_dataset(Dataset.SPLIT_NAMES[2])
 
     @property
     def data_mean(self):
@@ -438,3 +456,7 @@ def read_json_file(filepath):
     with open(filepath, "r") as j:
         json_dict = json.loads(j.read())
     return json_dict
+
+def lower_and_trim_strings(strings):
+    return [s.lower().trim() for s in strings]
+
