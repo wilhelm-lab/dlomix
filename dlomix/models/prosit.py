@@ -3,6 +3,7 @@ from tensorflow.keras.layers.experimental import preprocessing
 from dlomix.constants import ALPHABET_UNMOD
 from dlomix.layers.attention import AttentionLayer, DecoderAttentionLayer
 
+
 class PrositRetentionTimePredictor(tf.keras.Model):
     """Implementation of the Prosit model for retention time prediction.
 
@@ -123,21 +124,6 @@ class PrositIntensityPredictor(tf.keras.Model):
         "FRAGMENTATION_TYPE_KEY",
     ]
     PTM_INPUT_KEYS = ["ptm_atom_count_loss", "ptm_atom_count_gain", "ptm_location"]
-
-
-    # ToDo: 
-#     ptm_loc_in = Input(shape=(PEP_IN, 1, ), dtype='int32', name="ptm_closest_atom")
-#
-#     # > Process PTMs (location and atom count loss and gain)
-#     ptm_ac_loss_gain = Concatenate(name="ptm_ac_loss_gain")([ptm_ac_gain_in, ptm_ac_loss_in])
-#     ptm_ac_diff_loc = Concatenate(name="ptm_ac_diff_loc")([ptm_ac_loss_gain, ptm_loc_in])
-#     ptm_ac_diff_dense = Dense(LATENT//2, name='ptm_ac_diff_dense')(ptm_ac_diff_loc)
-#     ptm_ac_diff_do = Dropout(DROPOUT_RATE, name='ptm_ac_diff_do')(ptm_ac_diff_dense)
-#     tm_ac_diff_dense_2 = Dense(EMBEDDING_OUT*4, name='tm_ac_diff_dense_2')(ptm_ac_diff_do)
-#     ptm_ac_diff_do_2 = Dropout(DROPOUT_RATE, name='ptm_ac_diff_do_2')(tm_ac_diff_dense_2)
-#     tm_ac_diff_dense_3 = Dense(EMBEDDING_OUT, name='tm_ac_diff_dense_3')(ptm_ac_diff_do_2)
-#     ptm_ac_diff_do_3 = Dropout(DROPOUT_RATE, name='ptm_ac_diff_do_3')(tm_ac_diff_dense_3)
-
 
     def __init__(
         self,
@@ -290,6 +276,10 @@ class PrositIntensityPredictor(tf.keras.Model):
 
         if self.meta_encoder and len(meta_data) > 0:
             encoded_meta = self.meta_encoder(meta_data)
+        else:
+            raise ValueError(
+                f"Following metadata keys are expected in the model for Prosit Intesity: {PrositIntensityPredictor.META_DATA_KEYS}. The actual input passed to the model contains the following keys: {list(inputs.keys())}"
+            )
 
         # read PTM atom count features from the input dict
         ptm_ac_features = []
@@ -300,16 +290,24 @@ class PrositIntensityPredictor(tf.keras.Model):
 
         if self.ptm_encoder and len(ptm_ac_features) > 0:
             encoded_ptm = self.ptm_encoder(ptm_ac_features)
+        elif self.use_ptm_counts:
+            raise ValueError(
+                f"PTM features enabled and following PTM features are expected in the model for Prosit Intesity: {PrositIntensityPredictor.PTM_INPUT_KEYS}. The actual input passed to the model contains the following keys: {list(inputs.keys())}"
+            )
+        else:
+            encoded_ptm = None
 
         x = self.string_lookup(peptides_in)
         x = self.embedding(x)
         x = self.sequence_encoder(x)
 
-        if self.use_ptm_counts and self.ptm_aa_fusion:
+        if self.use_ptm_counts and self.ptm_aa_fusion and encoded_ptm is not None:
             x = self.ptm_aa_fusion([x, encoded_ptm])
 
         x = self.attention(x)
+
         x = self.meta_data_fusion_layer([x, encoded_meta])
+
         x = self.decoder(x)
         x = self.regressor(x)
 
