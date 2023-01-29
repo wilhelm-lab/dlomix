@@ -24,7 +24,9 @@ setuptools.setup(
         'matplotlib',
         'scikit-learn',
         'tensorflow',
-        'pyarrow'],
+        'pyarrow',
+        'pyteomics',
+        ],
     extras_require={
         "dev": [
             "pytest >= 3.7",

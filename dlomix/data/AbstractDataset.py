@@ -4,7 +4,7 @@ import numpy as np
 import tensorflow as tf
 
 from dlomix.utils import lower_and_trim_strings
-
+from dlomix.data.parsers import ProformaParser
 
 # what characterizes a datasets -->
 #   1. reading mode (string, CSV, json, parquet, in-memory, etc..)
@@ -37,6 +37,10 @@ class AbstractDataset(abc.ABC):
         a list of columns containing other features that can be used later as inputs to a model. Defaults to None.
     seq_length : int, optional
         the sequence length to be used, where all sequences will be padded to this length, longer sequences will be removed and not truncated. Defaults to 0.
+    parser : str, optional
+        name of the parser to use. Available parsers are in `dlomix.data.parsers.py`. Defaults to None; no parsing to be done on the sequence (works for unmodified sequences).
+    features_to_extract: list(dlomix.data.feature_extractors.SequenceFeatureExtractor), optional
+        List of feature extractor objects. Defaults to None; no features to extract.
     batch_size : int, optional
         the batch size to be used for consuming the dataset in training a model. Defaults to 32.
     val_ratio : int, optional
@@ -67,6 +71,8 @@ class AbstractDataset(abc.ABC):
         target_col,
         feature_cols=None,
         seq_length=0,
+        parser=None,
+        features_to_extract=None,
         batch_size=32,
         val_ratio=0,
         path_aminoacid_atomcounts=None,
@@ -84,6 +90,8 @@ class AbstractDataset(abc.ABC):
         self.sep = sep
         self.sequence_col = sequence_col.lower()
         self.target_col = target_col.lower()
+
+
         if feature_cols:
             self.feature_cols = lower_and_trim_strings(feature_cols)
         else:
@@ -93,6 +101,8 @@ class AbstractDataset(abc.ABC):
 
         # if seq_length is 0 (default) -> no padding
         self.seq_length = seq_length
+        self.parser = parser
+        self.features_to_extract = features_to_extract
 
         self._data_mean = 0
         self._data_std = 1
@@ -129,6 +139,36 @@ class AbstractDataset(abc.ABC):
                 path_aminoacid_atomcounts  # "../lookups/aa_comp_rel.csv"
             )
             self._init_atom_table()
+
+        self._resolve_parser()
+
+    def _resolve_parser(self):
+        if self.parser is None:
+            return
+        elif self.parser == "proforma":
+            self.parser = ProformaParser()
+        else:
+            raise ValueError(
+                f"Invalid parser provided {self.parser}. For a list of available parsers, check dlomix.data.parsers.py"
+            )
+
+    # double check
+    def _extract_features(self):
+        self.unmodified_sequences, self.modifications = self.parser.parse_sequences(
+            self.sequences
+        )
+
+        if self.features_to_extract:
+            self.sequence_features = []
+            for feature_class in self.features_to_extract:
+                extractor_class = feature_class()
+                self.sequence_features.append(
+                    extractor_class.extract_all(
+                        self.unmodified_sequences, self.modifications
+                    )
+                )
+
+        self.sequence_features = np.array(self.sequence_features).T
 
     def _init_atom_table(self):
         atom_counts = pd.read_csv(self.aminoacid_atom_counts_csv_path)
