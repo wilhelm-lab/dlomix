@@ -3,7 +3,6 @@ from tensorflow.keras.layers.experimental import preprocessing
 from dlomix.constants import ALPHABET_UNMOD
 from dlomix.layers.attention import AttentionLayer, DecoderAttentionLayer
 
-
 class PrositRetentionTimePredictor(tf.keras.Model):
     """Implementation of the Prosit model for retention time prediction.
 
@@ -123,7 +122,22 @@ class PrositIntensityPredictor(tf.keras.Model):
         "PRECURSOR_CHARGE_KEY",
         "FRAGMENTATION_TYPE_KEY",
     ]
-    PTM_INPUT_KEYS = ["ptm_atom_count_loss", "ptm_atom_count_gain"]
+    PTM_INPUT_KEYS = ["ptm_atom_count_loss", "ptm_atom_count_gain", "ptm_location"]
+
+
+    # ToDo: 
+#     ptm_loc_in = Input(shape=(PEP_IN, 1, ), dtype='int32', name="ptm_closest_atom")
+#
+#     # > Process PTMs (location and atom count loss and gain)
+#     ptm_ac_loss_gain = Concatenate(name="ptm_ac_loss_gain")([ptm_ac_gain_in, ptm_ac_loss_in])
+#     ptm_ac_diff_loc = Concatenate(name="ptm_ac_diff_loc")([ptm_ac_loss_gain, ptm_loc_in])
+#     ptm_ac_diff_dense = Dense(LATENT//2, name='ptm_ac_diff_dense')(ptm_ac_diff_loc)
+#     ptm_ac_diff_do = Dropout(DROPOUT_RATE, name='ptm_ac_diff_do')(ptm_ac_diff_dense)
+#     tm_ac_diff_dense_2 = Dense(EMBEDDING_OUT*4, name='tm_ac_diff_dense_2')(ptm_ac_diff_do)
+#     ptm_ac_diff_do_2 = Dropout(DROPOUT_RATE, name='ptm_ac_diff_do_2')(tm_ac_diff_dense_2)
+#     tm_ac_diff_dense_3 = Dense(EMBEDDING_OUT, name='tm_ac_diff_dense_3')(ptm_ac_diff_do_2)
+#     ptm_ac_diff_do_3 = Dropout(DROPOUT_RATE, name='ptm_ac_diff_do_3')(tm_ac_diff_dense_3)
+
 
     def __init__(
         self,
