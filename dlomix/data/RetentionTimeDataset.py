@@ -3,7 +3,9 @@ import pandas as pd
 import numpy as np
 import tensorflow as tf
 from dlomix.constants import DEFAULT_PARQUET_ENGINE
-from dlomix.data.AbstractDataset import AbstractDataset, read_parquet_file_pandas, read_json_file
+from dlomix.data.AbstractDataset import AbstractDataset
+from dlomix.data.reader_utils import read_parquet_file_pandas, read_json_file
+
 """
  TODO: check if it is better to abstract out a generic class for TF dataset wrapper, including:
  - splitting data logic (e.g. include task-specific stratification based on sequence length, iRT values)
@@ -65,10 +67,20 @@ class RetentionTimeDataset(AbstractDataset):
         path_aminoacid_atomcounts=None,
         sample_run=False,
     ):
-        super().__init__(data_source, sep, sequence_col,
-                        target_col, feature_cols, seq_length,
-                        batch_size, val_ratio, path_aminoacid_atomcounts,
-                        seed, test, sample_run)
+        super().__init__(
+            data_source,
+            sep,
+            sequence_col,
+            target_col,
+            feature_cols,
+            seq_length,
+            batch_size,
+            val_ratio,
+            path_aminoacid_atomcounts,
+            seed,
+            test,
+            sample_run,
+        )
 
         self.normalize_targets = normalize_targets
 
@@ -77,13 +89,9 @@ class RetentionTimeDataset(AbstractDataset):
         self.features_df = None
         self.example_id = None
 
-        
-
         # if data is provided with the constructor call --> load, otherwise --> done
         if self.data_source is not None:
             self.load_data(data=data_source)
-
-
 
     def load_data(self, data):
         """Load data into the dataset object, can be used to load data at a later point after initialization.
@@ -320,6 +328,7 @@ class RetentionTimeDataset(AbstractDataset):
     @staticmethod
     def _convert_inputs_to_dict(seq, target):
         return {"sequence": seq}, target
+
 
 if __name__ == "__main__":
     test_data_dict = {

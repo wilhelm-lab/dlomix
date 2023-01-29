@@ -1,16 +1,12 @@
 import abc
-import json
 import pandas as pd
 import numpy as np
 import tensorflow as tf
 
-#from dlomix.constants import DEFAULT_PARQUET_ENGINE
-
-# abstract out generics (reading from sources, static methods, member variables, etc...)
-# list abstract methods and annotate them @abc.abstractmethod
+from dlomix.utils import lower_and_trim_strings
 
 
-# what characterizes a datasets --> 
+# what characterizes a datasets -->
 #   1. reading mode (string, CSV, json, parquet, in-memory, etc..)
 #   2. inputs (define sequence column name and additional existing feature names)
 #   3. features to extract --> abstracted out in featureextractors list
@@ -209,8 +205,7 @@ class AbstractDataset(abc.ABC):
     #     )
 
     #     self.features_df = df[self.feature_cols]
-    
-    
+
     # def _update_data_loading_for_json_format(self):
     #     json_dict = self.data_source
 
@@ -218,7 +213,7 @@ class AbstractDataset(abc.ABC):
     #     self.target_col = json_dict.get(AbstractDataset.PARAMS_KEY, {}).get(
     #         AbstractDataset.TARGET_NAME_KEY, self.target_col
     #     )
-        
+
     #     self.sequence_col = json_dict.get(AbstractDataset.PARAMS_KEY, {}).get(
     #         AbstractDataset.SEQUENCE_COLUMN_KEY, self.sequence_col
     #     )
@@ -262,11 +257,10 @@ class AbstractDataset(abc.ABC):
     @abc.abstractmethod
     def _preprocess_tf_dataset(self):
         pass
-    
+
     @abc.abstractmethod
     def get_split_targets(self, split="val"):
-        """Retrieve all targets (original labels) for a specific split.
-        """
+        """Retrieve all targets (original labels) for a specific split."""
         pass
 
     def _pad_sequences(self, inputs, target):
@@ -362,23 +356,3 @@ class AbstractDataset(abc.ABC):
     @data_std.setter
     def data_std(self, value):
         self._data_std = value
-
-
-# to go to reader classes or reader utils
-def read_parquet_file_pandas(filepath, parquet_engine):
-    try:
-        df = pd.read_parquet(filepath, engine=parquet_engine)
-    except ImportError:
-        raise ImportError(
-            "Parquet engine is missing, please install fastparquet using pip or conda."
-        )
-    return df
-
-def read_json_file(filepath):
-    with open(filepath, "r") as j:
-        json_dict = json.loads(j.read())
-    return json_dict
-
-def lower_and_trim_strings(strings):
-    return [s.lower().trim() for s in strings]
-

@@ -61,11 +61,20 @@ class IntensityDataset(AbstractDataset):
         path_aminoacid_atomcounts=None,
         sample_run=False,
     ):
-        super().__init__(data_source, sep, sequence_col,
-                        intensities_col, feature_cols, seq_length,
-                        batch_size, val_ratio, path_aminoacid_atomcounts,
-                        seed, test, sample_run)
-
+        super().__init__(
+            data_source,
+            sep,
+            sequence_col,
+            intensities_col,
+            feature_cols,
+            seq_length,
+            batch_size,
+            val_ratio,
+            path_aminoacid_atomcounts,
+            seed,
+            test,
+            sample_run,
+        )
 
         self.collision_energy_col = collision_energy_col.lower()
         self.precursor_charge_col = precursor_charge_col.lower()
@@ -233,7 +242,7 @@ class IntensityDataset(AbstractDataset):
                     (
                         self.sequences[self.indicies_dict[split]],
                         self.collision_energy[self.indicies_dict[split]],
-                        self.precursor_charge[self.indicies_dict[split]]
+                        self.precursor_charge[self.indicies_dict[split]],
                     ),
                     self.intensities[self.indicies_dict[split]],
                 )
@@ -288,7 +297,6 @@ class IntensityDataset(AbstractDataset):
         :return: a denormalized nd.array with the targets or the predictions
         """
         return targets * self._data_std + self._data_mean
-
 
     def _normalize_target(self, seq, target):
 
