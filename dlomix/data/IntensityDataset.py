@@ -28,6 +28,8 @@ class IntensityDataset(AbstractDataset):
         a boolean whether to normalize the targets or not (subtract mean and divied by standard deviation). Defaults to False.
     seq_length : int, optional
         the sequence length to be used, where all sequences will be padded to this length, longer sequences will be removed and not truncated. Defaults to 0.
+    parser: Subclass of AbstractParser, optional
+        the parser to use to split amino acids and modifications. For more information, please see `dlomix.data.parsers`
     batch_size : int, optional
         the batch size to be used for consuming the dataset in training a model. Defaults to 32.
     val_ratio : int, optional
@@ -111,7 +113,9 @@ class IntensityDataset(AbstractDataset):
         self.data_source = data
 
         self._read_data()
-        self._validate_remove_long_sequences()
+        if self.parser:
+            self._parse_sequences()
+            self._validate_remove_long_sequences()
         self._split_data()
         self._build_tf_dataset()
         self._preprocess_tf_dataset()
@@ -195,7 +199,7 @@ class IntensityDataset(AbstractDataset):
 
         # give the index of the element as an ID for later reference if needed
         self.example_id = list(range(len(self.sequences)))
-
+        
     def _validate_remove_long_sequences(self) -> None:
         """
         Validate if all sequences are shorter than the padding length, otherwise drop them.

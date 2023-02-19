@@ -20,6 +20,8 @@ from dlomix.utils import lower_and_trim_strings
 # 4. run feature extractors based on input sequences, maintain features dict
 # 5. build TF Datasets accordingly
 
+# Consider collecting member variables related to the sequences in a named tuple (sequence, mod, n_term, c_term, etc..)
+
 
 class AbstractDataset(abc.ABC):
     r"""Base class for datasets.
@@ -151,7 +153,16 @@ class AbstractDataset(abc.ABC):
             raise ValueError(
                 f"Invalid parser provided {self.parser}. For a list of available parsers, check dlomix.data.parsers.py"
             )
+        
+        self.unmodified_sequences = None
+        self.modifications = None
+        self.n_term_modifications = None
+        self.c_term_modifications = None
 
+    def _parse_sequences(self):
+        (self.sequences, self.modifications,
+            self.n_term_modifications, self.c_term_modifications) = self.parser.parse_sequences(self.sequences)
+        
     # double check
     def _extract_features(self):
         self.unmodified_sequences, self.modifications = self.parser.parse_sequences(
