@@ -157,10 +157,13 @@ todo.md
 
 .DS_Store
 
-# model checkpoints in the run scripts directory
+# model checkpoints, csvs, pkls in the run scripts directory
 run_scripts/checkpoint*
 run_scripts/*.index
 run_scripts/*.data-*
+run_scripts/*.csv
+run_scripts/*.pkl
+
 
 # testing metadata
 metadata.parquet

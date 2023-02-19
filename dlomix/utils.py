@@ -14,3 +14,7 @@ def load_obj(name):
 
 def convert_nested_list_to_numpy_array(nested_list, dtype=np.float32):
     return np.array([np.array(x, dtype=dtype) for x in nested_list])
+
+
+def lower_and_trim_strings(strings):
+    return [s.lower().trim() for s in strings]

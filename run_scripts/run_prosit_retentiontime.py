@@ -15,7 +15,7 @@ from dlomix.reports import RetentionTimeReport
 
 model = PrositRetentionTimePredictor(seq_length=30)
 
-optimizer = tf.keras.optimizers.Adam(lr=0.0001, decay=1e-7)
+optimizer = tf.keras.optimizers.Adam(learning_rate=0.0001)
 
 TRAIN_DATAPATH = "../example_dataset/proteomTools_train_val.csv"
 TEST_DATAPATH = "../example_dataset/proteomTools_test.csv"
@@ -39,16 +39,13 @@ early_stop = tf.keras.callbacks.EarlyStopping(patience=20)
 callbacks = [checkpoint, early_stop, decay]
 
 
-history = model.fit(
-    d.train_data, epochs=150, validation_data=d.val_data, callbacks=callbacks
-)
 
 test_rtdata = RetentionTimeDataset(
     data_source=TEST_DATAPATH, seq_length=30, batch_size=512, test=True
 )
 
 predictions = model.predict(test_rtdata.test_data)
-predictions = d.denormalize_targets(predictions)
+#predictions = d.denormalize_targets(predictions)
 predictions = predictions.ravel()
 test_targets = test_rtdata.get_split_targets(split="test")
 

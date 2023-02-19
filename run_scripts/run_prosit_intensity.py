@@ -39,9 +39,7 @@ early_stop = tf.keras.callbacks.EarlyStopping(patience=20)
 callbacks = [checkpoint, early_stop, decay]
 
 
-history = model.fit(
-    d.train_data, epochs=5, validation_data=d.val_data, callbacks=callbacks
-)
+history = model.fit(d.train_data, epochs=2, validation_data=d.val_data, callbacks=callbacks)
 
 
 predictions = model.predict(d.val_data)
