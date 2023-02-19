@@ -5,7 +5,7 @@ from dlomix.data import IntensityDataset, RetentionTimeDataset
 
 INTENSITY_CSV_EXAMPLE_URL = "https://raw.githubusercontent.com/wilhelm-lab/dlomix/develop/example_dataset/intensity/intensity_data.csv"
 TEST_DATA_PARQUET = "./tests/assets/metadata.parquet"
-RT_PARQUET_EXAMPLE_URL = "https://zenodo.org/record/6602020/files/TUM_missing_first_meta_data.parquet?download=1"
+RT_PARQUET_EXAMPLE_URL = "https://zenodo.org/record/6602020/files/TUM_third_pool_meta_data.parquet?download=1"
 
 
 def test_empty_rtdataset():
