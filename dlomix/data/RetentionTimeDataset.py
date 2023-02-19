@@ -37,6 +37,8 @@ class RetentionTimeDataset(AbstractDataset):
         a boolean whether to normalize the targets or not (subtract mean and divied by standard deviation). Defaults to False.
     seq_length : int, optional
         the sequence length to be used, where all sequences will be padded to this length, longer sequences will be removed and not truncated. Defaults to 0.
+    parser: Subclass of AbstractParser, optional
+        the parser to use to split amino acids and modifications. For more information, please see `dlomix.data.parsers`
     batch_size : int, optional
         the batch size to be used for consuming the dataset in training a model. Defaults to 32.
     val_ratio : int, optional
@@ -109,8 +111,13 @@ class RetentionTimeDataset(AbstractDataset):
         self.data_source = data
 
         self._read_data()
-        self._validate_remove_long_sequences()
+        if self.parser:
+            self._parse_sequences()
+            self._validate_remove_long_sequences()
         self._split_data()
+        print(type(self.sequences))
+        print(self.sequences.shape)
+        print(self.sequences)
         self._build_tf_dataset()
         self._preprocess_tf_dataset()
 
@@ -211,20 +218,28 @@ class RetentionTimeDataset(AbstractDataset):
                 "Invalid data source provided as a string, please provide a path to a csv, parquet, or "
                 "or a json file."
             )
-
+                    
     def _validate_remove_long_sequences(self) -> None:
         """
         Validate if all sequences are shorter than the padding length, otherwise drop them.
         """
-        assert self.sequences.shape[0] > 0, "No sequences in the provided data."
-        assert len(self.sequences) == len(
-            self.targets
-        ), "Count of examples does not match for sequences and targets."
+        if self.sequences.shape[0] <= 0:
+            raise ValueError("No sequences in the provided data or sequences were not parsed correctly.")
+    
+        if len(self.sequences) != len(self.targets):
+            raise ValueError("Count of examples does not match for sequences and targets.")
 
         limit = self.seq_length
         vectorized_len = np.vectorize(lambda x: len(x))
         mask = vectorized_len(self.sequences) <= limit
         self.sequences, self.targets = self.sequences[mask], self.targets[mask]
+        self.modifications = self.modifications[mask]
+
+        self.n_term_modifications, self.c_term_modifications = (
+            self.n_term_modifications[mask],
+            self.c_term_modifications[mask]
+        )
+
         # once feature columns are introduced, apply the mask to the feature columns (subset the dataframe as well)
 
     def _split_data(self):
@@ -258,6 +273,15 @@ class RetentionTimeDataset(AbstractDataset):
                 self.tf_dataset[split] = self.tf_dataset[split].map(
                     lambda s, t: self._normalize_target(s, t),
                     num_parallel_calls=tf.data.AUTOTUNE,
+                )
+            
+            if self.parser and self.features_to_extract:
+                self.tf_dataset[split] = (
+                    self.tf_dataset[split]
+                    .map(
+                        RetentionTimeDataset._convert_inputs_to_dict,
+                        num_parallel_calls=tf.data.AUTOTUNE,
+                    )
                 )
 
             self.tf_dataset[split] = (
@@ -332,8 +356,11 @@ class RetentionTimeDataset(AbstractDataset):
     """
 
     @staticmethod
-    def _convert_inputs_to_dict(seq, target):
-        return {"sequence": seq}, target
+    def _convert_inputs_to_dict(inputs, target):
+        input_dict = {
+            "sequence": inputs[0]
+            }
+        return input_dict, target
 
 
 if __name__ == "__main__":
