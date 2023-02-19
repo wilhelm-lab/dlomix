@@ -20,8 +20,11 @@ class AbstractParser(abc.ABC):
         pass
 
     def _take_first_modification_proforma_output(self, mods):
-        # take first modification only (applied to all modifications including n and c terminal)
-        return next(iter(mods), None)
+        # # take first non-null element (modification only) (applied to all modifications including n and c terminal)
+        # # ensure it is a single element and not a string
+        # return next(filter(lambda x: x is not None, mods), None)
+        return [m[0] if m is not None else m for m in mods]
+
     
     def _flatten_seq_mods(self, parsed_sequence: list):
         """helper function to flatten a list of tuples to two lists.
@@ -60,14 +63,13 @@ class AbstractParser(abc.ABC):
             mod = self._take_first_modification_proforma_output(mod)
             mods.append(mod)
 
-            if n is not None:
-                n = self._take_first_modification_proforma_output(n)
             n_terms.append(n)
-
-            if c is not None:
-                c = self._take_first_modification_proforma_output(c)
             c_terms.append(c)
-        return np.array(seqs), np.array(mods), np.array(n_terms), np.array(c_terms)
+        seqs = np.array(seqs)
+        mods = np.array(mods)
+        n_terms = np.array(n_terms)
+        c_terms = np.array(c_terms)
+        return seqs, mods, n_terms, c_terms
     
 
 class ProformaParser(AbstractParser):
@@ -91,4 +93,10 @@ class ProformaParser(AbstractParser):
         
         n_term_mods = terminal_mods_dict.get("n_term")
         c_term_mods = terminal_mods_dict.get("c_term")
+
+        if n_term_mods:
+            n_term_mods = n_term_mods.pop()
+        if c_term_mods:
+            c_term_mods = c_term_mods.pop()
+            
         return parsed_sequence, n_term_mods, c_term_mods

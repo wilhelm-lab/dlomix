@@ -44,7 +44,8 @@ def test_parse_sequences():
     seqs, mods, n_terms, c_terms = parser.parse_sequences(sequences)
     assert seqs is not None
     #, mods, n_terms, c_terms])
-    print(seqs, mods, n_terms, c_terms)
+    logger.info(seqs)
+    logger.info(mods)
 
 def test_flatten_proforma_output():
     parser = ProformaParser()
