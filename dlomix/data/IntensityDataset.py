@@ -1,14 +1,15 @@
-import pandas as pd
 import numpy as np
+import pandas as pd
 import tensorflow as tf
-from dlomix.utils import convert_nested_list_to_numpy_array
 
+from dlomix.data.AbstractDataset import AbstractDataset
+from dlomix.utils import convert_nested_list_to_numpy_array
 
 # take into consideration if the pandas dataframe is pickled or not and then call read_pickle instead of read_csv
 # allow the possiblity to have three different dataset objects, one for train, val, and test
 
 
-class IntensityDataset:
+class IntensityDataset(AbstractDataset):
     r"""A dataset class for Intensity prediction tasks. It initialize a dataset object wrapping tf.Dataset and some relevant preprocessing steps.
 
     Parameters
@@ -40,10 +41,6 @@ class IntensityDataset:
     sample_run : bool, optional
         a boolean to limit the number of examples to a small number, SAMPLE_RUN_N, for testing and debugging purposes. Defaults to False.
     """
-    SPLIT_NAMES = ["train", "val", "test"]
-    BATCHES_TO_PREFETCH = tf.data.AUTOTUNE
-
-    SAMPLE_RUN_N = 100
 
     # TODO: For test dataset --> examples with longer sequences --> do not drop, add NaN for prediction
 
@@ -58,6 +55,8 @@ class IntensityDataset:
         feature_cols=None,
         normalize_targets=False,
         seq_length=0,
+        parser=None,
+        features_to_extract=None,
         batch_size=32,
         val_ratio=0,
         seed=21,
@@ -65,42 +64,30 @@ class IntensityDataset:
         path_aminoacid_atomcounts=None,
         sample_run=False,
     ):
-        super(IntensityDataset, self).__init__()
+        super().__init__(
+            data_source,
+            sep,
+            sequence_col,
+            intensities_col,
+            feature_cols,
+            seq_length,
+            parser,
+            features_to_extract,
+            batch_size,
+            val_ratio,
+            path_aminoacid_atomcounts,
+            seed,
+            test,
+            sample_run,
+        )
 
-        np.random.seed(seed)
-        self.seed = seed
-
-        self.data_source = data_source
-        self.sep = sep
-        self.sequence_col = sequence_col.lower()
         self.collision_energy_col = collision_energy_col.lower()
         self.precursor_charge_col = precursor_charge_col.lower()
-        self.intensities_col = intensities_col.lower()
-
-        if feature_cols:
-            self.feature_cols = [f.lower() for f in feature_cols]
-        else:
-            self.feature_cols = []
+        self.intensities_col = self.target_col
 
         self.normalize_targets = normalize_targets
-        self.sample_run = sample_run
 
-        # if seq_length is 0 (default) -> no padding
-        self.seq_length = seq_length
-
-        self._data_mean = 0
-        self._data_std = 1
-
-        self.batch_size = batch_size
-        self.val_ratio = val_ratio
-        self.testing_mode = test
         self.no_intensities = self.testing_mode
-
-        self.main_split = (
-            IntensityDataset.SPLIT_NAMES[2]
-            if self.testing_mode
-            else IntensityDataset.SPLIT_NAMES[0]
-        )
 
         self.sequences = None
         self.collision_energy = None
@@ -110,44 +97,9 @@ class IntensityDataset:
         self.features_df = None
         self.example_id = None
 
-        # if path to counts lookup table is provided, include count features, otherwise not
-        self.include_count_features = True if path_aminoacid_atomcounts else False
-
-        if self.include_count_features:
-            self.aminoacid_atom_counts_csv_path = (
-                path_aminoacid_atomcounts  # "../lookups/aa_comp_rel.csv"
-            )
-            self._init_atom_table()
-
-        # initialize TF Datasets dict
-        self.tf_dataset = (
-            {self.main_split: None, IntensityDataset.SPLIT_NAMES[1]: None}
-            if val_ratio != 0
-            else {self.main_split: None}
-        )
-
-        self.indicies_dict = (
-            {self.main_split: None, IntensityDataset.SPLIT_NAMES[1]: None}
-            if val_ratio != 0
-            else {self.main_split: None}
-        )
-
         # if data is provided with the constructor call --> load, otherwise --> done
         if self.data_source is not None:
             self.load_data(data=data_source)
-
-    def _init_atom_table(self):
-        atom_counts = pd.read_csv(self.aminoacid_atom_counts_csv_path)
-        atom_counts = atom_counts.astype(str)
-
-        keys_tensor = tf.constant(atom_counts["aa"].values)
-        values_tensor = tf.constant(
-            ["_".join(c) for c in list(atom_counts.iloc[:, 1:].values)]
-        )
-        init = tf.lookup.KeyValueTensorInitializer(keys_tensor, values_tensor)
-        IntensityDataset.ATOM_TABLE = tf.lookup.StaticHashTable(
-            init, default_value="0_0_0_0_0"
-        )
 
     def load_data(self, data):
         """Load data into the dataset object, can be used to load data at a later point after initialization.
@@ -292,9 +244,11 @@ class IntensityDataset:
         for split in self.tf_dataset.keys():
             self.tf_dataset[split] = tf.data.Dataset.from_tensor_slices(
                 (
-                    self.sequences[self.indicies_dict[split]],
-                    self.collision_energy[self.indicies_dict[split]],
-                    self.precursor_charge[self.indicies_dict[split]],
+                    (
+                        self.sequences[self.indicies_dict[split]],
+                        self.collision_energy[self.indicies_dict[split]],
+                        self.precursor_charge[self.indicies_dict[split]],
+                    ),
                     self.intensities[self.indicies_dict[split]],
                 )
             )
@@ -349,13 +303,6 @@ class IntensityDataset:
         """
         return targets * self._data_std + self._data_mean
 
-    def _pad_sequences(self, inputs, target):
-        pad_len = tf.abs(self.seq_length - tf.size(inputs["sequence"]))
-        paddings = tf.concat([[0], [pad_len]], axis=0)
-        inputs["sequence"] = tf.pad(inputs["sequence"], [paddings], "CONSTANT")
-        inputs["sequence"].set_shape([self.seq_length])
-        return inputs, target
-
     def _normalize_target(self, seq, target):
 
         target = tf.math.divide(
@@ -363,84 +310,16 @@ class IntensityDataset:
         )
         return seq, target
 
-    def _split_sequence(self, inputs, target):
-
-        inputs["sequence"] = tf.strings.bytes_split(inputs["sequence"])
-
-        return inputs, target
-
     """
     if more than one input is added, inputs are added to a python dict, the following methods assume that
     """
 
     @staticmethod
-    def _convert_inputs_to_dict(seq, collision, precursor, target):
+    def _convert_inputs_to_dict(inputs: tuple, target):
+        seq, collision, precursor = inputs
         inputs_dict = {
             "sequence": seq,
             "collision_energy": collision,
             "precursor_charge": precursor,
         }
         return inputs_dict, target
-
-    def _generate_single_counts(self, inputs, target):
-        inputs["counts"] = tf.map_fn(
-            lambda x: IntensityDataset.ATOM_TABLE.lookup(x), inputs["seq"]
-        )
-        inputs["counts"] = tf.map_fn(
-            lambda x: tf.strings.split(x, sep="_"), inputs["counts"]
-        )
-        inputs["counts"] = tf.strings.to_number(inputs["counts"])
-        inputs["counts"].set_shape([self.seq_length, 5])
-
-        return inputs, target
-
-    def _generate_di_counts(self, inputs, target):
-        # add every two neighboring elements without overlap [0 0 1 1 2 2 .... pad_length/2 pad_length/2]
-        segments_to_add = [i // 2 for i in range(self.seq_length)]
-        inputs["di_counts"] = tf.math.segment_sum(
-            inputs["counts"], tf.constant(segments_to_add)
-        )
-        inputs["di_counts"].set_shape([self.seq_length // 2, 5])
-
-        return inputs, target
-
-    def _get_tf_dataset(self, split=None):
-        assert (
-            split in self.tf_dataset.keys()
-        ), f"Requested data split is not available, available splits are {self.tf_dataset.keys()}"
-        if split in self.tf_dataset.keys():
-            return self.tf_dataset[split]
-        return self.tf_dataset
-
-    @property
-    def train_data(self):
-        """TensorFlow Dataset object for the training data"""
-        return self._get_tf_dataset(IntensityDataset.SPLIT_NAMES[0])
-
-    @property
-    def val_data(self):
-        """TensorFlow Dataset object for the validation data"""
-        return self._get_tf_dataset(IntensityDataset.SPLIT_NAMES[1])
-
-    @property
-    def test_data(self):
-        """TensorFlow Dataset object for the test data"""
-        return self._get_tf_dataset(IntensityDataset.SPLIT_NAMES[2])
-
-    @property
-    def data_mean(self):
-        """Mean value of the targets"""
-        return self._data_mean
-
-    @property
-    def data_std(self):
-        """Standard deviation value of the targets"""
-        return self._data_std
-
-    @data_mean.setter
-    def data_mean(self, value):
-        self._data_mean = value
-
-    @data_std.setter
-    def data_std(self, value):
-        self._data_std = value
