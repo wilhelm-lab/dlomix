@@ -1,7 +1,7 @@
-from dlomix.data import RetentionTimeDataset, IntensityDataset
 import numpy as np
 import pandas as pd
 
+from dlomix.data import IntensityDataset, RetentionTimeDataset
 
 INTENSITY_CSV_EXAMPLE_URL = "https://raw.githubusercontent.com/wilhelm-lab/dlomix/develop/example_dataset/intensity/intensity_data.csv"
 TEST_DATA_PARQUET = "./tests/assets/metadata.parquet"
@@ -57,6 +57,16 @@ def test_json_dict_rtdataset():
     rtdataset_filebased = RetentionTimeDataset(
         data_source=test_data_dict_file, seq_length=20
     )
+
+def test_parsed_rtdataset():
+    rtdataset = RetentionTimeDataset(data_source=RT_PARQUET_EXAMPLE_URL, seq_length=30, parser='proforma',
+                                     sequence_col="modified_sequence", target_col="indexed_retention_time",)
+    assert rtdataset.sequences is not None
+    assert rtdataset.modifications is not None
+    assert rtdataset.n_term_modifications is not None
+    assert rtdataset.c_term_modifications is not None
+    assert rtdataset.targets is not None
+    
 
 
 def test_empty_intensitydataset():
@@ -266,6 +276,16 @@ def test_simple_intensitydataset():
 
 def test_csv_intensitydataset():
     intensity_dataset = IntensityDataset(data_source=INTENSITY_CSV_EXAMPLE_URL)
+
+    assert intensity_dataset.sequences is not None
+    assert intensity_dataset.collision_energy is not None
+    assert intensity_dataset.precursor_charge is not None
+    assert intensity_dataset.intensities is not None
+    assert intensity_dataset.main_split is IntensityDataset.SPLIT_NAMES[0]
+
+def test_parsed_csv_intensitydataset():
+    intensity_dataset = IntensityDataset(data_source=INTENSITY_CSV_EXAMPLE_URL,
+                                         parser="proforma")
 
     assert intensity_dataset.sequences is not None
     assert intensity_dataset.collision_energy is not None

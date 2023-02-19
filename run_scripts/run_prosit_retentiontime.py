@@ -1,21 +1,22 @@
 import os
-import sys
 import pickle
-import tensorflow as tf
+import sys
+
 import pandas as pd
+import tensorflow as tf
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
 
+from dlomix.data import RetentionTimeDataset
 from dlomix.eval import TimeDeltaMetric
 from dlomix.models import PrositRetentionTimePredictor
-from dlomix.data import RetentionTimeDataset
 from dlomix.reports import RetentionTimeReport
 
 # consider the use-case for starting from a saved model
 
 model = PrositRetentionTimePredictor(seq_length=30)
 
-optimizer = tf.keras.optimizers.Adam(learning_rate=0.0001)
+optimizer = tf.keras.optimizers.Adam(learning_rate=0.001)
 
 TRAIN_DATAPATH = "../example_dataset/proteomTools_train_val.csv"
 TEST_DATAPATH = "../example_dataset/proteomTools_test.csv"
@@ -38,6 +39,7 @@ decay = tf.keras.callbacks.ReduceLROnPlateau(
 early_stop = tf.keras.callbacks.EarlyStopping(patience=20)
 callbacks = [checkpoint, early_stop, decay]
 
+history = model.fit(d.train_data, epochs=15, validation_data=d.val_data, callbacks=callbacks)
 
 
 test_rtdata = RetentionTimeDataset(
