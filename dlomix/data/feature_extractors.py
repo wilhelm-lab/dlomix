@@ -15,3 +15,17 @@ class SequenceFeatureExtractor(abc.ABC):
             feature = self.extract(seq, mods)
             features.append(feature)
         return features
+
+class LengthFeature(SequenceFeatureExtractor):
+    def __init__(self):
+        super(LengthFeature, self).__init__()
+    
+    def extract(self, seq, mods):
+        return len(seq)
+
+class CountModificationsFeature(SequenceFeatureExtractor):
+    def __init__(self):
+        super(LengthFeature, self).__init__()
+    
+    def extract(self, seq, mods):
+        return len(mods)
