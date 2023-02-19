@@ -19,6 +19,10 @@ class AbstractParser(abc.ABC):
         """
         pass
 
+    def _take_first_modification_proforma_output(self, mods):
+        # take first modification only (applied to all modifications including n and c terminal)
+        return next(iter(mods), None)
+    
     def _flatten_seq_mods(self, parsed_sequence: list):
         """helper function to flatten a list of tuples to two lists.
 
@@ -28,10 +32,7 @@ class AbstractParser(abc.ABC):
         Returns:
             list: a list of two lists or tuples (one for Amino acids and the other for modifications). `[['A', 'B', 'C'], [None, Unimod:1, None]]`
         """ 
-        seq, mods = [list(e) for e in zip(*parsed_sequence)]
-
-        # take first modification only and flatten the list
-        mods = [m[0] if m is not None else m for m in mods]
+        seq, mods = [list(i) for i in zip(*parsed_sequence)]
         return seq, mods
 
     
@@ -54,10 +55,17 @@ class AbstractParser(abc.ABC):
 
             # build sequence as a string from Amino Acid list
             seq = ''.join(seq)
-            
             seqs.append(seq)
+
+            mod = self._take_first_modification_proforma_output(mod)
             mods.append(mod)
+
+            if n is not None:
+                n = self._take_first_modification_proforma_output(n)
             n_terms.append(n)
+
+            if c is not None:
+                c = self._take_first_modification_proforma_output(c)
             c_terms.append(c)
         return np.array(seqs), np.array(mods), np.array(n_terms), np.array(c_terms)
     
