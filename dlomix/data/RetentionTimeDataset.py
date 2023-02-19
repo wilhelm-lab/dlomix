@@ -1,10 +1,12 @@
 import json
-import pandas as pd
+
 import numpy as np
+import pandas as pd
 import tensorflow as tf
+
 from dlomix.constants import DEFAULT_PARQUET_ENGINE
 from dlomix.data.AbstractDataset import AbstractDataset
-from dlomix.data.reader_utils import read_parquet_file_pandas, read_json_file
+from dlomix.data.reader_utils import read_json_file, read_parquet_file_pandas
 
 """
  TODO: check if it is better to abstract out a generic class for TF dataset wrapper, including:
@@ -60,6 +62,8 @@ class RetentionTimeDataset(AbstractDataset):
         feature_cols=None,
         normalize_targets=False,
         seq_length=0,
+        parser=None,
+        features_to_extract=None,
         batch_size=32,
         val_ratio=0,
         seed=21,
@@ -74,6 +78,8 @@ class RetentionTimeDataset(AbstractDataset):
             target_col,
             feature_cols,
             seq_length,
+            parser,
+            features_to_extract,
             batch_size,
             val_ratio,
             path_aminoacid_atomcounts,

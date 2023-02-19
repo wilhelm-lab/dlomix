@@ -1,8 +1,9 @@
-import pandas as pd
 import numpy as np
+import pandas as pd
 import tensorflow as tf
-from dlomix.utils import convert_nested_list_to_numpy_array
+
 from dlomix.data.AbstractDataset import AbstractDataset
+from dlomix.utils import convert_nested_list_to_numpy_array
 
 # take into consideration if the pandas dataframe is pickled or not and then call read_pickle instead of read_csv
 # allow the possiblity to have three different dataset objects, one for train, val, and test
@@ -54,6 +55,8 @@ class IntensityDataset(AbstractDataset):
         feature_cols=None,
         normalize_targets=False,
         seq_length=0,
+        parser=None,
+        features_to_extract=None,
         batch_size=32,
         val_ratio=0,
         seed=21,
@@ -68,6 +71,8 @@ class IntensityDataset(AbstractDataset):
             intensities_col,
             feature_cols,
             seq_length,
+            parser,
+            features_to_extract,
             batch_size,
             val_ratio,
             path_aminoacid_atomcounts,
