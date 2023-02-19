@@ -1,10 +1,11 @@
 import abc
-import pandas as pd
+
 import numpy as np
+import pandas as pd
 import tensorflow as tf
 
-from dlomix.utils import lower_and_trim_strings
 from dlomix.data.parsers import ProformaParser
+from dlomix.utils import lower_and_trim_strings
 
 # what characterizes a datasets -->
 #   1. reading mode (string, CSV, json, parquet, in-memory, etc..)
@@ -90,7 +91,6 @@ class AbstractDataset(abc.ABC):
         self.sep = sep
         self.sequence_col = sequence_col.lower()
         self.target_col = target_col.lower()
-
 
         if feature_cols:
             self.feature_cols = lower_and_trim_strings(feature_cols)
@@ -185,122 +185,50 @@ class AbstractDataset(abc.ABC):
 
     @abc.abstractmethod
     def load_data(self, data):
+        """load data from source and populate numpy arrays to use for tf.Dataset
+
+        Args:
+            data (str, tuple, dict): Path to csv or parquet file, tuple with numpy arrays, or a dict with keys
+            `AbstractDataset.METADATA_KEY`, `AbstractDataset.PARAMS_KEY`,
+            `AbstractDataset.TARGET_NAME_KEY`, `AbstractDataset.SEQUENCE_COLUMN_KEY`.
+        """
         pass
-
-    # @abc.abstractmethod
-    # def _read_data(self):
-    #     if not isinstance(self.data_source, (tuple, np.ndarray, str, dict)):
-    #         # Raise error, not a valid input
-    #         raise ValueError(
-    #             "Data source has to be either a tuple of two numpy arrays, a single numpy array, an in-memory dict,"
-    #             "or a string with a path to a csv/parquet/json file."
-    #         )
-    #     else:
-    #         pass
-
-    # def _read_tuple_data_source(self):
-    #     # source is tuple
-    #     tuple_size_is_two = len(self.data_source) == 2
-    #     if tuple_size_is_two:
-    #         tuple_elements_are_ndarray = isinstance(
-    #             self.data_source[0], np.ndarray
-    #         ) and isinstance(self.data_source[1], np.ndarray)
-    #         if tuple_elements_are_ndarray:
-    #             self.sequences = self.data_source[0]
-    #             self.targets = self.data_source[1]
-    #     else:
-    #         raise ValueError(
-    #             "If a tuple is provided, it has to have a length of 2 and both elements should be numpy arrays."
-    #         )
-
-    # def _read_array_data_source(self):
-    #     # source is numpy array
-    #     # only sequences are provided
-    #     self.sequences = self.data_source
-    #     self.targets = np.zeros(self.sequences.shape[0])
-    #     self._data_mean, self._data_std = 0, 1
-
-    # def _read_string_or_dict_data_source(self):
-    #     # source is string or dict
-    #     if isinstance(self.data_source, dict):
-    #         #  a dict is passed via the json
-    #         df = pd.DataFrame(self.data_source)
-    #     else:
-    #         # a string path is passed via the json or as a constructor argument
-    #         df = self._resolve_string_data_path()
-
-    #     # used only for testing with a smaller sample from a csv file
-    #     if self.sample_run:
-    #         df = df.head(AbstractDataset.SAMPLE_RUN_N)
-
-    #     # lower all column names
-    #     df.columns = lower_and_trim_strings(df.columns)
-
-    #     self.sequences, self.targets = (
-    #         df[self.sequence_col].values,
-    #         df[self.target_col].values,
-    #     )
-    #     self._data_mean, self._data_std = np.mean(self.targets), np.std(
-    #         self.targets
-    #     )
-
-    #     self.features_df = df[self.feature_cols]
-
-    # def _update_data_loading_for_json_format(self):
-    #     json_dict = self.data_source
-
-    #     self.data_source = json_dict.get(AbstractDataset.METADATA_KEY, "")
-    #     self.target_col = json_dict.get(AbstractDataset.PARAMS_KEY, {}).get(
-    #         AbstractDataset.TARGET_NAME_KEY, self.target_col
-    #     )
-
-    #     self.sequence_col = json_dict.get(AbstractDataset.PARAMS_KEY, {}).get(
-    #         AbstractDataset.SEQUENCE_COLUMN_KEY, self.sequence_col
-    #     )
-
-    # def _resolve_string_data_path(self):
-    #     is_json_file = self.data_source.endswith(".json")
-
-    #     if is_json_file:
-    #         json_dict = read_json_file(self.data_source)
-    #         self._update_data_loading_for_json_format(json_dict)
-
-    #     is_parquet_url = ".parquet" in self.data_source and self.data_source.startswith(
-    #         "http"
-    #     )
-    #     is_parquet_file = self.data_source.endswith(".parquet")
-    #     is_csv_file = self.data_source.endswith(".csv")
-
-    #     if is_parquet_url or is_parquet_file:
-    #         df = read_parquet_file_pandas(self.data_source, DEFAULT_PARQUET_ENGINE)
-    #         return df
-    #     elif is_csv_file:
-    #         df = pd.read_csv(self.data_source)
-    #         return df
-    #     else:
-    #         raise ValueError(
-    #             "Invalid data source provided as a string, please provide a path to a csv, parquet, or "
-    #             "or a json file."
-    #         )
 
     @abc.abstractmethod
     def _build_tf_dataset(self):
-        # consider adding the feature columns or extra inputs
+        """Build the tf.Dataset object for available splits using the data loaded by `load_data`.
+        Example:
+        `for split in self.tf_dataset.keys():
+            self.tf_dataset[split] = tf.data.Dataset.from_tensor_slices(
+                (self.inputs, self.outputs)
+            )`
+        """
         pass
-        # for split in self.tf_dataset.keys():
-        #     self.tf_dataset[split] = tf.data.Dataset.from_tensor_slices(
-        #         (
-        #             self.inputs, self.outputs
-        #         )
-        #     )
 
     @abc.abstractmethod
     def _preprocess_tf_dataset(self):
+        """Add processing logic (tensorflow functions) to apply to all tf.Datasets."""
         pass
 
     @abc.abstractmethod
     def get_split_targets(self, split="val"):
-        """Retrieve all targets (original labels) for a specific split."""
+        """Retrieve all targets (original labels) for a specific split (dependent on the task at hand)
+        Args:
+            split (str, optional): Name of the split, check `AbstractDataset.SPLIT_NAMES`. Defaults to "val".
+        """
+        pass
+
+    @staticmethod
+    @abc.abstractmethod
+    def _convert_inputs_to_dict(inputs, target):
+        """Collect all inputs into a python dict with corresponding keys.
+            When multiple inputs are used,this function is used at the beginning of the pre-processing
+            of TF.Datasets.
+
+        Args:
+            inputs (tuple(tf.Tensor)): tuple of input tensors
+            target (tf.Tensor): target label tensor
+        """
         pass
 
     def _pad_sequences(self, inputs, target):
@@ -324,15 +252,6 @@ class AbstractDataset(abc.ABC):
         else:
             inputs = tf.strings.bytes_split(inputs)
         return inputs, target
-
-    """
-    if more than one input is added, inputs are added to a python dict, the following methods assume that
-    """
-
-    @staticmethod
-    @abc.abstractmethod
-    def _convert_inputs_to_dict(inputs, target):
-        pass
 
     def _generate_single_counts(self, inputs, target):
         inputs["counts"] = tf.map_fn(
