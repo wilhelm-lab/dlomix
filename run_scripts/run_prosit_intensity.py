@@ -1,15 +1,17 @@
 import os
-import sys
 import pickle
-import tensorflow as tf
+import sys
+
 import pandas as pd
+import tensorflow as tf
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
 
 
-from dlomix.models import PrositIntensityPredictor
 from dlomix.data import IntensityDataset
+from dlomix.data.feature_extractors import LengthFeature
 from dlomix.losses import masked_spectral_distance
+from dlomix.models import PrositIntensityPredictor
 
 # consider the use-case for starting from a saved model
 
@@ -21,10 +23,8 @@ TRAIN_DATAPATH = "../example_dataset/intensity/intensity_data.csv"
 # TEST_DATAPATH = '../example_dataset/proteomTools_test.csv'
 
 d = IntensityDataset(
-    data_source=TRAIN_DATAPATH, seq_length=30, batch_size=128, val_ratio=0.3
-)
-
-# continue here: test dataset ???
+    data_source=TRAIN_DATAPATH, seq_length=30, batch_size=128, val_ratio=0.3,
+    )
 
 model.compile(optimizer=optimizer, loss=masked_spectral_distance, metrics=["mse"])
 

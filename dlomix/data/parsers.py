@@ -23,7 +23,7 @@ class AbstractParser(abc.ABC):
         # # take first non-null element (modification only) (applied to all modifications including n and c terminal)
         # # ensure it is a single element and not a string
         # return next(filter(lambda x: x is not None, mods), None)
-        return [m[0] if m is not None else m for m in mods]
+        return [m[0].id if m is not None else -1 for m in mods]
 
     
     def _flatten_seq_mods(self, parsed_sequence: list):
@@ -53,20 +53,19 @@ class AbstractParser(abc.ABC):
         n_terms = []
         c_terms = []
         for seq in sequences:
-            p, n, c = self._parse_sequence(seq)
-            seq, mod = self._flatten_seq_mods(p)
+            seq, mod, n, c = self._parse_sequence(seq)
 
             # build sequence as a string from Amino Acid list
             seq = ''.join(seq)
             seqs.append(seq)
 
-            mod = self._take_first_modification_proforma_output(mod)
             mods.append(mod)
 
             n_terms.append(n)
             c_terms.append(c)
         seqs = np.array(seqs)
-        mods = np.array(mods)
+        
+        mods = np.array(mods, dtype=object)
         n_terms = np.array(n_terms)
         c_terms = np.array(c_terms)
         return seqs, mods, n_terms, c_terms
@@ -95,8 +94,15 @@ class ProformaParser(AbstractParser):
         c_term_mods = terminal_mods_dict.get("c_term")
 
         if n_term_mods:
-            n_term_mods = n_term_mods.pop()
+            n_term_mods = n_term_mods.pop().id
+        else:
+            n_term_mods = -1
         if c_term_mods:
-            c_term_mods = c_term_mods.pop()
+            c_term_mods = c_term_mods.pop().id
+        else:
+            c_term_mods = -1
+
+        seq, mod = self._flatten_seq_mods(parsed_sequence)
+        mod = self._take_first_modification_proforma_output(mod)
             
-        return parsed_sequence, n_term_mods, c_term_mods
+        return seq, mod, n_term_mods, c_term_mods

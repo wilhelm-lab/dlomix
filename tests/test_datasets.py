@@ -2,10 +2,11 @@ import numpy as np
 import pandas as pd
 
 from dlomix.data import IntensityDataset, RetentionTimeDataset
+from dlomix.data.feature_extractors import LengthFeature
 
 INTENSITY_CSV_EXAMPLE_URL = "https://raw.githubusercontent.com/wilhelm-lab/dlomix/develop/example_dataset/intensity/intensity_data.csv"
 TEST_DATA_PARQUET = "./tests/assets/metadata.parquet"
-RT_PARQUET_EXAMPLE_URL = "https://zenodo.org/record/6602020/files/TUM_third_pool_meta_data.parquet?download=1"
+RT_PARQUET_EXAMPLE_URL = "https://zenodo.org/record/6602020/files/TUM_missing_first_meta_data.parquet?download=1"
 
 
 def test_empty_rtdataset():
@@ -60,7 +61,17 @@ def test_json_dict_rtdataset():
 
 def test_parsed_rtdataset():
     rtdataset = RetentionTimeDataset(data_source=RT_PARQUET_EXAMPLE_URL, seq_length=30, parser='proforma',
-                                     sequence_col="modified_sequence", target_col="indexed_retention_time",)
+                                     sequence_col="modified_sequence", target_col="indexed_retention_time", sample_run=True)
+    assert rtdataset.sequences is not None
+    assert rtdataset.modifications is not None
+    assert rtdataset.n_term_modifications is not None
+    assert rtdataset.c_term_modifications is not None
+    assert rtdataset.targets is not None
+
+def test_parsed_with_features_rtdataset():
+    rtdataset = RetentionTimeDataset(data_source=RT_PARQUET_EXAMPLE_URL, seq_length=30, parser='proforma',
+                                     sequence_col="modified_sequence", target_col="indexed_retention_time",
+                                     features_to_extract=[LengthFeature])
     assert rtdataset.sequences is not None
     assert rtdataset.modifications is not None
     assert rtdataset.n_term_modifications is not None

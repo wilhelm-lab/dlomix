@@ -5,12 +5,14 @@ import sys
 import pandas as pd
 import tensorflow as tf
 
-sys.path.append(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
-
 from dlomix.data import RetentionTimeDataset
+from dlomix.data.feature_extractors import LengthFeature, ModificationLocationFeature
 from dlomix.eval import TimeDeltaMetric
 from dlomix.models import PrositRetentionTimePredictor
 from dlomix.reports import RetentionTimeReport
+
+sys.path.append(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
+
 
 # consider the use-case for starting from a saved model
 
@@ -18,12 +20,23 @@ model = PrositRetentionTimePredictor(seq_length=30)
 
 optimizer = tf.keras.optimizers.Adam(learning_rate=0.001)
 
+PROSPECT_TRAIN_DATAPATH = "https://zenodo.org/record/6602020/files/TUM_missing_first_meta_data.parquet?download=1"
 TRAIN_DATAPATH = "../example_dataset/proteomTools_train_val.csv"
 TEST_DATAPATH = "../example_dataset/proteomTools_test.csv"
 
+
 d = RetentionTimeDataset(
-    data_source=TRAIN_DATAPATH, seq_length=30, batch_size=512, val_ratio=0.2
+    data_source=PROSPECT_TRAIN_DATAPATH, seq_length=30, batch_size=512, val_ratio=0.2,
+    parser="proforma", features_to_extract=[LengthFeature, ModificationLocationFeature], sample_run=False,
+    sequence_col="modified_sequence",
+        target_col="indexed_retention_time",
 )
+
+# no parser
+# d = RetentionTimeDataset(
+#     data_source=TRAIN_DATAPATH, seq_length=30, batch_size=2, val_ratio=0.2, sample_run=False,
+# )
+
 
 model.compile(
     optimizer=optimizer, loss="mse", metrics=["mean_absolute_error", TimeDeltaMetric()]
@@ -39,12 +52,21 @@ decay = tf.keras.callbacks.ReduceLROnPlateau(
 early_stop = tf.keras.callbacks.EarlyStopping(patience=20)
 callbacks = [checkpoint, early_stop, decay]
 
-history = model.fit(d.train_data, epochs=15, validation_data=d.val_data, callbacks=callbacks)
+history = model.fit(d.train_data, epochs=1, validation_data=d.val_data, callbacks=callbacks)
 
+
+# test_rtdata = RetentionTimeDataset(
+#     data_source=TEST_DATAPATH, seq_length=30, batch_size=2, test=True
+# )
 
 test_rtdata = RetentionTimeDataset(
-    data_source=TEST_DATAPATH, seq_length=30, batch_size=512, test=True
+    data_source=PROSPECT_TRAIN_DATAPATH, seq_length=30, batch_size=512, test=True,
+    parser="proforma", features_to_extract=[LengthFeature, ModificationLocationFeature], sample_run=False,
+    sequence_col="modified_sequence",
+        target_col="indexed_retention_time",
 )
+
+
 
 predictions = model.predict(test_rtdata.test_data)
 #predictions = d.denormalize_targets(predictions)

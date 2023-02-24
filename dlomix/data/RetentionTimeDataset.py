@@ -8,12 +8,6 @@ from dlomix.constants import DEFAULT_PARQUET_ENGINE
 from dlomix.data.AbstractDataset import AbstractDataset
 from dlomix.data.reader_utils import read_json_file, read_parquet_file_pandas
 
-"""
- TODO: check if it is better to abstract out a generic class for TF dataset wrapper, including:
- - splitting data logic (e.g. include task-specific stratification based on sequence length, iRT values)
- - loading data logic
- """
-
 # take into consideration if the pandas dataframe is pickled or not and then call read_pickle instead of read_csv
 # allow the possiblity to have three different dataset objects, one for train, val, and test
 
@@ -114,10 +108,9 @@ class RetentionTimeDataset(AbstractDataset):
         if self.parser:
             self._parse_sequences()
             self._validate_remove_long_sequences()
+        if self.features_to_extract:
+            self._extract_features()
         self._split_data()
-        print(type(self.sequences))
-        print(self.sequences.shape)
-        print(self.sequences)
         self._build_tf_dataset()
         self._preprocess_tf_dataset()
 
@@ -256,32 +249,38 @@ class RetentionTimeDataset(AbstractDataset):
         else:
             self.indicies_dict[self.main_split] = np.arange(n)
 
+    
     def _build_tf_dataset(self):
-        # consider adding the feature columns or extra inputs
+        input_dict = {}
+
         for split in self.tf_dataset.keys():
-            self.tf_dataset[split] = tf.data.Dataset.from_tensor_slices(
-                (
-                    self.sequences[self.indicies_dict[split]],
-                    self.targets[self.indicies_dict[split]],
-                )
-            )
+            if self.features_to_extract:
+                input_dict["sequence"] = self.get_examples_at_indices(self.sequences, split)
+                for feature_name, feature_values in zip(self.sequence_features_names, self.sequence_features):
+                    input_dict[feature_name] = self.get_examples_at_indices(feature_values, split)
+            else:
+                input_dict["sequence"] = self.get_examples_at_indices(self.sequences, split)
+
+            input_dict["target"] = self.get_examples_at_indices(self.targets, split)
+            
+            self.tf_dataset[split] = tf.data.Dataset.from_tensor_slices(input_dict)
+
 
     def _preprocess_tf_dataset(self):
         for split in self.tf_dataset.keys():
+            self.tf_dataset[split] = (
+                self.tf_dataset[split]
+                .map(
+                    RetentionTimeDataset._convert_inputs_to_dict,
+                    num_parallel_calls=tf.data.AUTOTUNE,
+                )
+            )
+
             # avoid normalizing targets for test data --> should not be needed
             if self.normalize_targets and not self.testing_mode:
                 self.tf_dataset[split] = self.tf_dataset[split].map(
                     lambda s, t: self._normalize_target(s, t),
                     num_parallel_calls=tf.data.AUTOTUNE,
-                )
-            
-            if self.parser and self.features_to_extract:
-                self.tf_dataset[split] = (
-                    self.tf_dataset[split]
-                    .map(
-                        RetentionTimeDataset._convert_inputs_to_dict,
-                        num_parallel_calls=tf.data.AUTOTUNE,
-                    )
                 )
 
             self.tf_dataset[split] = (
@@ -356,11 +355,8 @@ class RetentionTimeDataset(AbstractDataset):
     """
 
     @staticmethod
-    def _convert_inputs_to_dict(inputs, target):
-        input_dict = {
-            "sequence": inputs[0]
-            }
-        return input_dict, target
+    def _convert_inputs_to_dict(inputs):
+        return inputs, inputs["target"]
 
 
 if __name__ == "__main__":

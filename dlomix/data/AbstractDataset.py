@@ -163,24 +163,35 @@ class AbstractDataset(abc.ABC):
         (self.sequences, self.modifications,
             self.n_term_modifications, self.c_term_modifications) = self.parser.parse_sequences(self.sequences)
         
-    # double check
     def _extract_features(self):
-        self.unmodified_sequences, self.modifications = self.parser.parse_sequences(
-            self.sequences
-        )
-
         if self.features_to_extract:
             self.sequence_features = []
+            self.sequence_features_names = []
             for feature_class in self.features_to_extract:
+                print("extracting feature: ", feature_class)
                 extractor_class = feature_class()
+
                 self.sequence_features.append(
-                    extractor_class.extract_all(
-                        self.unmodified_sequences, self.modifications
+                    np.array(
+                        extractor_class.extract_all(
+                            self.sequences, self.modifications,
+                            self.seq_length if extractor_class.pad_to_seq_length else 0
+                        )
                     )
                 )
+                self.sequence_features_names.append(extractor_class.__class__.__name__.lower())
 
-        self.sequence_features = np.array(self.sequence_features).T
+    def get_examples_at_indices(self, examples, split):
+        if isinstance(examples, np.ndarray):
+            return examples[self.indicies_dict[split]]
+        # to handle features
+        if isinstance(examples, list):
+            return [examples_single[self.indicies_dict[split]] for examples_single in examples]
+        raise ValueError(f"Provided data structure to subset for examples at split indices is neither a list nor a numpy array, but rather a {type(examples)}.")
 
+
+
+        
     def _init_atom_table(self):
         atom_counts = pd.read_csv(self.aminoacid_atom_counts_csv_path)
         atom_counts = atom_counts.astype(str)
