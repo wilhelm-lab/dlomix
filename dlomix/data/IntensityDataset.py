@@ -225,8 +225,6 @@ class IntensityDataset:
             # for concatenation later, we expand dimensions
             self.collision_energy = self.collision_energy.values.reshape(-1, 1)
 
-            print(type(self.precursor_charge))
-            print(self.precursor_charge)
             self.precursor_charge = convert_nested_list_to_numpy_array(
                 self.precursor_charge.values, dtype=np.float64
             )

@@ -206,7 +206,6 @@ class PrositIntensityPredictor(tf.keras.Model):
         encoded_meta = self.meta_encoder([collision_energy_in, precursor_charge_in])
 
         x = self.string_lookup(peptides_in)
-        print("encoded sequence: ", x)
         x = self.embedding(x)
         x = self.sequence_encoder(x)
         x = self.attention(x)
