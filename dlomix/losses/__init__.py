@@ -1,3 +1,3 @@
-from .intensity import masked_spectral_distance, pearson_correlation
+from .intensity import masked_spectral_distance, masked_pearson_correlation_distance
 
-__all__ = [masked_spectral_distance, pearson_correlation]
+__all__ = [masked_spectral_distance, masked_pearson_correlation_distance]

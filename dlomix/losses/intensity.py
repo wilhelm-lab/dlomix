@@ -30,7 +30,7 @@ def masked_spectral_distance(y_true, y_pred):
     return 2 * arccos / np.pi
 
 
-def pearson_correlation(y_true, y_pred):
+def masked_pearson_correlation_distance(y_true, y_pred):
     epsilon = K.epsilon()
 
     # Masking: we multiply values by (true + 1) because then the peaks that cannot
@@ -43,4 +43,4 @@ def pearson_correlation(y_true, y_pred):
     xm, ym = true_masked-mx, pred_masked-my
     r_num = tf.math.reduce_mean(tf.multiply(xm, ym))
     r_den = tf.math.reduce_std(xm) * tf.math.reduce_std(ym)
-    return 1- (r_num/r_den)
+    return 1 - (r_num/r_den)
