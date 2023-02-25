@@ -35,7 +35,7 @@ class IntensityReport(Report):
         self.plot_all_metrics()
 
         # make custom plots
-        self.plot_spectral_angle(predictions_df, self.batch_size)
+        self.plot_spectral_angle(predictions_df)
         
         self._compile_report_resources_add_pdf_pages()
         self.pdf_file.output(join(self._output_path, "intensity_Report.pdf"), "F")
