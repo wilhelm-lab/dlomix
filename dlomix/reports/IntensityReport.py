@@ -1,6 +1,7 @@
 from os.path import join
 
 import numpy as np
+import pandas as pd
 import seaborn as sns
 from matplotlib import pyplot as plt
 from matplotlib.colors import LogNorm
@@ -27,21 +28,10 @@ class IntensityReport(Report):
         else:
             self.batch_size = IntensityReport.DEFAULT_BATCH_SIZE
 
-    def generate_report(self, targets, predictions, **kwargs):
+    def generate_report(self, dataset, predictions):
         self._init_report_resources()
 
-        # calculate metrics
-        sequences = kwargs.get("sequences", None)
-        precursor_charges = kwargs.get("precursor_charges", None)
-
-        if sequences and precursor_charges:
-            predictions_df = self.generate_intensity_results_df(targets, predictions, sequences, precursor_charges)
-        else:
-            raise ValueError(
-                f'''Arguments sequences and precursor_charges are required to generate Intensity Report,
-                provided arguments are: {kwargs.keys()}'''
-                )
-
+        predictions_df = self.generate_intensity_results_df(dataset, predictions)
         self.plot_all_metrics()
 
         # make custom plots
@@ -51,20 +41,28 @@ class IntensityReport(Report):
         self.pdf_file.output(join(self._output_path, "intensity_Report.pdf"), "F")
 
 
+    def generate_intensity_results_df(self, dataset, predictions):
+        predictions_df = pd.DataFrame()
+
+        predictions_df['sequences'] = dataset.sequences
+        predictions_df['intensities_pred'] = predictions.tolist()
+        predictions_df['precursor_charge_onehot'] = dataset.precursor_charge.tolist()
+        predictions_df['intensities_raw'] = dataset.intensities.tolist()
+
+        return predictions_df
+
     def plot_spectral_angle(
         self,
-        predictions_df,
-        batch_size
-    ):
+        predictions_df
+        ):
         """Create spectral  plot
 
         Arguments
         ---------
             predictions_df:  dataframe with raw intensities, predictions, sequences, precursor_charges
-            batch_size:  batch size used
         """
         
-        predictions_acc = normalize_intensity_predictions(predictions_df, batch_size)
+        predictions_acc = normalize_intensity_predictions(predictions_df, self.batch_size)
         violin_plot = sns.violinplot(predictions_acc['spectral_angle'])
         
         save_path = join(self._output_path, "violin_spectral_angle_plot" + self._figures_ext)
