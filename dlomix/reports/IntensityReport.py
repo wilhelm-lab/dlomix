@@ -6,9 +6,8 @@ from matplotlib import pyplot as plt
 from matplotlib.colors import LogNorm
 from matplotlib.ticker import LogLocator
 
-from dlomix.reports.Report import PDFFile, Report
-
 from .postprocessing import normalize_intensity_predictions
+from .Report import PDFFile, Report
 
 
 class IntensityReport(Report):
