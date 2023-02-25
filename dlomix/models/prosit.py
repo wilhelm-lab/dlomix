@@ -189,7 +189,7 @@ class PrositIntensityPredictor(tf.keras.Model):
         self.decoder = tf.keras.Sequential(
             [
                 tf.keras.layers.GRU(
-                    units=self.recurrent_layers_sizes[1],
+                    units=self.regressor_layer_size,
                     return_sequences=True,
                     name="decoder",
                 ),
@@ -206,7 +206,6 @@ class PrositIntensityPredictor(tf.keras.Model):
         encoded_meta = self.meta_encoder([collision_energy_in, precursor_charge_in])
 
         x = self.string_lookup(peptides_in)
-        print("encoded sequence: ", x)
         x = self.embedding(x)
         x = self.sequence_encoder(x)
         x = self.attention(x)

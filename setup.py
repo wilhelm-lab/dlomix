@@ -3,7 +3,7 @@ import setuptools
 with open("README.md", "r") as fh:
     long_description = fh.read()
 
-from dlomix import __version__, META_DATA
+from dlomix import META_DATA, __version__
 
 VERSION = __version__
 
@@ -24,7 +24,9 @@ setuptools.setup(
         'matplotlib',
         'scikit-learn',
         'tensorflow',
-        'pyarrow'],
+        'pyarrow',
+        'seaborn',
+        ],
     extras_require={
         "dev": [
             "pytest >= 3.7",

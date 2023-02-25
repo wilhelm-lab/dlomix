@@ -1,8 +1,8 @@
-import pandas as pd
 import numpy as np
+import pandas as pd
 import tensorflow as tf
-from dlomix.utils import convert_nested_list_to_numpy_array
 
+from dlomix.utils import convert_nested_list_to_numpy_array
 
 # take into consideration if the pandas dataframe is pickled or not and then call read_pickle instead of read_csv
 # allow the possiblity to have three different dataset objects, one for train, val, and test
@@ -225,8 +225,6 @@ class IntensityDataset:
             # for concatenation later, we expand dimensions
             self.collision_energy = self.collision_energy.values.reshape(-1, 1)
 
-            print(type(self.precursor_charge))
-            print(self.precursor_charge)
             self.precursor_charge = convert_nested_list_to_numpy_array(
                 self.precursor_charge.values, dtype=np.float64
             )
@@ -339,7 +337,7 @@ class IntensityDataset:
                 + list(self.indicies_dict.keys())
             )
 
-        return self.targets[self.indicies_dict[split]]
+        return self.intensities[self.indicies_dict[split]]
 
     def denormalize_targets(self, targets):
         """Denormalize the given targets (can also be predictions) by multiplying the standard deviation and adding the mean.
