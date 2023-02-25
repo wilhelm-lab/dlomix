@@ -1,4 +1,4 @@
-__version__ = "0.0.3"
+__version__ = "0.0.3int"
 
 META_DATA = {
     "author": "Omar Shouman",
