@@ -69,7 +69,7 @@ def get_spectral_angle(true, pred, batch_size=600):
     return sa
 
 
-def normalize_predictions(data, batch_size=600):
+def normalize_intensity_predictions(data, batch_size=600):
     assert "sequences" in data, "Key sequences is missing in the data provided for post-processing"
     assert "intensities_pred" in data, "Key intensities_pred is missing in the data provided for post-processing"
     assert "precursor_charge_onehot" in data, "Key precursor_charge_onehot is missing in the data provided for post-processing"
