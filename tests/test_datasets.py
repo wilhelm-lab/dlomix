@@ -1,12 +1,36 @@
+import csv
+import urllib.request
+from os.path import exists, join
+
 import numpy as np
 import pandas as pd
+import pytest
 
 from dlomix.data import IntensityDataset, RetentionTimeDataset
 from dlomix.data.feature_extractors import LengthFeature
 
 INTENSITY_CSV_EXAMPLE_URL = "https://raw.githubusercontent.com/wilhelm-lab/dlomix/develop/example_dataset/intensity/intensity_data.csv"
-TEST_DATA_PARQUET = "./tests/assets/metadata.parquet"
 RT_PARQUET_EXAMPLE_URL = "https://zenodo.org/record/6602020/files/TUM_missing_first_meta_data.parquet?download=1"
+
+
+TEST_ASSETS_TO_DOWNLOAD = [RT_PARQUET_EXAMPLE_URL, INTENSITY_CSV_EXAMPLE_URL]
+DOWNLOAD_PATH_FOR_ASSETS = join("tests", "assets")
+
+
+@pytest.fixture(scope="session", autouse=True)
+def download_assets():
+    for i, http_address in enumerate(TEST_ASSETS_TO_DOWNLOAD, start=1):
+        filename = f"file_{i}"
+        filepath = join(DOWNLOAD_PATH_FOR_ASSETS, filename)
+        if ".parquet" in http_address:
+            filepath += ".parquet"
+        if ".csv" in http_address:
+            filepath += ".csv"
+        if exists(filepath):
+            continue
+        print(f"downloading: {http_address}, to: {filename}")
+        urllib.request.urlretrieve(http_address, filepath)
+    return True
 
 
 def test_empty_rtdataset():
@@ -27,7 +51,7 @@ def test_simple_rtdataset():
 
 def test_parquet_rtdataset():
     rtdataset = RetentionTimeDataset(
-        data_source=RT_PARQUET_EXAMPLE_URL,
+        data_source=join(DOWNLOAD_PATH_FOR_ASSETS, "file_1.parquet"),
         sequence_col="modified_sequence",
         target_col="indexed_retention_time",
     )
@@ -46,10 +70,11 @@ def test_json_dict_rtdataset():
         "parameters": {"target_column_key": "linear rt"},
     }
 
-    pd.DataFrame(test_data_dict["metadata"]).to_parquet(TEST_DATA_PARQUET)
+    save_path_metadata_parquet = join(DOWNLOAD_PATH_FOR_ASSETS, "metadata.parquet")
+    pd.DataFrame(test_data_dict["metadata"]).to_parquet(save_path_metadata_parquet)
 
     test_data_dict_file = {
-        "metadata": TEST_DATA_PARQUET,
+        "metadata": save_path_metadata_parquet,
         "annotations": {},
         "parameters": {"target_column_key": "linear rt"},
     }
@@ -59,25 +84,40 @@ def test_json_dict_rtdataset():
         data_source=test_data_dict_file, seq_length=20
     )
 
+
 def test_parsed_rtdataset():
-    rtdataset = RetentionTimeDataset(data_source=RT_PARQUET_EXAMPLE_URL, seq_length=30, parser='proforma',
-                                     sequence_col="modified_sequence", target_col="indexed_retention_time", sample_run=True)
+    filepath = join(DOWNLOAD_PATH_FOR_ASSETS, "file_1.parquet")
+    rtdataset = RetentionTimeDataset(
+        data_source=filepath,
+        seq_length=30,
+        parser="proforma",
+        sequence_col="modified_sequence",
+        target_col="indexed_retention_time",
+        sample_run=True,
+    )
     assert rtdataset.sequences is not None
     assert rtdataset.modifications is not None
     assert rtdataset.n_term_modifications is not None
     assert rtdataset.c_term_modifications is not None
     assert rtdataset.targets is not None
 
+
 def test_parsed_with_features_rtdataset():
-    rtdataset = RetentionTimeDataset(data_source=RT_PARQUET_EXAMPLE_URL, seq_length=30, parser='proforma',
-                                     sequence_col="modified_sequence", target_col="indexed_retention_time",
-                                     features_to_extract=[LengthFeature])
+    filepath = join(DOWNLOAD_PATH_FOR_ASSETS, "file_1.parquet")
+    rtdataset = RetentionTimeDataset(
+        data_source=filepath,
+        seq_length=30,
+        parser="proforma",
+        sequence_col="modified_sequence",
+        target_col="indexed_retention_time",
+        features_to_extract=[LengthFeature],
+        sample_run=True,
+    )
     assert rtdataset.sequences is not None
     assert rtdataset.modifications is not None
     assert rtdataset.n_term_modifications is not None
     assert rtdataset.c_term_modifications is not None
     assert rtdataset.targets is not None
-    
 
 
 def test_empty_intensitydataset():
@@ -139,140 +179,8 @@ def test_simple_intensitydataset():
                         -1.0,
                         0.0,
                         0.0,
-                        -1.0,
-                        -1.0,
-                        -1.0,
-                        -1.0,
-                        -1.0,
-                        -1.0,
-                        -1.0,
-                        -1.0,
-                        -1.0,
-                        -1.0,
-                        -1.0,
-                        -1.0,
-                        -1.0,
-                        -1.0,
-                        -1.0,
-                        -1.0,
-                        -1.0,
-                        -1.0,
-                        -1.0,
-                        -1.0,
-                        -1.0,
-                        -1.0,
-                        -1.0,
-                        -1.0,
-                        -1.0,
-                        -1.0,
-                        -1.0,
-                        -1.0,
-                        -1.0,
-                        -1.0,
-                        -1.0,
-                        -1.0,
-                        -1.0,
-                        -1.0,
-                        -1.0,
-                        -1.0,
-                        -1.0,
-                        -1.0,
-                        -1.0,
-                        -1.0,
-                        -1.0,
-                        -1.0,
-                        -1.0,
-                        -1.0,
-                        -1.0,
-                        -1.0,
-                        -1.0,
-                        -1.0,
-                        -1.0,
-                        -1.0,
-                        -1.0,
-                        -1.0,
-                        -1.0,
-                        -1.0,
-                        -1.0,
-                        -1.0,
-                        -1.0,
-                        -1.0,
-                        -1.0,
-                        -1.0,
-                        -1.0,
-                        -1.0,
-                        -1.0,
-                        -1.0,
-                        -1.0,
-                        -1.0,
-                        -1.0,
-                        -1.0,
-                        -1.0,
-                        -1.0,
-                        -1.0,
-                        -1.0,
-                        -1.0,
-                        -1.0,
-                        -1.0,
-                        -1.0,
-                        -1.0,
-                        -1.0,
-                        -1.0,
-                        -1.0,
-                        -1.0,
-                        -1.0,
-                        -1.0,
-                        -1.0,
-                        -1.0,
-                        -1.0,
-                        -1.0,
-                        -1.0,
-                        -1.0,
-                        -1.0,
-                        -1.0,
-                        -1.0,
-                        -1.0,
-                        -1.0,
-                        -1.0,
-                        -1.0,
-                        -1.0,
-                        -1.0,
-                        -1.0,
-                        -1.0,
-                        -1.0,
-                        -1.0,
-                        -1.0,
-                        -1.0,
-                        -1.0,
-                        -1.0,
-                        -1.0,
-                        -1.0,
-                        -1.0,
-                        -1.0,
-                        -1.0,
-                        -1.0,
-                        -1.0,
-                        -1.0,
-                        -1.0,
-                        -1.0,
-                        -1.0,
-                        -1.0,
-                        -1.0,
-                        -1.0,
-                        -1.0,
-                        -1.0,
-                        -1.0,
-                        -1.0,
-                        -1.0,
-                        -1.0,
-                        -1.0,
-                        -1.0,
-                        -1.0,
-                        -1.0,
-                        -1.0,
-                        -1.0,
-                        -1.0,
                     ]
+                    + [-1.0] * 132
                 ]
             ),
         )
@@ -286,7 +194,8 @@ def test_simple_intensitydataset():
 
 
 def test_csv_intensitydataset():
-    intensity_dataset = IntensityDataset(data_source=INTENSITY_CSV_EXAMPLE_URL)
+    filepath = join(DOWNLOAD_PATH_FOR_ASSETS, "file_2.csv")
+    intensity_dataset = IntensityDataset(data_source=filepath, sample_run=True)
 
     assert intensity_dataset.sequences is not None
     assert intensity_dataset.collision_energy is not None
@@ -294,9 +203,12 @@ def test_csv_intensitydataset():
     assert intensity_dataset.intensities is not None
     assert intensity_dataset.main_split is IntensityDataset.SPLIT_NAMES[0]
 
+
 def test_parsed_csv_intensitydataset():
-    intensity_dataset = IntensityDataset(data_source=INTENSITY_CSV_EXAMPLE_URL,
-                                         parser="proforma")
+    filepath = join(DOWNLOAD_PATH_FOR_ASSETS, "file_2.csv")
+    intensity_dataset = IntensityDataset(
+        data_source=filepath, parser="proforma", sample_run=True
+    )
 
     assert intensity_dataset.sequences is not None
     assert intensity_dataset.collision_energy is not None
