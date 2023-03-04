@@ -22,6 +22,8 @@ from dlomix.utils import lower_and_trim_strings
 
 # Consider collecting member variables related to the sequences in a named tuple (sequence, mod, n_term, c_term, etc..)
 
+# consider making the dataset object iterable --> iterate over main split tf dataset
+
 
 class AbstractDataset(abc.ABC):
     r"""Base class for datasets.
@@ -153,16 +155,20 @@ class AbstractDataset(abc.ABC):
             raise ValueError(
                 f"Invalid parser provided {self.parser}. For a list of available parsers, check dlomix.data.parsers.py"
             )
-        
+
         self.unmodified_sequences = None
         self.modifications = None
         self.n_term_modifications = None
         self.c_term_modifications = None
 
     def _parse_sequences(self):
-        (self.sequences, self.modifications,
-            self.n_term_modifications, self.c_term_modifications) = self.parser.parse_sequences(self.sequences)
-        
+        (
+            self.sequences,
+            self.modifications,
+            self.n_term_modifications,
+            self.c_term_modifications,
+        ) = self.parser.parse_sequences(self.sequences)
+
     def _extract_features(self):
         if self.features_to_extract:
             self.sequence_features = []
@@ -174,24 +180,29 @@ class AbstractDataset(abc.ABC):
                 self.sequence_features.append(
                     np.array(
                         extractor_class.extract_all(
-                            self.sequences, self.modifications,
-                            self.seq_length if extractor_class.pad_to_seq_length else 0
+                            self.sequences,
+                            self.modifications,
+                            self.seq_length if extractor_class.pad_to_seq_length else 0,
                         )
                     )
                 )
-                self.sequence_features_names.append(extractor_class.__class__.__name__.lower())
+                self.sequence_features_names.append(
+                    extractor_class.__class__.__name__.lower()
+                )
 
     def get_examples_at_indices(self, examples, split):
         if isinstance(examples, np.ndarray):
             return examples[self.indicies_dict[split]]
         # to handle features
         if isinstance(examples, list):
-            return [examples_single[self.indicies_dict[split]] for examples_single in examples]
-        raise ValueError(f"Provided data structure to subset for examples at split indices is neither a list nor a numpy array, but rather a {type(examples)}.")
+            return [
+                examples_single[self.indicies_dict[split]]
+                for examples_single in examples
+            ]
+        raise ValueError(
+            f"Provided data structure to subset for examples at split indices is neither a list nor a numpy array, but rather a {type(examples)}."
+        )
 
-
-
-        
     def _init_atom_table(self):
         atom_counts = pd.read_csv(self.aminoacid_atom_counts_csv_path)
         atom_counts = atom_counts.astype(str)

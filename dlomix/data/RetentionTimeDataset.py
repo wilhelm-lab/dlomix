@@ -152,6 +152,9 @@ class RetentionTimeDataset(AbstractDataset):
                 # a string path is passed via the json or as a constructor argument
                 df = self._resolve_string_data_path()
 
+            # consider sorting to leverage caching when extracting features
+            # df.sort_values(by=self.sequence_col, inplace=True)
+
             # used only for testing with a smaller sample from a csv file
             if self.sample_run:
                 df = df.head(RetentionTimeDataset.SAMPLE_RUN_N)
@@ -211,16 +214,20 @@ class RetentionTimeDataset(AbstractDataset):
                 "Invalid data source provided as a string, please provide a path to a csv, parquet, or "
                 "or a json file."
             )
-                    
+
     def _validate_remove_long_sequences(self) -> None:
         """
         Validate if all sequences are shorter than the padding length, otherwise drop them.
         """
         if self.sequences.shape[0] <= 0:
-            raise ValueError("No sequences in the provided data or sequences were not parsed correctly.")
-    
+            raise ValueError(
+                "No sequences in the provided data or sequences were not parsed correctly."
+            )
+
         if len(self.sequences) != len(self.targets):
-            raise ValueError("Count of examples does not match for sequences and targets.")
+            raise ValueError(
+                "Count of examples does not match for sequences and targets."
+            )
 
         limit = self.seq_length
         vectorized_len = np.vectorize(lambda x: len(x))
@@ -230,7 +237,7 @@ class RetentionTimeDataset(AbstractDataset):
 
         self.n_term_modifications, self.c_term_modifications = (
             self.n_term_modifications[mask],
-            self.c_term_modifications[mask]
+            self.c_term_modifications[mask],
         )
 
         # once feature columns are introduced, apply the mask to the feature columns (subset the dataframe as well)
@@ -249,31 +256,34 @@ class RetentionTimeDataset(AbstractDataset):
         else:
             self.indicies_dict[self.main_split] = np.arange(n)
 
-    
     def _build_tf_dataset(self):
         input_dict = {}
 
         for split in self.tf_dataset.keys():
             if self.features_to_extract:
-                input_dict["sequence"] = self.get_examples_at_indices(self.sequences, split)
-                for feature_name, feature_values in zip(self.sequence_features_names, self.sequence_features):
-                    input_dict[feature_name] = self.get_examples_at_indices(feature_values, split)
+                input_dict["sequence"] = self.get_examples_at_indices(
+                    self.sequences, split
+                )
+                for feature_name, feature_values in zip(
+                    self.sequence_features_names, self.sequence_features
+                ):
+                    input_dict[feature_name] = self.get_examples_at_indices(
+                        feature_values, split
+                    )
             else:
-                input_dict["sequence"] = self.get_examples_at_indices(self.sequences, split)
+                input_dict["sequence"] = self.get_examples_at_indices(
+                    self.sequences, split
+                )
 
             input_dict["target"] = self.get_examples_at_indices(self.targets, split)
-            
-            self.tf_dataset[split] = tf.data.Dataset.from_tensor_slices(input_dict)
 
+            self.tf_dataset[split] = tf.data.Dataset.from_tensor_slices(input_dict)
 
     def _preprocess_tf_dataset(self):
         for split in self.tf_dataset.keys():
-            self.tf_dataset[split] = (
-                self.tf_dataset[split]
-                .map(
-                    RetentionTimeDataset._convert_inputs_to_dict,
-                    num_parallel_calls=tf.data.AUTOTUNE,
-                )
+            self.tf_dataset[split] = self.tf_dataset[split].map(
+                RetentionTimeDataset._convert_inputs_to_dict,
+                num_parallel_calls=tf.data.AUTOTUNE,
             )
 
             # avoid normalizing targets for test data --> should not be needed
@@ -356,7 +366,7 @@ class RetentionTimeDataset(AbstractDataset):
 
     @staticmethod
     def _convert_inputs_to_dict(inputs):
-        return inputs, inputs["target"]
+        return inputs, inputs.pop("target")
 
 
 if __name__ == "__main__":
