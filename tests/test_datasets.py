@@ -110,7 +110,7 @@ def test_parsed_with_features_rtdataset():
         parser="proforma",
         sequence_col="modified_sequence",
         target_col="indexed_retention_time",
-        features_to_extract=[LengthFeature],
+        features_to_extract=[LengthFeature()],
         sample_run=True,
     )
     assert rtdataset.sequences is not None
