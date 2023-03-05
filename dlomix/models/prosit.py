@@ -4,6 +4,12 @@ from tensorflow.keras.layers.experimental import preprocessing
 from dlomix.constants import ALPHABET_UNMOD
 from dlomix.layers.attention import AttentionLayer, DecoderAttentionLayer
 
+from ..data.feature_extractors import (
+    ModificationGainFeature,
+    ModificationLocationFeature,
+    ModificationLossFeature,
+)
+
 
 class PrositRetentionTimePredictor(tf.keras.Model):
     """Implementation of the Prosit model for retention time prediction.
@@ -88,7 +94,9 @@ class PrositRetentionTimePredictor(tf.keras.Model):
 
     def call(self, inputs, **kwargs):
         if isinstance(inputs, dict):
-            x = inputs.get(PrositRetentionTimePredictor.DEFAULT_INPUT_KEYS["SEQUENCE_KEY"])
+            x = inputs.get(
+                PrositRetentionTimePredictor.DEFAULT_INPUT_KEYS["SEQUENCE_KEY"]
+            )
         else:
             x = inputs
         x = self.string_lookup(x)
@@ -132,7 +140,11 @@ class PrositIntensityPredictor(tf.keras.Model):
         "PRECURSOR_CHARGE_KEY",
         "FRAGMENTATION_TYPE_KEY",
     ]
-    PTM_INPUT_KEYS = ["ptm_atom_count_loss", "ptm_atom_count_gain", "ptm_location"]
+    PTM_INPUT_KEYS = [
+        ModificationLossFeature.__name__.lower(),
+        ModificationGainFeature.__name__.lower(),
+        # ModificationLocationFeature.__name__.lower()
+    ]
 
     def __init__(
         self,
@@ -210,7 +222,6 @@ class PrositIntensityPredictor(tf.keras.Model):
         )
 
     def _build_encoders(self):
-
         self.meta_encoder = tf.keras.Sequential(
             [
                 tf.keras.layers.Concatenate(name="meta_in"),

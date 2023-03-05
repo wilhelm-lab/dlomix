@@ -4,8 +4,10 @@ import numpy as np
 import pandas as pd
 import tensorflow as tf
 
+from ..constants import DEFAULT_PARQUET_ENGINE
 from ..utils import lower_and_trim_strings
 from .parsers import ProformaParser
+from .reader_utils import read_json_file, read_parquet_file_pandas
 
 # what characterizes a datasets -->
 #   1. reading mode (string, CSV, json, parquet, in-memory, etc..)
@@ -169,6 +171,31 @@ class AbstractDataset(abc.ABC):
             self.c_term_modifications,
         ) = self.parser.parse_sequences(self.sequences)
 
+    def _resolve_string_data_path(self):
+        is_json_file = self.data_source.endswith(".json")
+
+        if is_json_file:
+            json_dict = read_json_file(self.data_source)
+            self._update_data_loading_for_json_format(json_dict)
+
+        is_parquet_url = ".parquet" in self.data_source and self.data_source.startswith(
+            "http"
+        )
+        is_parquet_file = self.data_source.endswith(".parquet")
+        is_csv_file = self.data_source.endswith(".csv")
+
+        if is_parquet_url or is_parquet_file:
+            df = read_parquet_file_pandas(self.data_source, DEFAULT_PARQUET_ENGINE)
+            return df
+        elif is_csv_file:
+            df = pd.read_csv(self.data_source)
+            return df
+        else:
+            raise ValueError(
+                "Invalid data source provided as a string, please provide a path to a csv, parquet, or "
+                "or a json file."
+            )
+
     def _extract_features(self):
         if self.features_to_extract:
             self.sequence_features = []
@@ -184,7 +211,8 @@ class AbstractDataset(abc.ABC):
                             self.sequences,
                             self.modifications,
                             self.seq_length if extractor_class.pad_to_seq_length else 0,
-                        )
+                        ),
+                        dtype=np.float32,
                     )
                 )
                 self.sequence_features_names.append(

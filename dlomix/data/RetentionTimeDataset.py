@@ -4,9 +4,7 @@ import numpy as np
 import pandas as pd
 import tensorflow as tf
 
-from dlomix.constants import DEFAULT_PARQUET_ENGINE
 from dlomix.data.AbstractDataset import AbstractDataset
-from dlomix.data.reader_utils import read_json_file, read_parquet_file_pandas
 
 # take into consideration if the pandas dataframe is pickled or not and then call read_pickle instead of read_csv
 # allow the possiblity to have three different dataset objects, one for train, val, and test
@@ -190,31 +188,6 @@ class RetentionTimeDataset(AbstractDataset):
         # ToDo: make dynamic based on parameters
         self.sequence_col = "modified_sequence"
 
-    def _resolve_string_data_path(self):
-        is_json_file = self.data_source.endswith(".json")
-
-        if is_json_file:
-            json_dict = read_json_file(self.data_source)
-            self._update_data_loading_for_json_format(json_dict)
-
-        is_parquet_url = ".parquet" in self.data_source and self.data_source.startswith(
-            "http"
-        )
-        is_parquet_file = self.data_source.endswith(".parquet")
-        is_csv_file = self.data_source.endswith(".csv")
-
-        if is_parquet_url or is_parquet_file:
-            df = read_parquet_file_pandas(self.data_source, DEFAULT_PARQUET_ENGINE)
-            return df
-        elif is_csv_file:
-            df = pd.read_csv(self.data_source)
-            return df
-        else:
-            raise ValueError(
-                "Invalid data source provided as a string, please provide a path to a csv, parquet, or "
-                "or a json file."
-            )
-
     def _validate_remove_long_sequences(self) -> None:
         """
         Validate if all sequences are shorter than the padding length, otherwise drop them.
@@ -260,20 +233,15 @@ class RetentionTimeDataset(AbstractDataset):
         input_dict = {}
 
         for split in self.tf_dataset.keys():
+            input_dict["sequence"] = self.get_examples_at_indices(self.sequences, split)
+
             if self.features_to_extract:
-                input_dict["sequence"] = self.get_examples_at_indices(
-                    self.sequences, split
-                )
                 for feature_name, feature_values in zip(
                     self.sequence_features_names, self.sequence_features
                 ):
                     input_dict[feature_name] = self.get_examples_at_indices(
                         feature_values, split
                     )
-            else:
-                input_dict["sequence"] = self.get_examples_at_indices(
-                    self.sequences, split
-                )
 
             input_dict["target"] = self.get_examples_at_indices(self.targets, split)
 
@@ -354,7 +322,6 @@ class RetentionTimeDataset(AbstractDataset):
             return targets
 
     def _normalize_target(self, seq, target):
-
         target = tf.math.divide(
             tf.math.subtract(target, self._data_mean), self._data_std
         )
