@@ -11,4 +11,5 @@ __all__ = [
     "SequenceFeatureExtractor",
     "ModificationLocationFeature",
     "ModificationLossFeature",
+    "ModificationGainFeature",
 ]

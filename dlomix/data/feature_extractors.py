@@ -1,5 +1,7 @@
 import abc
 
+from ..utils import get_constructor_call_object_creation
+
 ALPHABET_PTMS = {
     "A": 1,
     "C": 2,
@@ -51,7 +53,8 @@ ALPHABET_PTMS = {
     "K[UNIMOD:1363]": 48,
     "K[UNIMOD:1849]": 49,
     "K[UNIMOD:3]": 50,
-    "R[UNIMOD:36]": 52,
+    "R[UNIMOD:36]": 51,
+    "R[UNIMOD:36a]": 52,
     "P[UNIMOD:35]": 53,
     "Y[UNIMOD:354]": 54,
 }
@@ -89,6 +92,9 @@ class SequenceFeatureExtractor(abc.ABC):
 
         return single_feature
 
+    def __repr__(self) -> str:
+        return get_constructor_call_object_creation(self)
+
 
 class LengthFeature(SequenceFeatureExtractor):
     def __init__(self):
@@ -101,38 +107,38 @@ class LengthFeature(SequenceFeatureExtractor):
 class ModificationLocationFeature(SequenceFeatureExtractor):
 
     DICT_PTM_MOD_ATOM = {
-        23: 4,  # M(ox)  - S
-        24: 3,  # S(ph)  - O
-        25: 3,  # T(ph)  - O
-        26: 3,  # Y(ph)  - O
-        27: 1,  # R(ci)  - C
-        28: 2,  # K(ac)  - N
-        29: 2,  # K(gl)  - N
-        30: 1,  # Q(gl)  - C
-        31: 2,  # R(me)  - N
-        32: 2,  # K(me)  - N
-        33: 3,  # T(ga)  - O
-        34: 3,  # S(ga)  - O
-        35: 3,  # T(gl)  - O
-        36: 3,  # S(gl)  - O
-        37: 4,  # C(cam) - S
-        38: 2,  # [ac]-  - N
-        39: 1,  # E(gl)  - C
-        40: 2,  # K(dme)   - N
-        41: 2,  # K(tme)   - N
-        42: 2,  # K(f)     - N
-        43: 2,  # K(p)     - N
-        44: 2,  # K(b)     - N
-        45: 2,  # K(m)     - N
-        46: 2,  # K(s)     - N
-        47: 2,  # K(glu)   - N
-        48: 2,  # K(cr)    - N
-        49: 2,  # K(hib)   - N
-        50: 2,  # K(bi)    - N
-        51: 1,  # R(sdime) - C
-        52: 2,  # R(adime) - N
-        53: 1,  # P(h)     - C
-        54: 1,  # Y(n)     - C
+        "M[UNIMOD:35]": 4,
+        "S[UNIMOD:21]": 3,
+        "T[UNIMOD:21]": 3,
+        "Y[UNIMOD:21]": 3,
+        "R[UNIMOD:7]": 1,
+        "K[UNIMOD:1]": 2,
+        "K[UNIMOD:121]": 2,
+        "Q(gl)": 1,
+        "R[UNIMOD:34]": 2,
+        "K[UNIMOD:34]": 2,
+        "T(ga)": 3,
+        "S(ga)": 3,
+        "T(gl)": 3,
+        "S(gl)": 3,
+        "C[UNIMOD:4]": 4,
+        "[ac]-": 2,
+        "E(gl)": 1,
+        "K[UNIMOD:36]": 2,
+        "K[UNIMOD:37]": 2,
+        "K[UNIMOD:122]": 2,
+        "K[UNIMOD:58]": 2,
+        "K[UNIMOD:1289]": 2,
+        "K[UNIMOD:747]": 2,
+        "K[UNIMOD:64]": 2,
+        "K[UNIMOD:1848]": 2,
+        "K[UNIMOD:1363]": 2,
+        "K[UNIMOD:1849]": 2,
+        "K[UNIMOD:3]": 2,
+        "unknown": 1,
+        "R[UNIMOD:36]": 2,
+        "P[UNIMOD:35]": 1,
+        "Y[UNIMOD:354]": 1,
     }
 
     def __init__(self):
@@ -141,9 +147,7 @@ class ModificationLocationFeature(SequenceFeatureExtractor):
     def extract(self, seq, mods, seq_length):
         modified_aas = [f"{s}[UNIMOD:{m}]" for s, m in zip(seq, mods)]
         feature = [
-            ModificationLocationFeature.DICT_PTM_MOD_ATOM.get(
-                ALPHABET_PTMS.get(i, 0), 0
-            )
+            ModificationLocationFeature.DICT_PTM_MOD_ATOM.get(i, 0)
             for i in modified_aas
         ]
 
@@ -152,47 +156,39 @@ class ModificationLocationFeature(SequenceFeatureExtractor):
 
 class ModificationLossFeature(SequenceFeatureExtractor):
 
-    DICT_PTM_ATOM_COUNT_LOSS = {
-        #        H   C   N   O   P   S
-        23: [0, 0, 0, 0, 0, 0],  # M(ox)    -
-        24: [1, 0, 0, 0, 0, 0],  # S(ph)    -  H
-        25: [1, 0, 0, 0, 0, 0],  # T(ph)    -  H
-        26: [1, 0, 0, 0, 0, 0],  # Y(ph)    -  H
-        27: [1, 0, 1, 0, 0, 0],  # R(ci)    -  H N
-        28: [1, 0, 0, 0, 0, 0],  # K(ac)    -  H
-        29: [1, 0, 0, 0, 0, 0],  # K(gl)    -  H
-        30: [
-            9,
-            4,
-            2,
-            1,
-            0,
-            0,
-        ],  # Q(gl)    -  C(4) H(9) N(2) O                    * fixed
-        31: [1, 0, 0, 0, 0, 0],  # R(me)    -  H
-        32: [1, 0, 0, 0, 0, 0],  # K(me)    -  H
-        33: [1, 0, 0, 0, 0, 0],  # T(ga)    -  H
-        34: [1, 0, 0, 0, 0, 0],  # S(ga)    -  H
-        35: [1, 0, 0, 0, 0, 0],  # T(gl)    -  H
-        36: [1, 0, 0, 0, 0, 0],  # S(gl)    -  H
-        37: [1, 0, 0, 0, 0, 0],  # C(cam)   -  H
-        38: [1, 0, 0, 0, 0, 0],  # [ac]-    -  H
-        39: [8, 4, 1, 2, 0, 0],  # E(gl)    -  C(4) H(8) N O(2)     * new
-        40: [2, 0, 0, 0, 0, 0],  # K(dme)   -  H(2)
-        41: [3, 0, 0, 0, 0, 0],  # K(tme)   -  H(3)
-        42: [1, 0, 0, 0, 0, 0],  # K(f)     -  H
-        43: [1, 0, 0, 0, 0, 0],  # K(p)     -  H
-        44: [1, 0, 0, 0, 0, 0],  # K(b)     -  H
-        45: [1, 0, 0, 0, 0, 0],  # K(m)     -  H
-        46: [1, 0, 0, 0, 0, 0],  # K(s)     -  H
-        47: [1, 0, 0, 0, 0, 0],  # K(glu)   -  H
-        48: [1, 0, 0, 0, 0, 0],  # K(cr)    -  H
-        49: [1, 0, 0, 0, 0, 0],  # K(hib)   -  H
-        50: [1, 0, 0, 0, 0, 0],  # K(bi)    -  H
-        51: [3, 0, 2, 0, 0, 0],  # R(sdime) -  N(2) H(3)
-        52: [2, 0, 0, 0, 0, 0],  # R(adime) -  H(2)
-        53: [1, 0, 0, 0, 0, 0],  # P(h)     -  H
-        54: [1, 0, 0, 0, 0, 0],  # Y(n)     -  H
+    PTM_LOSS_LOOKUP = {
+        "M[UNIMOD:35]": [0, 0, 0, 0, 0, 0],
+        "S[UNIMOD:21]": [1, 0, 0, 0, 0, 0],
+        "T[UNIMOD:21]": [1, 0, 0, 0, 0, 0],
+        "Y[UNIMOD:21]": [1, 0, 0, 0, 0, 0],
+        "R[UNIMOD:7]": [1, 0, 1, 0, 0, 0],
+        "K[UNIMOD:1]": [1, 0, 0, 0, 0, 0],
+        "K[UNIMOD:121]": [1, 0, 0, 0, 0, 0],
+        "Q(gl)": [9, 4, 2, 1, 0, 0],
+        "R[UNIMOD:34]": [1, 0, 0, 0, 0, 0],
+        "K[UNIMOD:34]": [1, 0, 0, 0, 0, 0],
+        "T(ga)": [1, 0, 0, 0, 0, 0],
+        "S(ga)": [1, 0, 0, 0, 0, 0],
+        "T(gl)": [1, 0, 0, 0, 0, 0],
+        "S(gl)": [1, 0, 0, 0, 0, 0],
+        "C[UNIMOD:4]": [1, 0, 0, 0, 0, 0],
+        "[ac]-": [1, 0, 0, 0, 0, 0],
+        "E(gl)": [8, 4, 1, 2, 0, 0],
+        "K[UNIMOD:36]": [2, 0, 0, 0, 0, 0],
+        "K[UNIMOD:37]": [3, 0, 0, 0, 0, 0],
+        "K[UNIMOD:122]": [1, 0, 0, 0, 0, 0],
+        "K[UNIMOD:58]": [1, 0, 0, 0, 0, 0],
+        "K[UNIMOD:1289]": [1, 0, 0, 0, 0, 0],
+        "K[UNIMOD:747]": [1, 0, 0, 0, 0, 0],
+        "K[UNIMOD:64]": [1, 0, 0, 0, 0, 0],
+        "K[UNIMOD:1848]": [1, 0, 0, 0, 0, 0],
+        "K[UNIMOD:1363]": [1, 0, 0, 0, 0, 0],
+        "K[UNIMOD:1849]": [1, 0, 0, 0, 0, 0],
+        "K[UNIMOD:3]": [1, 0, 0, 0, 0, 0],
+        "unknown": [3, 0, 2, 0, 0, 0],
+        "R[UNIMOD:36]": [2, 0, 0, 0, 0, 0],
+        "P[UNIMOD:35]": [1, 0, 0, 0, 0, 0],
+        "Y[UNIMOD:354]": [1, 0, 0, 0, 0, 0],
     }
 
     def __init__(self):
@@ -203,9 +199,59 @@ class ModificationLossFeature(SequenceFeatureExtractor):
     def extract(self, seq, mods, seq_length):
         modified_aas = [f"{s}[UNIMOD:{m}]" for s, m in zip(seq, mods)]
         feature = [
-            ModificationLossFeature.DICT_PTM_ATOM_COUNT_LOSS.get(
-                ALPHABET_PTMS.get(i, 0), [0] * 6
-            )
+            ModificationLossFeature.PTM_LOSS_LOOKUP.get(i, [0] * 6)
+            for i in modified_aas
+        ]
+
+        return feature
+
+
+class ModificationGainFeature(SequenceFeatureExtractor):
+
+    PTM_GAIN_LOOKUP = {
+        "M[UNIMOD:35]": [0, 0, 0, 1, 0, 0],
+        "S[UNIMOD:21]": [2, 0, 0, 3, 1, 0],
+        "T[UNIMOD:21]": [2, 0, 0, 3, 1, 0],
+        "Y[UNIMOD:21]": [2, 0, 0, 3, 1, 0],
+        "R[UNIMOD:7]": [0, 0, 0, 1, 0, 0],
+        "K[UNIMOD:1]": [3, 2, 0, 1, 0, 0],
+        "K[UNIMOD:121]": [7, 4, 2, 2, 0, 0],
+        "Q(gl)": [6, 4, 1, 1, 0, 0],
+        "R[UNIMOD:34]": [3, 1, 0, 0, 0, 0],
+        "K[UNIMOD:34]": [3, 1, 0, 0, 0, 0],
+        "T(ga)": [14, 8, 1, 5, 0, 0],
+        "S(ga)": [14, 8, 1, 5, 0, 0],
+        "T(gl)": [14, 8, 1, 5, 0, 0],
+        "S(gl)": [14, 8, 1, 5, 0, 0],
+        "C[UNIMOD:4]": [4, 2, 1, 1, 0, 0],
+        "[ac]-": [3, 2, 0, 1, 0, 0],
+        "E(gl)": [6, 4, 1, 1, 0, 0],
+        "K[UNIMOD:36]": [6, 2, 0, 0, 0, 0],
+        "K[UNIMOD:37]": [9, 3, 0, 0, 0, 0],
+        "K[UNIMOD:122]": [0, 1, 0, 1, 0, 0],
+        "K[UNIMOD:58]": [5, 3, 0, 1, 0, 0],
+        "K[UNIMOD:1289]": [7, 4, 0, 1, 0, 0],
+        "K[UNIMOD:747]": [3, 3, 0, 3, 0, 0],
+        "K[UNIMOD:64]": [5, 4, 0, 3, 0, 0],
+        "K[UNIMOD:1848]": [7, 5, 0, 3, 0, 0],
+        "K[UNIMOD:1363]": [5, 4, 0, 1, 0, 0],
+        "K[UNIMOD:1849]": [7, 4, 0, 2, 0, 0],
+        "K[UNIMOD:3]": [15, 10, 2, 2, 0, 1],
+        "unknown": [7, 2, 2, 0, 0, 0],
+        "R[UNIMOD:36]": [6, 2, 0, 0, 0, 0],
+        "P[UNIMOD:35]": [1, 0, 0, 1, 0, 0],
+        "Y[UNIMOD:354]": [0, 0, 1, 2, 0, 0],
+    }
+
+    def __init__(self):
+        super(ModificationGainFeature, self).__init__(
+            pad_to_seq_length=True, padding_element=[0, 0, 0, 0, 0, 0]
+        )
+
+    def extract(self, seq, mods, seq_length):
+        modified_aas = [f"{s}[UNIMOD:{m}]" for s, m in zip(seq, mods)]
+        feature = [
+            ModificationGainFeature.PTM_GAIN_LOOKUP.get(i, [0] * 6)
             for i in modified_aas
         ]
 

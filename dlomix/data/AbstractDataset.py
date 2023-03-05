@@ -4,8 +4,8 @@ import numpy as np
 import pandas as pd
 import tensorflow as tf
 
-from dlomix.data.parsers import ProformaParser
-from dlomix.utils import lower_and_trim_strings
+from ..utils import lower_and_trim_strings
+from .parsers import ProformaParser
 
 # what characterizes a datasets -->
 #   1. reading mode (string, CSV, json, parquet, in-memory, etc..)
@@ -174,8 +174,9 @@ class AbstractDataset(abc.ABC):
             self.sequence_features = []
             self.sequence_features_names = []
             for feature_class in self.features_to_extract:
-                print("extracting feature: ", feature_class)
-                extractor_class = feature_class()
+                print("-" * 50)
+                print("Extracting feature: ", feature_class)
+                extractor_class = feature_class
 
                 self.sequence_features.append(
                     np.array(
@@ -311,7 +312,7 @@ class AbstractDataset(abc.ABC):
     def _get_tf_dataset(self, split=None):
         assert (
             split in self.tf_dataset.keys()
-        ), f"Requested data split is not available, available splits are {self.tf_dataset.keys()}"
+        ), f"Requested data split {split} is not available, available splits are {self.tf_dataset.keys()}"
         if split in self.tf_dataset.keys():
             return self.tf_dataset[split]
         return self.tf_dataset
