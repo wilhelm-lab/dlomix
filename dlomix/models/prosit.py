@@ -143,7 +143,7 @@ class PrositIntensityPredictor(tf.keras.Model):
     PTM_INPUT_KEYS = [
         ModificationLossFeature.__name__.lower(),
         ModificationGainFeature.__name__.lower(),
-        # ModificationLocationFeature.__name__.lower()
+        ModificationLocationFeature.__name__.lower(),
     ]
 
     def __init__(
