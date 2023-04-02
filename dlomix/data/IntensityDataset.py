@@ -311,7 +311,7 @@ class IntensityDataset(AbstractDataset):
                 + list(self.indicies_dict.keys())
             )
 
-        return self.targets[self.indicies_dict[split]]
+        return self.intensities[self.indicies_dict[split]]
 
     def denormalize_targets(self, targets):
         """Denormalize the given targets (can also be predictions) by multiplying the standard deviation and adding the mean.

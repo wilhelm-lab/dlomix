@@ -19,25 +19,26 @@ setuptools.setup(
     packages=setuptools.find_packages(),
     install_requires=[
         "fpdf",
-        "pandas",
-        "numpy",
         "matplotlib",
-        "scikit-learn",
-        "tensorflow",
+        "numpy",
+        "pandas",
         "pyarrow",
         # we install with the extra xml to ensure lxml is installed
         # more details about extras for pyteomics are here: https://pyteomics.readthedocs.io/en/latest/installation.html
         "pyteomics[XML]",
+        "scikit-learn",
+        "seaborn",
+        "tensorflow",
     ],
     extras_require={
         "dev": [
+            "black",
+            "pylint",
             "pytest >= 3.7",
             "pytest-cov",
-            "black",
-            "twine",
             "setuptools",
+            "twine",
             "wheel",
-            "pylint",
         ],
     },
     classifiers=[
