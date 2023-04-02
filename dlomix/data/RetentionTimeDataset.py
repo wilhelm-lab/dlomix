@@ -4,15 +4,7 @@ import numpy as np
 import pandas as pd
 import tensorflow as tf
 
-from dlomix.constants import DEFAULT_PARQUET_ENGINE
 from dlomix.data.AbstractDataset import AbstractDataset
-from dlomix.data.reader_utils import read_json_file, read_parquet_file_pandas
-
-"""
- TODO: check if it is better to abstract out a generic class for TF dataset wrapper, including:
- - splitting data logic (e.g. include task-specific stratification based on sequence length, iRT values)
- - loading data logic
- """
 
 # take into consideration if the pandas dataframe is pickled or not and then call read_pickle instead of read_csv
 # allow the possiblity to have three different dataset objects, one for train, val, and test
@@ -37,6 +29,8 @@ class RetentionTimeDataset(AbstractDataset):
         a boolean whether to normalize the targets or not (subtract mean and divied by standard deviation). Defaults to False.
     seq_length : int, optional
         the sequence length to be used, where all sequences will be padded to this length, longer sequences will be removed and not truncated. Defaults to 0.
+    parser: Subclass of AbstractParser, optional
+        the parser to use to split amino acids and modifications. For more information, please see `dlomix.data.parsers`
     batch_size : int, optional
         the batch size to be used for consuming the dataset in training a model. Defaults to 32.
     val_ratio : int, optional
@@ -109,7 +103,11 @@ class RetentionTimeDataset(AbstractDataset):
         self.data_source = data
 
         self._read_data()
-        self._validate_remove_long_sequences()
+        if self.parser:
+            self._parse_sequences()
+            self._validate_remove_long_sequences()
+        if self.features_to_extract:
+            self._extract_features()
         self._split_data()
         self._build_tf_dataset()
         self._preprocess_tf_dataset()
@@ -152,6 +150,9 @@ class RetentionTimeDataset(AbstractDataset):
                 # a string path is passed via the json or as a constructor argument
                 df = self._resolve_string_data_path()
 
+            # consider sorting to leverage caching when extracting features
+            # df.sort_values(by=self.sequence_col, inplace=True)
+
             # used only for testing with a smaller sample from a csv file
             if self.sample_run:
                 df = df.head(RetentionTimeDataset.SAMPLE_RUN_N)
@@ -187,44 +188,31 @@ class RetentionTimeDataset(AbstractDataset):
         # ToDo: make dynamic based on parameters
         self.sequence_col = "modified_sequence"
 
-    def _resolve_string_data_path(self):
-        is_json_file = self.data_source.endswith(".json")
-
-        if is_json_file:
-            json_dict = read_json_file(self.data_source)
-            self._update_data_loading_for_json_format(json_dict)
-
-        is_parquet_url = ".parquet" in self.data_source and self.data_source.startswith(
-            "http"
-        )
-        is_parquet_file = self.data_source.endswith(".parquet")
-        is_csv_file = self.data_source.endswith(".csv")
-
-        if is_parquet_url or is_parquet_file:
-            df = read_parquet_file_pandas(self.data_source, DEFAULT_PARQUET_ENGINE)
-            return df
-        elif is_csv_file:
-            df = pd.read_csv(self.data_source)
-            return df
-        else:
-            raise ValueError(
-                "Invalid data source provided as a string, please provide a path to a csv, parquet, or "
-                "or a json file."
-            )
-
     def _validate_remove_long_sequences(self) -> None:
         """
         Validate if all sequences are shorter than the padding length, otherwise drop them.
         """
-        assert self.sequences.shape[0] > 0, "No sequences in the provided data."
-        assert len(self.sequences) == len(
-            self.targets
-        ), "Count of examples does not match for sequences and targets."
+        if self.sequences.shape[0] <= 0:
+            raise ValueError(
+                "No sequences in the provided data or sequences were not parsed correctly."
+            )
+
+        if len(self.sequences) != len(self.targets):
+            raise ValueError(
+                "Count of examples does not match for sequences and targets."
+            )
 
         limit = self.seq_length
         vectorized_len = np.vectorize(lambda x: len(x))
         mask = vectorized_len(self.sequences) <= limit
         self.sequences, self.targets = self.sequences[mask], self.targets[mask]
+        self.modifications = self.modifications[mask]
+
+        self.n_term_modifications, self.c_term_modifications = (
+            self.n_term_modifications[mask],
+            self.c_term_modifications[mask],
+        )
+
         # once feature columns are introduced, apply the mask to the feature columns (subset the dataframe as well)
 
     def _split_data(self):
@@ -242,17 +230,30 @@ class RetentionTimeDataset(AbstractDataset):
             self.indicies_dict[self.main_split] = np.arange(n)
 
     def _build_tf_dataset(self):
-        # consider adding the feature columns or extra inputs
+        input_dict = {}
+
         for split in self.tf_dataset.keys():
-            self.tf_dataset[split] = tf.data.Dataset.from_tensor_slices(
-                (
-                    self.sequences[self.indicies_dict[split]],
-                    self.targets[self.indicies_dict[split]],
-                )
-            )
+            input_dict["sequence"] = self.get_examples_at_indices(self.sequences, split)
+
+            if self.features_to_extract:
+                for feature_name, feature_values in zip(
+                    self.sequence_features_names, self.sequence_features
+                ):
+                    input_dict[feature_name] = self.get_examples_at_indices(
+                        feature_values, split
+                    )
+
+            input_dict["target"] = self.get_examples_at_indices(self.targets, split)
+
+            self.tf_dataset[split] = tf.data.Dataset.from_tensor_slices(input_dict)
 
     def _preprocess_tf_dataset(self):
         for split in self.tf_dataset.keys():
+            self.tf_dataset[split] = self.tf_dataset[split].map(
+                RetentionTimeDataset._convert_inputs_to_dict,
+                num_parallel_calls=tf.data.AUTOTUNE,
+            )
+
             # avoid normalizing targets for test data --> should not be needed
             if self.normalize_targets and not self.testing_mode:
                 self.tf_dataset[split] = self.tf_dataset[split].map(
@@ -321,7 +322,6 @@ class RetentionTimeDataset(AbstractDataset):
             return targets
 
     def _normalize_target(self, seq, target):
-
         target = tf.math.divide(
             tf.math.subtract(target, self._data_mean), self._data_std
         )
@@ -332,8 +332,8 @@ class RetentionTimeDataset(AbstractDataset):
     """
 
     @staticmethod
-    def _convert_inputs_to_dict(seq, target):
-        return {"sequence": seq}, target
+    def _convert_inputs_to_dict(inputs):
+        return inputs, inputs.pop("target")
 
 
 if __name__ == "__main__":

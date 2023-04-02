@@ -1,7 +1,14 @@
 import tensorflow as tf
+from tensorflow.keras.layers.experimental import preprocessing
+
 from dlomix.constants import ALPHABET_UNMOD
 from dlomix.layers.attention import AttentionLayer, DecoderAttentionLayer
-from tensorflow.keras.layers.experimental import preprocessing
+
+from ..data.feature_extractors import (
+    ModificationGainFeature,
+    ModificationLocationFeature,
+    ModificationLossFeature,
+)
 
 
 class PrositRetentionTimePredictor(tf.keras.Model):
@@ -17,6 +24,10 @@ class PrositRetentionTimePredictor(tf.keras.Model):
         recurrent_layers_sizes (tuple, optional): A tuple of 2 values for the sizes of the two GRU layers in the encoder. Defaults to (256, 512).
         regressor_layer_size (int, optional): Size of the dense layer in the regressor after the encoder. Defaults to 512.
     """
+
+    DEFAULT_INPUT_KEYS = {
+        "SEQUENCE_KEY": "sequence",
+    }
 
     def __init__(
         self,
@@ -82,7 +93,13 @@ class PrositRetentionTimePredictor(tf.keras.Model):
         )
 
     def call(self, inputs, **kwargs):
-        x = self.string_lookup(inputs)
+        if isinstance(inputs, dict):
+            x = inputs.get(
+                PrositRetentionTimePredictor.DEFAULT_INPUT_KEYS["SEQUENCE_KEY"]
+            )
+        else:
+            x = inputs
+        x = self.string_lookup(x)
         x = self.embedding(x)
         x = self.encoder(x)
         x = self.attention(x)
@@ -123,7 +140,11 @@ class PrositIntensityPredictor(tf.keras.Model):
         "PRECURSOR_CHARGE_KEY",
         "FRAGMENTATION_TYPE_KEY",
     ]
-    PTM_INPUT_KEYS = ["ptm_atom_count_loss", "ptm_atom_count_gain", "ptm_location"]
+    PTM_INPUT_KEYS = [
+        ModificationLossFeature.__name__.lower(),
+        ModificationGainFeature.__name__.lower(),
+        ModificationLocationFeature.__name__.lower(),
+    ]
 
     def __init__(
         self,
@@ -201,7 +222,6 @@ class PrositIntensityPredictor(tf.keras.Model):
         )
 
     def _build_encoders(self):
-
         self.meta_encoder = tf.keras.Sequential(
             [
                 tf.keras.layers.Concatenate(name="meta_in"),

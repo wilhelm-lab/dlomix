@@ -28,6 +28,8 @@ class IntensityDataset(AbstractDataset):
         a boolean whether to normalize the targets or not (subtract mean and divied by standard deviation). Defaults to False.
     seq_length : int, optional
         the sequence length to be used, where all sequences will be padded to this length, longer sequences will be removed and not truncated. Defaults to 0.
+    parser: Subclass of AbstractParser, optional
+        the parser to use to split amino acids and modifications. For more information, please see `dlomix.data.parsers`
     batch_size : int, optional
         the batch size to be used for consuming the dataset in training a model. Defaults to 32.
     val_ratio : int, optional
@@ -111,8 +113,17 @@ class IntensityDataset(AbstractDataset):
         self.data_source = data
 
         self._read_data()
-        self._validate_remove_long_sequences()
+        # consider removing lengthy sequences when no parser is passed
+
+        # Numpy & Pandas
+        if self.parser:
+            self._parse_sequences()
+            self._validate_remove_long_sequences()
+        if self.features_to_extract:
+            self._extract_features()
         self._split_data()
+
+        # TF.Dataset
         self._build_tf_dataset()
         self._preprocess_tf_dataset()
 
@@ -148,7 +159,7 @@ class IntensityDataset(AbstractDataset):
                     "If a tuple is provided, it has to have a length of 4 and all elements should be numpy arrays."
                 )
         elif isinstance(self.data_source, str):
-            df = pd.read_csv(self.data_source)
+            df = self._resolve_string_data_path()
 
             # used only for testing with a smaller sample from a csv file
             if self.sample_run:
@@ -177,10 +188,8 @@ class IntensityDataset(AbstractDataset):
             # for concatenation later, we expand dimensions
             self.collision_energy = self.collision_energy.values.reshape(-1, 1)
 
-            print(type(self.precursor_charge))
-            print(self.precursor_charge)
             self.precursor_charge = convert_nested_list_to_numpy_array(
-                self.precursor_charge.values, dtype=np.float64
+                self.precursor_charge.values, dtype=np.float32
             )
             self.intensities = convert_nested_list_to_numpy_array(
                 self.intensities.values
@@ -240,18 +249,27 @@ class IntensityDataset(AbstractDataset):
             self.indicies_dict[self.main_split] = np.arange(n)
 
     def _build_tf_dataset(self):
-        # consider adding the feature columns or extra inputs
+        input_dict = {}
+
         for split in self.tf_dataset.keys():
-            self.tf_dataset[split] = tf.data.Dataset.from_tensor_slices(
-                (
-                    (
-                        self.sequences[self.indicies_dict[split]],
-                        self.collision_energy[self.indicies_dict[split]],
-                        self.precursor_charge[self.indicies_dict[split]],
-                    ),
-                    self.intensities[self.indicies_dict[split]],
-                )
+            input_dict["sequence"] = self.get_examples_at_indices(self.sequences, split)
+            if self.features_to_extract:
+                for feature_name, feature_values in zip(
+                    self.sequence_features_names, self.sequence_features
+                ):
+                    input_dict[feature_name] = self.get_examples_at_indices(
+                        feature_values, split
+                    )
+
+            input_dict["collision_energy"] = self.get_examples_at_indices(
+                self.collision_energy, split
             )
+            input_dict["precursor_charge"] = self.get_examples_at_indices(
+                self.precursor_charge, split
+            )
+            input_dict["target"] = self.get_examples_at_indices(self.intensities, split)
+
+            self.tf_dataset[split] = tf.data.Dataset.from_tensor_slices(input_dict)
 
     def _preprocess_tf_dataset(self):
         # ToDo: convert input to dict and assume this as the general case --> abstract out in parent class
@@ -304,22 +322,11 @@ class IntensityDataset(AbstractDataset):
         return targets * self._data_std + self._data_mean
 
     def _normalize_target(self, seq, target):
-
         target = tf.math.divide(
             tf.math.subtract(target, self._data_mean), self._data_std
         )
         return seq, target
 
-    """
-    if more than one input is added, inputs are added to a python dict, the following methods assume that
-    """
-
     @staticmethod
-    def _convert_inputs_to_dict(inputs: tuple, target):
-        seq, collision, precursor = inputs
-        inputs_dict = {
-            "sequence": seq,
-            "collision_energy": collision,
-            "precursor_charge": precursor,
-        }
-        return inputs_dict, target
+    def _convert_inputs_to_dict(inputs):
+        return inputs, inputs.pop("target")

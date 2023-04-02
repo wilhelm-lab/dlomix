@@ -4,8 +4,10 @@ import numpy as np
 import pandas as pd
 import tensorflow as tf
 
-from dlomix.data.parsers import ProformaParser
-from dlomix.utils import lower_and_trim_strings
+from ..constants import DEFAULT_PARQUET_ENGINE
+from ..utils import lower_and_trim_strings
+from .parsers import ProformaParser
+from .reader_utils import read_json_file, read_parquet_file_pandas
 
 # what characterizes a datasets -->
 #   1. reading mode (string, CSV, json, parquet, in-memory, etc..)
@@ -19,6 +21,10 @@ from dlomix.utils import lower_and_trim_strings
 # 3. pick targets from the data after the reader has finished, maintain the targets dict
 # 4. run feature extractors based on input sequences, maintain features dict
 # 5. build TF Datasets accordingly
+
+# Consider collecting member variables related to the sequences in a named tuple (sequence, mod, n_term, c_term, etc..)
+
+# consider making the dataset object iterable --> iterate over main split tf dataset
 
 
 class AbstractDataset(abc.ABC):
@@ -152,23 +158,79 @@ class AbstractDataset(abc.ABC):
                 f"Invalid parser provided {self.parser}. For a list of available parsers, check dlomix.data.parsers.py"
             )
 
-    # double check
-    def _extract_features(self):
-        self.unmodified_sequences, self.modifications = self.parser.parse_sequences(
-            self.sequences
-        )
+        self.unmodified_sequences = None
+        self.modifications = None
+        self.n_term_modifications = None
+        self.c_term_modifications = None
 
+    def _parse_sequences(self):
+        (
+            self.sequences,
+            self.modifications,
+            self.n_term_modifications,
+            self.c_term_modifications,
+        ) = self.parser.parse_sequences(self.sequences)
+
+    def _resolve_string_data_path(self):
+        is_json_file = self.data_source.endswith(".json")
+
+        if is_json_file:
+            json_dict = read_json_file(self.data_source)
+            self._update_data_loading_for_json_format(json_dict)
+
+        is_parquet_url = ".parquet" in self.data_source and self.data_source.startswith(
+            "http"
+        )
+        is_parquet_file = self.data_source.endswith(".parquet")
+        is_csv_file = self.data_source.endswith(".csv")
+
+        if is_parquet_url or is_parquet_file:
+            df = read_parquet_file_pandas(self.data_source, DEFAULT_PARQUET_ENGINE)
+            return df
+        elif is_csv_file:
+            df = pd.read_csv(self.data_source)
+            return df
+        else:
+            raise ValueError(
+                "Invalid data source provided as a string, please provide a path to a csv, parquet, or "
+                "or a json file."
+            )
+
+    def _extract_features(self):
         if self.features_to_extract:
             self.sequence_features = []
+            self.sequence_features_names = []
             for feature_class in self.features_to_extract:
-                extractor_class = feature_class()
+                print("-" * 50)
+                print("Extracting feature: ", feature_class)
+                extractor_class = feature_class
+
                 self.sequence_features.append(
-                    extractor_class.extract_all(
-                        self.unmodified_sequences, self.modifications
+                    np.array(
+                        extractor_class.extract_all(
+                            self.sequences,
+                            self.modifications,
+                            self.seq_length if extractor_class.pad_to_seq_length else 0,
+                        ),
+                        dtype=np.float32,
                     )
                 )
+                self.sequence_features_names.append(
+                    extractor_class.__class__.__name__.lower()
+                )
 
-        self.sequence_features = np.array(self.sequence_features).T
+    def get_examples_at_indices(self, examples, split):
+        if isinstance(examples, np.ndarray):
+            return examples[self.indicies_dict[split]]
+        # to handle features
+        if isinstance(examples, list):
+            return [
+                examples_single[self.indicies_dict[split]]
+                for examples_single in examples
+            ]
+        raise ValueError(
+            f"Provided data structure to subset for examples at split indices is neither a list nor a numpy array, but rather a {type(examples)}."
+        )
 
     def _init_atom_table(self):
         atom_counts = pd.read_csv(self.aminoacid_atom_counts_csv_path)
@@ -278,7 +340,7 @@ class AbstractDataset(abc.ABC):
     def _get_tf_dataset(self, split=None):
         assert (
             split in self.tf_dataset.keys()
-        ), f"Requested data split is not available, available splits are {self.tf_dataset.keys()}"
+        ), f"Requested data split {split} is not available, available splits are {self.tf_dataset.keys()}"
         if split in self.tf_dataset.keys():
             return self.tf_dataset[split]
         return self.tf_dataset

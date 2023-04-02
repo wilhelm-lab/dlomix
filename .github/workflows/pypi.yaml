@@ -30,6 +30,5 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.CLI_GH_TOKEN }}
         run: |
-          VERSION=$(python -c "from dlomix import __version__; print(__version__);")
+          VERSION=$(python setup.py --version)
           gh release create v$VERSION --title $VERSION --generate-notes
-        

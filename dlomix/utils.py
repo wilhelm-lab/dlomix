@@ -1,4 +1,5 @@
 import pickle
+
 import numpy as np
 
 
@@ -18,3 +19,16 @@ def convert_nested_list_to_numpy_array(nested_list, dtype=np.float32):
 
 def lower_and_trim_strings(strings):
     return [s.lower().trim() for s in strings]
+
+
+def get_constructor_call_object_creation(object):
+    members = [
+        attr
+        for attr in vars(object)
+        if not callable(getattr(object, attr)) and not attr.startswith(("_", "__"))
+    ]
+    values = [object.__getattribute__(m) for m in members]
+
+    repr = ", ".join([f"{m}={v}" for m, v in zip(members, values)])
+
+    return f"{object.__class__.__name__}({repr})"

@@ -1,6 +1,8 @@
-from dlomix.models import PrositRetentionTimePredictor, PrositIntensityPredictor
 import logging
+
 import pytest
+
+from dlomix.models import PrositIntensityPredictor, PrositRetentionTimePredictor
 
 logger = logging.getLogger(__name__)
 
@@ -52,17 +54,17 @@ def test_prosit_intensity_model_ptm_on_input():
             "collision_energy": (None, 1),
             "precursor_charge": (None, 6),
             "fragmentation_type": (None, 1),
-            "ptm_atom_count_loss": (
+            PrositIntensityPredictor.PTM_INPUT_KEYS[0]: (
                 None,
                 seq_len,
                 6,
             ),
-            "ptm_atom_count_gain": (
+            PrositIntensityPredictor.PTM_INPUT_KEYS[1]: (
                 None,
                 seq_len,
                 6,
             ),
-            "ptm_location": (
+            PrositIntensityPredictor.PTM_INPUT_KEYS[2]: (
                 None,
                 seq_len,
                 1,
