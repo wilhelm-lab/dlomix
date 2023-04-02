@@ -2,8 +2,8 @@ import numpy as np
 import pandas as pd
 import tensorflow as tf
 
-from dlomix.data.AbstractDataset import AbstractDataset
-from dlomix.utils import convert_nested_list_to_numpy_array
+from ..utils import convert_nested_list_to_numpy_array
+from .AbstractDataset import AbstractDataset
 
 # take into consideration if the pandas dataframe is pickled or not and then call read_pickle instead of read_csv
 # allow the possiblity to have three different dataset objects, one for train, val, and test

@@ -1,9 +1,11 @@
 from os.path import join
-from matplotlib import pyplot as plt
-from dlomix.reports.Report import PDFFile, Report
+
 import numpy as np
+from matplotlib import pyplot as plt
 from matplotlib.colors import LogNorm
 from matplotlib.ticker import LogLocator
+
+from .Report import PDFFile, Report
 
 
 class RetentionTimeReport(Report):

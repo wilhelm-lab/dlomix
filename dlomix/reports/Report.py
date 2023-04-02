@@ -1,11 +1,12 @@
-from fpdf import FPDF
-from matplotlib import pyplot as plt
-from os.path import join
-from os import makedirs
-import tensorflow as tf
-import warnings
 import abc
 import glob
+import warnings
+from os import makedirs
+from os.path import join
+
+import tensorflow as tf
+from fpdf import FPDF
+from matplotlib import pyplot as plt
 
 
 class Report(abc.ABC):
@@ -166,7 +167,6 @@ class PDFFile(FPDF):
     LINE_HEIGHT = 5
 
     def __init__(self, title):
-
         super().__init__()
         self.title = title
         self.width = PDFFile.PAGE_WIDTH

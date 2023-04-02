@@ -15,6 +15,7 @@ from dlomix import __version__
 
 logger.warn(__version__)
 
+
 def test_parse_single_sequence():
     parser = ProformaParser()
     seq, mod, n_term_mods, c_term_mods = parser._parse_sequence(NO_MODS_SEQUENCE)
@@ -24,6 +25,7 @@ def test_parse_single_sequence():
     assert len(mod) == 3
     assert n_term_mods == NO_MOD_VALUE
     assert c_term_mods is NO_MOD_VALUE
+
 
 def test_parse_sequence_no_nc_terminals():
     parser = ProformaParser()
@@ -39,6 +41,7 @@ def test_parse_sequence_no_nc_terminals():
     assert mod[2] is not None
     assert n_term_mods is not None
     assert c_term_mods is not None
+
 
 def test_parse_sequence_nc_terminals():
     parser = ProformaParser()
@@ -57,17 +60,19 @@ def test_parse_sequence_nc_terminals():
     assert n_term_mods is not None
     assert c_term_mods is not None
 
+
 def test_parse_sequences():
     parser = ProformaParser()
     sequences = [NO_MODS_SEQUENCE, MOD_SEQUENCE, ALL_MODS_SEQUENCE]
 
     seqs, mods, n_terms, c_terms = parser.parse_sequences(sequences)
     assert seqs is not None
-    #, mods, n_terms, c_terms])
+    # , mods, n_terms, c_terms])
     logger.info(seqs)
     logger.info(mods)
     logger.info(n_terms)
     logger.info(c_terms)
+
 
 def test_flatten_proforma_output():
     parser = ProformaParser()

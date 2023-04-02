@@ -1,8 +1,9 @@
-from dlomix.losses import masked_spectral_distance
+import logging
+
 import numpy as np
 import tensorflow as tf
 
-import logging
+from dlomix.losses import masked_spectral_distance
 
 logger = logging.getLogger(__name__)
 
