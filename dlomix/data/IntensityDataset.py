@@ -113,12 +113,17 @@ class IntensityDataset(AbstractDataset):
         self.data_source = data
 
         self._read_data()
+        # consider removing lengthy sequences when no parser is passed
+
+        # Numpy & Pandas
         if self.parser:
             self._parse_sequences()
             self._validate_remove_long_sequences()
         if self.features_to_extract:
             self._extract_features()
         self._split_data()
+
+        # TF.Dataset
         self._build_tf_dataset()
         self._preprocess_tf_dataset()
 
