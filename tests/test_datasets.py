@@ -1,5 +1,5 @@
-import csv
 import urllib.request
+from os import makedirs
 from os.path import exists, join
 
 import numpy as np
@@ -19,6 +19,7 @@ DOWNLOAD_PATH_FOR_ASSETS = join("tests", "assets")
 
 @pytest.fixture(scope="session", autouse=True)
 def download_assets():
+    makedirs(DOWNLOAD_PATH_FOR_ASSETS, exist_ok=True)
     for i, http_address in enumerate(TEST_ASSETS_TO_DOWNLOAD, start=1):
         filename = f"file_{i}"
         filepath = join(DOWNLOAD_PATH_FOR_ASSETS, filename)
