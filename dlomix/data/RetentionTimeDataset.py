@@ -1,4 +1,4 @@
-import json
+from os.path import join
 
 import numpy as np
 import pandas as pd
@@ -144,7 +144,7 @@ class RetentionTimeDataset(AbstractDataset):
 
         elif isinstance(self.data_source, (str, dict)):
             if isinstance(self.data_source, dict):
-                #  a dict is passed via the json
+                #  a dict is passed in-memory via the json
                 df = pd.DataFrame(self.data_source)
             else:
                 # a string path is passed via the json or as a constructor argument
@@ -178,10 +178,17 @@ class RetentionTimeDataset(AbstractDataset):
         # give the index of the element as an ID for later reference if needed
         self.example_id = list(range(len(self.sequences)))
 
-    def _update_data_loading_for_json_format(self):
+    def _update_data_loading_for_json_format(self, base_dir=None):
         json_dict = self.data_source
 
         self.data_source = json_dict.get(RetentionTimeDataset.METADATA_KEY, "")
+
+        # meta data file is assumed to be in the same path as the json input file
+        if base_dir:
+            self.data_source = join(
+                base_dir, json_dict.get(RetentionTimeDataset.METADATA_KEY, "")
+            )
+
         self.target_col = json_dict.get(RetentionTimeDataset.PARAMS_KEY, {}).get(
             RetentionTimeDataset.TARGET_NAME_KEY, self.target_col
         )

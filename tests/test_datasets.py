@@ -1,3 +1,4 @@
+import json
 import urllib.request
 from os import makedirs
 from os.path import exists, join
@@ -84,6 +85,18 @@ def test_json_dict_rtdataset():
     rtdataset_filebased = RetentionTimeDataset(
         data_source=test_data_dict_file, seq_length=20
     )
+
+
+def test_json_ms2ai_rt():
+    json_test_filepath = join(DOWNLOAD_PATH_FOR_ASSETS, "ms2ai", "RT", "dlomix.json")
+
+    # check how to handle this in code, either stay with relative path or strictly require absolute path
+    # get relative path of json file and concatenate it with the meta data path
+
+    rtdataset = RetentionTimeDataset(data_source=json_test_filepath, seq_length=20)
+    assert rtdataset.sequences is not None
+    assert rtdataset.targets is not None
+    assert rtdataset.main_split is RetentionTimeDataset.SPLIT_NAMES[0]
 
 
 def test_parsed_rtdataset():
@@ -214,5 +227,31 @@ def test_parsed_csv_intensitydataset():
     assert intensity_dataset.sequences is not None
     assert intensity_dataset.collision_energy is not None
     assert intensity_dataset.precursor_charge is not None
+    assert intensity_dataset.intensities is not None
+    assert intensity_dataset.main_split is IntensityDataset.SPLIT_NAMES[0]
+
+
+# def test_json_ms2ai_intensity():
+#     json_test_filepath = join(DOWNLOAD_PATH_FOR_ASSETS, "ms2ai", "INT", "dlomix.json")
+
+#     # check how to handle this in code, either stay with relative path or strictly require absolute path
+#     # get relative path of json file and concatenate it with the meta data path
+
+#     intensity_dataset = IntensityDataset(data_source=json_test_filepath, seq_length=20)
+#     assert intensity_dataset.sequences is not None
+#     assert intensity_dataset.intensities is not None
+#     assert intensity_dataset.main_split is IntensityDataset.SPLIT_NAMES[0]
+
+
+def test_json_prospect_intensity():
+    json_test_filepath = join(
+        DOWNLOAD_PATH_FOR_ASSETS, "ms2ai-prospect", "third_pool.json"
+    )
+
+    # check how to handle this in code, either stay with relative path or strictly require absolute path
+    # get relative path of json file and concatenate it with the meta data path
+
+    intensity_dataset = IntensityDataset(data_source=json_test_filepath, seq_length=30)
+    assert intensity_dataset.sequences is not None
     assert intensity_dataset.intensities is not None
     assert intensity_dataset.main_split is IntensityDataset.SPLIT_NAMES[0]

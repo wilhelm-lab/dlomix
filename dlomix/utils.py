@@ -32,3 +32,16 @@ def get_constructor_call_object_creation(object):
     repr = ", ".join([f"{m}={v}" for m, v in zip(members, values)])
 
     return f"{object.__class__.__name__}({repr})"
+
+
+def flatten_dict_for_values(d):
+    if not isinstance(d, dict):
+        return d
+    else:
+        items = []
+        for v in d.values():
+            if isinstance(v, dict):
+                return flatten_dict_for_values(v)
+            else:
+                items.append(v)
+        return items

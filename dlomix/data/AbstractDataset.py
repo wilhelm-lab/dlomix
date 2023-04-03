@@ -1,4 +1,5 @@
 import abc
+from os.path import abspath, dirname
 
 import numpy as np
 import pandas as pd
@@ -67,6 +68,7 @@ class AbstractDataset(abc.ABC):
     SAMPLE_RUN_N = 100
     METADATA_KEY = "metadata"
     PARAMS_KEY = "parameters"
+    ANNOTATIONS_KEY = "annotations"
     TARGET_NAME_KEY = "target_column_key"
     SEQUENCE_COLUMN_KEY = "sequence_column_key"
 
@@ -175,8 +177,9 @@ class AbstractDataset(abc.ABC):
         is_json_file = self.data_source.endswith(".json")
 
         if is_json_file:
-            json_dict = read_json_file(self.data_source)
-            self._update_data_loading_for_json_format(json_dict)
+            json_file_base_dir = dirname(abspath(self.data_source))
+            self.data_source = read_json_file(self.data_source)
+            self._update_data_loading_for_json_format(json_file_base_dir)
 
         is_parquet_url = ".parquet" in self.data_source and self.data_source.startswith(
             "http"
@@ -192,7 +195,7 @@ class AbstractDataset(abc.ABC):
             return df
         else:
             raise ValueError(
-                "Invalid data source provided as a string, please provide a path to a csv, parquet, or "
+                "Invalid data source provided as a string, please provide a path to a csv, parquet, "
                 "or a json file."
             )
 

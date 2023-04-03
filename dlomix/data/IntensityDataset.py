@@ -1,8 +1,10 @@
+from os.path import dirname, join
+
 import numpy as np
 import pandas as pd
 import tensorflow as tf
 
-from ..utils import convert_nested_list_to_numpy_array
+from ..utils import convert_nested_list_to_numpy_array, flatten_dict_for_values
 from .AbstractDataset import AbstractDataset
 
 # take into consideration if the pandas dataframe is pickled or not and then call read_pickle instead of read_csv
@@ -204,6 +206,40 @@ class IntensityDataset(AbstractDataset):
 
         # give the index of the element as an ID for later reference if needed
         self.example_id = list(range(len(self.sequences)))
+
+    def _update_data_loading_for_json_format(self, base_dir=None):
+        from prospectdataset import download_process_pool
+
+        json_dict = self.data_source
+        meta_data_filepath = json_dict.get(IntensityDataset.METADATA_KEY, "")
+        annotation_data_value = json_dict.get(IntensityDataset.ANNOTATIONS_KEY, "")
+        annotations_filepaths = flatten_dict_for_values(annotation_data_value)
+
+        # meta data file is assumed to be in the same path as the json input file
+        if base_dir:
+            meta_data_filepath = join(base_dir, meta_data_filepath)
+            annotations_filepaths = [
+                join(base_dir, file) for file in annotations_filepaths
+            ]
+
+        if len(annotations_filepaths) > 0:
+            annotations_dir = dirname(annotations_filepaths[0])
+        else:
+            raise ValueError(
+                "No paths to annotation files were provided in the JSON file."
+            )
+
+        self.data_source = download_process_pool(
+            annotations_data_dir=annotations_dir,
+            metadata_path=meta_data_filepath,
+            save_path=join(base_dir),
+        )
+
+        self.intensities_col = json_dict.get(IntensityDataset.PARAMS_KEY, {}).get(
+            IntensityDataset.TARGET_NAME_KEY, self.intensities_col
+        )
+        # ToDo: make dynamic based on parameters
+        self.sequence_col = "modified_sequence"
 
     def _validate_remove_long_sequences(self) -> None:
         """
