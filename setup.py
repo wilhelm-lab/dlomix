@@ -1,3 +1,5 @@
+import platform
+
 import setuptools
 
 with open("README.md", "r") as fh:
@@ -6,6 +8,38 @@ with open("README.md", "r") as fh:
 from dlomix import META_DATA, __version__
 
 VERSION = __version__
+
+os_name = platform.system().lower()
+
+if os_name == "darwin":
+    # Apple silicon
+    tensorflow_requirement = "tensorflow-macos"
+else:
+    tensorflow_requirement = "tensorflow"
+
+requirements = [
+    "fpdf",
+    "matplotlib",
+    "numpy",
+    "pandas",
+    "pyarrow",
+    # we install with the extra xml to ensure lxml is installed
+    # more details about extras for pyteomics are here: https://pyteomics.readthedocs.io/en/latest/installation.html
+    "pyteomics[XML]",
+    "scikit-learn",
+    "seaborn",
+    tensorflow_requirement,
+]
+
+dev_requirements = [
+    "black",
+    "pylint",
+    "pytest >= 3.7",
+    "pytest-cov",
+    "setuptools",
+    "twine",
+    "wheel",
+]
 
 setuptools.setup(
     name=META_DATA["package_name"].lower(),
@@ -17,29 +51,9 @@ setuptools.setup(
     long_description_content_type="text/markdown",
     url=META_DATA["github_url"],
     packages=setuptools.find_packages(),
-    install_requires=[
-        "fpdf",
-        "matplotlib",
-        "numpy",
-        "pandas",
-        "pyarrow",
-        # we install with the extra xml to ensure lxml is installed
-        # more details about extras for pyteomics are here: https://pyteomics.readthedocs.io/en/latest/installation.html
-        "pyteomics[XML]",
-        "scikit-learn",
-        "seaborn",
-        "tensorflow",
-    ],
+    install_requires=requirements,
     extras_require={
-        "dev": [
-            "black",
-            "pylint",
-            "pytest >= 3.7",
-            "pytest-cov",
-            "setuptools",
-            "twine",
-            "wheel",
-        ],
+        "dev": dev_requirements,
     },
     classifiers=[
         "Programming Language :: Python :: 3",
