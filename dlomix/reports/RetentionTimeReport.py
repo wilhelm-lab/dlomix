@@ -22,7 +22,7 @@ class RetentionTimeReport(Report):
     def generate_report(self, targets, predictions, **kwargs):
         self._init_report_resources()
 
-        r2 = self.calculate_r2(targets, predictions)
+        _ = self.calculate_r2(targets, predictions)
         self.plot_all_metrics()
         self.plot_residuals(targets, predictions)
         self.plot_density(targets, predictions)

@@ -150,6 +150,15 @@ class AbstractDataset(abc.ABC):
 
         self._resolve_parser()
 
+        self.sequences = None
+        self.unmodified_sequences = None
+        self.modifications = None
+        self.n_term_modifications = None
+        self.c_term_modifications = None
+
+        self.sequence_features = None
+        self.sequence_features_names = None
+
     def _resolve_parser(self):
         if self.parser is None:
             return
@@ -159,11 +168,6 @@ class AbstractDataset(abc.ABC):
             raise ValueError(
                 f"Invalid parser provided {self.parser}. For a list of available parsers, check dlomix.data.parsers.py"
             )
-
-        self.unmodified_sequences = None
-        self.modifications = None
-        self.n_term_modifications = None
-        self.c_term_modifications = None
 
     def _parse_sequences(self):
         (
@@ -257,7 +261,11 @@ class AbstractDataset(abc.ABC):
             `AbstractDataset.METADATA_KEY`, `AbstractDataset.PARAMS_KEY`,
             `AbstractDataset.TARGET_NAME_KEY`, `AbstractDataset.SEQUENCE_COLUMN_KEY`.
         """
-        pass
+        raise NotImplementedError("Not implemented")
+
+    @abc.abstractmethod
+    def _update_data_loading_for_json_format(self, base_dir):
+        raise NotImplementedError("Not implemented")
 
     @abc.abstractmethod
     def _build_tf_dataset(self):
@@ -268,12 +276,12 @@ class AbstractDataset(abc.ABC):
                 (self.inputs, self.outputs)
             )`
         """
-        pass
+        raise NotImplementedError("Not implemented")
 
     @abc.abstractmethod
     def _preprocess_tf_dataset(self):
         """Add processing logic (tensorflow functions) to apply to all tf.Datasets."""
-        pass
+        raise NotImplementedError("Not implemented")
 
     @abc.abstractmethod
     def get_split_targets(self, split="val"):
@@ -281,7 +289,7 @@ class AbstractDataset(abc.ABC):
         Args:
             split (str, optional): Name of the split, check `AbstractDataset.SPLIT_NAMES`. Defaults to "val".
         """
-        pass
+        raise NotImplementedError("Not implemented")
 
     @staticmethod
     @abc.abstractmethod
@@ -294,7 +302,7 @@ class AbstractDataset(abc.ABC):
             inputs (tuple(tf.Tensor)): tuple of input tensors
             target (tf.Tensor): target label tensor
         """
-        pass
+        raise NotImplementedError("Not implemented")
 
     def _pad_sequences(self, inputs, target):
         if isinstance(inputs, dict):

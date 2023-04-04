@@ -21,17 +21,18 @@ def lower_and_trim_strings(strings):
     return [s.lower().trim() for s in strings]
 
 
-def get_constructor_call_object_creation(object):
+def get_constructor_call_object_creation(object_instance):
     members = [
         attr
-        for attr in vars(object)
-        if not callable(getattr(object, attr)) and not attr.startswith(("_", "__"))
+        for attr in vars(object_instance)
+        if not callable(getattr(object_instance, attr))
+        and not attr.startswith(("_", "__"))
     ]
-    values = [object.__getattribute__(m) for m in members]
+    values = [object_instance.__getattribute__(m) for m in members]
 
-    repr = ", ".join([f"{m}={v}" for m, v in zip(members, values)])
+    repr_str = ", ".join([f"{m}={v}" for m, v in zip(members, values)])
 
-    return f"{object.__class__.__name__}({repr})"
+    return f"{object_instance.__class__.__name__}({repr_str})"
 
 
 def flatten_dict_for_values(d):
