@@ -1,5 +1,6 @@
-import json
+import logging
 import urllib.request
+import zipfile
 from os import makedirs
 from os.path import exists, join
 
@@ -10,12 +11,24 @@ import pytest
 from dlomix.data import IntensityDataset, RetentionTimeDataset
 from dlomix.data.feature_extractors import LengthFeature
 
-INTENSITY_CSV_EXAMPLE_URL = "https://raw.githubusercontent.com/wilhelm-lab/dlomix/develop/example_dataset/intensity/intensity_data.csv"
+logger = logging.getLogger(__name__)
+
 RT_PARQUET_EXAMPLE_URL = "https://zenodo.org/record/6602020/files/TUM_missing_first_meta_data.parquet?download=1"
-
-
-TEST_ASSETS_TO_DOWNLOAD = [RT_PARQUET_EXAMPLE_URL, INTENSITY_CSV_EXAMPLE_URL]
+INTENSITY_CSV_EXAMPLE_URL = "https://raw.githubusercontent.com/wilhelm-lab/dlomix/develop/example_dataset/intensity/intensity_data.csv"
+MS2AI_TEST_ASSETS = (
+    "https://github.com/wilhelm-lab/dlomix-resources/raw/main/test_assets/ms2ai.zip"
+)
+TEST_ASSETS_TO_DOWNLOAD = [
+    RT_PARQUET_EXAMPLE_URL,
+    INTENSITY_CSV_EXAMPLE_URL,
+    MS2AI_TEST_ASSETS,
+]
 DOWNLOAD_PATH_FOR_ASSETS = join("tests", "assets")
+
+
+def unzip_file(zip_file_path, dest_dir):
+    with zipfile.ZipFile(zip_file_path, "r") as f:
+        f.extractall(dest_dir)
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -28,10 +41,20 @@ def download_assets():
             filepath += ".parquet"
         if ".csv" in http_address:
             filepath += ".csv"
+        if ".zip" in http_address:
+            filepath += ".zip"
         if exists(filepath):
+            logger.info(
+                "Skipping {} since it exists at {}".format(http_address, filepath)
+            )
             continue
-        print(f"downloading: {http_address}, to: {filename}")
+        logger.info("Downloading: {}, to: {}".format(http_address, filepath))
         urllib.request.urlretrieve(http_address, filepath)
+        if ".zip" in filepath:
+            logger.info(
+                "Unzipping: {}, to: {}".format(filepath, DOWNLOAD_PATH_FOR_ASSETS)
+            )
+            unzip_file(filepath, DOWNLOAD_PATH_FOR_ASSETS)
     return True
 
 
@@ -243,9 +266,9 @@ def test_parsed_csv_intensitydataset():
 #     assert intensity_dataset.main_split is IntensityDataset.SPLIT_NAMES[0]
 
 
-def test_json_prospect_intensity():
+def test_json_prospect_sample_intensity():
     json_test_filepath = join(
-        DOWNLOAD_PATH_FOR_ASSETS, "ms2ai-prospect", "third_pool.json"
+        DOWNLOAD_PATH_FOR_ASSETS, "ms2ai", "INT", "third_pool.json"
     )
 
     # check how to handle this in code, either stay with relative path or strictly require absolute path
