@@ -229,6 +229,7 @@ class IntensityDataset(AbstractDataset):
                 "No paths to annotation files were provided in the JSON file."
             )
 
+        # ToDo: consider options to check if the files were processed earlier and skip this step since it is time consuming
         self.data_source = download_process_pool(
             annotations_data_dir=annotations_dir,
             metadata_path=meta_data_filepath,
