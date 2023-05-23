@@ -1,14 +1,13 @@
 import tensorflow as tf
 from tensorflow.keras.layers.experimental import preprocessing
 
-from dlomix.constants import ALPHABET_UNMOD
-from dlomix.layers.attention import AttentionLayer, DecoderAttentionLayer
-
+from ..constants import ALPHABET_UNMOD
 from ..data.feature_extractors import (
     ModificationGainFeature,
     ModificationLocationFeature,
     ModificationLossFeature,
 )
+from ..layers.attention import AttentionLayer, DecoderAttentionLayer
 
 
 class PrositRetentionTimePredictor(tf.keras.Model):

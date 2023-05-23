@@ -1,11 +1,12 @@
-from fpdf import FPDF
-from matplotlib import pyplot as plt
-from os.path import join
-from os import makedirs
-import tensorflow as tf
-import warnings
 import abc
 import glob
+import warnings
+from os import makedirs
+from os.path import join
+
+import tensorflow as tf
+from fpdf import FPDF
+from matplotlib import pyplot as plt
 
 
 class Report(abc.ABC):
@@ -36,14 +37,16 @@ class Report(abc.ABC):
         # an empty dict to use to list the report resources
         self._init_report_resources()
 
+        # empty pdf file
+        self.pdf_file = None
+
     def _set_history_dict(self, history):
         if isinstance(history, dict):
             self._history_dict = history
         elif not isinstance(history, tf.keras.callbacks.History):
             raise ValueError(
                 "Reporting requires a History object (tf.keras.callbacks.History) or its history dict attribute (History.history), which is returned from a call to "
-                "model.fit(). Passed history argument is of type {} ",
-                type(history),
+                f"model.fit(). Passed history argument is of type {type(history)} ",
             )
         elif not hasattr(history, "history"):
             raise ValueError(
@@ -63,7 +66,7 @@ class Report(abc.ABC):
             figures_ext = figures_ext[1:]
         if figures_ext not in Report.VALID_FIGURE_FORMATS:
             raise ValueError(
-                "Allowed figure formats are: {}", Report.VALID_FIGURE_FORMATS
+                f"Allowed figure formats are: {Report.VALID_FIGURE_FORMATS}"
             )
         self._figures_ext = "." + figures_ext
 
@@ -103,14 +106,17 @@ class Report(abc.ABC):
 
         if metric_name.lower() not in self._history_dict.keys():
             raise ValueError(
-                "Metric name to plot is not available in the history dict. Available metrics to plot are {}",
-                self._history_dict.keys(),
+                f"Metric name to plot is not available in the history dict. Available metrics to plot are {self._history_dict.keys()}",
             )
 
-        if "val_" + metric_name.lower() not in self._history_dict.keys():
+        if (
+            "val_" + metric_name.lower() not in self._history_dict.keys()
+            and metric_name.lower() not in ["lr"]
+        ):
             raise ValueError(
-                "No validation epochs were run during training, the metric name to plot is not available in the history dict. Available metrics to plot are {}",
-                self._history_dict.keys(),
+                f"""No validation epochs were run during training, the metric name to plot is not available in the history dict.
+                Available metrics to plot are {self._history_dict.keys()}
+                """,
             )
         plt.plot(self._history_dict[metric_name])
         plt.plot(self._history_dict["val_" + metric_name])
@@ -135,6 +141,7 @@ class Report(abc.ABC):
         """Plot all available Keras metrics in the History object."""
         metrics = self._history_dict.keys()
         metrics = filter(lambda x: not x.startswith(tuple(["val_", "_"])), metrics)
+        print("Plotting all metrics: ", list(metrics))
         for metric in metrics:
             self.plot_keras_metric(metric)
 
@@ -147,7 +154,6 @@ class Report(abc.ABC):
             targets: Array with target values.
             predictions: Array with prediction values.
         """
-        pass
 
 
 class PDFFile(FPDF):
@@ -166,7 +172,6 @@ class PDFFile(FPDF):
     LINE_HEIGHT = 5
 
     def __init__(self, title):
-
         super().__init__()
         self.title = title
         self.width = PDFFile.PAGE_WIDTH

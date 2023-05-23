@@ -17,7 +17,7 @@ class AbstractParser(abc.ABC):
         Args:
             sequence (str): a modified sequence
         """
-        pass
+        raise NotImplementedError("Not implemented.")
 
     def _take_first_modification_proforma_output(self, mods):
         # # take first non-null element (modification only) (applied to all modifications including n and c terminal)
@@ -25,7 +25,6 @@ class AbstractParser(abc.ABC):
         # return next(filter(lambda x: x is not None, mods), None)
         return [m[0].id if m is not None else -1 for m in mods]
 
-    
     def _flatten_seq_mods(self, parsed_sequence: list):
         """helper function to flatten a list of tuples to two lists.
 
@@ -34,13 +33,12 @@ class AbstractParser(abc.ABC):
 
         Returns:
             list: a list of two lists or tuples (one for Amino acids and the other for modifications). `[['A', 'B', 'C'], [None, Unimod:1, None]]`
-        """ 
+        """
         seq, mods = [list(i) for i in zip(*parsed_sequence)]
         return seq, mods
 
-    
     def parse_sequences(self, sequences):
-        """a generic function to apply the implementation of `_parse_sequence` to a list of sequencens. 
+        """a generic function to apply the implementation of `_parse_sequence` to a list of sequencens.
 
         Args:
             sequences (list): list of string sequences, possibly with modifications.
@@ -56,7 +54,7 @@ class AbstractParser(abc.ABC):
             seq, mod, n, c = self._parse_sequence(seq)
 
             # build sequence as a string from Amino Acid list
-            seq = ''.join(seq)
+            seq = "".join(seq)
             seqs.append(seq)
 
             mods.append(mod)
@@ -64,12 +62,12 @@ class AbstractParser(abc.ABC):
             n_terms.append(n)
             c_terms.append(c)
         seqs = np.array(seqs)
-        
+
         mods = np.array(mods, dtype=object)
         n_terms = np.array(n_terms)
         c_terms = np.array(c_terms)
         return seqs, mods, n_terms, c_terms
-    
+
 
 class ProformaParser(AbstractParser):
     def __init__(self):
@@ -84,12 +82,12 @@ class ProformaParser(AbstractParser):
 
         Returns:
             tuple(list, list, list): output of `pyteomics.proforma.parse' with the n-term and c-term modifications
-            extracted from the originally returned modifiers dict. 
+            extracted from the originally returned modifiers dict.
             More information: https://pyteomics.readthedocs.io/en/latest/api/proforma.html#pyteomics.proforma.parse
         """
         # returns tuple (list of tuples (AA, mods), and a dict with properties)
-        parsed_sequence, terminal_mods_dict = parse(sequence)  
-        
+        parsed_sequence, terminal_mods_dict = parse(sequence)
+
         n_term_mods = terminal_mods_dict.get("n_term")
         c_term_mods = terminal_mods_dict.get("c_term")
 
@@ -104,5 +102,5 @@ class ProformaParser(AbstractParser):
 
         seq, mod = self._flatten_seq_mods(parsed_sequence)
         mod = self._take_first_modification_proforma_output(mod)
-            
+
         return seq, mod, n_term_mods, c_term_mods

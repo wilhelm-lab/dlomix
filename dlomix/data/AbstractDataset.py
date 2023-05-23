@@ -1,4 +1,5 @@
 import abc
+from os.path import abspath, dirname
 
 import numpy as np
 import pandas as pd
@@ -67,6 +68,7 @@ class AbstractDataset(abc.ABC):
     SAMPLE_RUN_N = 100
     METADATA_KEY = "metadata"
     PARAMS_KEY = "parameters"
+    ANNOTATIONS_KEY = "annotations"
     TARGET_NAME_KEY = "target_column_key"
     SEQUENCE_COLUMN_KEY = "sequence_column_key"
 
@@ -148,6 +150,15 @@ class AbstractDataset(abc.ABC):
 
         self._resolve_parser()
 
+        self.sequences = None
+        self.unmodified_sequences = None
+        self.modifications = None
+        self.n_term_modifications = None
+        self.c_term_modifications = None
+
+        self.sequence_features = None
+        self.sequence_features_names = None
+
     def _resolve_parser(self):
         if self.parser is None:
             return
@@ -157,11 +168,6 @@ class AbstractDataset(abc.ABC):
             raise ValueError(
                 f"Invalid parser provided {self.parser}. For a list of available parsers, check dlomix.data.parsers.py"
             )
-
-        self.unmodified_sequences = None
-        self.modifications = None
-        self.n_term_modifications = None
-        self.c_term_modifications = None
 
     def _parse_sequences(self):
         (
@@ -175,8 +181,9 @@ class AbstractDataset(abc.ABC):
         is_json_file = self.data_source.endswith(".json")
 
         if is_json_file:
-            json_dict = read_json_file(self.data_source)
-            self._update_data_loading_for_json_format(json_dict)
+            json_file_base_dir = dirname(abspath(self.data_source))
+            self.data_source = read_json_file(self.data_source)
+            self._update_data_loading_for_json_format(json_file_base_dir)
 
         is_parquet_url = ".parquet" in self.data_source and self.data_source.startswith(
             "http"
@@ -192,7 +199,7 @@ class AbstractDataset(abc.ABC):
             return df
         else:
             raise ValueError(
-                "Invalid data source provided as a string, please provide a path to a csv, parquet, or "
+                "Invalid data source provided as a string, please provide a path to a csv, parquet, "
                 "or a json file."
             )
 
@@ -201,23 +208,31 @@ class AbstractDataset(abc.ABC):
             self.sequence_features = []
             self.sequence_features_names = []
             for feature_class in self.features_to_extract:
-                print("-" * 50)
                 print("Extracting feature: ", feature_class)
                 extractor_class = feature_class
-
-                self.sequence_features.append(
-                    np.array(
-                        extractor_class.extract_all(
-                            self.sequences,
-                            self.modifications,
-                            self.seq_length if extractor_class.pad_to_seq_length else 0,
-                        ),
-                        dtype=np.float32,
-                    )
+                feature_array = np.array(
+                    extractor_class.extract_all(
+                        self.sequences,
+                        self.modifications,
+                        self.seq_length if extractor_class.pad_to_seq_length else 0,
+                    ),
+                    dtype=np.float32,
                 )
+                # ensure an extra (1) dimension is added for later concatentiona
+                # this can be done later in tensorflow in the model as well, better ?
+                # what shapes of features could exist (BATCH X SEQ_LENGTH X 6), (BATCH X SEQ_LENGTH X 1)
+                if (
+                    feature_array.ndim < 3
+                    and feature_array.shape[-1] == self.seq_length
+                ):
+                    feature_array = np.expand_dims(feature_array, axis=-1)
+                self.sequence_features.append(feature_array)
                 self.sequence_features_names.append(
                     extractor_class.__class__.__name__.lower()
                 )
+
+    def _reshape_sequence_feature_arrays(self):
+        pass
 
     def get_examples_at_indices(self, examples, split):
         if isinstance(examples, np.ndarray):
@@ -254,7 +269,11 @@ class AbstractDataset(abc.ABC):
             `AbstractDataset.METADATA_KEY`, `AbstractDataset.PARAMS_KEY`,
             `AbstractDataset.TARGET_NAME_KEY`, `AbstractDataset.SEQUENCE_COLUMN_KEY`.
         """
-        pass
+        raise NotImplementedError("Not implemented")
+
+    @abc.abstractmethod
+    def _update_data_loading_for_json_format(self, base_dir):
+        raise NotImplementedError("Not implemented")
 
     @abc.abstractmethod
     def _build_tf_dataset(self):
@@ -265,12 +284,12 @@ class AbstractDataset(abc.ABC):
                 (self.inputs, self.outputs)
             )`
         """
-        pass
+        raise NotImplementedError("Not implemented")
 
     @abc.abstractmethod
     def _preprocess_tf_dataset(self):
         """Add processing logic (tensorflow functions) to apply to all tf.Datasets."""
-        pass
+        raise NotImplementedError("Not implemented")
 
     @abc.abstractmethod
     def get_split_targets(self, split="val"):
@@ -278,7 +297,7 @@ class AbstractDataset(abc.ABC):
         Args:
             split (str, optional): Name of the split, check `AbstractDataset.SPLIT_NAMES`. Defaults to "val".
         """
-        pass
+        raise NotImplementedError("Not implemented")
 
     @staticmethod
     @abc.abstractmethod
@@ -291,7 +310,7 @@ class AbstractDataset(abc.ABC):
             inputs (tuple(tf.Tensor)): tuple of input tensors
             target (tf.Tensor): target label tensor
         """
-        pass
+        raise NotImplementedError("Not implemented")
 
     def _pad_sequences(self, inputs, target):
         if isinstance(inputs, dict):

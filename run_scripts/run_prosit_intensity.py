@@ -23,8 +23,11 @@ TRAIN_DATAPATH = "../example_dataset/intensity/intensity_data.csv"
 # TEST_DATAPATH = '../example_dataset/proteomTools_test.csv'
 
 d = IntensityDataset(
-    data_source=TRAIN_DATAPATH, seq_length=30, batch_size=128, val_ratio=0.3,
-    )
+    data_source=TRAIN_DATAPATH,
+    seq_length=30,
+    batch_size=128,
+    val_ratio=0.3,
+)
 
 model.compile(optimizer=optimizer, loss=masked_spectral_distance, metrics=["mse"])
 
@@ -39,7 +42,9 @@ early_stop = tf.keras.callbacks.EarlyStopping(patience=20)
 callbacks = [checkpoint, early_stop, decay]
 
 
-history = model.fit(d.train_data, epochs=2, validation_data=d.val_data, callbacks=callbacks)
+history = model.fit(
+    d.train_data, epochs=2, validation_data=d.val_data, callbacks=callbacks
+)
 
 
 predictions = model.predict(d.val_data)
