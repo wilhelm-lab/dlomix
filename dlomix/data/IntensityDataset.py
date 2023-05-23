@@ -208,7 +208,7 @@ class IntensityDataset(AbstractDataset):
         self.example_id = list(range(len(self.sequences)))
 
     def _update_data_loading_for_json_format(self, base_dir=None):
-        from prospectdataset import download_process_pool
+        import prospectdataset as prospect
 
         json_dict = self.data_source
         meta_data_filepath = json_dict.get(IntensityDataset.METADATA_KEY, "")
@@ -230,10 +230,10 @@ class IntensityDataset(AbstractDataset):
             )
 
         # ToDo: consider options to check if the files were processed earlier and skip this step since it is time consuming
-        self.data_source = download_process_pool(
+        self.data_source = prospect.download_process_pool(
             annotations_data_dir=annotations_dir,
             metadata_path=meta_data_filepath,
-            save_path=join(base_dir),
+            save_filepath=join(base_dir, "processed_pool.parquet"),
         )
 
         self.intensities_col = json_dict.get(IntensityDataset.PARAMS_KEY, {}).get(
