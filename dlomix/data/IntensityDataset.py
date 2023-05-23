@@ -233,7 +233,7 @@ class IntensityDataset(AbstractDataset):
         self.data_source = prospect.download_process_pool(
             annotations_data_dir=annotations_dir,
             metadata_path=meta_data_filepath,
-            save_path=join(base_dir),
+            save_filepath=join(base_dir, "processed_pool.parquet"),
         )
 
         self.intensities_col = json_dict.get(IntensityDataset.PARAMS_KEY, {}).get(
