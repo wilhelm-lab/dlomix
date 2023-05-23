@@ -8,6 +8,7 @@ with open("README.md", "r") as fh:
 from dlomix import META_DATA, __version__
 
 VERSION = __version__
+tensorflow_version = "2.10.0"
 
 os_name = platform.system().lower()
 
@@ -16,6 +17,9 @@ if os_name == "darwin":
     tensorflow_requirement = "tensorflow-macos"
 else:
     tensorflow_requirement = "tensorflow"
+
+tensorflow_requirement = tensorflow_requirement + " == " + tensorflow_version
+
 
 requirements = [
     "fpdf",
