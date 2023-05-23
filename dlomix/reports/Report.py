@@ -109,7 +109,10 @@ class Report(abc.ABC):
                 f"Metric name to plot is not available in the history dict. Available metrics to plot are {self._history_dict.keys()}",
             )
 
-        if "val_" + metric_name.lower() not in self._history_dict.keys():
+        if (
+            "val_" + metric_name.lower() not in self._history_dict.keys()
+            and metric_name.lower() not in ["lr"]
+        ):
             raise ValueError(
                 f"""No validation epochs were run during training, the metric name to plot is not available in the history dict.
                 Available metrics to plot are {self._history_dict.keys()}
@@ -138,6 +141,7 @@ class Report(abc.ABC):
         """Plot all available Keras metrics in the History object."""
         metrics = self._history_dict.keys()
         metrics = filter(lambda x: not x.startswith(tuple(["val_", "_"])), metrics)
+        print("Plotting all metrics: ", list(metrics))
         for metric in metrics:
             self.plot_keras_metric(metric)
 

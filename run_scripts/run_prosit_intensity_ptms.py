@@ -56,11 +56,40 @@ callbacks = [checkpoint, early_stop, decay]
 
 
 history = model.fit(
-    d.train_data, epochs=1, validation_data=d.val_data, callbacks=callbacks
+    d.train_data, epochs=2, validation_data=d.val_data, callbacks=callbacks
 )
 
-predictions = model.predict(d.val_data)
-# predictions = d.denormalize_targets(predictions)
+# # to add test data, a pool for example
+# td = IntensityDataset(
+#     data_source=TRAIN_DATAPATH,
+#     seq_length=30,
+#     batch_size=128,
+#     val_ratio=0,
+#     precursor_charge_col="precursor_charge_onehot",
+#     sequence_col="modified_sequence",
+#     collision_energy_col="collision_energy_aligned_normed",
+#     intensities_col="intensities_raw",
+#     features_to_extract=[
+#         ModificationLocationFeature(),
+#         ModificationLossFeature(),
+#         ModificationGainFeature(),
+#     ],
+#     parser="proforma",
+#     test=True,
+# )
+# predictions = model.predict(td.test_data)
 
-print(predictions.shape)
-print(predictions[0])
+# print(predictions.shape)
+# print(predictions[0])
+
+# from dlomix.reports import IntensityReport
+
+# # create a report object by passing the history object and plot different metrics
+# report = IntensityReport(output_path="./output", history=history)
+# report.generate_report(td, predictions)
+# # you can also manually see the results by calling other utility functions
+
+# from dlomix.reports.postprocessing import normalize_intensity_predictions
+
+# predictions_df = report.generate_intensity_results_df(td, predictions)
+# predictions_df.to_csv("./predictions_prosit_intensity_ptm_fullrun.csv", index=False)

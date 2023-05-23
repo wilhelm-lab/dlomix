@@ -208,23 +208,31 @@ class AbstractDataset(abc.ABC):
             self.sequence_features = []
             self.sequence_features_names = []
             for feature_class in self.features_to_extract:
-                print("-" * 50)
                 print("Extracting feature: ", feature_class)
                 extractor_class = feature_class
-
-                self.sequence_features.append(
-                    np.array(
-                        extractor_class.extract_all(
-                            self.sequences,
-                            self.modifications,
-                            self.seq_length if extractor_class.pad_to_seq_length else 0,
-                        ),
-                        dtype=np.float32,
-                    )
+                feature_array = np.array(
+                    extractor_class.extract_all(
+                        self.sequences,
+                        self.modifications,
+                        self.seq_length if extractor_class.pad_to_seq_length else 0,
+                    ),
+                    dtype=np.float32,
                 )
+                # ensure an extra (1) dimension is added for later concatentiona
+                # this can be done later in tensorflow in the model as well, better ?
+                # what shapes of features could exist (BATCH X SEQ_LENGTH X 6), (BATCH X SEQ_LENGTH X 1)
+                if (
+                    feature_array.ndim < 3
+                    and feature_array.shape[-1] == self.seq_length
+                ):
+                    feature_array = np.expand_dims(feature_array, axis=-1)
+                self.sequence_features.append(feature_array)
                 self.sequence_features_names.append(
                     extractor_class.__class__.__name__.lower()
                 )
+
+    def _reshape_sequence_feature_arrays(self):
+        pass
 
     def get_examples_at_indices(self, examples, split):
         if isinstance(examples, np.ndarray):
