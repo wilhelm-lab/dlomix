@@ -46,6 +46,38 @@ dev_requirements = [
     "wheel",
 ]
 
+os_name = platform.system().lower()
+
+if os_name == "darwin":
+    # Apple silicon
+    tensorflow_requirement = "tensorflow-macos"
+else:
+    tensorflow_requirement = "tensorflow"
+
+requirements = [
+    "fpdf",
+    "matplotlib",
+    "numpy",
+    "pandas",
+    "pyarrow",
+    # we install with the extra xml to ensure lxml is installed
+    # more details about extras for pyteomics are here: https://pyteomics.readthedocs.io/en/latest/installation.html
+    "pyteomics[XML]",
+    "scikit-learn",
+    "seaborn",
+    tensorflow_requirement,
+]
+
+dev_requirements = [
+    "black",
+    "pylint",
+    "pytest >= 3.7",
+    "pytest-cov",
+    "setuptools",
+    "twine",
+    "wheel",
+]
+
 setuptools.setup(
     name=META_DATA["package_name"].lower(),
     version=VERSION,
