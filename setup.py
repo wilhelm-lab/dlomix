@@ -9,6 +9,7 @@ from dlomix import META_DATA, __version__
 
 VERSION = __version__
 tensorflow_version = "2.10.0"
+tensorflow_version = "2.10.0"
 
 os_name = platform.system().lower()
 
@@ -32,6 +33,7 @@ requirements = [
     "scikit-learn",
     "seaborn",
     tensorflow_requirement,
+    "prospect-dataset @ git+https://github.com/wilhelm-lab/PROSPECT.git@main",
     "prospect-dataset @ git+https://github.com/wilhelm-lab/PROSPECT.git@main",
 ]
 
@@ -61,7 +63,7 @@ setuptools.setup(
     },
     classifiers=[
         "Programming Language :: Python :: 3",
-        "Programming Language :: Python :: 3.7",
+        "Programming Language :: Python :: 3.8",
         "License :: OSI Approved :: MIT License",
         "Operating System :: OS Independent",
         "Topic :: Scientific/Engineering :: Bio-Informatics",
