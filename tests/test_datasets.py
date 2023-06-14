@@ -104,10 +104,8 @@ def test_json_dict_rtdataset():
         "parameters": {"target_column_key": "linear rt"},
     }
 
-    rtdataset = RetentionTimeDataset(data_source=test_data_dict, seq_length=20)
-    rtdataset_filebased = RetentionTimeDataset(
-        data_source=test_data_dict_file, seq_length=20
-    )
+    RetentionTimeDataset(data_source=test_data_dict, seq_length=20)
+    RetentionTimeDataset(data_source=test_data_dict_file, seq_length=20)
 
 
 def test_json_ms2ai_rt():

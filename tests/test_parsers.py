@@ -1,7 +1,5 @@
 import logging
 
-import numpy as np
-
 from dlomix.data.parsers import ProformaParser
 
 NO_MODS_SEQUENCE = "ABC"
