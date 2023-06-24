@@ -9,6 +9,7 @@ from dlomix import META_DATA, __version__
 
 VERSION = __version__
 tensorflow_version = "2.10.0"
+tensorflow_version = "2.10.0"
 
 os_name = platform.system().lower()
 
@@ -19,7 +20,6 @@ else:
     tensorflow_requirement = "tensorflow"
 
 tensorflow_requirement = tensorflow_requirement + " == " + tensorflow_version
-
 
 requirements = [
     "fpdf",
@@ -33,6 +33,7 @@ requirements = [
     "scikit-learn",
     "seaborn",
     tensorflow_requirement,
+    "prospect-dataset @ git+https://github.com/wilhelm-lab/PROSPECT.git@main",
     "prospect-dataset @ git+https://github.com/wilhelm-lab/PROSPECT.git@main",
 ]
 

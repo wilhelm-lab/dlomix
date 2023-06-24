@@ -1,15 +1,12 @@
 import os
-import pickle
 import sys
 
-import pandas as pd
 import tensorflow as tf
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
 
 
 from dlomix.data import IntensityDataset
-from dlomix.data.feature_extractors import LengthFeature
 from dlomix.losses import masked_spectral_distance
 from dlomix.models import PrositIntensityPredictor
 

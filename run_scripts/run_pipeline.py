@@ -1,4 +1,3 @@
-from dlomix.constants import ALPHABET_UNMOD
 from dlomix.data import RetentionTimeDataset
 from dlomix.eval import TimeDeltaMetric
 

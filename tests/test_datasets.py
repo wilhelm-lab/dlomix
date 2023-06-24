@@ -104,10 +104,8 @@ def test_json_dict_rtdataset():
         "parameters": {"target_column_key": "linear rt"},
     }
 
-    rtdataset = RetentionTimeDataset(data_source=test_data_dict, seq_length=20)
-    rtdataset_filebased = RetentionTimeDataset(
-        data_source=test_data_dict_file, seq_length=20
-    )
+    RetentionTimeDataset(data_source=test_data_dict, seq_length=20)
+    RetentionTimeDataset(data_source=test_data_dict_file, seq_length=20)
 
 
 def test_json_ms2ai_rt():
@@ -275,6 +273,28 @@ def test_json_prospect_sample_intensity():
     # get relative path of json file and concatenate it with the meta data path
 
     intensity_dataset = IntensityDataset(data_source=json_test_filepath, seq_length=30)
+    assert intensity_dataset.sequences is not None
+    assert intensity_dataset.intensities is not None
+    assert intensity_dataset.main_split is IntensityDataset.SPLIT_NAMES[0]
+
+
+def test_json_prospect_metadata_filtering():
+    json_test_filepath = join(
+        DOWNLOAD_PATH_FOR_ASSETS, "ms2ai", "INT", "third_pool.json"
+    )
+
+    # check how to handle this in code, either stay with relative path or strictly require absolute path
+    # get relative path of json file and concatenate it with the meta data path
+
+    intensity_dataset = IntensityDataset(
+        data_source=json_test_filepath,
+        seq_length=30,
+        sequence_filtering_criteria={
+            "max_precursor_charge": 6,
+            "max_peptide_length": 30,
+        },
+    )
+
     assert intensity_dataset.sequences is not None
     assert intensity_dataset.intensities is not None
     assert intensity_dataset.main_split is IntensityDataset.SPLIT_NAMES[0]

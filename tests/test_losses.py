@@ -1,6 +1,5 @@
 import logging
 
-import numpy as np
 import tensorflow as tf
 
 from dlomix.losses import masked_spectral_distance
