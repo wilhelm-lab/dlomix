@@ -226,6 +226,7 @@ class IntensityDataset(AbstractDataset):
                 join(base_dir, file) for file in annotations_filepaths
             ]
 
+        # all annotation files are assumed to be in the same directory
         if len(annotations_filepaths) > 0:
             annotations_dir = dirname(annotations_filepaths[0])
         else:
@@ -242,6 +243,11 @@ class IntensityDataset(AbstractDataset):
         #    "max_peptide_length": self.seq_length,
         #    "max_precursor_charge": 6,
         # }
+
+        print("Optionally Downloading and processing the data...")
+        print("Annotations directory: ", annotations_dir)
+        print("Metadata filepath: ", meta_data_filepath)
+        print("Base directory: ", base_dir)
 
         self.data_source = prospect.download_process_pool(
             annotations_data_dir=annotations_dir,
