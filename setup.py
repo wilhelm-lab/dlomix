@@ -33,8 +33,7 @@ requirements = [
     "scikit-learn",
     "seaborn",
     tensorflow_requirement,
-    "prospect-dataset @ git+https://github.com/wilhelm-lab/PROSPECT.git@main",
-    "prospect-dataset @ git+https://github.com/wilhelm-lab/PROSPECT.git@main",
+    "prospect-dataset @ git+https://github.com/wilhelm-lab/PROSPECT.git@develop",
 ]
 
 dev_requirements = [
