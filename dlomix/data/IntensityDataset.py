@@ -43,8 +43,8 @@ class IntensityDataset(AbstractDataset):
         a string with a path to a CSV table with the atom counts of the different amino acids (can be used for feature extraction). Defaults to None.
     sample_run : bool, optional
         a boolean to limit the number of examples to a small number, SAMPLE_RUN_N, for testing and debugging purposes. Defaults to False.
-    sequence_filtering_criteria : dict, optional
-        a dictionary with the filtering criteria to be used to filter the sequences. Defaults to None.
+    metadata_filtering_criteria : dict, optional
+        a dictionary with the filtering criteria (column names and conditions) to be used to filter the metadata. Defaults to None.
     """
 
     # TODO: For test dataset --> examples with longer sequences --> do not drop, add NaN for prediction
@@ -68,7 +68,7 @@ class IntensityDataset(AbstractDataset):
         test=False,
         path_aminoacid_atomcounts=None,
         sample_run=False,
-        sequence_filtering_criteria=None,
+        metadata_filtering_criteria=None,
     ):
         super().__init__(
             data_source,
@@ -91,7 +91,7 @@ class IntensityDataset(AbstractDataset):
         self.precursor_charge_col = precursor_charge_col.lower()
         self.intensities_col = self.target_col
 
-        self.sequence_filtering_criteria = sequence_filtering_criteria
+        self.metadata_filtering_criteria = metadata_filtering_criteria
 
         self.normalize_targets = normalize_targets
 
@@ -236,13 +236,7 @@ class IntensityDataset(AbstractDataset):
 
         # ToDo: consider options to check if the files were processed earlier and skip this step since it is time consuming
 
-        # to pass sequence_filtering_criteria
-        # example below
-        # self.sequence_filtering_criteria = {
-        #    "min_andromeda_score": "",
-        #    "max_peptide_length": self.seq_length,
-        #    "max_precursor_charge": 6,
-        # }
+        # to pass metadata_filtering_criteria
 
         print("Optionally Downloading and processing the data...")
         print("Annotations directory: ", annotations_dir)
@@ -253,7 +247,7 @@ class IntensityDataset(AbstractDataset):
             annotations_data_dir=annotations_dir,
             metadata_path=meta_data_filepath,
             save_filepath=join(base_dir, "processed_pool.parquet"),
-            sequence_filtering_criteria=self.sequence_filtering_criteria,
+            metadata_filtering_criteria=self.metadata_filtering_criteria,
         )
 
         self.intensities_col = json_dict.get(IntensityDataset.PARAMS_KEY, {}).get(

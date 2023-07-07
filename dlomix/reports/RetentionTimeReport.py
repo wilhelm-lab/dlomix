@@ -64,7 +64,7 @@ class RetentionTimeReport(Report):
             predictions: Array with prediction values
             xrange (tuple, optional): X-axis range for plotting the histogram. Defaults to (-10, 10).
         """
-        error = np.ravel(targets) - np.ravel(predictions)
+        error = np.ravel(predictions) - np.ravel(targets)
 
         x_min, x_max = xrange
         if xrange == (0, 0):
