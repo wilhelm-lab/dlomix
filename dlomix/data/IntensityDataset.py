@@ -240,6 +240,8 @@ class IntensityDataset(AbstractDataset):
 
         print("Optionally Downloading and processing the data...")
         print("Annotations directory: ", annotations_dir)
+
+        # fix directory path, use file names from the json file ???
         print("Metadata filepath: ", meta_data_filepath)
         print("Base directory: ", base_dir)
 
