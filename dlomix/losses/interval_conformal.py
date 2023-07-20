@@ -66,11 +66,14 @@ class RelativeCentralDistance(tf.keras.losses.Loss):
 
 
 class ConformalScore(tf.keras.losses.Loss):
+    '''
+    Computes conformal scores for prediction intervals pred_intervals and true values y_true.
+    '''
     def __init__(self, name="conformal_score", **kwargs):
         super().__init__(name=name, **kwargs)
 
-    def call(self, y_true, y_pred):
-        return tf.reduce_max(tf.stack([tf.subtract(y_pred, y_true)[:,0], -tf.subtract(y_pred, y_true)[:,1]], 1), -1)
+    def call(self, y_true, pred_intervals):
+        return tf.reduce_max(tf.stack([tf.subtract(pred_intervals, y_true)[:,0], -tf.subtract(pred_intervals, y_true)[:,1]], 1), -1)
 
     def get_config(self):
         config = {}
@@ -79,14 +82,18 @@ class ConformalScore(tf.keras.losses.Loss):
 
 
 class ConformalQuantile(tf.keras.losses.Loss):
+    '''
+    Computes the conformal quantile based on the distribution of conformal scores
+    for prediction intervals pred_intervals and true values y_true.
+    '''
     def __init__(self, alpha=0.1, name="conformal_quantile", **kwargs):
         super().__init__(name=name, **kwargs)
         self.alpha = alpha
 
-    def call(self, y_true, y_pred):
-        scores = tf.reduce_max(tf.stack([tf.subtract(y_pred, y_true)[:,0], -tf.subtract(y_pred, y_true)[:,1]], 1), -1)
+    def call(self, y_true, pred_intervals):
+        scores = tf.reduce_max(tf.stack([tf.subtract(pred_intervals, y_true)[:,0], -tf.subtract(pred_intervals, y_true)[:,1]], 1), -1)
         n = tf.cast(tf.shape(y_true)[0], tf.float32) #without casting to float, next line throws an error
-        q = tf.math.ceil((n + 1.)*(1. - self.alpha)) / n
+        q = tf.math.ceil((n + 1.) * (1. - self.alpha)) / n
         tfp_quantile = tf.sort(scores, axis=-1, direction='ASCENDING', name=None)[int(q * n)]
         return tfp_quantile
 
