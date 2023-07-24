@@ -65,11 +65,11 @@ class RelativeCentralDistance(tf.keras.losses.Loss):
         return {**base_config, **config}
 
 
-class ConformalScore(tf.keras.losses.Loss):
+class IntervalConformalScore(tf.keras.losses.Loss):
     '''
     Computes conformal scores for prediction intervals pred_intervals and true values y_true.
     '''
-    def __init__(self, name="conformal_score", **kwargs):
+    def __init__(self, name="interval_conformal_score", **kwargs):
         super().__init__(name=name, **kwargs)
 
     def call(self, y_true, pred_intervals):
@@ -81,12 +81,12 @@ class ConformalScore(tf.keras.losses.Loss):
         return {**base_config, **config}
 
 
-class ConformalQuantile(tf.keras.losses.Loss):
+class IntervalConformalQuantile(tf.keras.losses.Loss):
     '''
     Computes the conformal quantile based on the distribution of conformal scores
     for prediction intervals pred_intervals and true values y_true.
     '''
-    def __init__(self, alpha=0.1, name="conformal_quantile", **kwargs):
+    def __init__(self, alpha=0.1, name="interval_conformal_quantile", **kwargs):
         super().__init__(name=name, **kwargs)
         self.alpha = alpha
 
