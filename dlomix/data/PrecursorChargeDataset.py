@@ -11,7 +11,7 @@ from sklearn.model_selection import StratifiedShuffleSplit
 class PrecursorChargeStateDataset:
 
     def __init__(self, classification_type="multi_class", model_type="embedding", charge_states=None,
-                 dir_path='data/', file_type='.parquet',
+                 dir_path='data/',
                  columns_to_keep=None, test_ratio=0.1):
 
         """ CHECK ALL INPUTS """
@@ -58,13 +58,6 @@ class PrecursorChargeStateDataset:
         else:
             raise TypeError("dir_path must be a string.")
 
-        # check file_type
-        if isinstance(file_type, str):
-            if not file_type.startswith("."):
-                file_type = "." + file_type
-        else:
-            raise TypeError("file_type must be a string.")
-
         # check columns_to_keep
         if isinstance(columns_to_keep, list):
             if not all(isinstance(item, str) for item in columns_to_keep):
@@ -92,6 +85,9 @@ class PrecursorChargeStateDataset:
         df: dataframe containing the imported data
         '''
 
+
+        self.charge_states = charge_states
+        self.num_classes = len(self.charge_states)
         def combine_files_into_df(directory_path='data/', file_types=None, column_mapping=None):
             if file_types is None:
                 file_types = ['.parquet', '.tsv', '.csv']
@@ -122,6 +118,7 @@ class PrecursorChargeStateDataset:
                     dfs.append(df)
 
             df = pd.concat(dfs, ignore_index=True)
+            print(f"Step 1/12 complete. Combined {len(dfs)} files into one DataFrame.")
             return df
 
         '''
@@ -385,10 +382,6 @@ class PrecursorChargeStateDataset:
             return df
 
         self.dir_path = dir_path
-        self.file_type = file_type
-
-        self.charge_states = charge_states
-        self.num_classes = len(self.charge_states)
 
         self.classification_types = ['multi_class', 'multi_label']
         self.classification_type = classification_type
@@ -396,7 +389,7 @@ class PrecursorChargeStateDataset:
         self.model_types = ['embedding', 'conv2d', 'prosit']
         self.model_type = model_type
 
-        self.df = combine_files_into_df(dir_path, file_type)
+        self.df = combine_files_into_df(dir_path)
         self.df = drop_na(self.df, 'precursor_intensity')
         self.df = keep_desired_charges(self.df)
         self.df = aggregate_sequences(self.df)

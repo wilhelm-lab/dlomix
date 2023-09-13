@@ -31,7 +31,7 @@ class PrecursorChargeStatePredictor:
         self.max_len_seq = dataset.padding_length
         self.model_type = dataset.model_type
         self.classification_type = dataset.classification_type
-        self.shape = my_dataset.train_data[0].shape
+        self.shape = dataset.train_data[0].shape
         self.wandb = False
         self.compiled = False
         self.fitted = False
@@ -285,6 +285,7 @@ class PrecursorChargeStatePredictor:
                     true_labels = np.argmax(test_label, axis=1)
 
                     cm = confusion_matrix(true_labels, predicted_labels)
+                    print(cm)
                     print("Accuracy: ", accuracy_score(true_labels, predicted_labels))
                     print("Precision_weighted: ", precision_score(true_labels, predicted_labels, average='weighted'))
                     print("Recall_weighted: ", recall_score(true_labels, predicted_labels, average='weighted'))
