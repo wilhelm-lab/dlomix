@@ -1,5 +1,5 @@
 # install necessary packages
-!python -m pip install -q dlomix==0.0.4
+!python -m pip install git+https://github.com/goldjunge3010/dlomix_wandb_report
 !python -m pip install -q wandb
 
 # import necessary packages
