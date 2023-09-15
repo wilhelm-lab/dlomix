@@ -12,7 +12,7 @@ class PrecursorChargeStateDataset:
 
     def __init__(self, classification_type="multi_class", model_type="embedding", charge_states=None,
                  dir_path='data/',
-                 columns_to_keep=None, test_ratio=0.1):
+                 columns_to_keep=None, test_ratio=0.1, validation_ratio=0.2):
 
         """ CHECK ALL INPUTS """
 
@@ -422,7 +422,7 @@ class PrecursorChargeStateDataset:
         else:
             raise ValueError("classification_type must be one of the following: 'multi_class', 'multi_label'")
 
-        self.validation_ratio = 0.2
+        self.validation_ratio = validation_ratio
         self.test_mode = True
         if test_ratio > 0:
             self.test_ratio = test_ratio

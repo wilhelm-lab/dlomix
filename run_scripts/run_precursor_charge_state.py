@@ -21,6 +21,6 @@ model_class = PrecursorChargeStatePredictor(prospect_dataset)
 model_class.summary()
 model_class.compile()
 # model_class.wandb_init(api_key="YOUR_API_KEY", project_name="YOUR_PROJECT_NAME")
-model_class.fit(epochs=1, no_wandb=True)  # TODO set no_wandb to False if model_class.wand_init() is called
+model_class.fit(epochs=30, no_wandb=True)  # TODO set no_wandb to False if model_class.wand_init() is called
 model_class.evaluate()
 model_class.predict()  # Predict offers verification if given labels. Default is Prediction on Testdata.
