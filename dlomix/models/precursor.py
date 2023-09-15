@@ -13,18 +13,45 @@ import matplotlib.pyplot as plt
 import numpy as np
 import wandb
 from wandb.keras import WandbCallback
+import re
 
 
 class PrecursorChargeStatePredictor:
-    def __init__(self, dataset):
 
-        self.predicted = None
-        self.prediction = None
-        self.evaluated = None
-        self.evaluation = None
-        self.metrics = None
-        self.loss = None
+    def __init__(self, dataset=None, pretrained_model=None, sequence=None):
+        self.model = None
+        self.sequence = None
+        self.shape = None
+        self.classification_type = None
+        self.model_type = None
+        self.max_len_seq = None
+        self.voc_len = None
+        self.num_classes = None
+        self.dataset = None
         self.history = None
+        self.loss = None
+        self.metrics = None
+        self.evaluation = None
+        self.evaluated = None
+        self.prediction = None
+        self.predicted = None
+        self.skip_training = None
+        self.pretrained_model = None
+        self.wandb = False
+        self.compiled = False
+        self.fitted = False
+        self.pretrained = False
+        if dataset is not None:
+            self.initiate_with_dataset(dataset)
+        elif pretrained_model is not None and sequence is not None:
+            self.initiate_with_pretrained_model(pretrained_model, sequence)
+        else:
+            raise ValueError(
+                "PrecursorChargeStatePredictor must be initiated with either a dataset or a pretrained model.")
+
+    def initiate_with_dataset(self, dataset):
+        self.pretrained_model = pretrained_model
+        self.skip_training = skip_training
         self.dataset = dataset
         self.num_classes = dataset.num_classes
         self.voc_len = dataset.voc_len
@@ -32,10 +59,6 @@ class PrecursorChargeStatePredictor:
         self.model_type = dataset.model_type
         self.classification_type = dataset.classification_type
         self.shape = dataset.train_data[0].shape
-        self.wandb = False
-        self.compiled = False
-        self.fitted = False
-        self.pretrained = False
 
         if self.model_type == "embedding":
             self.model = self.embedding_model()
@@ -178,6 +201,14 @@ class PrecursorChargeStatePredictor:
 
             self.fitted = True
 
+    def save(self, output_path=None):
+        if output_path is None:
+            output_path = f"{self.model_type}_model.h5"
+        else:
+            if not output_path.endswith(".h5"):
+                output_path = f"{output_path}.h5"
+        self.model.save(output_path)
+
     def plot_training(self):
         if self.fitted:
             # Access the loss, validation loss, and accuracy from the history object
@@ -308,3 +339,85 @@ class PrecursorChargeStatePredictor:
 
             else:
                 raise ValueError("Not implemented for multi-class.")
+
+    def initiate_with_pretrained_model(self, pretrained_model=None, sequence=None):
+
+        # raise error if sequence longer than 63
+        if len(sequence) > 63:
+            raise ValueError("Sequence must be shorter than 63 amino acids in our pretrained model.")
+
+        self.pretrained_model = pretrained_model
+        self.sequence = sequence
+        self.model = keras.models.load_model(self.pretrained_model)
+        self.prediction = None
+
+        def pretrained_seq_translator(sequence, print_result=False, no_padding=False):
+            """
+            Translates a sequence into a vector of integers
+            :param print_result:
+            :param max_len:
+            :param sequence: string
+            :param dictionary: dictionary
+            :return: list
+            """
+            pattern = r'[A-Z]\[[^\]]*\]|.'  # regex pattern to match amino acids and modifications
+            # pattern = r'(\w\[UNIMOD:\d+\])' # regex pattern to match amino acids and modifications
+
+            dictionary = ['X', 'A', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'K', 'L', 'M', 'N', 'P', 'Q', 'R', 'S', 'T', 'V',
+                          'W', 'Y', 'C[UNIMOD:4]', 'M[UNIMOD:35]']
+            max_len = 63
+
+            result = [match for match in re.findall(pattern, sequence)]
+
+            # Fill the list with "X" characters until it reaches a length of 40
+            if not no_padding:
+                result += ['X'] * (max_len - len(result))
+            if print_result:
+                print(result)
+
+            aa_dictionary = dict()
+            for index, aa in enumerate(dictionary):
+                aa_dictionary[aa] = index
+
+            return [aa_dictionary[aa] for aa in result]
+
+        def generate_charge_prediction_text(charge_predictions, input_sequence):
+            max_charge_index = np.argmax(charge_predictions)
+            max_charge_value = round(charge_predictions[max_charge_index], 2)
+
+            charge_text = f"The predicted charge state for the input sequence '{input_sequence}' is {max_charge_index + 1} [{round(max_charge_value * 100, 2)}%]."
+            percentage_text = "Prediction percentages for all states:\n"
+
+            for index, prediction in enumerate(charge_predictions):
+                if index != max_charge_index:
+                    percentage = round(prediction * 100, 2)
+                    percentage_text += f"Charge state {index + 1}: {percentage}%\n"
+                else:
+                    percentage = round(prediction * 100, 2)
+                    percentage_text += f"--Charge state {index + 1}: {percentage}%\n"
+
+            full_text = charge_text + "\n" + percentage_text
+            return full_text
+
+        def predictor(self, sequence):
+            print("Sequence: ", sequence)
+            encoded_sequence = pretrained_seq_translator(sequence)
+            encoded_sequence = np.expand_dims(tf.convert_to_tensor(np.array(encoded_sequence)), axis=0)
+            sequence_prediction = self.model.predict(encoded_sequence, verbose=False)
+            print("Weights_per_Charge_State: ", [round(x, 2) for x in sequence_prediction[0]], "Sum: ",
+                  sum([round(x, 2) for x in sequence_prediction[0]]))
+            print("-----------------------------")
+            print(generate_charge_prediction_text(sequence_prediction[0], sequence))
+            return sequence_prediction
+
+        if isinstance(self.sequence, str):
+            prediction = predictor(self, self.sequence)
+            self.prediction = prediction
+
+        elif isinstance(self.sequence, list):
+            prediction = []
+            for seq in self.sequence:
+                prediction.append(predictor(self, seq))
+            self.prediction = prediction
+
+        return self.prediction
