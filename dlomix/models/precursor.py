@@ -159,6 +159,30 @@ class PrecursorChargeStatePredictor:
         config.max_len_seq = self.max_len_seq
         self.wandb = True
 
+    import tensorflow as tf
+    from keras import backend as K
+
+    def custom_binary_split_loss_wandb_0(y_true, y_pred):
+        return custom_binary_split_loss_wandb(K.cast(y_true, "float32"), K.cast(y_pred, "float32"), position=0)
+
+    def custom_binary_split_loss_wandb_1(y_true, y_pred):
+        return custom_binary_split_loss_wandb(K.cast(y_true, "float32"), K.cast(y_pred, "float32"), position=1)
+
+    def custom_binary_split_loss_wandb_2(y_true, y_pred):
+        return custom_binary_split_loss_wandb(K.cast(y_true, "float32"), K.cast(y_pred, "float32"), position=2)
+
+    def custom_binary_split_loss_wandb_3(y_true, y_pred):
+        return custom_binary_split_loss_wandb(K.cast(y_true, "float32"), K.cast(y_pred, "float32"), position=3)
+
+    def custom_binary_split_loss_wandb_4(y_true, y_pred):
+        return custom_binary_split_loss_wandb(K.cast(y_true, "float32"), K.cast(y_pred, "float32"), position=4)
+
+    def custom_binary_split_loss_wandb_5(y_true, y_pred):
+        return custom_binary_split_loss_wandb(K.cast(y_true, "float32"), K.cast(y_pred, "float32"), position=5)
+
+    def custom_binary_split_loss_wandb(y_true_t, y_pred_t, position=0):
+        return K.square(y_true_t[position][0] - y_pred_t[position][0])
+
     def compile(self, lr=0.0001):
         if self.classification_type == "multi_class":
             if self.model == "prosit":
@@ -172,9 +196,23 @@ class PrecursorChargeStatePredictor:
                 self.metrics = 'categorical_accuracy'
 
         elif self.classification_type == "multi_label":
-            self.model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['binary_accuracy'])
-            self.loss = 'binary_crossentropy'
-            self.metrics = 'binary_accuracy'
+            if self.model == "multilabel":
+                self.model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['binary_accuracy'])
+                self.loss = 'binary_crossentropy'
+                self.metrics = 'binary_accuracy'
+            elif self.model == "multihead":
+                model_embed.compile(loss=[custom_binary_split_loss_wandb_0,
+                                          custom_binary_split_loss_wandb_1,
+                                          custom_binary_split_loss_wandb_2,
+                                          custom_binary_split_loss_wandb_3,
+                                          custom_binary_split_loss_wandb_4,
+                                          custom_binary_split_loss_wandb_5],
+                                    optimizer=keras.optimizers.Adam(learning_rate=0.0001), metrics=["accuracy"])
+                self.loss = "custom_binary_split_loss_wandb_x"
+                self.metrics = "accuracy"
+            else:
+                raise ValueError(f"Not implemented for multi-label: {classification_type}. Should be: 'multilabel' or "
+                                 f"'multihead'")
         else:
             raise ValueError("classification_type must be one of the following: 'multi_class', 'multi_label'")
         self.compiled = True
