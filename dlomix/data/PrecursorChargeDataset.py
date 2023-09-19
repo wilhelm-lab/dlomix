@@ -31,11 +31,17 @@ class PrecursorChargeStateDataset:
         if isinstance(classification_type, str):
             if classification_type not in ["multi_class", "multi_label"]:
                 raise ValueError(
-                    f"Error: {classification_type} was set. classification_type must be either 'multi_class' or 'multi_label'.")
+                    f"Error: {classification_type} was set. classification_type must be either 'multi_class' or "
+                    f"'multi_label'.")
             else:
                 classification_type = classification_type.lower()
         else:
             raise TypeError(f"Error: {classification_type}. classification_type must be a string.")
+        if classification_type == "multi_label":
+            if len(charge_states) < 2:
+                raise ValueError(
+                    f"Error: {charge_states}. For multi_label classification at least two charge states must be "
+                    f"provided.")
 
         # check if charge states correct:
         if isinstance(charge_states, list):
@@ -55,7 +61,8 @@ class PrecursorChargeStateDataset:
         if isinstance(columns_to_keep, list):
             if not all(isinstance(item, str) for item in columns_to_keep):
                 raise ValueError(
-                    f"Error: {columns_to_keep}. columns_to_keep must be a list of strings. In Order: 'modified_sequence', 'precursor_charge', "
+                    f"Error: {columns_to_keep}. columns_to_keep must be a list of strings. In Order: "
+                    f"'modified_sequence', 'precursor_charge',"
                     "'precursor_intensity'.")
         else:
             raise TypeError(f"Error: {columns_to_keep}.columns_to_keep must be a list.")
@@ -84,7 +91,7 @@ class PrecursorChargeStateDataset:
         # resulting dataframe
         self.df = None
 
-        # attributes
+        # attributes (needed for model class: get_attributes())
         self.charge_states = charge_states
         self.num_classes = len(self.charge_states)
         self.padding_length = None
@@ -142,7 +149,7 @@ class PrecursorChargeStateDataset:
 
         # encode all occuring charge states per unique sequence in a binary vector
         # Step 9/12
-        self.df = encode_charge_states(self.df)
+        self.df = encode_charge_states(self.df, self.charge_states)
 
         # filter out all sequences where has_skipped_charges() returns True (if > 1000 occurrences)
         # Step 10/12
@@ -418,9 +425,9 @@ def remove_rare_sequence_lengths(df, representation_threshold=100):
     """
     Remove sequences of specific length represented less than a certain number of times
 
-    input: df containig "modified_sequence" column, representation_threshold
+    input: df containing "modified_sequence" column, representation_threshold
     output:
-    - df containing only sequence legths represented more than representation_threshold times
+    - df containing only sequence lengths represented more than representation_threshold times
     - padding_length
     default: representation_threshold = 100
 
@@ -449,7 +456,7 @@ def remove_rare_sequence_lengths(df, representation_threshold=100):
     return df, padding_length
 
 
-def encode_charge_states(df):
+def encode_charge_states(df, charge_states=None):
     """
     Encode all occuring charge states per unique sequence in a binary vector
 
@@ -459,15 +466,15 @@ def encode_charge_states(df):
     @return: df: DataFrame
     """
     df['charge_state_vector'] = df['precursor_charge'].apply(
-        lambda x: [1 if i in x else 0 for i in range(1, 7)])
+        lambda x: [1 if i in x else 0 for i in range(charge_states[0], charge_states[-1]+1)])
     print(f"Step 9/12 complete. Encoded all occuring charge states per unique sequence in a binary vector.")
     return df
 
 
 def has_skipped_charges(charge_state_vector):
     """
-    Checks if a vector contains only continous charge states e.g. [1,1,1,0,0,0]
-    Flase if a vector contains skipped charges e.g. [1,0,0,0,0,1]
+    Checks if a vector contains only continuous charge states e.g. [1,1,1,0,0,0]
+    False if a vector contains skipped charges e.g. [1,0,0,0,0,1]
 
     input: charge_state_vector
     output: True if no charge state is skipped, False if a charge state is skipped
