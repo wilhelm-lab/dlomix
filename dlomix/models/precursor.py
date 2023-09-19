@@ -1,36 +1,39 @@
-import tensorflow as tf
-from tensorflow import keras
-from tensorflow.keras import layers
-from tensorflow.keras.layers import Input, Dense, Embedding, Flatten, Dropout, Bidirectional, GRU, Conv2D, Lambda
-from tensorflow.keras.models import Model
-from dlomix.layers.attention import AttentionLayer, DecoderAttentionLayer
+import re
 import subprocess
-from sklearn.metrics import classification_report, confusion_matrix, accuracy_score, precision_score, recall_score, \
-    f1_score, ConfusionMatrixDisplay
-import seaborn as sn
-import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
+import tensorflow as tf
 import wandb
+from sklearn.metrics import (
+    confusion_matrix, ConfusionMatrixDisplay,
+    accuracy_score, precision_score, recall_score, f1_score
+
+)
+from tensorflow import keras
+from tensorflow.keras.layers import (
+    Input, Dense, Embedding, Flatten
+)
+from tensorflow.keras.models import Model
 from wandb.keras import WandbCallback
-import re
 
 
-class PrecursorChargeStatePredictor:
+class PrecursorChargeStatePredictor(tf.keras.Model):
+    # defin
 
-    def __init__(self, dataset=None, pretrained_model=None, sequence=None):
+    def __init__(self, dataset=None, pretrained_model=None, sequence=None, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.model = None
         self.sequence = None
         self.shape = None
         self.classification_type = None
-        self.model_type = None
         self.max_len_seq = None
         self.voc_len = None
         self.num_classes = None
         self.dataset = None
         self.history = None
         self.loss = None
-        self.metrics = None
+        self.in_metrics = None
         self.evaluation = None
         self.evaluated = None
         self.prediction = None
@@ -50,60 +53,12 @@ class PrecursorChargeStatePredictor:
                 "PrecursorChargeStatePredictor must be initiated with either a dataset or a pretrained model.")
 
     def initiate_with_dataset(self, dataset):
-        self.pretrained_model = pretrained_model
-        self.skip_training = skip_training
         self.dataset = dataset
         self.num_classes = dataset.num_classes
         self.voc_len = dataset.voc_len
         self.max_len_seq = dataset.padding_length
-        self.model_type = dataset.model_type
         self.classification_type = dataset.classification_type
         self.shape = dataset.train_data[0].shape
-
-        if self.model_type == "embedding":
-            self.model = self.embedding_model()
-        elif self.model_type == "conv2d":
-            self.model = self.conv2d_model()
-        elif self.model_type == "prosit":
-            self.model = self.prosit_model()
-        elif self.model_type == "multihead":
-            self.model = self.multihead_model()
-        elif self.model_type == "multilabel":
-            self.model = self.multilabel_model()
-        else:
-            raise ValueError(
-                "model_type must be one of the following: 'embedding', 'conv2d', 'prosit', 'multihead', 'multilabel'")
-
-    def prosit_model(self):
-        input_prosit = Input(shape=self.shape)
-        x = Model(inputs=input_prosit, outputs=input_prosit)
-        # Embedding, no vocabulary
-        y = Embedding(input_dim=self.voc_len, output_dim=self.max_len_seq, input_length=self.max_len_seq)(input_prosit)
-        # Encoder
-        y = Bidirectional(GRU(256, return_sequences=True))(y)
-        y = Dropout(0.5)(y)
-        y = GRU(512, return_sequences=True)(y)
-        y = Dropout(0.5)(y)
-        # Attention
-        y = AttentionLayer(y)
-        # Regressor
-        y = Dense(512, activation="relu")(y)
-        y = Dropout(0.1)(y)
-        # Output
-        out = Dense(self.num_classes, activation="softmax")(y)
-        model_prosit = Model(inputs=[x.input], outputs=out)
-        return model_prosit
-
-    def conv2d_model(self):
-        input_convolution = Input(shape=self.shape)
-        x = Model(inputs=input_convolution, outputs=input_convolution)
-        y = Rescaling(scale=1. / 100)(input_convolution)
-        y = Conv2D(filters=128, kernel_size=(1, 3), strides=1, activation="relu", padding='same')(y)
-        y = Flatten()(y)
-        y = Dense(210, activation="relu")(y)
-        z = Dense(self.num_classes, activation="softmax")(y)
-        model_convolution = Model(inputs=[x.input], outputs=z)
-        return model_convolution
 
     def embedding_model(self):
         input_embedding = Input(shape=self.shape)
@@ -116,20 +71,6 @@ class PrecursorChargeStatePredictor:
         z = Dense(self.num_classes, activation="softmax")(y)
         model_embed = Model(inputs=[x.input], outputs=z)
         return model_embed
-
-    def multihead_model(self):
-        input_multihead = Input(shape=self.shape)
-        x = Model(inputs=input_multihead, outputs=input_multihead)
-        y = Embedding(input_dim=self.voc_len, output_dim=self.max_len_seq, input_length=self.max_len_seq)(
-            input_multihead)
-        y = Flatten()(y)
-        branch_outputs = []
-        for i in range(6):
-            out = Lambda(lambda a: a[:, i:i + 1])(y)
-            out = Dense(2, activation="sigmoid")(out)
-            branch_outputs.append(out)
-        model_multihead = Model(inputs=[x.input], outputs=branch_outputs)
-        return model_multihead
 
     def multilabel_model(self):
         input_multilabel = Input(shape=self.shape)
@@ -152,67 +93,23 @@ class PrecursorChargeStatePredictor:
         subprocess.call(['wandb', 'login', api_key])
         wandb.init(project=project_name)
         config = wandb.config
-        config.model_type = self.model_type
         config.classification_type = self.classification_type
         config.num_classes = self.num_classes
         config.voc_len = self.voc_len
         config.max_len_seq = self.max_len_seq
         self.wandb = True
 
-    import tensorflow as tf
-    from keras import backend as K
-
-    def custom_binary_split_loss_wandb_0(y_true, y_pred):
-        return custom_binary_split_loss_wandb(K.cast(y_true, "float32"), K.cast(y_pred, "float32"), position=0)
-
-    def custom_binary_split_loss_wandb_1(y_true, y_pred):
-        return custom_binary_split_loss_wandb(K.cast(y_true, "float32"), K.cast(y_pred, "float32"), position=1)
-
-    def custom_binary_split_loss_wandb_2(y_true, y_pred):
-        return custom_binary_split_loss_wandb(K.cast(y_true, "float32"), K.cast(y_pred, "float32"), position=2)
-
-    def custom_binary_split_loss_wandb_3(y_true, y_pred):
-        return custom_binary_split_loss_wandb(K.cast(y_true, "float32"), K.cast(y_pred, "float32"), position=3)
-
-    def custom_binary_split_loss_wandb_4(y_true, y_pred):
-        return custom_binary_split_loss_wandb(K.cast(y_true, "float32"), K.cast(y_pred, "float32"), position=4)
-
-    def custom_binary_split_loss_wandb_5(y_true, y_pred):
-        return custom_binary_split_loss_wandb(K.cast(y_true, "float32"), K.cast(y_pred, "float32"), position=5)
-
-    def custom_binary_split_loss_wandb(y_true_t, y_pred_t, position=0):
-        return K.square(y_true_t[position][0] - y_pred_t[position][0])
-
     def compile(self, lr=0.0001):
         if self.classification_type == "multi_class":
-            if self.model == "prosit":
-                self.model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['categorical_accuracy'])
-                self.loss = 'categorical_crossentropy'
-                self.metrics = 'categorical_accuracy'
-            else:
-                self.model.compile(optimizer=keras.optimizers.Adam(learning_rate=lr), loss='categorical_crossentropy',
-                                   metrics=['categorical_accuracy'])
-                self.loss = 'categorical_crossentropy'
-                self.metrics = 'categorical_accuracy'
+            self.model.compile(optimizer=keras.optimizers.Adam(learning_rate=lr), loss='categorical_crossentropy',
+                               metrics=['categorical_accuracy'])
+            self.loss = 'categorical_crossentropy'
+            self.in_metrics = 'categorical_accuracy'
 
         elif self.classification_type == "multi_label":
-            if self.model == "multilabel":
-                self.model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['binary_accuracy'])
-                self.loss = 'binary_crossentropy'
-                self.metrics = 'binary_accuracy'
-            elif self.model == "multihead":
-                model_embed.compile(loss=[custom_binary_split_loss_wandb_0,
-                                          custom_binary_split_loss_wandb_1,
-                                          custom_binary_split_loss_wandb_2,
-                                          custom_binary_split_loss_wandb_3,
-                                          custom_binary_split_loss_wandb_4,
-                                          custom_binary_split_loss_wandb_5],
-                                    optimizer=keras.optimizers.Adam(learning_rate=0.0001), metrics=["accuracy"])
-                self.loss = "custom_binary_split_loss_wandb_x"
-                self.metrics = "accuracy"
-            else:
-                raise ValueError(f"Not implemented for multi-label: {classification_type}. Should be: 'multilabel' or "
-                                 f"'multihead'")
+            self.model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['binary_accuracy'])
+            self.loss = 'binary_crossentropy'
+            self.in_metrics = 'binary_accuracy'
         else:
             raise ValueError("classification_type must be one of the following: 'multi_class', 'multi_label'")
         self.compiled = True
@@ -241,7 +138,7 @@ class PrecursorChargeStatePredictor:
 
     def save(self, output_path=None):
         if output_path is None:
-            output_path = f"{self.model_type}_model.h5"
+            output_path = f"{self.classification_type}_model.h5"
         else:
             if not output_path.endswith(".h5"):
                 output_path = f"{output_path}.h5"
@@ -252,7 +149,7 @@ class PrecursorChargeStatePredictor:
             # Access the loss, validation loss, and accuracy from the history object
             loss = self.history['loss']
             val_loss = self.history['val_loss']
-            accuracy = self.history[self.metrics]
+            accuracy = self.history[self.in_metrics]
             val_accuracy = history.history[self.loss]
 
             # Plot the loss, validation loss, and accuracy curves
