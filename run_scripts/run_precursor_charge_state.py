@@ -14,10 +14,10 @@ model_type available:
 '''
 
 
-pretrained_version = True # TODO Set whether to use pretrained model or not
+pretrained_version = False # TODO Set whether to use pretrained model or not
 if pretrained_version:
 
-    model_path = '../pretrained_models/precursor_charge_state/example_multiclass_embedding/embed_150epoch_09152023.h5'
+    model_path = '../pretrained_models/precursor_charge_state/example_multiclass_embedding/embed_30epoch.h5'
     prospect_pretrained = PrecursorChargeStatePredictor(pretrained_model=model_path, sequence="EM[UNIMOD:35]LTRAIKTQLVLLT")
 
 else:
