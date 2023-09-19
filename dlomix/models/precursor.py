@@ -19,18 +19,27 @@ from wandb.keras import WandbCallback
 
 
 class PrecursorChargeStatePredictor(tf.keras.Model):
-    # defin
+    def __init__(self,
+                 # if retraining
+                 classification_type="multi_class",
+                 padding_length=63,
+                 voc_len=23,
+                 charge_states=None,
 
-    def __init__(self, dataset=None, pretrained_model=None, sequence=None, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+                 # if pretrained
+                 pretrained_model=None,
+                 sequence=None):
+        super(PrecursorChargeStatePredictor, self).__init__()
+        if charge_states is None:
+            charge_states = [1, 2, 3, 4, 5, 6]
         self.model = None
         self.sequence = None
-        self.shape = None
-        self.classification_type = None
-        self.max_len_seq = None
-        self.voc_len = None
-        self.num_classes = None
-        self.dataset = None
+        self.shape = np.array([padding_length, ])
+        self.classification_type = classification_type
+        self.max_len_seq = padding_length
+        self.voc_len = voc_len
+        self.charge_states = charge_states
+        self.num_classes = len(charge_states)
         self.history = None
         self.loss = None
         self.in_metrics = None
@@ -44,23 +53,23 @@ class PrecursorChargeStatePredictor(tf.keras.Model):
         self.compiled = False
         self.fitted = False
         self.pretrained = False
-        if dataset is not None:
-            self.initiate_with_dataset(dataset)
-        elif pretrained_model is not None and sequence is not None:
+
+        if pretrained_model is not None and sequence is not None:
             self.initiate_with_pretrained_model(pretrained_model, sequence)
-        else:
-            raise ValueError(
-                "PrecursorChargeStatePredictor must be initiated with either a dataset or a pretrained model.")
 
-    def initiate_with_dataset(self, dataset):
-        self.dataset = dataset
-        self.num_classes = dataset.num_classes
-        self.voc_len = dataset.voc_len
-        self.max_len_seq = dataset.padding_length
-        self.classification_type = dataset.classification_type
-        self.shape = dataset.train_data[0].shape
+        if self.classification_type == "multi_class":
+            self.model = self.multiclass_model()
+        elif self.classification_type == "multi_label":
+            self.model = self.multilabel_model()
+            if len(charge_states) <= 1:
+                raise ValueError(f"For multiclass classification, more than one charge state is required. "
+                                 f"You've entered: {charge_states} ")
 
-    def embedding_model(self):
+    def multiclass_model(self):
+        """
+        Multiclass model with embedding layer
+        :return: model
+        """
         input_embedding = Input(shape=self.shape)
         # the first branch operates on the first input
         x = Model(inputs=input_embedding, outputs=input_embedding)
@@ -73,6 +82,9 @@ class PrecursorChargeStatePredictor(tf.keras.Model):
         return model_embed
 
     def multilabel_model(self):
+        """
+        Multilabel model with embedding layer
+        """
         input_multilabel = Input(shape=self.shape)
         x = Model(inputs=input_multilabel, outputs=input_multilabel)
         y = Embedding(input_dim=self.voc_len, output_dim=self.max_len_seq, input_length=self.max_len_seq)(
@@ -84,12 +96,22 @@ class PrecursorChargeStatePredictor(tf.keras.Model):
         return model_multilabel
 
     def summary(self):
+        """
+        Prints a summary of the model
+        Overwrites Keras' summary method - Otherwise "not built, call 'build()' error
+        """
         self.model.summary()
 
     def wandb_init(self, api_key=None,
                    project_name="precursor-charge-state-prediction"):
+        """
+        Initializes weights&biases
+        @param api_key: str
+        @param project_name: str
+        """
         if api_key is None:
-            raise ValueError("No API key provided. Use model_class.wandb_init(api_key= '...', project_name = '...')")
+            raise ValueError(f"No API key provided. Use model_class.wandb_init(api_key= '...', project_name = '...')."
+                             f" You entered: {api_key}, {project_name}")
         subprocess.call(['wandb', 'login', api_key])
         wandb.init(project=project_name)
         config = wandb.config
@@ -100,6 +122,11 @@ class PrecursorChargeStatePredictor(tf.keras.Model):
         self.wandb = True
 
     def compile(self, lr=0.0001):
+        """
+        Compiles the model
+        Overwrites Keras' compile method, setting defaults according to the classification type
+        @param lr: float
+        """
         if self.classification_type == "multi_class":
             self.model.compile(optimizer=keras.optimizers.Adam(learning_rate=lr), loss='categorical_crossentropy',
                                metrics=['categorical_accuracy'])
@@ -114,7 +141,20 @@ class PrecursorChargeStatePredictor(tf.keras.Model):
             raise ValueError("classification_type must be one of the following: 'multi_class', 'multi_label'")
         self.compiled = True
 
-    def fit(self, batch_size=4096, callbacks=None, epochs=30, no_wandb=False):
+    def fit(self, batch_size=4096, callbacks=None, epochs=30, training_label=None, training_data=None,
+            validation_label=None, validation_data=None, no_wandb=False):
+        """
+        Fits the model
+        Overwrites Keras' fit method, defining input parameters according to expected dataset input
+        @param batch_size: int
+        @param callbacks: list
+        @param epochs: int
+        @param training_label: list
+        @param training_data: list
+        @param validation_label: list
+        @param validation_data: list
+        @param no_wandb: bool
+        """
         if not self.compiled:
             raise ValueError("Model must be compiled before fitting. Use model_class.compile().")
         elif not self.wandb and not no_wandb:
@@ -129,14 +169,18 @@ class PrecursorChargeStatePredictor(tf.keras.Model):
                     callbacks = [WandbCallback()]
             # print(self.shape) print(callbacks, len(self.dataset.train_data), len(self.dataset.train_label),
             # len(self.dataset.val_data), len(self.dataset.val_label))
-            self.history = self.model.fit(self.dataset.train_data, self.dataset.train_label, epochs=epochs,
+            self.history = self.model.fit(training_data, training_label, epochs=epochs,
                                           batch_size=batch_size,
-                                          validation_data=(self.dataset.val_data, self.dataset.val_label),
+                                          validation_data=(validation_data, validation_label),
                                           callbacks=callbacks, verbose=1)
 
             self.fitted = True
 
     def save(self, output_path=None):
+        """
+        Saves the model
+        Overwrites Keras' save method
+        """
         if output_path is None:
             output_path = f"{self.classification_type}_model.h5"
         else:
@@ -145,6 +189,10 @@ class PrecursorChargeStatePredictor(tf.keras.Model):
         self.model.save(output_path)
 
     def plot_training(self):
+        """
+        Plots the training curves (Training and Validation Loss, Training and Validation Accuracy)
+        Basic Matplotlib plot
+        """
         if self.fitted:
             # Access the loss, validation loss, and accuracy from the history object
             loss = self.history['loss']
@@ -183,97 +231,166 @@ class PrecursorChargeStatePredictor(tf.keras.Model):
             raise ValueError("Model was not trained. No data to plot. Use model_class.fit()")
 
     def load_weights(self, path):
+        """
+        Loads weights from a given path
+        Overwrites Keras' load_weights method
+        """
         self.model = tf.keras.saving.load_model(path)
         self.pretrained = True
 
-    def evaluate(self, test_data=None, test_label=None, test_mode=False):
-        if not self.fitted:
-            if not test_mode:
-                if test_data is None or test_label is None:
-                    raise ValueError(
-                        "You did not provide test_data and test_label. Use model_class.evaluate(test_data, "
-                        "test_label) or set apply test_ratio>0 to model_class")
-                else:
-                    self.evaluation = self.model.evaluate(test_data, test_label)
-                    self.evaluated = True
-            else:
-                self.evaluation = self.model.evaluate(self.dataset.test_data, self.dataset.test_label)
-                self.evaluated = True
+    def evaluate(self, test_data=None, test_label=None):
+        """
+        Evaluates the model
+        Overwrites Keras' evaluate method, defining input parameters according to expected dataset input
+        @param test_data: list
+        @param test_label: list
+        """
+        if test_data is None or test_label is None:
+            raise ValueError(
+                "You did not provide test_data and test_label. Use model_class.evaluate(test_data, "
+                "test_label) or set apply test_ratio>0 to model_class")
         else:
-            if self.pretrained:
-                if test_data is None or test_label is None:
-                    raise ValueError(
-                        "You did not provide test_data and test_label. Use model_class.evaluate(test_data, "
-                        "test_label) or set apply test_ratio>0 to model_class")
-                else:
-                    self.evaluation = self.model.evaluate(test_data, test_label)
-                    self.evaluated = True
-            else:
-                self.evaluation = self.model.evaluate(self.dataset.test_data, self.dataset.test_label)
-                self.evaluated = True
+            self.evaluation = self.model.evaluate(test_data, test_label)
+            self.evaluated = True
 
         print(f"test loss, test acc: {self.evaluation}")
 
-    def predict(self, test_data=None, test_label=None, test_mode=False, no_verification=False):
-        if not self.fitted:
-            if not test_mode:
-                if test_data is None:
-                    raise ValueError(
-                        "You did not provide test_data and test_label. Use model_class.evaluate(test_data, "
-                        "test_label) or set apply test_ratio>0 to model_class")
-                else:
-                    self.prediction = self.model.predict(test_data)
-                    self.predicted = True
-            else:
-                self.prediction = self.model.predict(test_data)
-                self.predicted = True
+    def predict(self, test_data=None, test_label=None, verification=True, classification_type=None,
+                charge_states=None):
+        """
+        Predicts the labels for a given test dataset, optionally verifying the prediction on the given labels
+        Overwrites Keras' predict method, defining input parameters according to expected dataset input
+        Outputs a confusion matrix and a dataframe with precision, recall and f1-score for each class label
+        @param test_data: list
+        @param test_label: list
+        @param verification: bool
+        @param classification_type: str
+        @param charge_states: list
+        """
+        if test_data is None:
+            raise ValueError(
+                "You did not provide test_data and test_label. Use model_class.evaluate(test_data, "
+                "test_label) or set apply test_ratio>0 to model_class")
         else:
-            if self.pretrained:
-                if test_data is None:
-                    raise ValueError(
-                        "You did not provide test_data and test_label. Use model_class.predict(test_data, test_label) "
-                        "or set apply test_ratio>0 to model_class")
-                else:
-                    self.prediction = self.model.predict(test_data)
-                    self.predicted = True
-            else:
-                test_data = self.dataset.test_data
-                test_label = self.dataset.test_label
-                self.prediction = self.model.predict(test_data)
-                self.predicted = True
+            self.prediction = self.model.predict(test_data)
+            self.predicted = True
 
-        if not no_verification:
-            if self.classification_type == "multi_class":
-                if test_label is None:
-                    raise ValueError("You did not provide test_label for prediction-verification.")
-                else:
-                    predicted_labels = np.argmax(self.prediction, axis=1)
-                    true_labels = np.argmax(test_label, axis=1)
+        if test_label is None and verification:
+            raise ValueError("You did not provide test_label for prediction-verification.")
+
+        else:
+            if classification_type == "multi_class":
+                predicted_labels = np.argmax(self.prediction, axis=1)
+                true_labels = np.argmax(test_label, axis=1)
+
+                cm = confusion_matrix(true_labels, predicted_labels)
+                print(cm)
+                print("Accuracy: ", accuracy_score(true_labels, predicted_labels))
+                print("Precision_weighted: ", precision_score(true_labels, predicted_labels, average='weighted'))
+                print("Recall_weighted: ", recall_score(true_labels, predicted_labels, average='weighted'))
+                print("F1_weighted: ", f1_score(true_labels, predicted_labels, average='weighted'))
+                disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=charge_states)
+                disp.plot(cmap=plt.cm.Blues, xticks_rotation=45)
+                # add legend title and axis labels
+                plt.xlabel('Predicted Label')
+                plt.ylabel('True Label')
+                plt.title('Confusion Matrix')
+                # plt.colorbar(label="Number of Samples")
+                plt.show()
+
+                new_df = pd.DataFrame()
+                new_df['charge'] = self.charge_states
+                new_df['precision'] = precision_score(true_labels, predicted_labels, average=None)
+                new_df['recall'] = recall_score(true_labels, predicted_labels, average=None)
+                new_df['f1'] = f1_score(true_labels, predicted_labels, average=None)
+                print(new_df)
+
+            else:
+                charge_dict_true = dict()
+                charge_dict_pred = dict()
+                for index, row in enumerate(test_label):
+                    for index2 in range(len(row)):
+                        if index2 + charge_states[0] not in charge_dict_true:
+                            charge_dict_true[index2 + charge_states[0]] = []
+                            charge_dict_pred[index2 + charge_states[0]] = []
+                            charge_dict_true[index2 + charge_states[0]].append(row[index2])
+                            charge_dict_pred[index2 + charge_states[0]].append(row[index2])
+                        else:
+                            charge_dict_true[index2 + charge_states[0]].append(row[index2])
+                            charge_dict_pred[index2 + charge_states[0]].append(row[index2])
+
+                for key, value in charge_dict_true.items():
+                    true_labels = value
+                    predicted_labels = charge_dict_pred[key]
 
                     cm = confusion_matrix(true_labels, predicted_labels)
                     print(cm)
-                    print("Accuracy: ", accuracy_score(true_labels, predicted_labels))
-                    print("Precision_weighted: ", precision_score(true_labels, predicted_labels, average='weighted'))
-                    print("Recall_weighted: ", recall_score(true_labels, predicted_labels, average='weighted'))
-                    print("F1_weighted: ", f1_score(true_labels, predicted_labels, average='weighted'))
-                    disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=self.dataset.charge_states)
+
+                    classes_here = [0, key]
+                    disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=classes_here)
+
                     disp.plot(cmap=plt.cm.Blues, xticks_rotation=45)
                     # add legend title and axis labels
                     plt.xlabel('Predicted Label')
                     plt.ylabel('True Label')
-                    plt.title('Confusion Matrix')
+                    plt.title(f'Confusion Matrix, Charge State {key}')
                     # plt.colorbar(label="Number of Samples")
+                    # write text below plot
+                    plt.text(-0.5, 2.1,
+                             f"Accuracy: {round(accuracy_score(true_labels, predicted_labels), 3)}\nPrecision (weighted): {round(precision_score(true_labels, predicted_labels, average='weighted'), 3)}\nRecall (weighted): {round(recall_score(true_labels, predicted_labels, average='weighted'), 3)}\nF1-score (weighted): {round(f1_score(true_labels, predicted_labels, average='weighted'), 3)}",
+                             fontsize=10)
+
+                    # write text for topk below plot
+                    # plt.text(3.5, 7.5, f"TopK-Accuracy: {round(topK_accuracy, 3)}\n\n\n", fontsize=10)
+
                     plt.show()
 
-                    new_df = pd.DataFrame()
-                    new_df['charge'] = [1, 2, 3, 4, 5, 6]
-                    new_df['precision'] = precision_score(true_labels, predicted_labels, average=None)
-                    new_df['recall'] = recall_score(true_labels, predicted_labels, average=None)
-                    new_df['f1'] = f1_score(true_labels, predicted_labels, average=None)
-                    print(new_df)
+                new_df3 = pd.DataFrame(columns=['charge'])
 
-            else:
-                raise ValueError("Not implemented for multi-class.")
+                charge_dict_true = dict()
+                charge_dict_pred = dict()
+                for index, row in enumerate(test_label):
+                    for index2 in range(len(row)):
+                        if index2 + charge_states[0] not in charge_dict_true:
+                            charge_dict_true[index2 + charge_states[0]] = []
+                            charge_dict_pred[index2 + charge_states[0]] = []
+                            charge_dict_true[index2 + charge_states[0]].append(row[index2])
+                            charge_dict_pred[index2 + charge_states[0]].append(row[index2])
+                        else:
+                            charge_dict_true[index2 + charge_states[0]].append(row[index2])
+                            charge_dict_pred[index2 + charge_states[0]].append(row[index2])
+
+                new_df3['charge'] = [0, 1]
+                for key, value in charge_dict_true.items():
+                    matrix = confusion_matrix(value, charge_dict_pred[key])
+                    new_df3[f'{key}_accuracy'] = matrix.diagonal() / matrix.sum(axis=1)
+                    new_df3[f'{key}_precision'] = precision_score(value, charge_dict_pred[key], average=None)
+                    new_df3[f'{key}_recall'] = recall_score(value, charge_dict_pred[key], average=None)
+                    new_df3[f'{key}_f1'] = f1_score(value, charge_dict_pred[key], average=None)
+
+                new_df2 = pd.DataFrame(columns=['charge', 'accuracy', 'precision', 'recall', 'f1'])
+
+                charges_list = []
+                to_take_list = []
+                for num in range(charge_states[0], charge_states[-1] + 1):
+                    for value in ["not-", ""]:
+                        col_name = value + str(num)
+                        charges_list.append(col_name)
+                        to_take_list.append(f'{num}')
+                new_df2['charge'] = charges_list
+
+                counter = 0
+                for index, row in new_df2.iterrows():
+
+                    if counter > 1:
+                        counter = 0
+                    new_df2.at[index, 'accuracy'] = new_df3.at[counter, f'{to_take_list[index]}_accuracy']
+                    new_df2.at[index, 'precision'] = new_df3.at[counter, f'{to_take_list[index]}_precision']
+                    new_df2.at[index, 'recall'] = new_df3.at[counter, f'{to_take_list[index]}_recall']
+                    new_df2.at[index, 'f1'] = new_df3.at[counter, f'{to_take_list[index]}_f1']
+                    counter += 1
+
+                print(new_df2)
 
     def initiate_with_pretrained_model(self, pretrained_model=None, sequence=None):
 
@@ -320,7 +437,8 @@ class PrecursorChargeStatePredictor(tf.keras.Model):
             max_charge_index = np.argmax(charge_predictions)
             max_charge_value = round(charge_predictions[max_charge_index], 2)
 
-            charge_text = f"The predicted charge state for the input sequence '{input_sequence}' is {max_charge_index + 1} [{round(max_charge_value * 100, 2)}%]."
+            charge_text = (f"The predicted charge state for the input sequence '{input_sequence}' is "
+                           f"{max_charge_index + 1} [{round(max_charge_value * 100, 2)}%].")
             percentage_text = "Prediction percentages for all states:\n"
 
             for index, prediction in enumerate(charge_predictions):

@@ -9,8 +9,8 @@ DATAPATH = 'C:/Users/micro/OneDrive/Dokumente/GitHub/Masterpraktikum/data/'
 '''
 classification_type available: "multi_class", "multi_label"
 model_type available: 
-- multi_class: "embedding", "conv2d", "prosit"
-- multi_label: "multilabel", "multihead"
+- multi_class (embedding)
+- multi_label (embedding)
 '''
 
 
@@ -21,15 +21,33 @@ if pretrained_version:
     prospect_pretrained = PrecursorChargeStatePredictor(pretrained_model=model_path, sequence="EM[UNIMOD:35]LTRAIKTQLVLLT")
 
 else:
-    prospect_dataset = PrecursorChargeStateDataset(classification_type="multi_class", model_type="embedding",
-                                                   charge_states=[1, 2, 3, 4, 5, 6], dir_path=DATAPATH,
+    prospect_dataset = PrecursorChargeStateDataset(classification_type="multi_class",
+                                                   charge_states=[1,2,3,4,5,6], dir_path=DATAPATH,
                                                    columns_to_keep=['modified_sequence', 'precursor_charge',
                                                                     'precursor_intensity'])
 
-    model_class = PrecursorChargeStatePredictor(prospect_dataset)
+    model_class = PrecursorChargeStatePredictor(
+        classification_type=prospect_dataset.classification_type,
+        charge_states=prospect_dataset.charge_states,
+        voc_len=prospect_dataset.voc_len,
+        padding_length=prospect_dataset.padding_length,
+    )
     model_class.summary()
     model_class.compile()
     # model_class.wandb_init(api_key="YOUR_API_KEY", project_name="YOUR_PROJECT_NAME")
-    model_class.fit(epochs=30, no_wandb=True)  # TODO set no_wandb to False if model_class.wand_init() is called
-    model_class.evaluate()
-    model_class.predict()  # Predict offers verification if given labels. Default is Prediction on Testdata.
+    model_class.fit(epochs=30, no_wandb=True, # TODO set no_wandb to False if model_class.wand_init() is called
+                    training_data=prospect_dataset.train_data,
+                    training_label=prospect_dataset.train_label,
+                    validation_data=prospect_dataset.val_data,
+                    validation_label=prospect_dataset.val_label,
+                    batch_size=4096)
+    model_class.evaluate(
+        test_data=prospect_dataset.test_data,
+        test_label=prospect_dataset.test_label
+    )
+    model_class.predict(
+        test_data=prospect_dataset.test_data,
+        test_label=prospect_dataset.test_label,
+        classification_type=prospect_dataset.classification_type,
+        charge_states=prospect_dataset.charge_states
+    )
