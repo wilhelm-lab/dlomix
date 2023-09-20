@@ -125,7 +125,7 @@ class PrecursorChargeStateDataset:
 
         # keep only desired charge states
         # Step 3/12
-        self.df = keep_desired_charges(self.df, self.charge_states)
+        self.df = keep_desired_charges(self.df, self.charge_states, min_count=2)
 
         # aggregate all sequences to unique sequences
         # Step 4/12
@@ -270,13 +270,15 @@ def drop_na(df, column='precursor_intensity'):
     return df
 
 
-def keep_desired_charges(df, charge_list=None):
+def _keep_desired_charges(df, charge_list=None):
     """
     Keep only desired charge states
     Default: keep charge states 1-6
     @param df: DataFrame
     @param charge_list: list of charge states to be kept
     """
+    df['precursor_charge'].value_counts()
+
     if charge_list is None:
         charge_list = [1, 2, 3, 4, 5, 6]
     df = df[df['precursor_charge'].isin(charge_list)]
@@ -284,15 +286,42 @@ def keep_desired_charges(df, charge_list=None):
     return df
 
 
-'''
-Find all UNIMOD annotations and add them to the vocabulary
-(The length of the vocabulary +1 is used later for the embedding layer)
-'''
+def keep_desired_charges(df, charge_list=None, min_count=None):
+    """
+    Keep only desired charge states and filter out charges with counts less than min_count.
+    Default: keep charge states 1-6 with no minimum count filtering.
+
+    @param df: DataFrame
+    @param charge_list: list of charge states to be kept
+    @param min_count: minimum count of charge states to be retained
+    """
+    if charge_list is None:
+        charge_list = [1, 2, 3, 4, 5, 6]
+
+    if min_count is not None:
+        charge_list_prev = charge_list
+        charge_counts = df['precursor_charge'].value_counts()
+        charge_list = [charge for charge in charge_list if charge_counts.get(charge, 0) >= min_count]
+        if len(charge_list) < len(charge_list_prev):
+            total_list = [charge for charge in charge_list_prev if charge not in charge_list]
+            print(f"Caution! Removed charge states with less than {min_count} occurrences in the dataset. "
+                  f"Charges removed: {total_list}")
+
+    df = df[df['precursor_charge'].isin(charge_list)]
+
+    if min_count is not None:
+        print(
+            f"Step 3/12 complete. Removed charge states not in {charge_list} or with counts less than {min_count}.")
+    else:
+        print(f"Step 3/12 complete. Removed charge states not in {charge_list}.")
+
+    return df
 
 
 def complete_vocabulary(df):
     """
-    Completes the vocabulary with all the possible amino acids and modifications
+    Find all UNIMOD annotations and add them to the vocabulary
+    (The length of the vocabulary +1 is used later for the embedding layer)
     @param df: DataFrame
     @return: vocabulary: list, list of all amino acids and modifications
     @return: vocab_len: int, length of the vocabulary
@@ -466,7 +495,7 @@ def encode_charge_states(df, charge_states=None):
     @return: df: DataFrame
     """
     df['charge_state_vector'] = df['precursor_charge'].apply(
-        lambda x: [1 if i in x else 0 for i in range(charge_states[0], charge_states[-1]+1)])
+        lambda x: [1 if i in x else 0 for i in range(charge_states[0], charge_states[-1] + 1)])
     print(f"Step 9/12 complete. Encoded all occuring charge states per unique sequence in a binary vector.")
     return df
 
