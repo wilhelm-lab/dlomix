@@ -1,8 +1,8 @@
 from .IntensityReport import IntensityReport
 from .RetentionTimeReport import RetentionTimeReport
-from .MonteCarloReport import MonteCarloReport
+from .UncertaintyReport import UncertaintyReport
 
 __all__ = ["RetentionTimeReport",
            "IntensityReport",
-           "MonteCarloReport",
+           "UncertaintyReport",
            ]

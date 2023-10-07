@@ -73,7 +73,8 @@ class IntervalConformalScore(tf.keras.losses.Loss):
         super().__init__(name=name, **kwargs)
 
     def call(self, y_true, pred_intervals):
-        return tf.reduce_max(tf.stack([tf.subtract(pred_intervals, y_true)[:,0], -tf.subtract(pred_intervals, y_true)[:,1]], 1), -1)
+        return tf.reduce_max(tf.stack([tf.subtract(pred_intervals, y_true)[:,0], 
+                                       -tf.subtract(pred_intervals, y_true)[:,1]], 1), -1)
 
     def get_config(self):
         config = {}
@@ -94,7 +95,7 @@ class IntervalConformalQuantile(tf.keras.losses.Loss):
         scores = tf.reduce_max(tf.stack([tf.subtract(pred_intervals, y_true)[:,0], -tf.subtract(pred_intervals, y_true)[:,1]], 1), -1)
         n = tf.cast(tf.shape(y_true)[0], tf.float32) #without casting to float, next line throws an error
         q = tf.math.ceil((n + 1.) * (1. - self.alpha)) / n
-        tfp_quantile = tf.sort(scores, axis=-1, direction='ASCENDING', name=None)[int(q * n)]
+        tfp_quantile = tf.sort(scores, axis=-1, direction='ASCENDING', name=None)[tf.math.minimum(int(q * n), int(n-1))]
         return tfp_quantile
 
     def get_config(self):

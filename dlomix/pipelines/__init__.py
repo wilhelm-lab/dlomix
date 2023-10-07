@@ -1,6 +1,8 @@
 from .pipeline import RetentionTimePipeline
-from .MCDOpipeline import MCDOPipeline
+from .MCDpipeline import MCDPipeline
+from .QRpipeline import QRpipeline
 
 __all__ = [RetentionTimePipeline,
-           MCDOPipeline
+           MCDPipeline,
+           QRpipeline
           ]

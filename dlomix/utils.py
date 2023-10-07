@@ -31,3 +31,4 @@ def set_global_seed(seed=42):
     
     tf.config.threading.set_inter_op_parallelism_threads(1)
     tf.config.threading.set_intra_op_parallelism_threads(1)
+            
