@@ -50,7 +50,7 @@ Functionality:
 - [X] add residual plots to reporting, possibly other regression analysis tools
 - [X] output reporting results as PDF
 - [ ] extend data representation to include modifications
-
+- [ ] explore confidence in predictions (Monte Carlo, Conformal prediction)
 Package structure:
 
 - [X] integrate `deeplc.py` into `models.py`, preferably introduce a package structure (e.g. `models.retention_time`)
