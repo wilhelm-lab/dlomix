@@ -50,6 +50,7 @@ Functionality:
 - [X] add residual plots to reporting, possibly other regression analysis tools
 - [X] output reporting results as PDF
 - [ ] extend data representation to include modifications
+- [ ] added required modules for precursor charge prediction
 
 Package structure:
 
