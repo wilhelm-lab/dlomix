@@ -289,7 +289,7 @@ def test_json_prospect_metadata_filtering():
     intensity_dataset = IntensityDataset(
         data_source=json_test_filepath,
         seq_length=30,
-        sequence_filtering_criteria={
+        metadata_filtering_criteria={
             "max_precursor_charge": 6,
             "max_peptide_length": 30,
         },
