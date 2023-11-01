@@ -1,7 +1,3 @@
-# install necessary packages
-!python -m pip install git+https://github.com/goldjunge3010/dlomix_wandb_report
-!python -m pip install -q wandb
-
 # import necessary packages
 import numpy as np
 import pandas as pd
