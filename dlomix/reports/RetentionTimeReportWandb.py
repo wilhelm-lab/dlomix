@@ -1,14 +1,14 @@
-import os
-import re
-
 import numpy as np
 import pandas as pd
+import re
+import os
+
 import wandb
+from wandb.keras import WandbCallback
+from wandb.keras import WandbMetricsLogger
 import wandb.apis.reports as wr
-from wandb.keras import WandbCallback, WandbMetricsLogger
 
 from ..data import RetentionTimeDataset
-
 
 class RetentionTimeReportWandb:
 
@@ -33,7 +33,7 @@ class RetentionTimeReportWandb:
     self.table_key_rt = ""
     self.model_info = []
 
-  def create_report(self, add_config_section = True, add_data_section = True, add_train_section = True, add_val_section = True, add_model_section = True):
+  def create_report(self, add_config_section = True, add_data_section = True, add_train_section = True, add_val_section = True, add_train_val_section = True, add_model_section = True):
     """Create a report in wandb.
 
     Args:
@@ -41,6 +41,7 @@ class RetentionTimeReportWandb:
         add_data_section (bool, optional): Add a section for input data to the report. Defaults to True.
         add_train_section (bool, optional): Add a section for training metrics to the report. Defaults to True.
         add_val_section (bool, optional): Add a section for validation metrics to the report. Defaults to True.
+        add_train_val_section (bool, optional): Add a section for train-val metrics to the report. Defaults to True.
         add_model_section (bool, optional): Add a section for model summary and number of parameters to the report. Defaults to True.
     """
     report = wr.Report(
@@ -63,7 +64,9 @@ class RetentionTimeReportWandb:
       report.blocks += self._build_train_section()
     if add_val_section:
       report.blocks += self._build_val_section()
-      
+    if add_train_val_section:
+      report.blocks += self._build_train_val_section()
+
     report.save()
 
   # get metrics of last run in project or from specified run_id
@@ -210,6 +213,25 @@ class RetentionTimeReportWandb:
         wr.HorizontalRule()
     ]
     return model_block
+
+    def _build_train_val_section(self):
+    train_val_metrics_names = self.get_train_val_metrics_names()
+    panel_list_epoch = []
+    for name in train_val_metrics_names:
+      panel_list_epoch.append(wr.LinePlot(x='Step', y=list(name)))
+    train_val_block = [
+        wr.H1(text = "Train - Validation metrics"),
+        wr.P("The following section shows the different metrics for both training and validation in comaprison. All used metrics are added by default. The metrics are shown per epoch."),
+        wr.H2(text = "per epoch"),
+        wr.PanelGrid(
+          runsets=[
+            wr.Runset(self.entity, self.project),
+          ],
+          panels = panel_list_epoch
+        ),
+        wr.HorizontalRule(),
+    ]
+    return train_val_block
   
   def log_sequence_length_table(self, data: pd.DataFrame, seq_col:str = "modified_sequence"):
     """Log sequence length table to wandb
@@ -288,7 +310,6 @@ class RetentionTimeReportWandb:
 
   def log_model_data(self, model):
     from contextlib import redirect_stdout
-
     # save modelsummary to txt
     with open('modelsummary.txt', 'w') as f:
         with redirect_stdout(f):
