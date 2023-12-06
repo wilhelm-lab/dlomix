@@ -16,10 +16,17 @@ A version that includes experiment tracking with [Weights and Biases](https://ww
 More learning resources can be found in the [dlomix-resources](https://github.com/wilhelm-lab/dlomix-resources) repository.
 
 ## Installation
+
 Run the following to install:
 ```bash
 $ pip install dlomix
-``` 
+```
+
+If you would like to use [Weights & Biases](wandb.ai) for experiment tracking and use the available reports for Retention Time under `/notebooks`, please install the optional `wandb` python dependency with `dlomix` by running:
+
+```bash
+$ pip install dlomix[wandb]
+```
 
 **General Overview**
 -  `data`: structures for modeling the input data, currently based on `tf.Dataset`
@@ -50,7 +57,7 @@ Functionality:
 - [X] add residual plots to reporting, possibly other regression analysis tools
 - [X] output reporting results as PDF
 - [ ] extend data representation to include modifications
-- [ ] refactor reporting module to use W&B Report API
+- [X] refactor reporting module to use W&B Report API (Retention Time)
 
 Package structure:
 
