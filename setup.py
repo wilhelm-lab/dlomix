@@ -37,6 +37,9 @@ setuptools.setup(
             "wheel",
             "pylint",
         ],
+        "wandb": [
+            "wandb >= 0.15",
+        ]
     },
     classifiers=[
         "Programming Language :: Python :: 3",
