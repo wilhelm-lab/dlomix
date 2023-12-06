@@ -11,7 +11,8 @@ from ..data.RetentionTimeDataset import RetentionTimeDataset
 
 class RetentionTimeReportModelComparisonWandb:
     
-    VEGA_LITE_PRESETS_ID = "master_praktikum"
+    # Wilhelmlab WandB account that has all VEGA presets required for the reports
+    VEGA_LITE_PRESETS_ID = "prosit-compms"
 
     def __init__(
         self,
@@ -67,6 +68,7 @@ class RetentionTimeReportModelComparisonWandb:
             report.blocks += self._build_r2_section()
         if add_density_section:
             report.blocks += self._build_density_section()
+        
         report.save()
 
     def calculate_r2(self, targets, predictions):
@@ -92,12 +94,12 @@ class RetentionTimeReportModelComparisonWandb:
                 panels=[
                     wr.CustomChart(
                         query={"summaryTable": {"tableKey": self.table_key_len}},
-                        chart_name=f"{RetentionTimeReportModelComparisonWandb.VEGA_LITE_PRESETS_ID}/hist_pep_len",
+                        chart_name=f"{RetentionTimeReportModelComparisonWandb.VEGA_LITE_PRESETS_ID}/histogram_peptide_length",
                         chart_fields={"value": self.test_dataset.sequence_col},
                     ),
                     wr.CustomChart(
                         query={"summaryTable": {"tableKey": self.table_key_rt}},
-                        chart_name=f"{RetentionTimeReportModelComparisonWandb.VEGA_LITE_PRESETS_ID}/hist_ret_time",
+                        chart_name=f"{RetentionTimeReportModelComparisonWandb.VEGA_LITE_PRESETS_ID}/histogram_irt",
                         chart_fields={"value": self.test_dataset.target_col},
                     ),
                 ],
@@ -112,7 +114,7 @@ class RetentionTimeReportModelComparisonWandb:
             panel_list_models.append(
                 wr.CustomChart(
                     query={"summaryTable": {"tableKey": f"results_table_{model}"}},
-                    chart_name=f"{RetentionTimeReportModelComparisonWandb.VEGA_LITE_PRESETS_ID}/hist_residuals",
+                    chart_name=f"{RetentionTimeReportModelComparisonWandb.VEGA_LITE_PRESETS_ID}/histogram_residuals_irt",
                     chart_fields={"value": "residuals", "name": model},
                 )
             )
@@ -166,7 +168,7 @@ class RetentionTimeReportModelComparisonWandb:
             panel_list_models.append(
                 wr.CustomChart(
                     query={"summaryTable": {"tableKey": f"results_table_{model}"}},
-                    chart_name=f"{RetentionTimeReportModelComparisonWandb.VEGA_LITE_PRESETS_ID}/density_plot",
+                    chart_name=f"{RetentionTimeReportModelComparisonWandb.VEGA_LITE_PRESETS_ID}/density_plot_irt",
                     chart_fields={
                         "measured": "irt",
                         "predicted": "predicted_irt",
@@ -235,7 +237,7 @@ class RetentionTimeReportModelComparisonWandb:
         table = wandb.Table(dataframe=counts_df)
         # log to wandb
         hist = wandb.plot_table(
-            vega_spec_name=f"{RetentionTimeReportModelComparisonWandb.VEGA_LITE_PRESETS_ID}/hist_pep_len",
+            vega_spec_name=f"{RetentionTimeReportModelComparisonWandb.VEGA_LITE_PRESETS_ID}/histogram_peptide_length",
             data_table=table,
             fields={"value": seq_col},
         )
@@ -258,7 +260,7 @@ class RetentionTimeReportModelComparisonWandb:
         table = wandb.Table(dataframe=rt_df)
         # log to wandb
         hist = wandb.plot_table(
-            vega_spec_name=f"{RetentionTimeReportModelComparisonWandb.VEGA_LITE_PRESETS_ID}/hist_ret_time",
+            vega_spec_name=f"{RetentionTimeReportModelComparisonWandb.VEGA_LITE_PRESETS_ID}/histogram_irt",
             data_table=table,
             fields={"value": rt_col},
         )

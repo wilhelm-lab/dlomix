@@ -21,7 +21,8 @@ class RetentionTimeReportRunComparisonWandb:
         "batch/batch_step",
     ]
 
-    VEGA_LITE_PRESETS_ID = "master_praktikum"
+    # Wilhelmlab WandB account that has all VEGA presets required for the reports
+    VEGA_LITE_PRESETS_ID = "prosit-compms"
 
     def __init__(
         self,
@@ -180,12 +181,12 @@ class RetentionTimeReportRunComparisonWandb:
                 panels=[
                     wr.CustomChart(
                         query={"summaryTable": {"tableKey": self.table_key_len}},
-                        chart_name=f"{RetentionTimeReportRunComparisonWandb.VEGA_LITE_PRESETS_ID}/hist_pep_len",
+                        chart_name=f"{RetentionTimeReportRunComparisonWandb.VEGA_LITE_PRESETS_ID}/histogram_peptide_length",
                         chart_fields={"value": self.dataset.sequence_col},
                     ),
                     wr.CustomChart(
                         query={"summaryTable": {"tableKey": self.table_key_rt}},
-                        chart_name=f"{RetentionTimeReportRunComparisonWandb.VEGA_LITE_PRESETS_ID}/hist_ret_time",
+                        chart_name=f"{RetentionTimeReportRunComparisonWandb.VEGA_LITE_PRESETS_ID}/histogram_irt",
                         chart_fields={"value": self.dataset.target_col},
                     ),
                 ],
@@ -267,26 +268,26 @@ class RetentionTimeReportRunComparisonWandb:
         ]
         return model_block
 
-        def _build_train_val_section(self):
-            train_val_metrics_names = self.get_train_val_metrics_names()
-            panel_list_epoch = []
-            for name in train_val_metrics_names:
-                panel_list_epoch.append(wr.LinePlot(x="Step", y=list(name)))
-            train_val_block = [
-                wr.H1(text="Train - Validation metrics"),
-                wr.P(
-                    "The following section shows the different metrics for both training and validation in comaprison. All used metrics are added by default. The metrics are shown per epoch."
-                ),
-                wr.H2(text="per epoch"),
-                wr.PanelGrid(
-                    runsets=[
-                        wr.Runset(self.entity, self.project),
-                    ],
-                    panels=panel_list_epoch,
-                ),
-                wr.HorizontalRule(),
-            ]
-            return train_val_block
+    def _build_train_val_section(self):
+        train_val_metrics_names = self.get_train_val_metrics_names()
+        panel_list_epoch = []
+        for name in train_val_metrics_names:
+            panel_list_epoch.append(wr.LinePlot(x="Step", y=list(name)))
+        train_val_block = [
+            wr.H1(text="Train - Validation metrics"),
+            wr.P(
+                "The following section shows the different metrics for both training and validation in comaprison. All used metrics are added by default. The metrics are shown per epoch."
+            ),
+            wr.H2(text="per epoch"),
+            wr.PanelGrid(
+                runsets=[
+                    wr.Runset(self.entity, self.project),
+                ],
+                panels=panel_list_epoch,
+            ),
+            wr.HorizontalRule(),
+        ]
+        return train_val_block
 
     def log_sequence_length_table(
         self, data: pd.DataFrame, seq_col: str = "modified_sequence"
@@ -307,7 +308,7 @@ class RetentionTimeReportRunComparisonWandb:
         table = wandb.Table(dataframe=counts_df)
         # log to wandb
         hist = wandb.plot_table(
-            vega_spec_name=f"{RetentionTimeReportRunComparisonWandb.VEGA_LITE_PRESETS_ID}/hist_pep_len",
+            vega_spec_name=f"{RetentionTimeReportRunComparisonWandb.VEGA_LITE_PRESETS_ID}/histogram_peptide_length",
             data_table=table,
             fields={"value": seq_col},
         )
@@ -330,7 +331,7 @@ class RetentionTimeReportRunComparisonWandb:
         table = wandb.Table(dataframe=rt_df)
         # log to wandb
         hist = wandb.plot_table(
-            vega_spec_name=f"{RetentionTimeReportRunComparisonWandb.VEGA_LITE_PRESETS_ID}/hist_ret_time",
+            vega_spec_name=f"{RetentionTimeReportRunComparisonWandb.VEGA_LITE_PRESETS_ID}/histogram_irt",
             data_table=table,
             fields={"value": rt_col},
         )
