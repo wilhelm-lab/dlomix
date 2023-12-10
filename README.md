@@ -1,10 +1,10 @@
 # DLOmix
 
-[![Documentation Status](https://readthedocs.org/projects/dlomix/badge/?version=stable)](https://dlomix.readthedocs.io/en/stable/?badge=stable)
+[![Docs](https://readthedocs.org/projects/dlomix/badge/?version=stable)](https://dlomix.readthedocs.io/en/stable/?badge=stable)
 [![Build](https://github.com/wilhelm-lab/dlomix/actions/workflows/build.yaml/badge.svg)](https://github.com/wilhelm-lab/dlomix/actions/workflows/build.yaml)
 [![PyPI](https://github.com/wilhelm-lab/dlomix/actions/workflows/pypi.yaml/badge.svg)](https://github.com/wilhelm-lab/dlomix/actions/workflows/pypi.yaml)
 
-**DLOmix** is a python framework for Deep Learning in Proteomics. Initially built ontop of TensorFlow/Keras, support for PyTorch can however be integrated once the main API is established.
+**DLOmix** is a Python framework for Deep Learning in Proteomics. Initially built on top of TensorFlow/Keras, support for PyTorch can however be integrated once the main API is established.
 
 ## Usage
 Experiment a simple retention time prediction use-case using Google Colab &nbsp;&nbsp; [![Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/wilhelm-lab/dlomix/blob/develop/notebooks/Example_RTModel_Walkthrough_colab.ipynb)
@@ -16,16 +16,23 @@ A version that includes experiment tracking with [Weights and Biases](https://ww
 More learning resources can be found in the [dlomix-resources](https://github.com/wilhelm-lab/dlomix-resources) repository.
 
 ## Installation
+
 Run the following to install:
 ```bash
 $ pip install dlomix
-``` 
+```
+
+If you would like to use [Weights & Biases](wandb.ai) for experiment tracking and use the available reports for Retention Time under `/notebooks`, please install the optional `wandb` python dependency with `dlomix` by running:
+
+```bash
+$ pip install dlomix[wandb]
+```
 
 **General Overview**
--  `data`: structures for modelling the input data, currently based on `tf.Dataset`
+-  `data`: structures for modeling the input data, currently based on `tf.Dataset`
 -  `eval`: classes for evaluating models and reporting results
 -  `layers`: custom layers used for building models, based on `tf.keras.layers.Layer`
--  `losses`: custom losses to be use for training with `model.fit()`
+-  `losses`: custom losses to be used for training with `model.fit()`
 - `models`: common model architectures for the relevant use-cases based on `tf.keras.Model` to allow for using the Keras training API
 -  `pipelines`: an exemplary high-level pipeline implementation
 -  `reports`: classes for generating reports related to the different tasks
@@ -37,7 +44,7 @@ $ pip install dlomix
 **Use-cases**
 
 - Retention Time Prediction: 
-    - a regression problem where the the retention time of a peptide sequence is to be predicted. 
+    - a regression problem where the retention time of a peptide sequence is to be predicted. 
 
 
 
@@ -50,6 +57,7 @@ Functionality:
 - [X] add residual plots to reporting, possibly other regression analysis tools
 - [X] output reporting results as PDF
 - [ ] extend data representation to include modifications
+- [X] refactor reporting module to use W&B Report API (Retention Time)
 
 Package structure:
 
@@ -60,7 +68,7 @@ Package structure:
 
 
 ## Developing DLOmix
-To install dlomix, along with the the tools needed to develop and run tests, run the following command in your virtualenv:
+To install dlomix, along with the tools needed to develop and run tests, run the following command in your virtualenv:
 ```bash
 $ pip install -e .[dev]
 ```

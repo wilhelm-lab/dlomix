@@ -59,6 +59,9 @@ setuptools.setup(
     install_requires=requirements,
     extras_require={
         "dev": dev_requirements,
+        "wandb": [
+            "wandb >= 0.15",
+        ]
     },
     classifiers=[
         "Programming Language :: Python :: 3",
