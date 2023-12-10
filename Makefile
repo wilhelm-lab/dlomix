@@ -3,6 +3,9 @@ uninstall:
 install:
 	pip install --upgrade pip && pip install -e .
 
+install-nodeps:
+	pip install --upgrade pip && pip install -e . --no-deps
+
 install-dev:
 	pip install --upgrade pip && pip install -e .[dev]
 
@@ -13,6 +16,14 @@ test:
 	mkdir -p cov/
 
 	python -m pytest tests/ --junitxml=junit/test-results.xml --cov=dlomix --cov-report html:cov/cov_html --cov-report xml:cov/cov.xml --cov-report lcov:cov/cov.info --cov-report annotate:cov/cov_annotate
+
+test-local:
+	make uninstall
+	make install-nodeps
+	mkdir -p cov/
+
+	python -m pytest tests/ --junitxml=junit/test-results.xml --cov=dlomix --cov-report html:cov/cov_html --cov-report xml:cov/cov.xml --cov-report lcov:cov/cov.info --cov-report annotate:cov/cov_annotate
+
 
 format:
 	isort --profile black .
