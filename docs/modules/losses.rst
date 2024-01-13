@@ -1,13 +1,11 @@
-dlomix.layers package
+dlomix.losses
 =====================
 
-Submodules
-----------
 
-dlomix.layers.attention module
+dlomix.losses.intensity
 ------------------------------
 
-.. automodule:: dlomix.layers.attention
+.. automodule:: dlomix.losses.intensity
    :members:
    :undoc-members:
    :show-inheritance:
@@ -15,7 +13,7 @@ dlomix.layers.attention module
 Module contents
 ---------------
 
-.. automodule:: dlomix.layers
+.. automodule:: dlomix.losses
    :members:
    :undoc-members:
    :show-inheritance:

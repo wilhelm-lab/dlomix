@@ -3,16 +3,38 @@
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
-Welcome to DLOmix's documentation!
-==================================
-.. automodule:: dlomix
+Deep Learning for Proteomics
+============================
+.. image:: https://img.shields.io/badge/docs-latest-brightgreen.svg?style=flat
+    :target: https://dlomix.readthedocs.io/en/latest/?badge=latest
+    :alt: Documentation Status
+..
+   .. automodule:: dlomix
     :members:
 
 .. toctree::
-   :maxdepth: 2
-   :caption: Contents:
+   :glob:
+   :maxdepth: 1
+   :caption: Notes
 
-   modules
+   notes/installation
+   notes/quickstart
+..   notes/citation
+
+
+.. toctree::
+   :glob:
+   :maxdepth: 1
+   :caption: Package Reference
+
+   modules/data
+   modules/models
+   modules/losses
+   modules/eval
+   modules/reports
+   modules/layers
+   modules/pipelines
+
 
 Indices and tables
 ==================

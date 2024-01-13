@@ -10,6 +10,16 @@ from ..data.RetentionTimeDataset import RetentionTimeDataset
 
 
 class RetentionTimeReportModelComparisonWandb:
+    """Creates WandB report for comparing models.
+
+    Parameters
+    ----------
+        models (dict): keys are model names, values are model objects
+        project (str): Name of the project.
+        title (str): Title of the report.
+        description (str): Description of the report.
+        test_dataset (RetentionTimeDataset): Test dataset object to compare predictions of models on.
+    """
     
     # Wilhelmlab WandB account that has all VEGA presets required for the reports
     VEGA_LITE_PRESETS_ID = "prosit-compms"
@@ -22,15 +32,7 @@ class RetentionTimeReportModelComparisonWandb:
         description: str,
         test_dataset: RetentionTimeDataset,
     ):
-        """Creates WandB report for comparing models.
-
-        Args:
-            models (dict): keys are model names, values are model objects
-            project (str): Name of the project.
-            title (str): Title of the report.
-            description (str): Description of the report.
-            test_dataset (RetentionTimeDataset): Test dataset object to compare predictions of models on.
-        """
+    
         self.project = project
         self.title = title
         self.description = description

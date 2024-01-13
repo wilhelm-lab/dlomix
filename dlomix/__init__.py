@@ -5,6 +5,6 @@ META_DATA = {
     "author_email": "o.shouman@tum.de",
     "description": "Deep Learning for Proteomics",
     "package_name": "DLOmix",
-    "copyright_text": "2023, Wilhelm Lab, TU Munich.",
+    "copyright_text": "2024, Wilhelm Lab, TU Munich.",
     "github_url": "https://github.com/wilhelm-lab/dlomix",
 }

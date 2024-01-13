@@ -1,10 +1,8 @@
-dlomix.pipelines package
+dlomix.pipelines
 ========================
 
-Submodules
-----------
 
-dlomix.pipelines.pipeline module
+dlomix.pipelines.pipeline
 --------------------------------
 
 .. automodule:: dlomix.pipelines.pipeline

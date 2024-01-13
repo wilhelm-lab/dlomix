@@ -1,10 +1,8 @@
-dlomix.eval package
+dlomix.eval
 ===================
 
-Submodules
-----------
 
-dlomix.eval.rt\_eval module
+dlomix.eval.rt\_eval
 ---------------------------
 
 .. automodule:: dlomix.eval.rt_eval

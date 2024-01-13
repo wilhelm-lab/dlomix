@@ -12,12 +12,13 @@
 
 import os
 import sys
+
 sys.path.insert(0, os.path.abspath('..'))
 
 
 # -- Project information -----------------------------------------------------
 
-from dlomix import __version__, META_DATA
+from dlomix import META_DATA, __version__
 
 project = META_DATA['package_name']
 copyright = META_DATA['copyright_text']
@@ -40,6 +41,8 @@ extensions = [
     'sphinx.ext.viewcode'
 ]
 
+extensions += ["sphinxawesome_theme.highlighting"]
+
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
 
@@ -54,12 +57,16 @@ exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
 # The theme to use for HTML and HTML Help pages.  See the documentation for
 # a list of builtin themes.
 #
-html_theme = 'nature'
+#html_theme = 'nature'
+#html_theme = 'bizstyle'
+html_theme = "sphinxawesome_theme"
 
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,
 # so a file named "default.css" will overwrite the builtin "default.css".
 html_static_path = ['_static']
 
+html_permalinks = False
+add_module_names = False
 
 # -- Extension configuration -------------------------------------------------

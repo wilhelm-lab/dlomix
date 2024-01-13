@@ -1,10 +1,15 @@
-dlomix.data package
+dlomix.data
 ===================
 
-Submodules
-----------
+dlomix.data.IntensityDataset 
+-----------------------------------
 
-dlomix.data.RetentionTimeDataset module
+.. automodule:: dlomix.data.IntensityDataset
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+dlomix.data.RetentionTimeDataset
 ---------------------------------------
 
 .. automodule:: dlomix.data.RetentionTimeDataset
