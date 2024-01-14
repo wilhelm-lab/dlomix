@@ -1,6 +1,6 @@
 
 Quickstart
-==========
+**********
 
 Experiment a simple retention time prediction use-case using Google Colab |Colab RT|
 

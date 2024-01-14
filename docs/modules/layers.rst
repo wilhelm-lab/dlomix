@@ -1,5 +1,5 @@
-dlomix.layers
-=====================
+:code:`dlomix.layers`
+**********************
 
 
 dlomix.layers.attention

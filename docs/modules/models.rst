@@ -1,5 +1,5 @@
-dlomix.models
-=====================
+:code:`dlomix.models`
+*********************
 
 
 dlomix.models.base

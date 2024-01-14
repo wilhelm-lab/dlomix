@@ -1,5 +1,5 @@
-dlomix.reports
-======================
+:code:`dlomix.reports`
+**********************
 
 dlomix.reports.IntensityReport
 -------------------------------------

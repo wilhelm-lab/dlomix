@@ -1,5 +1,5 @@
-dlomix.eval
-===================
+:code:`dlomix.eval`
+*******************
 
 
 dlomix.eval.rt\_eval

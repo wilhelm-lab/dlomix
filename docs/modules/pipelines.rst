@@ -1,5 +1,5 @@
-dlomix.pipelines
-========================
+:code:`dlomix.pipelines`
+************************
 
 
 dlomix.pipelines.pipeline

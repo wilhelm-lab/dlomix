@@ -1,5 +1,6 @@
-dlomix.data
-===================
+:code:`dlomix.data`
+*******************
+
 
 dlomix.data.IntensityDataset 
 -----------------------------------

@@ -14,4 +14,8 @@ format:
 lint:
 	pylint --disable=R,C ./dlomix/*
 
+build-docs:
+	cd docs && make clean html
+	cd docs/_build/html/ && open index.html
+
 all: install format test

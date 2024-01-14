@@ -1,5 +1,5 @@
-dlomix.losses
-=====================
+:code:`dlomix.losses`
+*********************
 
 
 dlomix.losses.intensity

@@ -6,7 +6,7 @@
 DLOmix - Deep Learning for Proteomics
 =====================================
 
-|docs-badge| |build-badge| |pypi-badge|
+|docs-badge| - |build-badge| - |pypi-badge|
 
 .. |docs-badge| image:: https://img.shields.io/badge/docs-latest-brightgreen.svg?style=flat
     :target: https://dlomix.readthedocs.io/en/latest/?badge=latest
@@ -27,10 +27,15 @@ The goal of DLOmix is to be easy to use and flexible, while still providing the 
 .. automodule:: dlomix
     :members:
 
+.. include:: notes/installation.rst
+.. include:: notes/quickstart.rst
+
+
 .. toctree::
    :glob:
    :maxdepth: 1
-   :caption: Notes
+   :caption: How To
+
 
    notes/installation
    notes/quickstart
@@ -41,6 +46,7 @@ The goal of DLOmix is to be easy to use and flexible, while still providing the 
    :glob:
    :maxdepth: 1
    :caption: Package Reference
+
 
    modules/data
    modules/models
