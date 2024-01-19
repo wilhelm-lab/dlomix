@@ -103,7 +103,7 @@ class PrositIntensityPredictor(tf.keras.Model):
 
     def __init__(
         self,
-        embedding_output_dim=16,
+        embedding_output_dim=32,
         seq_length=30,
         len_fion=6,
         vocab_dict=ALPHABET_UNMOD,
@@ -131,13 +131,9 @@ class PrositIntensityPredictor(tf.keras.Model):
             vocabulary=list(vocab_dict.keys())
         )
 
-        rand_uni_weights = np.random.uniform(-1, 1, size=(24, 16))
-        rand_uni_weights.shape
-
         self.embedding = tf.keras.layers.Embedding(
             input_dim=self.embeddings_count,
             output_dim=embedding_output_dim,
-            #weights=[rand_uni_weights],
             input_length=seq_length,
         )
 

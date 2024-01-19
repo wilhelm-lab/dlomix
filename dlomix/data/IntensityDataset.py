@@ -211,6 +211,7 @@ class IntensityDataset:
             self.precursor_charge = df[self.precursor_charge_col]
             self.intensities = df[self.intensities_col]
 
+
             # parse strings into lists, for precursor charge and intensities
             if isinstance(self.precursor_charge.iloc[0], str):
                 self.precursor_charge = self.precursor_charge.apply(eval)
