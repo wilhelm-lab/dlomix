@@ -2,7 +2,8 @@ import tensorflow as tf
 from tensorflow.keras.layers.experimental import preprocessing
 from dlomix.constants import ALPHABET_UNMOD
 from dlomix.layers.attention import AttentionLayer, DecoderAttentionLayer
-
+from keras import initializers
+import numpy as np
 
 class PrositRetentionTimePredictor(tf.keras.Model):
     """Implementation of the Prosit model for retention time prediction.
@@ -130,9 +131,13 @@ class PrositIntensityPredictor(tf.keras.Model):
             vocabulary=list(vocab_dict.keys())
         )
 
+        rand_uni_weights = np.random.uniform(-1, 1, size=(24, 16))
+        rand_uni_weights.shape
+
         self.embedding = tf.keras.layers.Embedding(
             input_dim=self.embeddings_count,
             output_dim=embedding_output_dim,
+            #weights=[rand_uni_weights],
             input_length=seq_length,
         )
 

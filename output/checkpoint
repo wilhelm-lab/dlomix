@@ -1,0 +1,2 @@
+model_checkpoint_path: "rtmodel"
+all_model_checkpoint_paths: "rtmodel"
