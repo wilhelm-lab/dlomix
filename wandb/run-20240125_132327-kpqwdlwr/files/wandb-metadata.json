@@ -1,0 +1,52 @@
+{
+    "os": "Windows-10-10.0.22621-SP0",
+    "python": "3.10.11",
+    "heartbeatAt": "2024-01-25T12:23:29.477279",
+    "startedAt": "2024-01-25T12:23:27.869364",
+    "docker": null,
+    "cuda": null,
+    "args": [],
+    "state": "running",
+    "program": "ptm.ipynb",
+    "codePathLocal": "ptm.ipynb",
+    "root": "D:/Uni/Masterarbeit/dlomix",
+    "git": {
+        "remote": "https://github.com/wilhelm-lab/dlomix.git",
+        "commit": "ecaa87fb2b2b7ef655a035ea331c49bb760a8b8a"
+    },
+    "email": "c.kloppert@campus.lmu.de",
+    "host": "Chris_laptop",
+    "username": "cklop",
+    "executable": "C:\\Users\\cklop\\AppData\\Local\\Programs\\Python\\Python310\\python.exe",
+    "cpu_count": 6,
+    "cpu_count_logical": 12,
+    "cpu_freq": {
+        "current": 4001.0,
+        "min": 0.0,
+        "max": 4001.0
+    },
+    "cpu_freq_per_core": [
+        {
+            "current": 4001.0,
+            "min": 0.0,
+            "max": 4001.0
+        }
+    ],
+    "disk": {
+        "/": {
+            "total": 931.4960899353027,
+            "used": 46.931419372558594
+        }
+    },
+    "gpu": "NVIDIA GeForce RTX 4050 Laptop GPU",
+    "gpu_count": 1,
+    "gpu_devices": [
+        {
+            "name": "NVIDIA GeForce RTX 4050 Laptop GPU",
+            "memory_total": 6439305216
+        }
+    ],
+    "memory": {
+        "total": 31.18850326538086
+    }
+}
