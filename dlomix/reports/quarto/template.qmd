@@ -1,0 +1,135 @@
+---
+title: "TITLE_HERE"
+format:
+  html:
+    code-fold: FOLD_CODE_FLAG
+    page-layout: full
+  pdf:
+    echo: false
+format-links: false
+jupyter: python3
+---
+
+# Data
+The following section is showing a simple explorative data analysis of the used dataset. The first histogram shows the distribution of peptide lengths in the data set, while the second histogram shows the distribution of indexed retention times.
+
+``` {python}
+import matplotlib.pyplot as plt
+import matplotlib.image as mpimg
+import os
+
+image_dir = "DATA_PLOTS_PATH"
+images = [f for f in os.listdir(image_dir) if os.path.isfile(os.path.join(image_dir, f))]
+
+# Set the number of rows and columns for the subplot grid
+rows = len(images) // 3 + (len(images) % 3 > 0)
+cols = min(len(images), 3)
+
+# Create subplots
+fig, axes = plt.subplots(rows, cols, figsize=(15, 5 * rows))  # Adjust the figsize as needed
+
+# Iterate through the subplots and display each image
+for i, ax in enumerate(axes.flat):
+    if i < len(images):
+        img = mpimg.imread(os.path.join(image_dir, images[i]))
+        ax.imshow(img)
+        ax.axis('off')  # Optional: Turn off axis labels
+
+# Adjust layout for better spacing
+plt.tight_layout()
+plt.subplots_adjust(right = 0.7)
+plt.show()
+```
+
+# Train metrics per epoch
+The following section shows the different metrics that were used to track the training. All used metrics are added by default. The resolution of this section is per epoch.
+
+``` {python}
+image_dir = "TRAIN_PLOTS_PATH"
+images = [f for f in os.listdir(image_dir) if os.path.isfile(os.path.join(image_dir, f))]
+
+# Set the number of rows and columns for the subplot grid
+rows = len(images) // 2 + (len(images) % 2 > 0)
+cols = min(len(images), 2)
+
+# Create subplots
+fig, axes = plt.subplots(rows, cols, figsize=(15, 5 * rows))  # Adjust the figsize as needed
+
+# Iterate through the subplots and display each image
+for i, ax in enumerate(axes.flat):
+    if i < len(images):
+        img = mpimg.imread(os.path.join(image_dir, images[i]))
+        ax.imshow(img)
+        ax.axis('off')  # Optional: Turn off axis labels
+
+# Hide the empty subplot if uneven number of plots
+if len(images) % 2 != 0:
+    axes[rows - 1][1].axis('off')
+
+# Adjust layout for better spacing
+plt.tight_layout()
+plt.subplots_adjust(right = 0.7)
+plt.show()
+```
+
+# Validation metrics per epoch
+The following section shows the different metrics that were used to track the validation. All used metrics are added by default. The resolution of this section is per epoch.
+
+``` {python}
+image_dir = "VAL_PLOTS_PATH"
+images = [f for f in os.listdir(image_dir) if os.path.isfile(os.path.join(image_dir, f))]
+
+# Set the number of rows and columns for the subplot grid
+rows = len(images) // 2 + (len(images) % 2 > 0)
+cols = min(len(images), 2)
+
+# Create subplots
+fig, axes = plt.subplots(rows, cols, figsize=(15, 5 * rows))  # Adjust the figsize as needed
+
+# Iterate through the subplots and display each image
+for i, ax in enumerate(axes.flat):
+    if i < len(images):
+        img = mpimg.imread(os.path.join(image_dir, images[i]))
+        ax.imshow(img)
+        ax.axis('off')  # Optional: Turn off axis labels
+
+# Hide the empty subplot if uneven number of plots
+if len(images) % 2 != 0:
+    axes[rows - 1][1].axis('off')
+
+# Adjust layout for better spacing
+plt.tight_layout()
+plt.subplots_adjust(right = 0.7)
+plt.show()
+```
+
+# Train-Validation metrics per epoch
+The following section shows the training metrics in comparision with the validation metrics.. All used metrics are added by default. The resolution of this section is per epoch.
+
+``` {python}
+image_dir = "TRAIN_VAL_PLOTS_PATH"
+images = [f for f in os.listdir(image_dir) if os.path.isfile(os.path.join(image_dir, f))]
+
+# Set the number of rows and columns for the subplot grid
+rows = len(images) // 2 + (len(images) % 2 > 0)
+cols = min(len(images), 2)
+
+# Create subplots
+fig, axes = plt.subplots(rows, cols, figsize=(15, 5 * rows))  # Adjust the figsize as needed
+
+# Iterate through the subplots and display each image
+for i, ax in enumerate(axes.flat):
+    if i < len(images):
+        img = mpimg.imread(os.path.join(image_dir, images[i]))
+        ax.imshow(img)
+        ax.axis('off')  # Optional: Turn off axis labels
+
+# Hide the empty subplot if uneven number of plots
+if len(images) % 2 != 0:
+    axes[rows - 1][1].axis('off')
+
+# Adjust layout for better spacing
+plt.tight_layout()
+plt.subplots_adjust(right = 0.7)
+plt.show()
+```
