@@ -160,3 +160,6 @@ run_scripts/*.data-*
 
 # testing metadata
 metadata.parquet
+
+# pycharm
+.idea
