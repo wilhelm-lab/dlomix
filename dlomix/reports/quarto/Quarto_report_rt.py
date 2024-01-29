@@ -14,17 +14,45 @@ class QuartoReport:
     REPLACEMENT_KEYS = {
         "title": "TITLE_HERE", "fold-code": "FOLD_CODE_FLAG", "train_plots": "TRAIN_PLOTS_PATH",
         "val_plots": "VAL_PLOTS_PATH", "data_plots": "DATA_PLOTS_PATH",
-        "train_val_plots": "TRAIN_VAL_PLOTS_PATH"
+        "train_val_plots": "TV_PLOTS_PATH"
     }
 
-    def __init__(self, history, data=None, title="Retention time report", fold_code=True, output_path="./output.qmd"):
-        self.history = history
+    def __init__(self, history, data=None, title="Retention time report", fold_code=True, output_path="/Users/andi/PycharmProjects/dlomix_repo/dlomix/reports/quarto"):
         self.title = title
         self.fold_code = fold_code
         self.qmd_template_location = "./template.qmd"
         self.output_path = output_path
         self.data = data
         self.qmd_content = None
+
+        if history is None:
+            warnings.warn(
+                "The passed History object is None, no training/validation data can be reported."
+            )
+            self._history_dict = {}
+        else:
+            self._set_history_dict(history)
+
+    def _set_history_dict(self, history):
+        if isinstance(history, dict):
+            self._history_dict = history
+        elif not isinstance(history, tf.keras.callbacks.History):
+            raise ValueError(
+                "Reporting requires a History object (tf.keras.callbacks.History) or its history dict attribute (History.history), which is returned from a call to "
+                "model.fit(). Passed history argument is of type {} ",
+                type(history),
+            )
+        elif not hasattr(history, "history"):
+            raise ValueError(
+                "The passed History object does not have a history attribute, which is a dict with results."
+            )
+        else:
+            self._history_dict = history.history
+
+        if len(self._history_dict.keys()) == 0:
+            warnings.warn(
+                "The passed History object contains an empty history dict, no training was done."
+            )
 
     def generate_report(self, **kwargs):  # other arguments from the task workflow
 
@@ -61,30 +89,52 @@ class QuartoReport:
                                                     train_val_plots_path)
 
     def save_qmd_file(self):
-        open(self.output_path, "w").write(self.qmd_content)
+        path = join(self.output_path, "output.qmd")
+        open(selfpath, "w").write(self.qmd_content)
         print(
-            f"File Saved to disk under: {self.output_path}.\nUse Quarto to render the report by running:\n\nquarto render {self.output_path} --to pdf")
+            f"File Saved to disk under: {path}.\nUse Quarto to render the report by running:\n\nquarto render {path} --to pdf")
 
-    def save_summary(self):
-        with open('modelsummary.txt', 'w') as f:
-            with redirect_stdout(f):
-                model.summary()
+    def plot_keras_metric(self, metric_name, save_plot=True):
+        """Plot a keras metric given its name and the history object returned by model.fit()
 
-    def plot_save_image(self):
-        import matplotlib.pyplot as plt
-        import numpy as np
+        Arguments
+        ---------
+            metric_name: String with the name of the metric.
+            save_plot (bool, optional): whether to save plot to disk or not. Defaults to True.
+        """
 
-        r = np.arange(0, 2, 0.01)
-        theta = 2 * np.pi * r
-        fig, ax = plt.subplots(
-            subplot_kw={'projection': 'polar'}
-        )
-        ax.plot(theta, r)
-        ax.set_rticks([0.5, 1, 1.5, 2])
-        ax.grid(True)
-        plt.savefig("test.png")
+        if metric_name.lower() not in self._history_dict.keys():
+            raise ValueError(
+                "Metric name to plot is not available in the history dict. Available metrics to plot are {}",
+                self._history_dict.keys(),
+            )
+
+        if "val_" + metric_name.lower() not in self._history_dict.keys():
+            raise ValueError(
+                "No validation epochs were run during training, the metric name to plot is not available in the history dict. Available metrics to plot are {}",
+                self._history_dict.keys(),
+            )
+
+        y = self._history_dict.get(metric_name)
+        x = range(1, len(y) + 1)
+
+        # Create a basic line plot
+        plt.plot(x, y)
+
+        # Add labels and title
+        plt.xlabel('Epoch')
+        plt.ylabel(metric_name)
+        plt.title(f"{metric_name}/epoch")
+
+        # Save the plot
+        plt.savefig(f"{self.output_path}/train_{metric_name}.png")
         plt.clf()
-        return "test.png"
+    
+    def plot_all_train_metrics(self):
+        """ Plot all training metrics available in self._history_dict."""
+        train_dict = {key: value for key, value in self._history_dict.items() if "val" not in key}
+        for key in train_dict:
+            self.plot_keras_metric(key)
 
     def plot_save_data(self):
         path = f"data_plots/"
