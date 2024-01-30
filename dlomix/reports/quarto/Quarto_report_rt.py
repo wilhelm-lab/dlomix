@@ -1,6 +1,9 @@
 import os
+from os.path import join
 from contextlib import redirect_stdout
 import matplotlib.pyplot as plt
+import matplotlib.image as mpimg
+
 
 # todo:
 # class will be specific for rt reporting
@@ -17,10 +20,11 @@ class QuartoReport:
         "train_val_plots": "TV_PLOTS_PATH"
     }
 
-    def __init__(self, history, data=None, title="Retention time report", fold_code=True, output_path="/Users/andi/PycharmProjects/dlomix_repo/dlomix/reports/quarto"):
+    def __init__(self, history, data=None, title="Retention time report", fold_code=True,
+                 output_path="/Users/andi/PycharmProjects/dlomix_repo/dlomix/reports/quarto/"):
         self.title = title
         self.fold_code = fold_code
-        self.qmd_template_location = "./template.qmd"
+        self.qmd_template_location = "/Users/andi/PycharmProjects/dlomix_repo/dlomix/reports/quarto/template.qmd"
         self.output_path = output_path
         self.data = data
         self.qmd_content = None
@@ -54,10 +58,23 @@ class QuartoReport:
                 "The passed History object contains an empty history dict, no training was done."
             )
 
+    def create_plot_folder_structure(self):
+        root = join(self.output_path, "plots")
+        if not os.path.exists(root):
+            os.makedirs(root)
+        subfolders = ['train', 'val', 'train_val']
+        for subfolder in subfolders:
+            path = os.path.join(root, subfolder)
+            if not os.path.exists(path):
+                os.makedirs(path)
+
     def generate_report(self, **kwargs):  # other arguments from the task workflow
 
         # load the skeleton qmd file
         self.load_qmd_template()
+
+        # create folder structure for plots
+        self.create_plot_folder_structure()
 
         # replace values and add stuff in the report
         self.update_qmd()
@@ -75,26 +92,29 @@ class QuartoReport:
         self.qmd_content = self.qmd_content.replace(QuartoReport.REPLACEMENT_KEYS["title"], self.title)
         self.qmd_content = self.qmd_content.replace(QuartoReport.REPLACEMENT_KEYS["fold-code"], str(self.fold_code))
 
-        data_plots_path = self.plot_save_data()
-        self.qmd_content = self.qmd_content.replace(QuartoReport.REPLACEMENT_KEYS["data_plots"], data_plots_path)
+        # data_plots_path = self.plot_save_data()
+        # self.qmd_content = self.qmd_content.replace(QuartoReport.REPLACEMENT_KEYS["data_plots"], data_plots_path)
 
-        train_plots_path = self.plot_save_train_metrics()
-        self.qmd_content = self.qmd_content.replace(QuartoReport.REPLACEMENT_KEYS["train_plots"], train_plots_path)
+        train_plots_path = self.plot_all_train_metrics()
+        train_image_path = self.create_plot_image(train_plots_path)
+        self.qmd_content = self.qmd_content.replace(QuartoReport.REPLACEMENT_KEYS["train_plots"], train_image_path)
 
-        val_plots_path = self.plot_save_val_metrics()
-        self.qmd_content = self.qmd_content.replace(QuartoReport.REPLACEMENT_KEYS["val_plots"], val_plots_path)
+        val_plots_path = self.plot_all_val_metrics()
+        val_image_path = self.create_plot_image(val_plots_path)
+        self.qmd_content = self.qmd_content.replace(QuartoReport.REPLACEMENT_KEYS["val_plots"], val_image_path)
 
-        train_val_plots_path = self.plot_save_train_val_metrics()
+        train_val_plots_path = self.plot_all_train_val_metrics()
+        train_val_image_path = self.create_plot_image(train_val_plots_path)
         self.qmd_content = self.qmd_content.replace(QuartoReport.REPLACEMENT_KEYS["train_val_plots"],
-                                                    train_val_plots_path)
+                                                    train_val_image_path)
 
     def save_qmd_file(self):
         path = join(self.output_path, "output.qmd")
-        open(selfpath, "w").write(self.qmd_content)
+        open(path, "w").write(self.qmd_content)
         print(
             f"File Saved to disk under: {path}.\nUse Quarto to render the report by running:\n\nquarto render {path} --to pdf")
 
-    def plot_keras_metric(self, metric_name, save_plot=True):
+    def plot_keras_metric(self, metric_name, save_path="", save_plot=True):
         """Plot a keras metric given its name and the history object returned by model.fit()
 
         Arguments
@@ -109,15 +129,10 @@ class QuartoReport:
                 self._history_dict.keys(),
             )
 
-        if "val_" + metric_name.lower() not in self._history_dict.keys():
-            raise ValueError(
-                "No validation epochs were run during training, the metric name to plot is not available in the history dict. Available metrics to plot are {}",
-                self._history_dict.keys(),
-            )
-
         y = self._history_dict.get(metric_name)
         x = range(1, len(y) + 1)
 
+        plt.figure(figsize=(8, 6))
         # Create a basic line plot
         plt.plot(x, y)
 
@@ -127,14 +142,92 @@ class QuartoReport:
         plt.title(f"{metric_name}/epoch")
 
         # Save the plot
-        plt.savefig(f"{self.output_path}/train_{metric_name}.png")
+        plt.savefig(f"{save_path}/{metric_name}.png", bbox_inches='tight')
         plt.clf()
-    
+
+    def plot_train_vs_val_keras_metric(self, metric_name, save_path="", save_plot=True):
+        # check if val has been run
+        if metric_name.lower() not in self._history_dict.keys():
+            raise ValueError(
+                "Metric name to plot is not available in the history dict. Available metrics to plot are {}",
+                self._history_dict.keys(),
+            )
+        y_1 = self._history_dict.get(metric_name)
+        y_2 = self._history_dict.get(f"val_{metric_name}")
+        x = range(1, len(y_1) + 1)
+
+        plt.figure(figsize=(8, 6))
+
+        # Create a basic line plot
+        plt.plot(x, y_1, label="Validation loss")
+        plt.plot(x, y_2, label="Training loss")
+
+        # Add labels and title
+        plt.xlabel('Epoch')
+        plt.ylabel(metric_name)
+        plt.title(metric_name)
+
+        # Show the plot
+        plt.legend()
+
+        # Save the plot
+        plt.savefig(f"{save_path}/train_val_{metric_name}.png", bbox_inches='tight')
+        plt.clf()
+
     def plot_all_train_metrics(self):
         """ Plot all training metrics available in self._history_dict."""
+        save_path = join(self.output_path, "plots/train")
         train_dict = {key: value for key, value in self._history_dict.items() if "val" not in key}
         for key in train_dict:
-            self.plot_keras_metric(key)
+            self.plot_keras_metric(key, save_path)
+        return save_path
+
+    def plot_all_val_metrics(self):
+        """ Plot all validation metrics available in self._history_dict."""
+        save_path = join(self.output_path, "plots/val")
+        val_dict = {key: value for key, value in self._history_dict.items() if "val" in key}
+        for key in val_dict:
+            self.plot_keras_metric(key, save_path)
+        return save_path
+
+    def plot_all_train_val_metrics(self):
+        """ Plot all validation metrics available in self._history_dict."""
+        save_path = join(self.output_path, "plots/train_val")
+        metrics_dict = {key: value for key, value in self._history_dict.items() if "val" not in key}
+        for key in metrics_dict:
+            self.plot_train_vs_val_keras_metric(key, save_path)
+        return save_path
+
+    def create_plot_image(self, path, n_cols=2):
+        """ Create an image that includes all images in a folder and arrange it in 2 columns"""
+        images = [f for f in os.listdir(path) if os.path.isfile(os.path.join(path, f)) and f != "report_image.png"]
+
+        # Set the number of rows and columns for the subplot grid
+        rows = len(images) // n_cols + (len(images) % n_cols > 0)
+        cols = min(len(images), n_cols)
+
+        # Create subplots
+        fig, axes = plt.subplots(rows, cols, figsize=(15, 5 * rows))  # Adjust the figsize as needed
+
+        # Iterate through the subplots and display each image
+        for i, ax in enumerate(axes.flat):
+            if i < len(images):
+                img = mpimg.imread(os.path.join(path, images[i]))
+                ax.imshow(img)
+                ax.axis('off')  # Optional: Turn off axis labels
+
+        # Adjust layout for better spacing
+        plt.tight_layout()
+        plt.subplots_adjust(right=0.7)
+
+        # Hide the empty subplot if uneven number of plots
+        if len(images) % n_cols != 0:
+            axes[rows - 1][1].axis('off')
+
+        save_path = join(path, "report_image.png")
+        plt.savefig(save_path, bbox_inches='tight')
+        plt.clf()
+        return save_path
 
     def plot_save_data(self):
         path = f"data_plots/"
@@ -165,88 +258,4 @@ class QuartoReport:
         plt.title('Histogram of indexed retention time')
         plt.savefig(f"{path}data_irt.png")
         plt.clf()
-        return path
-
-    def plot_save_train_metrics(self):
-        path = f"train_plots/"
-        try:
-            os.makedirs(path)
-            print(f"Folder '{path}' created successfully.")
-        except FileExistsError:
-            print(f"Folder '{path}' already exists.")
-        train_dict = {key: value for key, value in history.history.items() if "val" not in key}
-
-        for key in train_dict:
-            y = train_dict.get(key)
-            x = range(1, len(y) + 1)
-
-            # Create a basic line plot
-            plt.plot(x, y)
-
-            # Add labels and title
-            plt.xlabel('Epoch')
-            plt.ylabel(key)
-            plt.title(f"{key}/epoch")
-
-            # Save the plot
-            plt.savefig(f"{path}train_{key}.png")
-            plt.clf()
-        return path
-
-    def plot_save_val_metrics(self):
-        path = f"val_plots/"
-        try:
-            os.makedirs(path)
-            print(f"Folder '{path}' created successfully.")
-        except FileExistsError:
-            print(f"Folder '{path}' already exists.")
-        val_dict = {key: value for key, value in history.history.items() if "val" in key}
-
-        for key in val_dict:
-            y = val_dict.get(key)
-            x = range(1, len(y) + 1)
-
-            # Create a basic line plot
-            plt.plot(x, y)
-
-            # Add labels and title
-            plt.xlabel('Epoch')
-            plt.ylabel(key)
-            plt.title(f"{key}/epoch")
-
-            # Save the plot
-            plt.savefig(f"{path}val_{key}.png")
-            plt.clf()
-        return path
-
-    def plot_save_train_val_metrics(self):
-        path = f"train_val_plots/"
-        try:
-            os.makedirs(path)
-            print(f"Folder '{path}' created successfully.")
-        except FileExistsError:
-            print(f"Folder '{path}' already exists.")
-        val_dict = {key: value for key, value in history.history.items() if "val" in key}
-        train_dict = {key: value for key, value in history.history.items() if "val" not in key}
-
-        for key_v, key_t in zip(val_dict, train_dict):
-            y_1 = val_dict.get(key_v)
-            y_2 = train_dict.get(key_t)
-            x = range(1, len(y_1) + 1)
-
-            # Create a basic line plot
-            plt.plot(x, y_1, label="Validation loss")
-            plt.plot(x, y_2, label="Training loss")
-
-            # Add labels and title
-            plt.xlabel('Epoch')
-            plt.ylabel(key_t)
-            plt.title(key_t)
-
-            # Show the plot
-            plt.legend()
-
-            # Save the plot
-            plt.savefig(f"{path}train_val_{key_t}.png")
-            plt.clf()
         return path
