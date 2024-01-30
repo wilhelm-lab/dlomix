@@ -3,17 +3,18 @@ from os.path import join
 from contextlib import redirect_stdout
 import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
+import warnings
 
 
 # todo:
 # class will be specific for rt reporting
 # qmd template will also be specific for rt reporting + task
-# plot functions should be independent
 # parametric/constant template location
 # make data optional
 
 
 class QuartoReport:
+    TEMPLATE_PATH = "/Users/andi/PycharmProjects/dlomix_repo/dlomix/reports/quarto/template.qmd"
     REPLACEMENT_KEYS = {
         "title": "TITLE_HERE", "fold-code": "FOLD_CODE_FLAG", "train_plots": "TRAIN_PLOTS_PATH",
         "val_plots": "VAL_PLOTS_PATH", "data_plots": "DATA_PLOTS_PATH",
@@ -24,9 +25,8 @@ class QuartoReport:
                  output_path="/Users/andi/PycharmProjects/dlomix_repo/dlomix/reports/quarto/"):
         self.title = title
         self.fold_code = fold_code
-        self.qmd_template_location = "/Users/andi/PycharmProjects/dlomix_repo/dlomix/reports/quarto/template.qmd"
+        self.qmd_template_location = QuartoReport.TEMPLATE_PATH
         self.output_path = output_path
-        self.data = data
         self.qmd_content = None
 
         if history is None:
@@ -36,6 +36,16 @@ class QuartoReport:
             self._history_dict = {}
         else:
             self._set_history_dict(history)
+
+        if data is None:
+            warnings.warn(
+                "The passed data object is None, no data related plots can be reported."
+            )
+            self._create_plot_folder_structure(subfolders=['train', 'val', 'train_val'])
+            self.data = None
+        else:
+            self.data = data
+            self._create_plot_folder_structure(subfolders=['train', 'val', 'train_val', 'data'])
 
     def _set_history_dict(self, history):
         if isinstance(history, dict):
@@ -58,11 +68,10 @@ class QuartoReport:
                 "The passed History object contains an empty history dict, no training was done."
             )
 
-    def create_plot_folder_structure(self):
+    def _create_plot_folder_structure(self, subfolders=None):
         root = join(self.output_path, "plots")
         if not os.path.exists(root):
             os.makedirs(root)
-        subfolders = ['train', 'val', 'train_val']
         for subfolder in subfolders:
             path = os.path.join(root, subfolder)
             if not os.path.exists(path):
@@ -72,9 +81,6 @@ class QuartoReport:
 
         # load the skeleton qmd file
         self.load_qmd_template()
-
-        # create folder structure for plots
-        self.create_plot_folder_structure()
 
         # replace values and add stuff in the report
         self.update_qmd()
@@ -92,8 +98,13 @@ class QuartoReport:
         self.qmd_content = self.qmd_content.replace(QuartoReport.REPLACEMENT_KEYS["title"], self.title)
         self.qmd_content = self.qmd_content.replace(QuartoReport.REPLACEMENT_KEYS["fold-code"], str(self.fold_code))
 
-        # data_plots_path = self.plot_save_data()
-        # self.qmd_content = self.qmd_content.replace(QuartoReport.REPLACEMENT_KEYS["data_plots"], data_plots_path)
+        if self.data is not None:
+            data_plots_path = self.plot_all_data_plots()
+            data_image_path = self.create_plot_image(data_plots_path)
+            self.qmd_content = self.qmd_content.replace(QuartoReport.REPLACEMENT_KEYS["data_plots"], data_image_path)
+        else:
+            # delete plot command to avoid error
+            self.qmd_content = self.qmd_content.replace("![Data plots](DATA_PLOTS_PATH)", "NO DATA PROVIDED!")
 
         train_plots_path = self.plot_all_train_metrics()
         train_image_path = self.create_plot_image(train_plots_path)
@@ -143,7 +154,7 @@ class QuartoReport:
         # Save the plot
         plt.savefig(f"{save_path}/{metric_name}.png", bbox_inches='tight')
         plt.clf()
-        
+
     def plot_histogram(self, x, label="numeric variable", bin_size=10, save_path=""):
         plt.figure(figsize=(8, 6))
         plt.hist(x, edgecolor="black", bins=bin_size)
@@ -181,6 +192,18 @@ class QuartoReport:
         # Save the plot
         plt.savefig(f"{save_path}/train_val_{metric_name}.png", bbox_inches='tight')
         plt.clf()
+
+    def plot_all_data_plots(self):
+        save_path = join(self.output_path, "plots/data")
+
+        # count lengths of sequences and plot histogram
+        vek_len = np.vectorize(len)
+        seq_lens = vek_len(self.data.sequences)
+        self.plot_histogram(x=seq_lens, label="Peptide length", save_path=save_path)
+
+        # plot irt histogram
+        self.plot_histogram(x=rtdata.targets, label="Indexed retention time", bin_size=30, save_path=save_path)
+        return save_path
 
     def plot_all_train_metrics(self):
         """ Plot all training metrics available in self._history_dict."""
