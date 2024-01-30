@@ -3,14 +3,19 @@ from os.path import join
 from contextlib import redirect_stdout
 import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
+import numpy as np
 import warnings
 
 
 # todo:
 # class will be specific for rt reporting
 # qmd template will also be specific for rt reporting + task
-# parametric/constant template location
-# make data optional
+
+# include model information -> how?
+# add test_targets + predictions
+# add density plot
+# add r2 
+# add residuals plot
 
 
 class QuartoReport:
@@ -18,16 +23,23 @@ class QuartoReport:
     REPLACEMENT_KEYS = {
         "title": "TITLE_HERE", "fold-code": "FOLD_CODE_FLAG", "train_plots": "TRAIN_PLOTS_PATH",
         "val_plots": "VAL_PLOTS_PATH", "data_plots": "DATA_PLOTS_PATH",
-        "train_val_plots": "TV_PLOTS_PATH"
+        "train_val_plots": "TV_PLOTS_PATH", "model_info": "MODEL_INFORMATION",
+        "residuals_plot": "RESIDUALS_PLOT_PATH"
     }
 
-    def __init__(self, history, data=None, title="Retention time report", fold_code=True,
+    def __init__(self, history, data=None, test_targets=None, predictions=None, title="Retention time report",
+                 fold_code=True,
                  output_path="/Users/andi/PycharmProjects/dlomix_repo/dlomix/reports/quarto/"):
         self.title = title
         self.fold_code = fold_code
         self.qmd_template_location = QuartoReport.TEMPLATE_PATH
         self.output_path = output_path
         self.qmd_content = None
+
+        self.test_targets = test_targets
+        self.predictions = predictions
+
+        subfolders = ['train', 'val', 'train_val']
 
         if history is None:
             warnings.warn(
@@ -41,11 +53,20 @@ class QuartoReport:
             warnings.warn(
                 "The passed data object is None, no data related plots can be reported."
             )
-            self._create_plot_folder_structure(subfolders=['train', 'val', 'train_val'])
-            self.data = None
         else:
-            self.data = data
-            self._create_plot_folder_structure(subfolders=['train', 'val', 'train_val', 'data'])
+            subfolders.append("data")
+        self.data = data
+
+        if test_targets is None or predictions is None:
+            warnings.warn(
+                "Either the passed test_targets object or the passed predictions object is None, no test related plots can be reported."
+            )
+        else:
+            subfolders.append("test")
+        self.test_targets = test_targets
+        self.predictions = predictions
+
+        self._create_plot_folder_structure(subfolders)
 
     def _set_history_dict(self, history):
         if isinstance(history, dict):
@@ -119,6 +140,14 @@ class QuartoReport:
         self.qmd_content = self.qmd_content.replace(QuartoReport.REPLACEMENT_KEYS["train_val_plots"],
                                                     train_val_image_path)
 
+        if self.test_targets is not None and predictions is not None:
+            residuals_plot_path = self.plot_residuals()
+            self.qmd_content = self.qmd_content.replace(QuartoReport.REPLACEMENT_KEYS["residuals_plot"],
+                                                        residuals_plot_path)
+        else:
+            # delete plot command to avoid error
+            self.qmd_content = self.qmd_content.replace("![Data plots](DATA_PLOTS_PATH)", "NO DATA PROVIDED!")
+
     def save_qmd_file(self):
         path = join(self.output_path, "output.qmd")
         open(path, "w").write(self.qmd_content)
@@ -155,9 +184,9 @@ class QuartoReport:
         plt.savefig(f"{save_path}/{metric_name}.png", bbox_inches='tight')
         plt.clf()
 
-    def plot_histogram(self, x, label="numeric variable", bin_size=10, save_path=""):
+    def plot_histogram(self, x, label="numeric variable", bins=10, save_path=""):
         plt.figure(figsize=(8, 6))
-        plt.hist(x, edgecolor="black", bins=bin_size)
+        plt.hist(x, edgecolor="black", bins=bins)
         plt.xlabel(label)
         plt.ylabel('Counts')
         plt.title(f"Histogram of {label}")
@@ -195,14 +224,13 @@ class QuartoReport:
 
     def plot_all_data_plots(self):
         save_path = join(self.output_path, "plots/data")
-
         # count lengths of sequences and plot histogram
         vek_len = np.vectorize(len)
         seq_lens = vek_len(self.data.sequences)
         self.plot_histogram(x=seq_lens, label="Peptide length", save_path=save_path)
 
         # plot irt histogram
-        self.plot_histogram(x=rtdata.targets, label="Indexed retention time", bin_size=30, save_path=save_path)
+        self.plot_histogram(x=rtdata.targets, label="Indexed retention time", bins=30, save_path=save_path)
         return save_path
 
     def plot_all_train_metrics(self):
@@ -228,6 +256,14 @@ class QuartoReport:
         for key in metrics_dict:
             self.plot_train_vs_val_keras_metric(key, save_path)
         return save_path
+
+    def plot_residuals(self):
+        save_path = join(self.output_path, "plots/test")
+        error = np.ravel(self.test_targets) - np.ravel(self.predictions)
+        file_name = "Residuals.png"
+        self.plot_histogram(x=error, label="Residuals", bins=100, save_path=save_path)
+        image_path = join(save_path, file_name)
+        return image_path
 
     def create_plot_image(self, path, n_cols=2):
         """ Create an image that includes all images in a folder and arrange it in 2 columns"""
@@ -259,34 +295,3 @@ class QuartoReport:
         plt.savefig(save_path, bbox_inches='tight')
         plt.clf()
         return save_path
-
-    def plot_save_data(self):
-        path = f"data_plots/"
-        try:
-            os.makedirs(path)
-            print(f"Folder '{path}' created successfully.")
-        except FileExistsError:
-            print(f"Folder '{path}' already exists.")
-
-        # Create sequence length histogram
-        vek_len = np.vectorize(len)
-        seq_lens = vek_len(self.data.sequences)
-        # Create histogram
-        plt.hist(seq_lens, edgecolor="black")
-        # Add labels and title
-        plt.xlabel('Peptide length')
-        plt.ylabel('Counts')
-        plt.title('Histogram of peptide lengths')
-        # Save the plot
-        plt.savefig(f"{path}data_pep_len.png")
-        plt.clf()
-
-        # Create irt histogram
-        plt.hist(rtdata.targets, bins=30, edgecolor="black")
-        # Add labels and title
-        plt.xlabel('Indexed retention time')
-        plt.ylabel('Counts')
-        plt.title('Histogram of indexed retention time')
-        plt.savefig(f"{path}data_irt.png")
-        plt.clf()
-        return path
