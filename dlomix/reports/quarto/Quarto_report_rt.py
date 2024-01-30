@@ -114,13 +114,12 @@ class QuartoReport:
         print(
             f"File Saved to disk under: {path}.\nUse Quarto to render the report by running:\n\nquarto render {path} --to pdf")
 
-    def plot_keras_metric(self, metric_name, save_path="", save_plot=True):
+    def plot_keras_metric(self, metric_name, save_path=""):
         """Plot a keras metric given its name and the history object returned by model.fit()
 
         Arguments
         ---------
             metric_name: String with the name of the metric.
-            save_plot (bool, optional): whether to save plot to disk or not. Defaults to True.
         """
 
         if metric_name.lower() not in self._history_dict.keys():
@@ -143,6 +142,15 @@ class QuartoReport:
 
         # Save the plot
         plt.savefig(f"{save_path}/{metric_name}.png", bbox_inches='tight')
+        plt.clf()
+        
+    def plot_histogram(self, x, label="numeric variable", bin_size=10, save_path=""):
+        plt.figure(figsize=(8, 6))
+        plt.hist(x, edgecolor="black", bins=bin_size)
+        plt.xlabel(label)
+        plt.ylabel('Counts')
+        plt.title(f"Histogram of {label}")
+        plt.savefig(f"{save_path}/{label}.png", bbox_inches='tight')
         plt.clf()
 
     def plot_train_vs_val_keras_metric(self, metric_name, save_path="", save_plot=True):
