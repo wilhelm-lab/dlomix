@@ -39,3 +39,8 @@ by default. The resolution of this section is per epoch.
 This section shows the residuals histogram.
 
 ![Histogram of model's residuals](RESIDUALS_PLOT_PATH)
+
+# Density
+This section shows the density plot.
+
+![Density plot](DENSITY_PLOT_PATH)

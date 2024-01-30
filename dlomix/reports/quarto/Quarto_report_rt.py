@@ -1,8 +1,11 @@
 import os
 from os.path import join
 from contextlib import redirect_stdout
+import matplotlib as mpl
 import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
+from matplotlib.colors import LogNorm
+from matplotlib.ticker import LogLocator
 import numpy as np
 import warnings
 
@@ -24,7 +27,7 @@ class QuartoReport:
         "title": "TITLE_HERE", "fold-code": "FOLD_CODE_FLAG", "train_plots": "TRAIN_PLOTS_PATH",
         "val_plots": "VAL_PLOTS_PATH", "data_plots": "DATA_PLOTS_PATH",
         "train_val_plots": "TV_PLOTS_PATH", "model_info": "MODEL_INFORMATION",
-        "residuals_plot": "RESIDUALS_PLOT_PATH"
+        "residuals_plot": "RESIDUALS_PLOT_PATH", "density_plot": "DENSITY_PLOT_PATH"
     }
 
     def __init__(self, history, data=None, test_targets=None, predictions=None, title="Retention time report",
@@ -144,8 +147,13 @@ class QuartoReport:
             residuals_plot_path = self.plot_residuals()
             self.qmd_content = self.qmd_content.replace(QuartoReport.REPLACEMENT_KEYS["residuals_plot"],
                                                         residuals_plot_path)
+            density_plot_path = self.plot_density()
+            self.qmd_content = self.qmd_content.replace(QuartoReport.REPLACEMENT_KEYS["density_plot"],
+                                                        density_plot_path)
         else:
             # delete plot command to avoid error
+            self.qmd_content = self.qmd_content.replace("![Histogram of model's residuals](RESIDUALS_PLOT_PATH)",
+                                                        "NO DATA PROVIDED!")
             self.qmd_content = self.qmd_content.replace("![Data plots](DATA_PLOTS_PATH)", "NO DATA PROVIDED!")
 
     def save_qmd_file(self):
@@ -259,10 +267,62 @@ class QuartoReport:
 
     def plot_residuals(self):
         save_path = join(self.output_path, "plots/test")
-        error = np.ravel(self.test_targets) - np.ravel(self.predictions)
         file_name = "Residuals.png"
+        error = np.ravel(self.test_targets) - np.ravel(self.predictions)
         self.plot_histogram(x=error, label="Residuals", bins=100, save_path=save_path)
         image_path = join(save_path, file_name)
+        return image_path
+
+    def plot_density(self):
+        save_path = join(self.output_path, "plots/test")
+        file_name = "Density.png"
+        targets = np.ravel(self.test_targets)
+        predictions = np.ravel(self.predictions)
+        H, xedges, yedges = np.histogram2d(targets, predictions, bins=1000)
+
+        x_min = np.min(targets)
+        x_max = np.max(targets)
+
+        # H needs to be rotated and flipped
+        H = np.rot90(H)
+        H = np.flipud(H)
+
+        # Mask zeros
+        Hmasked = np.ma.masked_where(H == 0, H)  # Mask pixels with a value of zero
+
+        # Plot 2D histogram using pcolor
+        palette = "Reds_r"
+        irt_delta95 = 5
+        delta95_line_color = "#36479E"
+        cm = mpl.colormaps[palette]
+        plt.pcolormesh(
+            xedges, yedges, Hmasked, cmap=cm, norm=LogNorm(vmin=1e0, vmax=1e2)
+        )
+
+        plt.xlabel("iRT (measured)")
+        plt.ylabel("iRT (predicted)")
+
+        cbar = plt.colorbar(ticks=LogLocator(subs=range(5)))
+        cbar.ax.set_ylabel("Counts", fontsize=14)
+
+        plt.plot([x_min, x_max], [x_min, x_max], c="black")
+        plt.plot(
+            [x_min, x_max],
+            [x_min - irt_delta95, x_max - irt_delta95],
+            color=delta95_line_color,
+        )
+        plt.plot(
+            [x_min, x_max],
+            [x_min + irt_delta95, x_max + irt_delta95],
+            color=delta95_line_color,
+        )
+
+        font_size = 14  # Adjust as appropriate.
+        cbar.ax.tick_params(labelsize=font_size)
+        cbar.ax.minorticks_on()
+        image_path = join(save_path, file_name)
+        plt.savefig(image_path, bbox_inches='tight')
+        plt.clf()
         return image_path
 
     def create_plot_image(self, path, n_cols=2):
