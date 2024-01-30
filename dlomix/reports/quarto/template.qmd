@@ -14,23 +14,19 @@ jupyter: python3
 The following section is showing a simple explorative data analysis of the used dataset. The first histogram shows the
 distribution of peptide lengths in the data set, while the second histogram shows the distribution of indexed retention
 times.
-
 ![Data plots](DATA_PLOTS_PATH)
 
 # Train metrics per epoch
 The following section shows the different metrics that were used to track the training. All used metrics are added by
 default. The resolution of this section is per epoch.
-
 ![Plots of training metrics](TRAIN_PLOTS_PATH)
 
 # Validation metrics per epoch
 The following section shows the different metrics that were used to track the validation. All used metrics are added by
 default. The resolution of this section is per epoch.
-
 ![Plots of validation metrics](VAL_PLOTS_PATH)
 
 # Train-Validation metrics per epoch
 The following section shows the training metrics in comparision with the validation metrics.. All used metrics are added
 by default. The resolution of this section is per epoch.
-
 ![Plots of training metrics vs. validation metrics](TV_PLOTS_PATH)
