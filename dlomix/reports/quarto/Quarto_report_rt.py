@@ -16,7 +16,7 @@ import warnings
 
 # include model information -> how?
 # clean way to include/exclude optional parts
-# 
+# include per batch metrics? custom callback needed
 
 
 class QuartoReport:

@@ -1,0 +1,26 @@
+---
+title: "TITLE_HERE"
+format:
+  html:
+    code-fold: FOLD_CODE_FLAG
+    page-layout: full
+  pdf:
+    echo: false
+format-links: false
+jupyter: python3
+---
+
+# Train metrics per epoch
+The following section shows the different metrics that were used to track the training. All used metrics are added by
+default. The resolution of this section is per epoch.
+![Plots of training metrics](TRAIN_PLOTS_PATH)
+
+# Validation metrics per epoch
+The following section shows the different metrics that were used to track the validation. All used metrics are added by
+default. The resolution of this section is per epoch.
+![Plots of validation metrics](VAL_PLOTS_PATH)
+
+# Train-Validation metrics per epoch
+The following section shows the training metrics in comparision with the validation metrics.. All used metrics are added
+by default. The resolution of this section is per epoch.
+![Plots of training metrics vs. validation metrics](TV_PLOTS_PATH)
