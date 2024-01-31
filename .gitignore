@@ -163,3 +163,6 @@ metadata.parquet
 
 # pycharm
 .idea
+
+# personal logbook
+log_book.md
