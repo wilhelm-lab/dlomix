@@ -15,10 +15,8 @@ import warnings
 # qmd template will also be specific for rt reporting + task
 
 # include model information -> how?
-# add test_targets + predictions
-# add density plot
-# add r2 
-# add residuals plot
+# clean way to include/exclude optional parts
+# 
 
 
 class QuartoReport:
@@ -27,7 +25,8 @@ class QuartoReport:
         "title": "TITLE_HERE", "fold-code": "FOLD_CODE_FLAG", "train_plots": "TRAIN_PLOTS_PATH",
         "val_plots": "VAL_PLOTS_PATH", "data_plots": "DATA_PLOTS_PATH",
         "train_val_plots": "TV_PLOTS_PATH", "model_info": "MODEL_INFORMATION",
-        "residuals_plot": "RESIDUALS_PLOT_PATH", "density_plot": "DENSITY_PLOT_PATH"
+        "residuals_plot": "RESIDUALS_PLOT_PATH", "density_plot": "DENSITY_PLOT_PATH",
+        "r2_score": "R2_SCORE_VALUE"
     }
 
     def __init__(self, history, data=None, test_targets=None, predictions=None, title="Retention time report",
@@ -150,6 +149,9 @@ class QuartoReport:
             density_plot_path = self.plot_density()
             self.qmd_content = self.qmd_content.replace(QuartoReport.REPLACEMENT_KEYS["density_plot"],
                                                         density_plot_path)
+            r2 = self.calculate_r2(self.test_targets, self.predictions)
+            self.qmd_content = self.qmd_content.replace(QuartoReport.REPLACEMENT_KEYS["r2_score"], str(r2))
+
         else:
             # delete plot command to avoid error
             self.qmd_content = self.qmd_content.replace("![Histogram of model's residuals](RESIDUALS_PLOT_PATH)",
@@ -324,6 +326,11 @@ class QuartoReport:
         plt.savefig(image_path, bbox_inches='tight')
         plt.clf()
         return image_path
+
+    def calculate_r2(self, targets, predictions):
+        from sklearn.metrics import r2_score
+        r2 = r2_score(np.ravel(targets), np.ravel(predictions))
+        return r2
 
     def create_plot_image(self, path, n_cols=2):
         """ Create an image that includes all images in a folder and arrange it in 2 columns"""
