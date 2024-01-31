@@ -7,4 +7,5 @@ __all__ = [
     "PrositRetentionTimePredictor",
     "DeepLCRetentionTimePredictor",
     "PrositIntensityPredictor",
+    "PrositSumIntensityPredictor",
 ]
