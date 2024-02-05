@@ -9,25 +9,33 @@ from matplotlib.ticker import LogLocator
 import numpy as np
 import warnings
 
+
+# make data optional
+# make prediction optional
+# val/test violin plots
+#   - concatenate val/test
+#   - add flag column whether val/test
+#   - adapt violin plot function
+
 class QuartoReportIntensity:
     TEMPLATE_PATH = "/Users/andi/PycharmProjects/dlomix_repo/dlomix/reports/quarto/template_intensity.qmd"
     REPLACEMENT_KEYS = {
-        "title": "TITLE_HERE", "fold-code": "FOLD_CODE_FLAG"
+        "title": "TITLE_HERE", "fold-code": "FOLD_CODE_FLAG", "train_plots": "TRAIN_PLOTS_PATH",
+        "val_plots": "VAL_PLOTS_PATH", "train_val_plots": "TV_PLOTS_PATH", "violin_plot": "VIOLIN_PLOT_PATH"
     }
 
-    def __init__(self, history, data=None, test_targets=None, predictions=None, title="Intensity report",
+    def __init__(self, history, train_data=None, predictions=None, title="Intensity report",
                  fold_code=True,
                  output_path="/Users/andi/PycharmProjects/dlomix_repo/dlomix/reports/quarto/"):
         self.title = title
         self.fold_code = fold_code
-        self.qmd_template_location = QuartoReport.TEMPLATE_PATH
+        self.qmd_template_location = QuartoReportIntensity.TEMPLATE_PATH
         self.output_path = output_path
         self.qmd_content = None
-
-        self.test_targets = test_targets
+        self.train_data = train_data
         self.predictions = predictions
 
-        subfolders = ['train', 'val', 'train_val']
+        subfolders = ['train', 'val', 'train_val', 'spectral']
 
         if history is None:
             warnings.warn(
@@ -36,23 +44,6 @@ class QuartoReportIntensity:
             self._history_dict = {}
         else:
             self._set_history_dict(history)
-
-        if data is None:
-            warnings.warn(
-                "The passed data object is None, no data related plots can be reported."
-            )
-        else:
-            subfolders.append("data")
-        self.data = data
-
-        if test_targets is None or predictions is None:
-            warnings.warn(
-                "Either the passed test_targets object or the passed predictions object is None, no test related plots can be reported."
-            )
-        else:
-            subfolders.append("test")
-        self.test_targets = test_targets
-        self.predictions = predictions
 
         self._create_plot_folder_structure(subfolders)
 
@@ -104,29 +95,28 @@ class QuartoReportIntensity:
         # if data is not provided skip data content
         # always decide which piece goes into qmd which into python code depending on optional or not
 
-        self.qmd_content = self.qmd_content.replace(QuartoReport.REPLACEMENT_KEYS["title"], self.title)
-        self.qmd_content = self.qmd_content.replace(QuartoReport.REPLACEMENT_KEYS["fold-code"], str(self.fold_code))
-
-        if self.data is not None:
-            data_plots_path = self.plot_all_data_plots()
-            data_image_path = self.create_plot_image(data_plots_path)
-            self.qmd_content = self.qmd_content.replace(QuartoReport.REPLACEMENT_KEYS["data_plots"], data_image_path)
-        else:
-            # delete plot command to avoid error
-            self.qmd_content = self.qmd_content.replace("![Data plots](DATA_PLOTS_PATH)", "NO DATA PROVIDED!")
+        self.qmd_content = self.qmd_content.replace(QuartoReportIntensity.REPLACEMENT_KEYS["title"], self.title)
+        self.qmd_content = self.qmd_content.replace(QuartoReportIntensity.REPLACEMENT_KEYS["fold-code"],
+                                                    str(self.fold_code))
 
         train_plots_path = self.plot_all_train_metrics()
         train_image_path = self.create_plot_image(train_plots_path)
-        self.qmd_content = self.qmd_content.replace(QuartoReport.REPLACEMENT_KEYS["train_plots"], train_image_path)
+        self.qmd_content = self.qmd_content.replace(QuartoReportIntensity.REPLACEMENT_KEYS["train_plots"],
+                                                    train_image_path)
 
         val_plots_path = self.plot_all_val_metrics()
         val_image_path = self.create_plot_image(val_plots_path)
-        self.qmd_content = self.qmd_content.replace(QuartoReport.REPLACEMENT_KEYS["val_plots"], val_image_path)
+        self.qmd_content = self.qmd_content.replace(QuartoReportIntensity.REPLACEMENT_KEYS["val_plots"], val_image_path)
 
         train_val_plots_path = self.plot_all_train_val_metrics()
         train_val_image_path = self.create_plot_image(train_val_plots_path)
-        self.qmd_content = self.qmd_content.replace(QuartoReport.REPLACEMENT_KEYS["train_val_plots"],
+        self.qmd_content = self.qmd_content.replace(QuartoReportIntensity.REPLACEMENT_KEYS["train_val_plots"],
                                                     train_val_image_path)
+
+        results_df = self.generate_intensity_results_df()
+        violin_plots_path = self.plot_spectral_angle(results_df, facet="precursor_charge")
+        self.qmd_content = self.qmd_content.replace(QuartoReportIntensity.REPLACEMENT_KEYS["violin_plot"],
+                                                    violin_plots_path)
 
     def save_qmd_file(self):
         path = join(self.output_path, "output.qmd")
@@ -164,15 +154,6 @@ class QuartoReportIntensity:
         plt.savefig(f"{save_path}/{metric_name}.png", bbox_inches='tight')
         plt.clf()
 
-    def plot_histogram(self, x, label="numeric variable", bins=10, save_path=""):
-        plt.figure(figsize=(8, 6))
-        plt.hist(x, edgecolor="black", bins=bins)
-        plt.xlabel(label)
-        plt.ylabel('Counts')
-        plt.title(f"Histogram of {label}")
-        plt.savefig(f"{save_path}/{label}.png", bbox_inches='tight')
-        plt.clf()
-
     def plot_train_vs_val_keras_metric(self, metric_name, save_path="", save_plot=True):
         # check if val has been run
         if metric_name.lower() not in self._history_dict.keys():
@@ -201,17 +182,6 @@ class QuartoReportIntensity:
         # Save the plot
         plt.savefig(f"{save_path}/train_val_{metric_name}.png", bbox_inches='tight')
         plt.clf()
-
-    def plot_all_data_plots(self):
-        save_path = join(self.output_path, "plots/data")
-        # count lengths of sequences and plot histogram
-        vek_len = np.vectorize(len)
-        seq_lens = vek_len(self.data.sequences)
-        self.plot_histogram(x=seq_lens, label="Peptide length", save_path=save_path)
-
-        # plot irt histogram
-        self.plot_histogram(x=rtdata.targets, label="Indexed retention time", bins=30, save_path=save_path)
-        return save_path
 
     def plot_all_train_metrics(self):
         """ Plot all training metrics available in self._history_dict."""
@@ -261,9 +231,40 @@ class QuartoReportIntensity:
 
         # Hide the empty subplot if uneven number of plots
         if len(images) % n_cols != 0:
-            axes[rows - 1][1].axis('off')
+            axes[rows - 1][n_cols - 1].axis('off')
 
         save_path = join(path, "report_image.png")
         plt.savefig(save_path, bbox_inches='tight')
+        plt.clf()
+        return save_path
+
+    def generate_intensity_results_df(self):
+        predictions_df = pd.DataFrame()
+        predictions_df['sequences'] = self.train_data.sequences
+        predictions_df['intensities_pred'] = self.predictions.tolist()
+        predictions_df['precursor_charge_onehot'] = self.data.precursor_charge.tolist()
+        predictions_df['precursor_charge'] = np.argmax(self.data.precursor_charge, axis=1) + 1
+        predictions_df['intensities_raw'] = self.data.intensities.tolist()
+        predictions_df['collision_energy'] = self.data.collision_energy
+        return predictions_df
+
+    def plot_spectral_angle(
+            self,
+            predictions_df,
+            facet=None
+    ):
+        """Create spectral  plot
+
+        Arguments
+        ---------
+            predictions_df:  dataframe with raw intensities, predictions, sequences, precursor_charges
+        """
+        plt.figure(figsize=(8, 6))
+        predictions_acc = normalize_intensity_predictions(predictions_df, self.train_data.batch_size)
+        violin_plot = sns.violinplot(data=predictions_acc, x=facet, y="spectral_angle")
+        save_path = join(self.output_path, "plots/spectral", "violin_spectral_angle_plot.png")
+
+        fig = violin_plot.get_figure()
+        fig.savefig(save_path)
         plt.clf()
         return save_path
