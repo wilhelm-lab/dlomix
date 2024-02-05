@@ -9,11 +9,3 @@ dlomix.eval.rt\_eval
    :members:
    :undoc-members:
    :show-inheritance:
-
-Module contents
----------------
-
-.. automodule:: dlomix.eval
-   :members:
-   :undoc-members:
-   :show-inheritance:

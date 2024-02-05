@@ -25,11 +25,4 @@ dlomix.models.prosit
    :members:
    :undoc-members:
    :show-inheritance:
-
-Module contents
----------------
-
-.. automodule:: dlomix.models
-   :members:
-   :undoc-members:
-   :show-inheritance:
+   

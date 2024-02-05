@@ -48,11 +48,3 @@ dlomix.reports.postprocessing
    :members:
    :undoc-members:
    :show-inheritance:
-
-Module contents
----------------
-
-.. automodule:: dlomix.reports
-   :members:
-   :undoc-members:
-   :show-inheritance:

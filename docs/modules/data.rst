@@ -8,7 +8,7 @@ dlomix.data.IntensityDataset
 .. automodule:: dlomix.data.IntensityDataset
    :members:
    :undoc-members:
-   :show-inheritance:
+..   :show-inheritance:
 
 dlomix.data.RetentionTimeDataset
 ---------------------------------------
@@ -16,12 +16,5 @@ dlomix.data.RetentionTimeDataset
 .. automodule:: dlomix.data.RetentionTimeDataset
    :members:
    :undoc-members:
-   :show-inheritance:
+..   :show-inheritance:
 
-Module contents
----------------
-
-.. automodule:: dlomix.data
-   :members:
-   :undoc-members:
-   :show-inheritance:
