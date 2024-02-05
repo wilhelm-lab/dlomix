@@ -13,6 +13,15 @@ from ..data import RetentionTimeDataset
 
 
 class RetentionTimeReportRunComparisonWandb:
+    """Create WandB report for comparing runs.
+
+    Parameters
+    ----------
+        project (str): Name of the project to be used in wandb.
+        title (str): Title of the report in wandb.
+        description (str): Description of the report in wandb.
+        dataset (RetentionTimeDataset, optional): The retention time dataset if logging the data is desired. Defaults to None, no logging of input data.
+    """
 
     METRICS_TO_EXCLUDE = [
         "epoch/learning_rate",
@@ -31,14 +40,6 @@ class RetentionTimeReportRunComparisonWandb:
         description: str,
         dataset: RetentionTimeDataset = None,
     ):
-        """Create WandB report for comparing runs.
-
-        Args:
-            project (str): Name of the project to be used in wandb.
-            title (str): Title of the report in wandb.
-            description (str): Description of the report in wandb.
-            dataset (RetentionTimeDataset, optional): The retention time dataset if logging the data is desired. Defaults to None, no logging of input data.
-        """
         self.project = project
         self.title = title
         self.description = description
@@ -386,6 +387,7 @@ class RetentionTimeReportRunComparisonWandb:
 
     def log_model_data(self, model):
         import io
+
         model_summary_buffer = io.StringIO()
         model.summary(print_fn=lambda x: model_summary_buffer.write(x + "<br>"))
         model_summary_lines = model_summary_buffer.getvalue().split("<br>")

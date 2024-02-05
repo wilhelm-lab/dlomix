@@ -1,6 +1,6 @@
 import tensorflow as tf
 import tensorflow.keras.backend as K
-from tensorflow.keras import regularizers, constraints, initializers, activations
+from tensorflow.keras import activations, constraints, initializers, regularizers
 
 
 class DecoderAttentionLayer(tf.keras.layers.Layer):
@@ -34,7 +34,6 @@ class AttentionLayer(tf.keras.layers.Layer):
         bias=True,
         **kwargs
     ):
-
         self.supports_masking = True
         self.init = initializers.get("glorot_uniform")
         self.W_regularizer = regularizers.get(W_regularizer)

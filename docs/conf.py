@@ -12,12 +12,12 @@
 
 import os
 import sys
-sys.path.insert(0, os.path.abspath('..'))
 
+sys.path.insert(0, os.path.abspath('..'))
 
 # -- Project information -----------------------------------------------------
 
-from dlomix import __version__, META_DATA
+from dlomix import META_DATA, __version__
 
 project = META_DATA['package_name']
 copyright = META_DATA['copyright_text']
@@ -54,7 +54,29 @@ exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
 # The theme to use for HTML and HTML Help pages.  See the documentation for
 # a list of builtin themes.
 #
-html_theme = 'nature'
+
+html_theme = 'sphinx_book_theme'
+
+# book theme
+html_theme_options = {
+    "repository_url": META_DATA["github_url"],
+    "use_repository_button": True,
+    "logo": {
+        "image_dark": "assets/logo_dark.jpg",
+    },
+}
+
+html_logo = 'assets/logo.jpg'
+
+html_title = f"DLOmix | v{release}"
+html_use_index = False  # Don't create index
+html_domain_indices = False  # Don't need module indices
+html_copy_source = False  # Don't need sources
+html_permalinks = True
+#html_permalinks_icon = Icons.permalinks_icon
+add_module_names = False
+
+sitemap_url_scheme = "{link}"
 
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,

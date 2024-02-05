@@ -1,12 +1,14 @@
+import zipfile
+from os import makedirs
+from os.path import dirname, join, splitext
+
 import numpy as np
+import requests
+
 from dlomix.constants import retention_time_pipeline_parameters
 from dlomix.data.RetentionTimeDataset import RetentionTimeDataset
 from dlomix.models.base import RetentionTimePredictor
 from dlomix.reports import RetentionTimeReport
-from os.path import join, dirname, splitext
-from os import makedirs
-import requests
-import zipfile
 
 # pipelines can be used to train the model further or from scratch given a dataset
 # add string arguments (e.g. prosit to create the model, data source to create the dataset)
@@ -63,9 +65,9 @@ class RetentionTimePipeline:
         zip_ref.close()
 
     """
-    
+
     Predict retention times given data either as numpy array of sequences or a filepath to a csv file
-    
+
     """
 
     def predict(self, data=None):

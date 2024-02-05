@@ -10,7 +10,22 @@ from ..data.RetentionTimeDataset import RetentionTimeDataset
 
 
 class RetentionTimeReportModelComparisonWandb:
-    
+    """Creates a WandB report for comparing models.
+
+    Parameters
+    ----------
+    models : dict
+        A dictionary where the keys are model names and the values are model objects.
+    project : str
+        The name of the project.
+    title : str
+        The title of the report.
+    description : str
+        The description of the report.
+    test_dataset : RetentionTimeDataset
+        The test dataset object to compare the predictions of models on.
+    """
+
     # Wilhelmlab WandB account that has all VEGA presets required for the reports
     VEGA_LITE_PRESETS_ID = "prosit-compms"
 
@@ -22,15 +37,6 @@ class RetentionTimeReportModelComparisonWandb:
         description: str,
         test_dataset: RetentionTimeDataset,
     ):
-        """Creates WandB report for comparing models.
-
-        Args:
-            models (dict): keys are model names, values are model objects
-            project (str): Name of the project.
-            title (str): Title of the report.
-            description (str): Description of the report.
-            test_dataset (RetentionTimeDataset): Test dataset object to compare predictions of models on.
-        """
         self.project = project
         self.title = title
         self.description = description
@@ -48,11 +54,16 @@ class RetentionTimeReportModelComparisonWandb:
     ):
         """Creates the report in wandb.
 
-        Args:
-            add_data_section (bool, optional): Add a section for input data to the report. Defaults to True.
-            add_residuals_section (bool, optional): Add a section for residual plots. Defaults to True.
-            add_r2_section (bool, optional): Add a section for the R2 metric. Defaults to True.
-            add_density_section (bool, optional): Add a section for the density plot. Defaults to True.
+        Parameters
+        ----------
+            add_data_section: bool, optional
+                Add a section for input data to the report. Defaults to True.
+            add_residuals_section: bool, optional
+                Add a section for residual plots. Defaults to True.
+            add_r2_section: bool, optional
+                Add a section for the R2 metric. Defaults to True.
+            add_density_section: bool, optional
+                Add a section for the density plot. Defaults to True.
         """
         report = wr.Report(
             project=self.project, title=self.title, description=self.description
@@ -68,7 +79,7 @@ class RetentionTimeReportModelComparisonWandb:
             report.blocks += self._build_r2_section()
         if add_density_section:
             report.blocks += self._build_density_section()
-        
+
         report.save()
 
     def calculate_r2(self, targets, predictions):
@@ -138,7 +149,9 @@ class RetentionTimeReportModelComparisonWandb:
     def _build_r2_section(self):
         r2_block = [
             wr.H1(text="R2"),
-            wr.P("The following plot displays the R2 score for all the compared models."),
+            wr.P(
+                "The following plot displays the R2 score for all the compared models."
+            ),
             wr.PanelGrid(
                 runsets=[
                     wr.Runset(self.entity, self.project),
@@ -180,9 +193,7 @@ class RetentionTimeReportModelComparisonWandb:
 
         density_block = [
             wr.H1(text="Density"),
-            wr.P(
-                "This section displays the density plots for all compared models."
-            ),
+            wr.P("This section displays the density plots for all compared models."),
             wr.PanelGrid(
                 runsets=[
                     wr.Runset(self.entity, self.project),
