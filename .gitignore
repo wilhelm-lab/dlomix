@@ -161,6 +161,10 @@ todo.md
 run_scripts/checkpoint*
 run_scripts/*.index
 run_scripts/*.data-*
+run_scripts/*.csv
 
 # testing metadata
 metadata.parquet
+
+# test assets (will be downloaded the first time tests are run and then ignore by git)
+assets/
