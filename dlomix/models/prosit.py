@@ -1,5 +1,6 @@
 import tensorflow as tf
 from tensorflow.keras.layers.experimental import preprocessing
+
 from dlomix.constants import ALPHABET_UNMOD
 from dlomix.layers.attention import AttentionLayer, DecoderAttentionLayer
 
@@ -159,7 +160,6 @@ class PrositIntensityPredictor(tf.keras.Model):
         )
 
     def _build_encoders(self):
-
         self.meta_encoder = tf.keras.Sequential(
             [
                 tf.keras.layers.Concatenate(name="meta_in"),

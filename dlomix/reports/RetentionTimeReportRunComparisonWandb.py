@@ -40,7 +40,6 @@ class RetentionTimeReportRunComparisonWandb:
         description: str,
         dataset: RetentionTimeDataset = None,
     ):
-        
         self.project = project
         self.title = title
         self.description = description
@@ -388,6 +387,7 @@ class RetentionTimeReportRunComparisonWandb:
 
     def log_model_data(self, model):
         import io
+
         model_summary_buffer = io.StringIO()
         model.summary(print_fn=lambda x: model_summary_buffer.write(x + "<br>"))
         model_summary_lines = model_summary_buffer.getvalue().split("<br>")

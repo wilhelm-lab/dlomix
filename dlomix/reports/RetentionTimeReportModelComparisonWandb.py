@@ -20,7 +20,7 @@ class RetentionTimeReportModelComparisonWandb:
         description (str): Description of the report.
         test_dataset (RetentionTimeDataset): Test dataset object to compare predictions of models on.
     """
-    
+
     # Wilhelmlab WandB account that has all VEGA presets required for the reports
     VEGA_LITE_PRESETS_ID = "prosit-compms"
 
@@ -32,7 +32,6 @@ class RetentionTimeReportModelComparisonWandb:
         description: str,
         test_dataset: RetentionTimeDataset,
     ):
-    
         self.project = project
         self.title = title
         self.description = description
@@ -70,7 +69,7 @@ class RetentionTimeReportModelComparisonWandb:
             report.blocks += self._build_r2_section()
         if add_density_section:
             report.blocks += self._build_density_section()
-        
+
         report.save()
 
     def calculate_r2(self, targets, predictions):
@@ -140,7 +139,9 @@ class RetentionTimeReportModelComparisonWandb:
     def _build_r2_section(self):
         r2_block = [
             wr.H1(text="R2"),
-            wr.P("The following plot displays the R2 score for all the compared models."),
+            wr.P(
+                "The following plot displays the R2 score for all the compared models."
+            ),
             wr.PanelGrid(
                 runsets=[
                     wr.Runset(self.entity, self.project),
@@ -182,9 +183,7 @@ class RetentionTimeReportModelComparisonWandb:
 
         density_block = [
             wr.H1(text="Density"),
-            wr.P(
-                "This section displays the density plots for all compared models."
-            ),
+            wr.P("This section displays the density plots for all compared models."),
             wr.PanelGrid(
                 runsets=[
                     wr.Runset(self.entity, self.project),

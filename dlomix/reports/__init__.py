@@ -5,8 +5,9 @@ from .RetentionTimeReportModelComparisonWandb import (
 )
 from .RetentionTimeReportRunComparisonWandb import RetentionTimeReportRunComparisonWandb
 
-__all__ = ["RetentionTimeReport",
-           "IntensityReport",
-           "RetentionTimeReportRunComparisonWandb",
-           "RetentionTimeReportModelComparisonWandb",
-           ]
+__all__ = [
+    "RetentionTimeReport",
+    "IntensityReport",
+    "RetentionTimeReportRunComparisonWandb",
+    "RetentionTimeReportModelComparisonWandb",
+]
