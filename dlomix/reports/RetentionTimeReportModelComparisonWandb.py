@@ -10,15 +10,20 @@ from ..data.RetentionTimeDataset import RetentionTimeDataset
 
 
 class RetentionTimeReportModelComparisonWandb:
-    """Creates WandB report for comparing models.
+    """Creates a WandB report for comparing models.
 
     Parameters
     ----------
-        models (dict): keys are model names, values are model objects
-        project (str): Name of the project.
-        title (str): Title of the report.
-        description (str): Description of the report.
-        test_dataset (RetentionTimeDataset): Test dataset object to compare predictions of models on.
+    models : dict
+        A dictionary where the keys are model names and the values are model objects.
+    project : str
+        The name of the project.
+    title : str
+        The title of the report.
+    description : str
+        The description of the report.
+    test_dataset : RetentionTimeDataset
+        The test dataset object to compare the predictions of models on.
     """
 
     # Wilhelmlab WandB account that has all VEGA presets required for the reports
@@ -49,11 +54,16 @@ class RetentionTimeReportModelComparisonWandb:
     ):
         """Creates the report in wandb.
 
-        Args:
-            add_data_section (bool, optional): Add a section for input data to the report. Defaults to True.
-            add_residuals_section (bool, optional): Add a section for residual plots. Defaults to True.
-            add_r2_section (bool, optional): Add a section for the R2 metric. Defaults to True.
-            add_density_section (bool, optional): Add a section for the density plot. Defaults to True.
+        Parameters
+        ----------
+            add_data_section: bool, optional
+                Add a section for input data to the report. Defaults to True.
+            add_residuals_section: bool, optional
+                Add a section for residual plots. Defaults to True.
+            add_r2_section: bool, optional
+                Add a section for the R2 metric. Defaults to True.
+            add_density_section: bool, optional
+                Add a section for the density plot. Defaults to True.
         """
         report = wr.Report(
             project=self.project, title=self.title, description=self.description
