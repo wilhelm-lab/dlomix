@@ -1,10 +1,14 @@
 name: PyPI
 
 on:
+  workflow_dispatch:
   workflow_run:
     workflows: ["Build"]
     types:
       - completed
+  push:
+    branches:
+      - main
 
 jobs:
   release:
@@ -15,7 +19,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v2
         with:
-          python-version: '3.7'
+          python-version: '3.8'
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
@@ -32,6 +36,6 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.CLI_GH_TOKEN }}
         run: |
-          VERSION=$(python -c "from dlomix import __version__; print(__version__);")
+          VERSION=$(python setup.py --version)
           gh release create v$VERSION --title $VERSION --generate-notes
         
