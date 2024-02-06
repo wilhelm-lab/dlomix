@@ -54,6 +54,9 @@ coverage.xml
 .hypothesis/
 .pytest_cache/
 
+# put all coverage in one place
+cov/
+
 # Translations
 *.mo
 *.pot
@@ -150,6 +153,7 @@ notebooks/wandb
 
 # local to do file if exists :)
 todo.txt
+todo.md
 
 .DS_Store
 
@@ -157,6 +161,10 @@ todo.txt
 run_scripts/checkpoint*
 run_scripts/*.index
 run_scripts/*.data-*
+run_scripts/*.csv
 
 # testing metadata
 metadata.parquet
+
+# test assets (will be downloaded the first time tests are run and then ignore by git)
+assets/

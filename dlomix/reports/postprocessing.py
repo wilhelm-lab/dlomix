@@ -10,9 +10,7 @@ def reshape_dims(array):
     n, dims = array.shape
     assert dims == 174
     nlosses = 1
-    return array.reshape(
-        [array.shape[0], 30 - 1, 2, nlosses, 3]
-    )
+    return array.reshape([array.shape[0], 30 - 1, 2, nlosses, 3])
 
 
 def reshape_flat(array):
@@ -28,14 +26,14 @@ def normalize_base_peak(array):
     return array
 
 
-def mask_outofrange(array, lengths, mask=-1.):
+def mask_outofrange(array, lengths, mask=-1.0):
     # dim
     for i in range(array.shape[0]):
         array[i, lengths[i] - 1 :, :, :, :] = mask
     return array
 
 
-def mask_outofcharge(array, charges, mask=-1.):
+def mask_outofcharge(array, charges, mask=-1.0):
     # dim
     for i in range(array.shape[0]):
         if charges[i] < 3:
@@ -44,7 +42,6 @@ def mask_outofcharge(array, charges, mask=-1.):
 
 
 def get_spectral_angle(true, pred, batch_size=600):
-
     n = true.shape[0]
     sa = np.zeros([n])
 
@@ -70,12 +67,18 @@ def get_spectral_angle(true, pred, batch_size=600):
 
 
 def normalize_intensity_predictions(data, batch_size=600):
-    assert "sequences" in data, "Key sequences is missing in the data provided for post-processing"
-    assert "intensities_pred" in data, "Key intensities_pred is missing in the data provided for post-processing"
-    assert "precursor_charge_onehot" in data, "Key precursor_charge_onehot is missing in the data provided for post-processing"
+    assert (
+        "sequences" in data
+    ), "Key sequences is missing in the data provided for post-processing"
+    assert (
+        "intensities_pred" in data
+    ), "Key intensities_pred is missing in the data provided for post-processing"
+    assert (
+        "precursor_charge_onehot" in data
+    ), "Key precursor_charge_onehot is missing in the data provided for post-processing"
 
     sequence_lengths = data["sequences"].apply(lambda x: len(x))
-    intensities =  np.stack(data["intensities_pred"].to_numpy()).astype(np.float32)
+    intensities = np.stack(data["intensities_pred"].to_numpy()).astype(np.float32)
     precursor_charge_onehot = np.stack(data["precursor_charge_onehot"].to_numpy())
     charges = list(precursor_charge_onehot.argmax(axis=1) + 1)
 
@@ -91,6 +94,8 @@ def normalize_intensity_predictions(data, batch_size=600):
 
     if "intensities_raw" in data:
         data["spectral_angle"] = get_spectral_angle(
-            np.stack(data["intensities_raw"].to_numpy()).astype(np.float32), intensities, batch_size=batch_size
+            np.stack(data["intensities_raw"].to_numpy()).astype(np.float32),
+            intensities,
+            batch_size=batch_size,
         )
     return data

@@ -1,21 +1,42 @@
-from fpdf import FPDF
-from matplotlib import pyplot as plt
-from os.path import join
-from os import makedirs
-import tensorflow as tf
-import warnings
 import abc
 import glob
+import warnings
+from os import makedirs
+from os.path import join
+
+import tensorflow as tf
+from fpdf import FPDF
+from matplotlib import pyplot as plt
 
 
 class Report(abc.ABC):
-    """Base class for reports, child classes should implement the abstract method generate_report.
+    """Base class for reports.
+
+    Child classes should implement the abstract method `generate_report`.
 
     Parameters
     ----------
-        output_path: path to save output files and figures.
-        history : reference to a Keras History object or its history dict attribute (History.history).
-        figures_ext: File extension and format for saving figures.
+    output_path : str
+        Path to save output files and figures.
+    history : tf.keras.callbacks.History or dict
+        Reference to a Keras History object or its history dict attribute (History.history).
+    figures_ext : str
+        File extension and format for saving figures.
+
+    Attributes
+    ----------
+    VALID_FIGURE_FORMATS : list
+        List of valid figure formats.
+
+    Methods
+    -------
+    plot_keras_metric(metric_name, save_plot=True)
+        Plot a Keras metric given its name and the history object.
+    plot_all_metrics()
+        Plot all available Keras metrics in the History object.
+    generate_report(targets, predictions, **kwargs)
+        Abstract method to generate a complete report.
+
     """
 
     VALID_FIGURE_FORMATS = ["pdf", "jpeg", "jpg", "png"]
@@ -93,12 +114,14 @@ class Report(abc.ABC):
                 )
 
     def plot_keras_metric(self, metric_name, save_plot=True):
-        """Plot a keras metric given its name and the history object returned by model.fit()
+        """Plot a Keras metric given its name and the history object.
 
         Arguments
         ---------
-            metric_name: String with the name of the metric.
-            save_plot (bool, optional): whether to save plot to disk or not. Defaults to True.
+        metric_name : str
+            The name of the metric.
+        save_plot : bool, optional
+            Whether to save the plot to disk or not. Defaults to True.
         """
 
         if metric_name.lower() not in self._history_dict.keys():
@@ -140,12 +163,16 @@ class Report(abc.ABC):
 
     @abc.abstractmethod
     def generate_report(self, targets, predictions, **kwargs):
-        """Abstract method to generate a complete report. Child classes need to implement this method.
+        """Abstract method to generate a complete report.
+
+        Child classes need to implement this method.
 
         Arguments
         ---------
-            targets: Array with target values.
-            predictions: Array with prediction values.
+        targets : array-like
+            Array with target values.
+        predictions : array-like
+            Array with prediction values.
         """
         pass
 
@@ -166,7 +193,6 @@ class PDFFile(FPDF):
     LINE_HEIGHT = 5
 
     def __init__(self, title):
-
         super().__init__()
         self.title = title
         self.width = PDFFile.PAGE_WIDTH
@@ -218,16 +244,122 @@ class PDFFile(FPDF):
         self._create_first_page_if_document_empty()
         self._add_section_content(section_title, section_body)
 
-    def add_content_plot_page(self, plot_filepath, section_title="", section_body=""):
-        """Add a new page with a section title, a paragraph, and a plot. At least a plot has to be provided.
+    class PDFFile(FPDF):
+        """PDF file template class.
 
-        Arguments
-        ---------
-            plot_filepath (str): filepath of the plot to be inserted in the new page.
-            section_title (str, optional): title for the section. Defaults to "".
-            section_body (str, optional): paragraph text to add. Defaults to "".
+        Parameters
+        ----------
+        title : str
+            Title for the pdf file.
+
+        Attributes
+        ----------
+        PAGE_WIDTH : int
+            Width of the PDF page.
+        PAGE_HEIGHT : int
+            Height of the PDF page.
+        SECTION_PARAGRAPH_FONT : list
+            Font settings for section paragraphs.
+        SECTION_TITLE_FONT : list
+            Font settings for section titles.
+        LINE_HEIGHT : int
+            Height of a line in the PDF.
+
+        Methods
+        -------
+        header()
+            Override method to add a header to the PDF.
+        footer()
+            Override method to add a footer to the PDF.
+        _add_plot(plot_filepath)
+            Add a plot to the PDF.
+        _add_section_content(section_title, section_body)
+            Add a section title and body to the PDF.
+        _create_first_page_if_document_empty()
+            Create the first page of the PDF if it is empty.
+        add_content_text_page(section_title, section_body)
+            Add a section title, paragraph, and plot to the PDF.
+        add_content_plot_page(plot_filepath, section_title="", section_body="")
+            Add a new page with a section title, paragraph, and plot to the PDF.
+
         """
 
-        self._create_first_page_if_document_empty()
-        self._add_section_content(section_title, section_body)
-        self._add_plot(plot_filepath)
+        PAGE_WIDTH = 210
+        PAGE_HEIGHT = 297
+        SECTION_PARAGRAPH_FONT = ["Arial", "", 11]
+        SECTION_TITLE_FONT = ["Arial", "B", 13]
+        LINE_HEIGHT = 5
+
+        def __init__(self, title):
+            super().__init__()
+            self.title = title
+            self.width = PDFFile.PAGE_WIDTH
+            self.height = PDFFile.PAGE_HEIGHT
+
+            self.set_auto_page_break(True)
+            self.document_empty = True
+
+        def header(self):
+            self.set_font("Arial", "B", 11)
+            self.cell(self.width - 80)
+            self.cell(60, 1, self.title, 0, 0, "R")
+            self.ln(20)
+
+        def footer(self):
+            # Page numbers in the footer
+            self.set_y(-15)
+            self.set_font("Arial", "I", 8)
+            self.set_text_color(128)
+            self.cell(0, 10, "Page " + str(self.page_no()), 0, 0, "C")
+
+        def _add_plot(self, plot_filepath):
+            self.image(plot_filepath)
+            self.ln(3 * PDFFile.LINE_HEIGHT)
+
+        def _add_section_content(self, section_title, section_body):
+            if section_title != "":
+                self.set_font(*PDFFile.SECTION_TITLE_FONT)
+                self.cell(w=0, txt=section_title)
+                self.ln(PDFFile.LINE_HEIGHT)
+            if section_body != "":
+                self.set_font(*PDFFile.SECTION_PARAGRAPH_FONT)
+                self.multi_cell(w=0, h=PDFFile.LINE_HEIGHT, txt=section_body)
+                self.ln(PDFFile.LINE_HEIGHT)
+
+        def _create_first_page_if_document_empty(self):
+            if self.document_empty:
+                self.add_page()
+                self.document_empty = False
+
+        def add_content_text_page(self, section_title, section_body):
+            """Add a section title and a paragraph.
+
+            Parameters
+            ----------
+            section_title : str
+                Title for the section.
+            section_body : str
+                Paragraph text to add.
+
+            """
+            self._create_first_page_if_document_empty()
+            self._add_section_content(section_title, section_body)
+
+        def add_content_plot_page(
+            self, plot_filepath, section_title="", section_body=""
+        ):
+            """Add a new page with a section title, a paragraph, and a plot. At least a plot has to be provided.
+
+            Parameters
+            ----------
+            plot_filepath : str
+                Filepath of the plot to be inserted in the new page.
+            section_title : str, optional
+                Title for the section. Defaults to "".
+            section_body : str, optional
+                Paragraph text to add. Defaults to "".
+
+            """
+            self._create_first_page_if_document_empty()
+            self._add_section_content(section_title, section_body)
+            self._add_plot(plot_filepath)

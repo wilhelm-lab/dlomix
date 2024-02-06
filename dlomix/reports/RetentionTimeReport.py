@@ -1,9 +1,12 @@
 from os.path import join
-from matplotlib import pyplot as plt
-from dlomix.reports.Report import PDFFile, Report
+from warnings import warn
+
 import numpy as np
+from matplotlib import pyplot as plt
 from matplotlib.colors import LogNorm
 from matplotlib.ticker import LogLocator
+
+from dlomix.reports.Report import PDFFile, Report
 
 
 class RetentionTimeReport(Report):
@@ -14,6 +17,12 @@ class RetentionTimeReport(Report):
 
     def __init__(self, output_path, history, figures_ext="png"):
         super(RetentionTimeReport, self).__init__(output_path, history, figures_ext)
+
+        warn(
+            f"{self.__class__.__name__} This class is deprecated and will not further developed. Use RetentionTimeReportWandb instead for creating a report with the Weights & Biases Report API.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
 
         self.pdf_file = PDFFile("DLOmix - Retention Time Report")
 

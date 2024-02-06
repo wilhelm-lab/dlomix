@@ -16,10 +16,17 @@ A version that includes experiment tracking with [Weights and Biases](https://ww
 More learning resources can be found in the [dlomix-resources](https://github.com/wilhelm-lab/dlomix-resources) repository.
 
 ## Installation
+
 Run the following to install:
 ```bash
 $ pip install dlomix
-``` 
+```
+
+If you would like to use [Weights & Biases](wandb.ai) for experiment tracking and use the available reports for Retention Time under `/notebooks`, please install the optional `wandb` python dependency with `dlomix` by running:
+
+```bash
+$ pip install dlomix[wandb]
+```
 
 **General Overview**
 -  `data`: structures for modeling the input data, currently based on `tf.Dataset`
@@ -36,8 +43,8 @@ $ pip install dlomix
 
 **Use-cases**
 
-- Retention Time Prediction: 
-    - a regression problem where the retention time of a peptide sequence is to be predicted. 
+- Retention Time Prediction:
+    - a regression problem where the retention time of a peptide sequence is to be predicted.
 
 
 
@@ -50,6 +57,7 @@ Functionality:
 - [X] add residual plots to reporting, possibly other regression analysis tools
 - [X] output reporting results as PDF
 - [ ] extend data representation to include modifications
+- [X] refactor reporting module to use W&B Report API (Retention Time)
 - [ ] added required modules for precursor charge prediction
 
 Package structure:
@@ -80,4 +88,3 @@ Robbin Bouwmeester, Ralf Gabriels, Niels Hulstaert, Lennart Martens, Sven Degroe
 bioRxiv 2020.03.28.013003; doi: 10.1101/2020.03.28.013003
 
 [3] Bouwmeester, R., Gabriels, R., Hulstaert, N. et al. DeepLC can predict retention times for peptides that carry as-yet unseen modifications. Nat Methods 18, 1363–1369 (2021). https://doi.org/10.1038/s41592-021-01301-5
- 
