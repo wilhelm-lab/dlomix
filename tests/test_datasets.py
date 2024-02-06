@@ -8,7 +8,11 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from dlomix.data import IntensityDataset, RetentionTimeDataset
+from dlomix.data import (
+    IntensityDataset,
+    PrecursorChargeStateDataset,
+    RetentionTimeDataset,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -188,3 +192,8 @@ def test_csv_intensitydataset():
     assert intensity_dataset.precursor_charge is not None
     assert intensity_dataset.intensities is not None
     assert intensity_dataset.main_split is IntensityDataset.SPLIT_NAMES[0]
+
+
+def test_empty_charge_prediction_dataset():
+    dataset = PrecursorChargeStateDataset()
+    assert dataset is not None
