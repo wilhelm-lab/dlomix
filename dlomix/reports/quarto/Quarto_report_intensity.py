@@ -13,6 +13,8 @@ import warnings
 # make data optional
 # make prediction optional
 # val/test violin plots
+#   - 
+#   - how to get val predictions? make users pass them?
 #   - concatenate val/test
 #   - add flag column whether val/test
 #   - adapt violin plot function
