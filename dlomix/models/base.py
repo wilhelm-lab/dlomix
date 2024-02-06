@@ -1,5 +1,4 @@
 import tensorflow as tf
-from tensorflow.keras.layers.experimental import preprocessing
 
 from dlomix.constants import ALPHABET_UNMOD
 
@@ -30,10 +29,6 @@ class RetentionTimePredictor(tf.keras.Model):
 
         # tie the count of embeddings to the size of the vocabulary (count of amino acids)
         self.embeddings_count = len(vocab_dict) + 2
-
-        self.string_lookup = preprocessing.StringLookup(
-            vocabulary=list(vocab_dict.keys())
-        )
 
         self.embedding = tf.keras.layers.Embedding(
             input_dim=self.embeddings_count,
@@ -75,8 +70,7 @@ class RetentionTimePredictor(tf.keras.Model):
             )
 
     def call(self, inputs, **kwargs):
-        x = self.string_lookup(inputs)
-        x = self.embedding(x)
+        x = self.embedding(inputs)
         x = self.encoder(x)
         x = self.flatten(x)
         x = self.regressor(x)

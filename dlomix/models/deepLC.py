@@ -1,5 +1,4 @@
 import tensorflow as tf
-from tensorflow.keras.layers.experimental import preprocessing
 
 from dlomix.constants import ALPHABET_UNMOD
 
@@ -13,9 +12,6 @@ class DeepLCRetentionTimePredictor(tf.keras.Model):
         self._use_global_features = use_global_features
 
         self.leaky_relu = tf.keras.layers.ReLU(max_value=20, negative_slope=0.1)
-        self.string_lookup = preprocessing.StringLookup(
-            vocabulary=list(vocab_dict.keys())
-        )
 
         self._build_aminoacid_branch()
         self._build_diaminoacid_branch()
@@ -112,8 +108,7 @@ class DeepLCRetentionTimePredictor(tf.keras.Model):
     def call(self, inputs, **kwargs):
         outputs = {}
 
-        integer_encoded = self.string_lookup(inputs["seq"])
-        onehot_encoded = tf.one_hot(integer_encoded, depth=self.seq_length)
+        onehot_encoded = tf.one_hot(inputs["seq"], depth=self.seq_length)
 
         if self._use_global_features:
             outputs["global_features_output"] = self.global_features_branch(

@@ -1,5 +1,4 @@
 import tensorflow as tf
-from tensorflow.keras.layers.experimental import preprocessing
 
 from dlomix.constants import ALPHABET_UNMOD
 from dlomix.layers.attention import AttentionLayer, DecoderAttentionLayer
@@ -46,10 +45,6 @@ class PrositRetentionTimePredictor(tf.keras.Model):
         self.regressor_layer_size = regressor_layer_size
         self.recurrent_layers_sizes = recurrent_layers_sizes
 
-        self.string_lookup = preprocessing.StringLookup(
-            vocabulary=list(vocab_dict.keys())
-        )
-
         self.embedding = tf.keras.layers.Embedding(
             input_dim=self.embeddings_count,
             output_dim=embedding_output_dim,
@@ -85,8 +80,7 @@ class PrositRetentionTimePredictor(tf.keras.Model):
         )
 
     def call(self, inputs, **kwargs):
-        x = self.string_lookup(inputs)
-        x = self.embedding(x)
+        x = self.embedding(inputs)
         x = self.encoder(x)
         x = self.attention(x)
         x = self.regressor(x)
@@ -140,10 +134,6 @@ class PrositIntensityPredictor(tf.keras.Model):
 
         # maximum number of fragment ions
         self.max_ion = self.seq_length - 1
-
-        self.string_lookup = preprocessing.StringLookup(
-            vocabulary=list(vocab_dict.keys())
-        )
 
         self.embedding = tf.keras.layers.Embedding(
             input_dim=self.embeddings_count,
@@ -219,8 +209,7 @@ class PrositIntensityPredictor(tf.keras.Model):
 
         encoded_meta = self.meta_encoder([collision_energy_in, precursor_charge_in])
 
-        x = self.string_lookup(peptides_in)
-        x = self.embedding(x)
+        x = self.embedding(peptides_in)
         x = self.sequence_encoder(x)
         x = self.attention(x)
 
