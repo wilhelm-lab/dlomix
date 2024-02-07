@@ -17,6 +17,7 @@ import warnings
 # include model information -> how?
 # clean way to include/exclude optional parts
 # include per batch metrics? custom callback needed
+# delete or keep images after report creation?
 
 
 class QuartoReport:
@@ -26,18 +27,20 @@ class QuartoReport:
         "val_plots": "VAL_PLOTS_PATH", "data_plots": "DATA_PLOTS_PATH",
         "train_val_plots": "TV_PLOTS_PATH", "model_info": "MODEL_INFORMATION",
         "residuals_plot": "RESIDUALS_PLOT_PATH", "density_plot": "DENSITY_PLOT_PATH",
-        "r2_score": "R2_SCORE_VALUE"
+        "r2_score": "R2_SCORE_VALUE", "model": "MODEL_NAME", "total_params": "TOTAL_PARAMS",
+        "trainable_params": "TRAINABLE_PARAMS",
+        "non_trainable_params": "NT_PARAMS"
     }
 
-    def __init__(self, history, data=None, test_targets=None, predictions=None, title="Retention time report",
-                 fold_code=True,
+    def __init__(self, history, data=None, test_targets=None, predictions=None, model=None,
+                 title="Retention time report", fold_code=True,
                  output_path="/Users/andi/PycharmProjects/dlomix_repo/dlomix/reports/quarto/"):
         self.title = title
         self.fold_code = fold_code
         self.qmd_template_location = QuartoReport.TEMPLATE_PATH
         self.output_path = output_path
         self.qmd_content = None
-
+        self.model = model
         self.test_targets = test_targets
         self.predictions = predictions
 
@@ -65,8 +68,11 @@ class QuartoReport:
             )
         else:
             subfolders.append("test")
-        self.test_targets = test_targets
-        self.predictions = predictions
+
+        if model is None:
+            warnings.warn(
+                "The passed model object is None, no model related information can be reported."
+            )
 
         self._create_plot_folder_structure(subfolders)
 
@@ -100,6 +106,53 @@ class QuartoReport:
             if not os.path.exists(path):
                 os.makedirs(path)
 
+    def _get_model_data(self):
+        import io
+        model_summary_buffer = io.StringIO()
+        model.summary(print_fn=lambda x: model_summary_buffer.write(x + "<br>"))
+        model_summary_lines = model_summary_buffer.getvalue().split("<br>")
+
+        lines = [line.rstrip() for line in model_summary_lines]
+
+        # remove formatting lines
+        strings_to_remove = ["____", "===="]
+        cleaned_list = [
+            item
+            for item in lines
+            if not any(string in item for string in strings_to_remove)
+        ]
+
+        # split into words by splitting if there are more than two whitespaces
+        words = []
+        for line in cleaned_list:
+            words.append(re.split(r"\s{2,}", line))
+
+        # remove lines that contain less than 3 characters
+        filtered_list_of_lists = [
+            sublist for sublist in words if all(len(item) > 3 for item in sublist)
+        ]
+
+        # extract layer info and model info
+        layer_info = [sublist for sublist in filtered_list_of_lists if len(sublist) > 2]
+        model_info = [sublist for sublist in filtered_list_of_lists if len(sublist) < 2]
+
+        # flatten model_info and filter entries with length smaller than 5
+        model_info_flat = [item for sublist in model_info for item in sublist]
+        model_info_flat_filtered = [item for item in model_info_flat if len(item) >= 5]
+
+        model_info_dict = {}
+        for item in model_info_flat_filtered:
+            # Split each string by ": "
+            key, value = item.split(": ", 1)
+            # Add the key-value pair to the dictionary
+            model_info_dict[key] = value
+
+        # create layer_info_df
+        column_names = layer_info[0]
+        layer_info_df = pd.DataFrame(layer_info[1:], columns=column_names)
+
+        return model_info_dict, layer_info_df
+
     def generate_report(self, **kwargs):  # other arguments from the task workflow
 
         # load the skeleton qmd file
@@ -120,6 +173,17 @@ class QuartoReport:
 
         self.qmd_content = self.qmd_content.replace(QuartoReport.REPLACEMENT_KEYS["title"], self.title)
         self.qmd_content = self.qmd_content.replace(QuartoReport.REPLACEMENT_KEYS["fold-code"], str(self.fold_code))
+
+        if self.model is not None:
+            model_info_dict, _ = self._get_model_data()
+            self.qmd_content = self.qmd_content.replace(QuartoReport.REPLACEMENT_KEYS["model"],
+                                                        model_info_dict.get("Model"))
+            self.qmd_content = self.qmd_content.replace(QuartoReport.REPLACEMENT_KEYS["total_params"],
+                                                        model_info_dict.get("Total params"))
+            self.qmd_content = self.qmd_content.replace(QuartoReport.REPLACEMENT_KEYS["trainable_params"],
+                                                        model_info_dict.get("Trainable params"))
+            self.qmd_content = self.qmd_content.replace(QuartoReport.REPLACEMENT_KEYS["non_trainable_params"],
+                                                        model_info_dict.get("Non-trainable params"))
 
         if self.data is not None:
             data_plots_path = self.plot_all_data_plots()

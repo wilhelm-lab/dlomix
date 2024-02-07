@@ -10,6 +10,15 @@ format-links: false
 jupyter: python3
 ---
 
+# Model information
+The following section shows information about the model. The table below contains information about the models' layers.
+
+* Model: MODEL_NAME
+* Total parameters: TOTAL_PARAMS
+* Trainable parameters: TRAINABLE_PARAMS
+* Non-trainable parameters: NT_PARAMS
+{{< pagebreak >}}
+
 # Data
 The following section is showing a simple explorative data analysis of the used dataset. The first histogram shows the
 distribution of peptide lengths in the data set, while the second histogram shows the distribution of indexed retention
