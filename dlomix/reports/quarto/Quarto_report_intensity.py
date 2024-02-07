@@ -12,8 +12,10 @@ import warnings
 
 # make data optional
 # make prediction optional
+# intensity report in the develop branch
+# check weave also if doable programmatically
+
 # val/test violin plots
-#   - 
 #   - how to get val predictions? make users pass them?
 #   - concatenate val/test
 #   - add flag column whether val/test
