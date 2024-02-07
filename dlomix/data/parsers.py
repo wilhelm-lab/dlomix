@@ -112,7 +112,9 @@ class ProformaParser(AbstractParser):
         mod = self._take_first_modification_proforma_output(mod)
 
         if self.build_naive_vocab:
-            proforma_splitted_sequence = rebuild_proforma_sequence(seq, mod)
+            proforma_splitted_sequence = rebuild_proforma_sequence(
+                seq, mod, n_term_mods, c_term_mods
+            )
             for s in proforma_splitted_sequence:
                 if self.extended_vocab.get(s) is None:
                     print(

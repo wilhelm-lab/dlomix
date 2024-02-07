@@ -203,10 +203,12 @@ class PrositIntensityPredictor(tf.keras.Model):
         )
 
     def call(self, inputs, **kwargs):
-        peptides_in = inputs["sequence"]
-        collision_energy_in = inputs["collision_energy"]
-        precursor_charge_in = inputs["precursor_charge"]
+        peptides_in = inputs["modified_sequence"]
+        collision_energy_in = inputs["collision_energy_aligned_normed"]
+        precursor_charge_in = inputs["precursor_charge_onehot"]
 
+        collision_energy_in = tf.expand_dims(collision_energy_in, axis=1)
+        precursor_charge_in = tf.cast(precursor_charge_in, tf.float32)
         encoded_meta = self.meta_encoder([collision_energy_in, precursor_charge_in])
 
         x = self.embedding(peptides_in)

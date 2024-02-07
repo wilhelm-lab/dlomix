@@ -1,6 +1,18 @@
 import re
+from enum import Enum
 
 from .sequence_utils import rebuild_proforma_sequence
+
+
+class EncodingScheme(Enum):
+    NO_MODS = "unmod"
+    NAIVE_MODS = "naive-mods"
+
+    @classmethod
+    def _missing_(cls, value):
+        raise ValueError(
+            f"Provided {cls.__name__} is not defined. Valid values are: {', '.join([e.value for e in cls])}"
+        )
 
 
 def add_parsed_sequence_info(
@@ -23,10 +35,18 @@ def add_parsed_sequence_info(
 
 
 def update_sequence_with_splitted_proforma_format(
-    example, raw_sequence_column_name, mods_column_name, new_column_name
+    example,
+    raw_sequence_column_name,
+    mods_column_name,
+    n_term_column_name,
+    c_term_column_name,
+    new_column_name,
 ):
     example[new_column_name] = rebuild_proforma_sequence(
-        example[raw_sequence_column_name], example[mods_column_name]
+        example[raw_sequence_column_name],
+        example[mods_column_name],
+        example[n_term_column_name],
+        example[c_term_column_name],
     )
     return example
 
