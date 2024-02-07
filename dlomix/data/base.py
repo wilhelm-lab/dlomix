@@ -1,5 +1,6 @@
 import abc
 import warnings
+from pprint import pprint
 from typing import Callable, Dict, List, Optional, Union
 
 from datasets import Dataset, DatasetDict, load_dataset
@@ -255,7 +256,8 @@ class AbstractPeptideDataset(abc.ABC):
         for step, args in zip(
             self.processing_pipeline_steps, self.processing_pipeline_args
         ):
-            print(f"For the next step, using the following args: {args}")
+            print("For the next step, using the following args:")
+            pprint(args)
             self.dataset = self.dataset.map(
                 lambda x: step(x, **args), desc=f"Applying {step.__name__}..."
             )
