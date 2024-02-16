@@ -1,7 +1,7 @@
 import re
 from enum import Enum
 
-from .sequence_utils import rebuild_proforma_sequence
+from .sequence_utils import parse_sequence_native, rebuild_proforma_sequence
 
 
 class EncodingScheme(Enum):
@@ -31,7 +31,64 @@ def add_parsed_sequence_info(
     example[new_column_names[1]] = mods
     example[new_column_names[2]] = n_terms
     example[new_column_names[3]] = c_terms
+
+    example[sequence_column_name] = rebuild_proforma_sequence(
+        seq,
+        mods,
+        n_terms,
+        c_terms,
+    )
+
     return example
+
+
+def add_parsed_sequence_info_fast(
+    example,
+    sequence_column_name: str,
+    new_column_names: list = [
+        "raw_sequence",
+        "n_terminal_mods",
+        "c_terminal_mods",
+    ],
+):
+    n_terms, seq, c_terms = parse_sequence_native(example[sequence_column_name])
+    example[new_column_names[0]] = seq
+    example[new_column_names[1]] = n_terms
+    example[new_column_names[2]] = c_terms
+
+    example[sequence_column_name] = [n_terms] + seq + [c_terms]
+
+    return example
+
+
+def add_parsed_sequence_info_fast_batched(
+    batch,
+    sequence_column_name: str,
+    new_column_names: list = [
+        "raw_sequence",
+        "n_terminal_mods",
+        "c_terminal_mods",
+    ],
+):
+    batch[new_column_names[0]] = []
+    batch[new_column_names[1]] = []
+    batch[new_column_names[2]] = []
+
+    for index, sequence in enumerate(batch[sequence_column_name]):
+        n_terms, seq, c_terms = parse_sequence_native(sequence)
+        batch[new_column_names[0]].append(seq)
+        batch[new_column_names[1]].append(n_terms)
+        batch[new_column_names[2]].append(c_terms)
+
+        updated_seq = seq
+        if n_terms != "[]-":
+            updated_seq = [n_terms] + updated_seq
+        if c_terms != "-[]":
+            updated_seq = updated_seq + [c_terms]
+
+        batch[sequence_column_name][index] = updated_seq
+
+    return batch
 
 
 def update_sequence_with_splitted_proforma_format(
@@ -66,62 +123,46 @@ def encode_sequence(example, sequence_column_name, alphabet):
     return example
 
 
-def pad_drop_sequence(example, seq_len, padding, sequence_column_name):
+def encode_sequence_batched(batch, sequence_column_name, alphabet):
+    # encode with alphabet
+
+    for index, sequence in enumerate(batch[sequence_column_name]):
+        batch[sequence_column_name][index] = [
+            alphabet.get(amino_acid) for amino_acid in sequence
+        ]
+
+    return batch
+
+
+def pad_truncate_sequence(example, seq_len, padding, sequence_column_name):
     length = len(example[sequence_column_name])
     if length < seq_len:
         example[sequence_column_name].extend([padding] * (seq_len - length))
     if length > seq_len:
         example[sequence_column_name] = example[sequence_column_name][:seq_len]
+
     return example
 
 
-def get_mod_loss_feature(
-    example,
-    sequence_column_name,
-    feature_column_name="mod_loss",
-    default_value=[0, 0, 0, 0, 0, 0],
-):
-    PTM_LOSS_LOOKUP = {
-        "M[UNIMOD:35]": [0, 0, 0, 0, 0, 0],
-        "S[UNIMOD:21]": [1, 0, 0, 0, 0, 0],
-        "T[UNIMOD:21]": [1, 0, 0, 0, 0, 0],
-        "Y[UNIMOD:21]": [1, 0, 0, 0, 0, 0],
-        "R[UNIMOD:7]": [1, 0, 1, 0, 0, 0],
-        "K[UNIMOD:1]": [1, 0, 0, 0, 0, 0],
-        "K[UNIMOD:121]": [1, 0, 0, 0, 0, 0],
-        "Q(gl)": [9, 4, 2, 1, 0, 0],
-        "R[UNIMOD:34]": [1, 0, 0, 0, 0, 0],
-        "K[UNIMOD:34]": [1, 0, 0, 0, 0, 0],
-        "T(ga)": [1, 0, 0, 0, 0, 0],
-        "S(ga)": [1, 0, 0, 0, 0, 0],
-        "T(gl)": [1, 0, 0, 0, 0, 0],
-        "S(gl)": [1, 0, 0, 0, 0, 0],
-        "C[UNIMOD:4]": [1, 0, 0, 0, 0, 0],
-        "[ac]-": [1, 0, 0, 0, 0, 0],
-        "E(gl)": [8, 4, 1, 2, 0, 0],
-        "K[UNIMOD:36]": [2, 0, 0, 0, 0, 0],
-        "K[UNIMOD:37]": [3, 0, 0, 0, 0, 0],
-        "K[UNIMOD:122]": [1, 0, 0, 0, 0, 0],
-        "K[UNIMOD:58]": [1, 0, 0, 0, 0, 0],
-        "K[UNIMOD:1289]": [1, 0, 0, 0, 0, 0],
-        "K[UNIMOD:747]": [1, 0, 0, 0, 0, 0],
-        "K[UNIMOD:64]": [1, 0, 0, 0, 0, 0],
-        "K[UNIMOD:1848]": [1, 0, 0, 0, 0, 0],
-        "K[UNIMOD:1363]": [1, 0, 0, 0, 0, 0],
-        "K[UNIMOD:1849]": [1, 0, 0, 0, 0, 0],
-        "K[UNIMOD:3]": [1, 0, 0, 0, 0, 0],
-        "unknown": [3, 0, 2, 0, 0, 0],
-        "R[UNIMOD:36]": [2, 0, 0, 0, 0, 0],
-        "P[UNIMOD:35]": [1, 0, 0, 0, 0, 0],
-        "Y[UNIMOD:354]": [1, 0, 0, 0, 0, 0],
-    }
-    sequence = example[sequence_column_name].strip("_")
+def pad_truncate_sequence_batched(batch, seq_len, padding, sequence_column_name):
+    for index, sequence in enumerate(batch[sequence_column_name]):
+        length = len(sequence)
+        if length < seq_len:
+            batch[sequence_column_name][index].extend([padding] * (seq_len - length))
+        if length > seq_len:
+            batch[sequence_column_name][index] = sequence[:seq_len]
 
-    if "UNIMOD" not in example[sequence_column_name]:
-        example[feature_column_name] = [default_value for _ in range(len(sequence))]
-        return example
+    return batch
 
-    example[feature_column_name] = [
-        PTM_LOSS_LOOKUP.get(i, [0] * 6) for i in example[sequence_column_name]
-    ]
+
+def pad_sequence(example, seq_len, padding, sequence_column_name):
+    length = len(example[sequence_column_name])
+    if length < seq_len:
+        example[sequence_column_name].extend([padding] * (seq_len - length))
     return example
+
+
+def get_num_processors():
+    import multiprocessing
+
+    return multiprocessing.cpu_count()

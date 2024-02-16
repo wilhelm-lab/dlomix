@@ -9,11 +9,11 @@ from datasets_sql import query
 from ..constants import ALPHABET_UNMOD
 from .dataset_utils import (
     EncodingScheme,
-    add_parsed_sequence_info,
-    encode_sequence,
-    pad_drop_sequence,
+    add_parsed_sequence_info_fast_batched,
+    encode_sequence_batched,
+    get_num_processors,
+    pad_truncate_sequence_batched,
     remove_ptms,
-    update_sequence_with_splitted_proforma_format,
 )
 from .parsers import ProformaParser
 
@@ -65,6 +65,8 @@ class AbstractPeptideDataset(abc.ABC):
         self.dataset: Optional[Union[Dataset, DatasetDict]] = None
         self.empty_dataset_mode = False
         self.predefined_split = False
+        self._default_num_proc = get_num_processors()
+        self._default_batch_processing_size = 1000
         self._load_dataset()
 
         self.relevant_columns = None
@@ -147,16 +149,26 @@ class AbstractPeptideDataset(abc.ABC):
         else:
             # parse sequences only if encoding scheme is not unmod
             # here naive mods is the only other option for now (hence, extend the vocabulary)
-            self.parser = ProformaParser(build_naive_vocab=True, base_vocab=self.vocab)
-            self.dataset = self.dataset.map(
-                lambda x: add_parsed_sequence_info(
-                    x, self.sequence_column, self.parser
-                ),
-                desc="Parsing sequences...",
-            )
+            # self.parser = ProformaParser(build_naive_vocab=True, base_vocab=self.vocab)
+            # self.dataset = self.dataset.map(
+            #    lambda x: add_parsed_sequence_info(
+            #        x, self.sequence_column, self.parser
+            #    ),
+            #    desc="Parsing sequences...",
+            # )
 
             # get the extended vocab from the parser
-            self.extended_vocab = self.parser.extended_vocab
+            # self.extended_vocab = self.parser.extended_vocab
+
+            self.dataset = self.dataset.map(
+                lambda x: add_parsed_sequence_info_fast_batched(
+                    x, self.sequence_column
+                ),
+                desc="Parsing sequences fast...",
+                num_proc=self._default_num_proc,
+                batched=True,
+                batch_size=self._default_batch_processing_size,
+            )
 
     def _configure_processing_pipeline(self):
         # Filter and Pad
@@ -203,7 +215,7 @@ class AbstractPeptideDataset(abc.ABC):
                 f"Max sequence length provided is neither an int nor a string; type provided is {type(self.max_seq_len)}, value is {self.max_seq_len}."
             )
 
-        self.processing_pipeline_steps.append(pad_drop_sequence)
+        self.processing_pipeline_steps.append(pad_truncate_sequence_batched)
         self.processing_pipeline_args.append(
             {
                 "seq_len": seq_len,
@@ -214,7 +226,7 @@ class AbstractPeptideDataset(abc.ABC):
 
     def _configure_encoding_step(self):
         if self.encoding_scheme == EncodingScheme.NO_MODS:
-            self.processing_pipeline_steps.append(encode_sequence)
+            self.processing_pipeline_steps.append(encode_sequence_batched)
             self.processing_pipeline_args.append(
                 {"sequence_column_name": self.sequence_column, "alphabet": self.vocab}
             )
@@ -223,21 +235,21 @@ class AbstractPeptideDataset(abc.ABC):
                 "Naive encoding for PTMs: please use the dataset attribute extended_vocab for the full alphabet and pass it to the model if needed. \nUsage: dataset.extended_vocab"
             )
             # add proforma sequence splitted column
-            self.processing_pipeline_steps.append(
-                update_sequence_with_splitted_proforma_format
-            )
-            self.processing_pipeline_args.append(
-                {
-                    "raw_sequence_column_name": "raw_sequence",
-                    "mods_column_name": "mods",
-                    "n_term_column_name": "n_terminal_mods",
-                    "c_term_column_name": "c_terminal_mods",
-                    "new_column_name": self.sequence_column,
-                }
-            )
+            # self.processing_pipeline_steps.append(
+            #    update_sequence_with_splitted_proforma_format
+            # )
+            # self.processing_pipeline_args.append(
+            #    {
+            #        "raw_sequence_column_name": "raw_sequence",
+            #        "mods_column_name": "mods",
+            #        "n_term_column_name": "n_terminal_mods",
+            #        "c_term_column_name": "c_terminal_mods",
+            #        "new_column_name": self.sequence_column,
+            #    }
+            # )
 
             # encode proforma sequence with the extended vocab provided by the parser
-            self.processing_pipeline_steps.append(encode_sequence)
+            self.processing_pipeline_steps.append(encode_sequence_batched)
             self.processing_pipeline_args.append(
                 {
                     "sequence_column_name": self.sequence_column,
@@ -259,7 +271,11 @@ class AbstractPeptideDataset(abc.ABC):
             print("For the next step, using the following args:")
             pprint(args)
             self.dataset = self.dataset.map(
-                lambda x: step(x, **args), desc=f"Applying {step.__name__}..."
+                lambda x: step(x, **args),
+                desc=f"Applying {step.__name__}...",
+                batched=True,
+                batch_size=self._default_batch_processing_size,
+                num_proc=self._default_num_proc,
             )
             print("-" * 100)
 
