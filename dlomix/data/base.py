@@ -4,7 +4,6 @@ from pprint import pprint
 from typing import Callable, Dict, List, Optional, Union
 
 from datasets import Dataset, DatasetDict, load_dataset
-from datasets_sql import query
 
 from ..constants import ALPHABET_UNMOD
 from .dataset_utils import (
@@ -15,7 +14,6 @@ from .dataset_utils import (
     pad_truncate_sequence_batched,
     remove_ptms,
 )
-from .parsers import ProformaParser
 
 
 class AbstractPeptideDataset(abc.ABC):
@@ -191,11 +189,13 @@ class AbstractPeptideDataset(abc.ABC):
                 # experimental = not working!
                 d = self.dataset["train"]
                 if self.encoding_scheme == EncodingScheme.NO_MODS:
-                    seq_len = query(
-                        f"SELECT MAX(LENGTH({self.sequence_column})) FROM d"
-                    )
+                    pass
+                    # seq_len = query(
+                    #    f"SELECT MAX(LENGTH({self.sequence_column})) FROM d"
+                    # )
                 else:
-                    seq_len = query("SELECT MAX(LENGTH(raw_sequence)) FROM d")
+                    pass
+                    # seq_len = query("SELECT MAX(LENGTH(raw_sequence)) FROM d")
                 pass
             else:
                 raise ValueError(
