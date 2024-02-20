@@ -119,7 +119,14 @@ class AbstractPeptideDataset(abc.ABC):
 
         if self.model_features is not None:
             self.relevant_columns.extend(self.model_features)
+
+        # select only relevant columns
         self.dataset = self.dataset.select_columns(self.relevant_columns)
+
+        # remove label column
+        self.relevant_columns = list(
+            set(self.relevant_columns) - set(self.label_column)
+        )
 
     def _split_dataset(self):
         # logic to split
@@ -296,34 +303,31 @@ class AbstractPeptideDataset(abc.ABC):
     def tensor_train_data(self):
         """TensorFlow Dataset object for the training data"""
         return self.dataset["train"].to_tf_dataset(
-            columns=[self.sequence_column, *self.model_features]
-            if self.model_features is not None
-            else self.sequence_column,
+            columns=self.relevant_columns,
             label_cols=self.label_column,
-            shuffle=True,
+            shuffle=False,
             batch_size=self.batch_size,
+            # num_workers=self._default_num_proc//2,
         )
 
     @property
     def tensor_val_data(self):
         """TensorFlow Dataset object for the val data"""
         return self.dataset["val"].to_tf_dataset(
-            columns=[self.sequence_column, *self.model_features]
-            if self.model_features is not None
-            else self.sequence_column,
+            columns=self.relevant_columns,
             label_cols=self.label_column,
             shuffle=False,
             batch_size=self.batch_size,
+            # num_workers=self._default_num_proc//2,
         )
 
     @property
     def tensor_test_data(self):
         """TensorFlow Dataset object for the test data"""
         return self.dataset["test"].to_tf_dataset(
-            columns=[self.sequence_column, *self.model_features]
-            if self.model_features is not None
-            else self.sequence_column,
+            columns=self.relevant_columns,
             label_cols=self.label_column,
             shuffle=False,
             batch_size=self.batch_size,
+            # num_workers=self._default_num_proc//2,
         )
