@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import tensorflow as tf
-import wandb
+# import wandb
 from sklearn.metrics import (
     confusion_matrix, ConfusionMatrixDisplay,
     accuracy_score, precision_score, recall_score, f1_score
@@ -15,7 +15,9 @@ from tensorflow.keras.layers import (
     Input, Dense, Embedding, Flatten
 )
 from tensorflow.keras.models import Model
-from wandb.keras import WandbCallback
+# from wandb.keras import WandbCallback
+
+# TODO Split models into seperate classes
 
 
 class PrecursorChargeStatePredictor(tf.keras.Model):
@@ -64,6 +66,7 @@ class PrecursorChargeStatePredictor(tf.keras.Model):
             if len(charge_states) <= 1:
                 raise ValueError(f"For multiclass classification, more than one charge state is required. "
                                  f"You've entered: {charge_states} ")
+    # TODO
 
     def multiclass_model(self):
         """
@@ -72,7 +75,10 @@ class PrecursorChargeStatePredictor(tf.keras.Model):
         """
         input_embedding = Input(shape=self.shape)
         # the first branch operates on the first input
+        # remove
         x = Model(inputs=input_embedding, outputs=input_embedding)
+
+        # Only thing needed
         y = Embedding(input_dim=self.voc_len, output_dim=self.max_len_seq, input_length=self.max_len_seq)(
             input_embedding)
         y = Flatten()(y)
@@ -95,6 +101,7 @@ class PrecursorChargeStatePredictor(tf.keras.Model):
         model_multilabel = Model(inputs=[x.input], outputs=z)
         return model_multilabel
 
+    #
     def summary(self):
         """
         Prints a summary of the model
@@ -102,13 +109,13 @@ class PrecursorChargeStatePredictor(tf.keras.Model):
         """
         self.model.summary()
 
-    def wandb_init(self, api_key=None,
+    """ def wandb_init(self, api_key=None,
                    project_name="precursor-charge-state-prediction"):
-        """
+        
         Initializes weights&biases
         @param api_key: str
         @param project_name: str
-        """
+        
         if api_key is None:
             raise ValueError(f"No API key provided. Use model_class.wandb_init(api_key= '...', project_name = '...')."
                              f" You entered: {api_key}, {project_name}")
@@ -119,8 +126,9 @@ class PrecursorChargeStatePredictor(tf.keras.Model):
         config.num_classes = self.num_classes
         config.voc_len = self.voc_len
         config.max_len_seq = self.max_len_seq
-        self.wandb = True
+        self.wandb = True """
 
+    # TODO move to taining (example notebook)
     def compile(self, lr=0.0001):
         """
         Compiles the model
@@ -134,12 +142,15 @@ class PrecursorChargeStatePredictor(tf.keras.Model):
             self.in_metrics = 'categorical_accuracy'
 
         elif self.classification_type == "multi_label":
-            self.model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['binary_accuracy'])
+            self.model.compile(optimizer='adam', loss='binary_crossentropy', metrics=[
+                               'binary_accuracy'])
             self.loss = 'binary_crossentropy'
             self.in_metrics = 'binary_accuracy'
         else:
-            raise ValueError("classification_type must be one of the following: 'multi_class', 'multi_label'")
+            raise ValueError(
+                "classification_type must be one of the following: 'multi_class', 'multi_label'")
         self.compiled = True
+    # TODO move to taining (example notebook) without function. Use built in fit
 
     def fit(self, batch_size=4096, callbacks=None, epochs=30, training_label=None, training_data=None,
             validation_label=None, validation_data=None, no_wandb=False):
@@ -156,7 +167,8 @@ class PrecursorChargeStatePredictor(tf.keras.Model):
         @param no_wandb: bool
         """
         if not self.compiled:
-            raise ValueError("Model must be compiled before fitting. Use model_class.compile().")
+            raise ValueError(
+                "Model must be compiled before fitting. Use model_class.compile().")
         elif not self.wandb and not no_wandb:
             raise ValueError(
                 "You did not initialize weights&biases. Set model_class.init(no_wandb=True) or use "
@@ -166,15 +178,18 @@ class PrecursorChargeStatePredictor(tf.keras.Model):
                 if no_wandb:
                     callbacks = []
                 else:
-                    callbacks = [WandbCallback()]
+                    pass
+                    # callbacks = [WandbCallback()]
             # print(self.shape) print(callbacks, len(self.dataset.train_data), len(self.dataset.train_label),
             # len(self.dataset.val_data), len(self.dataset.val_label))
             self.history = self.model.fit(training_data, training_label, epochs=epochs,
                                           batch_size=batch_size,
-                                          validation_data=(validation_data, validation_label),
+                                          validation_data=(
+                                              validation_data, validation_label),
                                           callbacks=callbacks, verbose=1)
 
             self.fitted = True
+    # TODO use built in save
 
     def save(self, output_path=None):
         """
@@ -188,6 +203,7 @@ class PrecursorChargeStatePredictor(tf.keras.Model):
                 output_path = f"{output_path}.h5"
         self.model.save(output_path)
 
+    # TODO move to reporting
     def plot_training(self):
         """
         Plots the training curves (Training and Validation Loss, Training and Validation Accuracy)
@@ -228,7 +244,9 @@ class PrecursorChargeStatePredictor(tf.keras.Model):
             # Show the plots
             plt.show()
         else:
-            raise ValueError("Model was not trained. No data to plot. Use model_class.fit()")
+            raise ValueError(
+                "Model was not trained. No data to plot. Use model_class.fit()")
+    # TODO move to example notebook
 
     def load_weights(self, path):
         """
@@ -238,6 +256,7 @@ class PrecursorChargeStatePredictor(tf.keras.Model):
         self.model = tf.keras.saving.load_model(path)
         self.pretrained = True
 
+    # TODO move to example notebook and use built in functionality
     def evaluate(self, test_data=None, test_label=None):
         """
         Evaluates the model
@@ -254,6 +273,7 @@ class PrecursorChargeStatePredictor(tf.keras.Model):
             self.evaluated = True
 
         print(f"test loss, test acc: {self.evaluation}")
+    # TODO move to example notebook and use built in functionality
 
     def predict(self, test_data=None, test_label=None, verification=True, classification_type=None,
                 charge_states=None):
@@ -276,7 +296,8 @@ class PrecursorChargeStatePredictor(tf.keras.Model):
             self.predicted = True
 
         if test_label is None and verification:
-            raise ValueError("You did not provide test_label for prediction-verification.")
+            raise ValueError(
+                "You did not provide test_label for prediction-verification.")
 
         else:
             if classification_type == "multi_class":
@@ -285,11 +306,16 @@ class PrecursorChargeStatePredictor(tf.keras.Model):
 
                 cm = confusion_matrix(true_labels, predicted_labels)
                 print(cm)
-                print("Accuracy: ", accuracy_score(true_labels, predicted_labels))
-                print("Precision_weighted: ", precision_score(true_labels, predicted_labels, average='weighted'))
-                print("Recall_weighted: ", recall_score(true_labels, predicted_labels, average='weighted'))
-                print("F1_weighted: ", f1_score(true_labels, predicted_labels, average='weighted'))
-                disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=charge_states)
+                print("Accuracy: ", accuracy_score(
+                    true_labels, predicted_labels))
+                print("Precision_weighted: ", precision_score(
+                    true_labels, predicted_labels, average='weighted'))
+                print("Recall_weighted: ", recall_score(
+                    true_labels, predicted_labels, average='weighted'))
+                print("F1_weighted: ", f1_score(true_labels,
+                      predicted_labels, average='weighted'))
+                disp = ConfusionMatrixDisplay(
+                    confusion_matrix=cm, display_labels=charge_states)
                 disp.plot(cmap=plt.cm.Blues, xticks_rotation=45)
                 # add legend title and axis labels
                 plt.xlabel('Predicted Label')
@@ -300,9 +326,12 @@ class PrecursorChargeStatePredictor(tf.keras.Model):
 
                 new_df = pd.DataFrame()
                 new_df['charge'] = self.charge_states
-                new_df['precision'] = precision_score(true_labels, predicted_labels, average=None)
-                new_df['recall'] = recall_score(true_labels, predicted_labels, average=None)
-                new_df['f1'] = f1_score(true_labels, predicted_labels, average=None)
+                new_df['precision'] = precision_score(
+                    true_labels, predicted_labels, average=None)
+                new_df['recall'] = recall_score(
+                    true_labels, predicted_labels, average=None)
+                new_df['f1'] = f1_score(
+                    true_labels, predicted_labels, average=None)
                 print(new_df)
 
             else:
@@ -313,11 +342,15 @@ class PrecursorChargeStatePredictor(tf.keras.Model):
                         if index2 + charge_states[0] not in charge_dict_true:
                             charge_dict_true[index2 + charge_states[0]] = []
                             charge_dict_pred[index2 + charge_states[0]] = []
-                            charge_dict_true[index2 + charge_states[0]].append(row[index2])
-                            charge_dict_pred[index2 + charge_states[0]].append(row[index2])
+                            charge_dict_true[index2 +
+                                             charge_states[0]].append(row[index2])
+                            charge_dict_pred[index2 +
+                                             charge_states[0]].append(row[index2])
                         else:
-                            charge_dict_true[index2 + charge_states[0]].append(row[index2])
-                            charge_dict_pred[index2 + charge_states[0]].append(row[index2])
+                            charge_dict_true[index2 +
+                                             charge_states[0]].append(row[index2])
+                            charge_dict_pred[index2 +
+                                             charge_states[0]].append(row[index2])
 
                 for key, value in charge_dict_true.items():
                     true_labels = value
@@ -327,7 +360,8 @@ class PrecursorChargeStatePredictor(tf.keras.Model):
                     print(cm)
 
                     classes_here = [0, key]
-                    disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=classes_here)
+                    disp = ConfusionMatrixDisplay(
+                        confusion_matrix=cm, display_labels=classes_here)
 
                     disp.plot(cmap=plt.cm.Blues, xticks_rotation=45)
                     # add legend title and axis labels
@@ -354,21 +388,30 @@ class PrecursorChargeStatePredictor(tf.keras.Model):
                         if index2 + charge_states[0] not in charge_dict_true:
                             charge_dict_true[index2 + charge_states[0]] = []
                             charge_dict_pred[index2 + charge_states[0]] = []
-                            charge_dict_true[index2 + charge_states[0]].append(row[index2])
-                            charge_dict_pred[index2 + charge_states[0]].append(row[index2])
+                            charge_dict_true[index2 +
+                                             charge_states[0]].append(row[index2])
+                            charge_dict_pred[index2 +
+                                             charge_states[0]].append(row[index2])
                         else:
-                            charge_dict_true[index2 + charge_states[0]].append(row[index2])
-                            charge_dict_pred[index2 + charge_states[0]].append(row[index2])
+                            charge_dict_true[index2 +
+                                             charge_states[0]].append(row[index2])
+                            charge_dict_pred[index2 +
+                                             charge_states[0]].append(row[index2])
 
                 new_df3['charge'] = [0, 1]
                 for key, value in charge_dict_true.items():
                     matrix = confusion_matrix(value, charge_dict_pred[key])
-                    new_df3[f'{key}_accuracy'] = matrix.diagonal() / matrix.sum(axis=1)
-                    new_df3[f'{key}_precision'] = precision_score(value, charge_dict_pred[key], average=None)
-                    new_df3[f'{key}_recall'] = recall_score(value, charge_dict_pred[key], average=None)
-                    new_df3[f'{key}_f1'] = f1_score(value, charge_dict_pred[key], average=None)
+                    new_df3[f'{key}_accuracy'] = matrix.diagonal() / \
+                        matrix.sum(axis=1)
+                    new_df3[f'{key}_precision'] = precision_score(
+                        value, charge_dict_pred[key], average=None)
+                    new_df3[f'{key}_recall'] = recall_score(
+                        value, charge_dict_pred[key], average=None)
+                    new_df3[f'{key}_f1'] = f1_score(
+                        value, charge_dict_pred[key], average=None)
 
-                new_df2 = pd.DataFrame(columns=['charge', 'accuracy', 'precision', 'recall', 'f1'])
+                new_df2 = pd.DataFrame(
+                    columns=['charge', 'accuracy', 'precision', 'recall', 'f1'])
 
                 charges_list = []
                 to_take_list = []
@@ -384,10 +427,14 @@ class PrecursorChargeStatePredictor(tf.keras.Model):
 
                     if counter > 1:
                         counter = 0
-                    new_df2.at[index, 'accuracy'] = new_df3.at[counter, f'{to_take_list[index]}_accuracy']
-                    new_df2.at[index, 'precision'] = new_df3.at[counter, f'{to_take_list[index]}_precision']
-                    new_df2.at[index, 'recall'] = new_df3.at[counter, f'{to_take_list[index]}_recall']
-                    new_df2.at[index, 'f1'] = new_df3.at[counter, f'{to_take_list[index]}_f1']
+                    new_df2.at[index, 'accuracy'] = new_df3.at[counter,
+                                                               f'{to_take_list[index]}_accuracy']
+                    new_df2.at[index, 'precision'] = new_df3.at[counter,
+                                                                f'{to_take_list[index]}_precision']
+                    new_df2.at[index, 'recall'] = new_df3.at[counter,
+                                                             f'{to_take_list[index]}_recall']
+                    new_df2.at[index, 'f1'] = new_df3.at[counter,
+                                                         f'{to_take_list[index]}_f1']
                     counter += 1
 
                 print(new_df2)
@@ -396,7 +443,8 @@ class PrecursorChargeStatePredictor(tf.keras.Model):
 
         # raise error if sequence longer than 63
         if len(sequence) > 63:
-            raise ValueError("Sequence must be shorter than 63 amino acids in our pretrained model.")
+            raise ValueError(
+                "Sequence must be shorter than 63 amino acids in our pretrained model.")
 
         self.pretrained_model = pretrained_model
         self.sequence = sequence
@@ -455,12 +503,15 @@ class PrecursorChargeStatePredictor(tf.keras.Model):
         def predictor(self, sequence):
             print("Sequence: ", sequence)
             encoded_sequence = pretrained_seq_translator(sequence)
-            encoded_sequence = np.expand_dims(tf.convert_to_tensor(np.array(encoded_sequence)), axis=0)
-            sequence_prediction = self.model.predict(encoded_sequence, verbose=False)
+            encoded_sequence = np.expand_dims(
+                tf.convert_to_tensor(np.array(encoded_sequence)), axis=0)
+            sequence_prediction = self.model.predict(
+                encoded_sequence, verbose=False)
             print("Weights_per_Charge_State: ", [round(x, 2) for x in sequence_prediction[0]], "Sum: ",
                   sum([round(x, 2) for x in sequence_prediction[0]]))
             print("-----------------------------")
-            print(generate_charge_prediction_text(sequence_prediction[0], sequence))
+            print(generate_charge_prediction_text(
+                sequence_prediction[0], sequence))
             return sequence_prediction
 
         if isinstance(self.sequence, str):
