@@ -13,6 +13,7 @@ from itertools import combinations
 import seaborn as sns
 import itertools
 
+
 # todo:
 # default train + val sections to false or even remove them completly at some point
 # make text of all sections more meaningful + more scientific + more description
@@ -36,8 +37,19 @@ class QuartoReport:
         "r2_score": "R2_SCORE_VALUE", "model": "MODEL_NAME", "total_params": "TOTAL_PARAMS",
         "trainable_params": "TRAINABLE_PARAMS",
         "non_trainable_params": "NT_PARAMS",
-        "layer_information": "LAYER_TABLE"
+        "layer_information": "LAYER_TABLE",
+        "data_placeholder": "DATA_SECTION_PLACEHOLDER"
     }
+
+    DATA_SECTION = """
+# Data
+The following section is showing a simple explorative data analysis of the used dataset. The first histogram shows the
+distribution of peptide lengths in the data set, while the second histogram shows the distribution of indexed retention
+times.
+
+![Data plots](DATA_PLOTS_PATH)
+{{< pagebreak >}}
+    """
 
     def __init__(self, history, data=None, test_targets=None, predictions=None, model=None,
                  title="Retention time report", fold_code=True,
@@ -197,10 +209,13 @@ class QuartoReport:
         if self.data is not None:
             data_plots_path = self.plot_all_data_plots()
             data_image_path = self.create_plot_image(data_plots_path)
+            self.qmd_content = self.qmd_content.replace(QuartoReport.REPLACEMENT_KEYS["data_placeholder"],
+                                                        QuartoReport.DATA_SECTION)
             self.qmd_content = self.qmd_content.replace(QuartoReport.REPLACEMENT_KEYS["data_plots"], data_image_path)
+
         else:
             # delete plot command to avoid error
-            self.qmd_content = self.qmd_content.replace("![Data plots](DATA_PLOTS_PATH)", "NO DATA PROVIDED!")
+            self.qmd_content = self.qmd_content.replace(QuartoReport.REPLACEMENT_KEYS["data_placeholder"], "")
 
         train_plots_path = self.plot_all_train_metrics()
         train_image_path = self.create_plot_image(train_plots_path)
@@ -241,7 +256,7 @@ class QuartoReport:
         regex = "\[.*?\]|\-"
         return [re.sub(regex, "", seq) for seq in sequences]
 
-    def plot_rt_distribution(self, save_path = ""):
+    def plot_rt_distribution(self, save_path=""):
         df = pd.DataFrame(self.data.sequences, columns=['unmod_seq'])
         df["length"] = df["unmod_seq"].str.len()
         df["retention_time"] = self.data.targets
@@ -292,7 +307,7 @@ class QuartoReport:
         # define order of legend labels    
         handles, labels = plt.gca().get_legend_handles_labels()
         order = [index for index, value in sorted(enumerate(labels), key=lambda x: int(x[1]))]
-        plt.legend([handles[idx] for idx in order], [labels[idx] for idx in order], ncol = 3,loc='upper right')
+        plt.legend([handles[idx] for idx in order], [labels[idx] for idx in order], ncol=3, loc='upper right')
         # ncol=1, bbox_to_anchor=(1.05, 1.0), loc='upper left'
         plt.title("Density of Levenshtein distance per peptide length")
         plt.xlabel("Levenshtein distance")
@@ -318,7 +333,7 @@ class QuartoReport:
 
         plt.figure(figsize=(8, 6))
         # Create a basic line plot
-        plt.plot(x, y)
+        plt.plot(x, y, color="orange")
 
         # Add labels and title
         plt.xlabel('Epoch')
@@ -352,8 +367,8 @@ class QuartoReport:
         plt.figure(figsize=(8, 6))
 
         # Create a basic line plot
-        plt.plot(x, y_1, label="Validation loss")
-        plt.plot(x, y_2, label="Training loss")
+        plt.plot(x, y_1, label="Validation loss", color="blue")
+        plt.plot(x, y_2, label="Training loss", color="orange")
 
         # Add labels and title
         plt.xlabel('Epoch')

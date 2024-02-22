@@ -21,13 +21,7 @@ The following section shows information about the model. The table below contain
 LAYER_TABLE
 {{< pagebreak >}}
 
-# Data
-The following section is showing a simple explorative data analysis of the used dataset. The first histogram shows the
-distribution of peptide lengths in the data set, while the second histogram shows the distribution of indexed retention
-times.
-
-![Data plots](DATA_PLOTS_PATH)
-{{< pagebreak >}}
+DATA_SECTION_PLACEHOLDER
 
 # Train metrics per epoch
 The following section shows the different metrics that were used to track the training. All used metrics are added by
