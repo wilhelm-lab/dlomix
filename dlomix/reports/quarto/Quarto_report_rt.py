@@ -14,13 +14,10 @@ import seaborn as sns
 import itertools
 
 # todo:
-# class will be specific for rt reporting
-# qmd template will also be specific for rt reporting + task
 # default train + val sections to false or even remove them completly at some point
 # make text of all sections more meaningful + more scientific + more description
 
 # include layer information from summary()
-# include Levenshtein distance plot + include Density plot from PROSPECT paper
 # clean way to include/exclude optional parts
 # exclude and only inject if needed -> .py file with all the text variables needed
 # include per batch metrics? custom callback needed
