@@ -11,7 +11,7 @@ import warnings
 from Levenshtein import distance as levenshtein_distance
 from itertools import combinations
 import seaborn as sns
-
+import itertools
 
 # todo:
 # class will be specific for rt reporting
@@ -244,6 +244,29 @@ class QuartoReport:
         regex = "\[.*?\]|\-"
         return [re.sub(regex, "", seq) for seq in sequences]
 
+    def plot_rt_distribution(self, save_path = ""):
+        df = pd.DataFrame(self.data.sequences, columns=['unmod_seq'])
+        df["length"] = df["unmod_seq"].str.len()
+        df["retention_time"] = self.data.targets
+        palette = itertools.cycle(sns.color_palette("YlOrRd_r", n_colors=len(df.length.unique())))
+        lengths = sorted(df["length"].unique())
+        plt.figure(figsize=(8, 6))
+        plot = plt.scatter(lengths, lengths, c=lengths, cmap='YlOrRd_r')
+        cbar = plt.colorbar()
+        plt.cla()
+        plot.remove()
+        for i in range(df["length"].min(), df["length"].max() + 1):
+            if len(df[df["length"] == i]["retention_time"]) != 1 and \
+                    len(df[df["length"] == i]["retention_time"]) != 2:
+                ax = sns.kdeplot(data=df[df["length"] == i]["retention_time"],
+                                 color=next(palette))
+        ax.set(xlabel='retention time', ylabel='density')
+        cbar.ax.set_ylabel('peptide length', rotation=270)
+        cbar.ax.yaxis.set_label_coords(3.2, .5)
+        plt.title("Density of retention time per peptide length")
+        plt.savefig(f"{save_path}/rt_dist.png", bbox_inches='tight')
+        plt.clf()
+
     def plot_levenshtein(self, save_path=""):
         seqs_wo_mods = self.internal_without_mods(self.data.sequences)
         seqs_wo_dupes = list(dict.fromkeys(seqs_wo_mods))
@@ -264,7 +287,7 @@ class QuartoReport:
             for pep_tuple in a:
                 current_list.append(levenshtein_distance(pep_tuple[0], pep_tuple[1]) - 1)
             lv_dict[str(length)] = current_list
-
+        fig = plt.figure(figsize=(8, 6))
         sns.set_palette("rocket_r", n_colors=36)
 
         for length in available_lengths:
@@ -272,10 +295,10 @@ class QuartoReport:
         # define order of legend labels    
         handles, labels = plt.gca().get_legend_handles_labels()
         order = [index for index, value in sorted(enumerate(labels), key=lambda x: int(x[1]))]
-        plt.legend([handles[idx] for idx in order], [labels[idx] for idx in order], ncol=2, bbox_to_anchor=(1.05, 1.0),
-                   loc='upper left')
+        plt.legend([handles[idx] for idx in order], [labels[idx] for idx in order], ncol = 3,loc='upper right')
+        # ncol=1, bbox_to_anchor=(1.05, 1.0), loc='upper left'
+        plt.title("Density of Levenshtein distance per peptide length")
         plt.xlabel("Levenshtein distance")
-        plt.figure(figsize=(8, 6))
         plt.savefig(f"{save_path}/levenshtein.png", bbox_inches='tight')
         plt.clf()
 
@@ -357,6 +380,7 @@ class QuartoReport:
         # plot irt histogram
         self.plot_histogram(x=rtdata.targets, label="Indexed retention time", bins=30, save_path=save_path)
         self.plot_levenshtein(save_path=save_path)
+        self.plot_rt_distribution(save_path=save_path)
         return save_path
 
     def plot_all_train_metrics(self):
