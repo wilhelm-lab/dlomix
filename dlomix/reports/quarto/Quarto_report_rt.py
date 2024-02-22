@@ -8,16 +8,25 @@ from matplotlib.colors import LogNorm
 from matplotlib.ticker import LogLocator
 import numpy as np
 import warnings
+from Levenshtein import distance as levenshtein_distance
+from itertools import combinations
+import seaborn as sns
 
 
 # todo:
 # class will be specific for rt reporting
 # qmd template will also be specific for rt reporting + task
+# default train + val sections to false or even remove them completly at some point
+# make text of all sections more meaningful + more scientific + more description
 
-# include model information -> how?
+# include layer information from summary()
+# include Levenshtein distance plot + include Density plot from PROSPECT paper
 # clean way to include/exclude optional parts
+# exclude and only inject if needed -> .py file with all the text variables needed
 # include per batch metrics? custom callback needed
 # delete or keep images after report creation?
+
+# look at PROSPECT
 
 
 class QuartoReport:
@@ -29,7 +38,8 @@ class QuartoReport:
         "residuals_plot": "RESIDUALS_PLOT_PATH", "density_plot": "DENSITY_PLOT_PATH",
         "r2_score": "R2_SCORE_VALUE", "model": "MODEL_NAME", "total_params": "TOTAL_PARAMS",
         "trainable_params": "TRAINABLE_PARAMS",
-        "non_trainable_params": "NT_PARAMS"
+        "non_trainable_params": "NT_PARAMS",
+        "layer_information": "LAYER_TABLE"
     }
 
     def __init__(self, history, data=None, test_targets=None, predictions=None, model=None,
@@ -174,16 +184,18 @@ class QuartoReport:
         self.qmd_content = self.qmd_content.replace(QuartoReport.REPLACEMENT_KEYS["title"], self.title)
         self.qmd_content = self.qmd_content.replace(QuartoReport.REPLACEMENT_KEYS["fold-code"], str(self.fold_code))
 
-        if self.model is not None:
-            model_info_dict, _ = self._get_model_data()
-            self.qmd_content = self.qmd_content.replace(QuartoReport.REPLACEMENT_KEYS["model"],
-                                                        model_info_dict.get("Model"))
-            self.qmd_content = self.qmd_content.replace(QuartoReport.REPLACEMENT_KEYS["total_params"],
-                                                        model_info_dict.get("Total params"))
-            self.qmd_content = self.qmd_content.replace(QuartoReport.REPLACEMENT_KEYS["trainable_params"],
-                                                        model_info_dict.get("Trainable params"))
-            self.qmd_content = self.qmd_content.replace(QuartoReport.REPLACEMENT_KEYS["non_trainable_params"],
-                                                        model_info_dict.get("Non-trainable params"))
+        # if self.model is not None:
+        #     model_info_dict, _ = self._get_model_data()
+        #     self.qmd_content = self.qmd_content.replace(QuartoReport.REPLACEMENT_KEYS["model"],
+        #                                                 model_info_dict.get("Model"))
+        #     self.qmd_content = self.qmd_content.replace(QuartoReport.REPLACEMENT_KEYS["total_params"],
+        #                                                 model_info_dict.get("Total params"))
+        #     self.qmd_content = self.qmd_content.replace(QuartoReport.REPLACEMENT_KEYS["trainable_params"],
+        #                                                 model_info_dict.get("Trainable params"))
+        #     self.qmd_content = self.qmd_content.replace(QuartoReport.REPLACEMENT_KEYS["non_trainable_params"],
+        #                                                 model_info_dict.get("Non-trainable params"))
+        #     self.qmd_content = self.qmd_content.replace(QuartoReport.REPLACEMENT_KEYS["layer_information"],
+        #                                                 layer_info_df.to_string())
 
         if self.data is not None:
             data_plots_path = self.plot_all_data_plots()
@@ -227,6 +239,45 @@ class QuartoReport:
         open(path, "w").write(self.qmd_content)
         print(
             f"File Saved to disk under: {path}.\nUse Quarto to render the report by running:\n\nquarto render {path} --to pdf")
+
+    def internal_without_mods(self, sequences):
+        regex = "\[.*?\]|\-"
+        return [re.sub(regex, "", seq) for seq in sequences]
+
+    def plot_levenshtein(self, save_path=""):
+        seqs_wo_mods = self.internal_without_mods(self.data.sequences)
+        seqs_wo_dupes = list(dict.fromkeys(seqs_wo_mods))
+        df = pd.DataFrame(seqs_wo_dupes, columns=['mod_seq'])
+        df["unmod_seq"] = self.data.sequences
+        df["length"] = df["mod_seq"].str.len()
+        lv_dict = {}
+        pep_groups = df.groupby('length')
+        available_lengths = df.length.unique()
+
+        for length, peptides in pep_groups:
+            current_list = []
+            if len(peptides.index) > 1000:
+                samples = peptides['unmod_seq'].sample(n=1000, random_state=1)
+            else:
+                samples = peptides['unmod_seq'].values
+            a = combinations(samples, 2)
+            for pep_tuple in a:
+                current_list.append(levenshtein_distance(pep_tuple[0], pep_tuple[1]) - 1)
+            lv_dict[str(length)] = current_list
+
+        sns.set_palette("rocket_r", n_colors=36)
+
+        for length in available_lengths:
+            fig = sns.kdeplot(np.array(lv_dict[str(length)]), bw_method=0.5, label=str(length), cbar=True, fill=True)
+        # define order of legend labels    
+        handles, labels = plt.gca().get_legend_handles_labels()
+        order = [index for index, value in sorted(enumerate(labels), key=lambda x: int(x[1]))]
+        plt.legend([handles[idx] for idx in order], [labels[idx] for idx in order], ncol=2, bbox_to_anchor=(1.05, 1.0),
+                   loc='upper left')
+        plt.xlabel("Levenshtein distance")
+        plt.figure(figsize=(8, 6))
+        plt.savefig(f"{save_path}/levenshtein.png", bbox_inches='tight')
+        plt.clf()
 
     def plot_keras_metric(self, metric_name, save_path=""):
         """Plot a keras metric given its name and the history object returned by model.fit()
@@ -305,6 +356,7 @@ class QuartoReport:
 
         # plot irt histogram
         self.plot_histogram(x=rtdata.targets, label="Indexed retention time", bins=30, save_path=save_path)
+        self.plot_levenshtein(save_path=save_path)
         return save_path
 
     def plot_all_train_metrics(self):

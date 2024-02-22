@@ -17,6 +17,8 @@ The following section shows information about the model. The table below contain
 * Total parameters: TOTAL_PARAMS
 * Trainable parameters: TRAINABLE_PARAMS
 * Non-trainable parameters: NT_PARAMS
+
+LAYER_TABLE
 {{< pagebreak >}}
 
 # Data
