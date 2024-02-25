@@ -44,7 +44,7 @@ default. The resolution of this section is per epoch.
 {{< pagebreak >}}
     """
 
-    def __init__(self, history, train_data=None, test_data=None, predictions=None, title="Intensity report",
+    def __init__(self, history, test_data=None, predictions=None, title="Intensity report",
                  fold_code=True, train_section=False, val_section=False,
                  output_path="/Users/andi/PycharmProjects/dlomix_repo/dlomix/reports/quarto/int"):
         self.title = title
@@ -52,13 +52,12 @@ default. The resolution of this section is per epoch.
         self.qmd_template_location = QuartoReportIntensity.TEMPLATE_PATH
         self.output_path = output_path
         self.qmd_content = None
-        self.train_data = train_data
         self.test_data = test_data
         self.predictions = predictions
         self.train_section = train_section
         self.val_section = val_section
 
-        subfolders = ['train', 'val', 'train_val', 'spectral']
+        subfolders = ['train_val', 'spectral']
 
         if history is None:
             warnings.warn(
@@ -67,6 +66,11 @@ default. The resolution of this section is per epoch.
             self._history_dict = {}
         else:
             self._set_history_dict(history)
+            
+        if test_data is None or predictions is None:
+            warnings.warn(
+                "Either the test data or the predictions passed is None, no spectral angle can be reported."
+            )
 
         if self.train_section:
             subfolders.append("train")
