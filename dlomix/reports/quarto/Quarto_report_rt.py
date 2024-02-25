@@ -82,7 +82,7 @@ default. The resolution of this section is per epoch.
         self.train_section = train_section
         self.val_section = val_section
 
-        subfolders = ['train', 'val', 'train_val']
+        subfolders = ['train_val']
 
         if history is None:
             warnings.warn(
@@ -111,6 +111,11 @@ default. The resolution of this section is per epoch.
             warnings.warn(
                 "The passed model object is None, no model related information can be reported."
             )
+        
+        if self.train_section:
+            subfolders.append("train")
+        if self.val_section:
+            subfolders.append("val")
 
         self._create_plot_folder_structure(subfolders)
 
