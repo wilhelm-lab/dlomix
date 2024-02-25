@@ -10,16 +10,10 @@ format-links: false
 jupyter: python3
 ---
 {{< pagebreak >}}
-# Train metrics per epoch
-The following section shows the different metrics that were used to track the training. All used metrics are added by
-default. The resolution of this section is per epoch.
-![Plots of training metrics](TRAIN_PLOTS_PATH)
-{{< pagebreak >}}
-# Validation metrics per epoch
-The following section shows the different metrics that were used to track the validation. All used metrics are added by
-default. The resolution of this section is per epoch.
-![Plots of validation metrics](VAL_PLOTS_PATH)
-{{< pagebreak >}}
+TRAIN_SECTION_PLACEHOLDER
+
+VAL_SECTION_PLACEHOLDER
+
 # Train-Validation metrics per epoch
 The following section shows the training metrics in comparision with the validation metrics.. All used metrics are added
 by default. The resolution of this section is per epoch.

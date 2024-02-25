@@ -8,15 +8,13 @@ from matplotlib.colors import LogNorm
 from matplotlib.ticker import LogLocator
 import numpy as np
 import warnings
+from dlomix.reports.postprocessing import normalize_intensity_predictions
+import seaborn as sns
 
 
 # make data optional
 # make prediction optional
-# intensity report in the develop branch
-# check weave also if doable programmatically
-
 # val/test violin plots
-#   - how to get val predictions? make users pass them?
 #   - concatenate val/test
 #   - add flag column whether val/test
 #   - adapt violin plot function
@@ -25,19 +23,40 @@ class QuartoReportIntensity:
     TEMPLATE_PATH = "/Users/andi/PycharmProjects/dlomix_repo/dlomix/reports/quarto/template_intensity.qmd"
     REPLACEMENT_KEYS = {
         "title": "TITLE_HERE", "fold-code": "FOLD_CODE_FLAG", "train_plots": "TRAIN_PLOTS_PATH",
-        "val_plots": "VAL_PLOTS_PATH", "train_val_plots": "TV_PLOTS_PATH", "violin_plot": "VIOLIN_PLOT_PATH"
+        "val_plots": "VAL_PLOTS_PATH", "train_val_plots": "TV_PLOTS_PATH", "violin_plot": "VIOLIN_PLOT_PATH",
+        "train_placeholder": "TRAIN_SECTION_PLACEHOLDER", "val_placeholder": "VAL_SECTION_PLACEHOLDER"
     }
+    TRAIN_SECTION = """
+# Train metrics per epoch
+The following section shows the different metrics that were used to track the training. All used metrics are added by
+default. The resolution of this section is per epoch.
 
-    def __init__(self, history, train_data=None, predictions=None, title="Intensity report",
-                 fold_code=True,
-                 output_path="/Users/andi/PycharmProjects/dlomix_repo/dlomix/reports/quarto/"):
+![Plots of training metrics](TRAIN_PLOTS_PATH)
+{{< pagebreak >}}
+    """
+
+    VAL_SECTION = """
+# Validation metrics per epoch
+The following section shows the different metrics that were used to track the validation. All used metrics are added by
+default. The resolution of this section is per epoch.
+
+![Plots of validation metrics](VAL_PLOTS_PATH)
+{{< pagebreak >}}
+    """
+
+    def __init__(self, history, train_data=None, test_data=None, predictions=None, title="Intensity report",
+                 fold_code=True, train_section=False, val_section=False,
+                 output_path="/Users/andi/PycharmProjects/dlomix_repo/dlomix/reports/quarto/int"):
         self.title = title
         self.fold_code = fold_code
         self.qmd_template_location = QuartoReportIntensity.TEMPLATE_PATH
         self.output_path = output_path
         self.qmd_content = None
         self.train_data = train_data
+        self.test_data = test_data
         self.predictions = predictions
+        self.train_section = train_section
+        self.val_section = val_section
 
         subfolders = ['train', 'val', 'train_val', 'spectral']
 
@@ -48,6 +67,11 @@ class QuartoReportIntensity:
             self._history_dict = {}
         else:
             self._set_history_dict(history)
+
+        if self.train_section:
+            subfolders.append("train")
+        if self.val_section:
+            subfolders.append("val")
 
         self._create_plot_folder_structure(subfolders)
 
@@ -103,14 +127,25 @@ class QuartoReportIntensity:
         self.qmd_content = self.qmd_content.replace(QuartoReportIntensity.REPLACEMENT_KEYS["fold-code"],
                                                     str(self.fold_code))
 
-        train_plots_path = self.plot_all_train_metrics()
-        train_image_path = self.create_plot_image(train_plots_path)
-        self.qmd_content = self.qmd_content.replace(QuartoReportIntensity.REPLACEMENT_KEYS["train_plots"],
-                                                    train_image_path)
+        if self.train_section:
+            train_plots_path = self.plot_all_train_metrics()
+            train_image_path = self.create_plot_image(train_plots_path)
+            self.qmd_content = self.qmd_content.replace(QuartoReportIntensity.REPLACEMENT_KEYS["train_placeholder"],
+                                                        QuartoReportIntensity.TRAIN_SECTION)
+            self.qmd_content = self.qmd_content.replace(QuartoReportIntensity.REPLACEMENT_KEYS["train_plots"],
+                                                        train_image_path)
+        else:
+            self.qmd_content = self.qmd_content.replace(QuartoReportIntensity.REPLACEMENT_KEYS["train_placeholder"], "")
 
-        val_plots_path = self.plot_all_val_metrics()
-        val_image_path = self.create_plot_image(val_plots_path)
-        self.qmd_content = self.qmd_content.replace(QuartoReportIntensity.REPLACEMENT_KEYS["val_plots"], val_image_path)
+        if self.val_section:
+            val_plots_path = self.plot_all_val_metrics()
+            val_image_path = self.create_plot_image(val_plots_path)
+            self.qmd_content = self.qmd_content.replace(QuartoReportIntensity.REPLACEMENT_KEYS["val_placeholder"],
+                                                        QuartoReportIntensity.VAL_SECTION)
+            self.qmd_content = self.qmd_content.replace(QuartoReportIntensity.REPLACEMENT_KEYS["val_plots"],
+                                                        val_image_path)
+        else:
+            self.qmd_content = self.qmd_content.replace(QuartoReportIntensity.REPLACEMENT_KEYS["val_placeholder"], "")
 
         train_val_plots_path = self.plot_all_train_val_metrics()
         train_val_image_path = self.create_plot_image(train_val_plots_path)
@@ -244,12 +279,12 @@ class QuartoReportIntensity:
 
     def generate_intensity_results_df(self):
         predictions_df = pd.DataFrame()
-        predictions_df['sequences'] = self.train_data.sequences
+        predictions_df['sequences'] = self.test_data.sequences
         predictions_df['intensities_pred'] = self.predictions.tolist()
-        predictions_df['precursor_charge_onehot'] = self.data.precursor_charge.tolist()
-        predictions_df['precursor_charge'] = np.argmax(self.data.precursor_charge, axis=1) + 1
-        predictions_df['intensities_raw'] = self.data.intensities.tolist()
-        predictions_df['collision_energy'] = self.data.collision_energy
+        predictions_df['precursor_charge_onehot'] = self.test_data.precursor_charge.tolist()
+        predictions_df['precursor_charge'] = np.argmax(self.test_data.precursor_charge, axis=1) + 1
+        predictions_df['intensities_raw'] = self.test_data.intensities.tolist()
+        predictions_df['collision_energy'] = self.test_data.collision_energy
         return predictions_df
 
     def plot_spectral_angle(
@@ -264,7 +299,7 @@ class QuartoReportIntensity:
             predictions_df:  dataframe with raw intensities, predictions, sequences, precursor_charges
         """
         plt.figure(figsize=(8, 6))
-        predictions_acc = normalize_intensity_predictions(predictions_df, self.train_data.batch_size)
+        predictions_acc = normalize_intensity_predictions(predictions_df, self.test_data.batch_size)
         violin_plot = sns.violinplot(data=predictions_acc, x=facet, y="spectral_angle")
         save_path = join(self.output_path, "plots/spectral", "violin_spectral_angle_plot.png")
 
