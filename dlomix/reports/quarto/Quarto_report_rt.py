@@ -15,12 +15,9 @@ import itertools
 
 
 # todo:
-# default train + val sections to false or even remove them completly at some point
 # make text of all sections more meaningful + more scientific + more description
 
 # include layer information from summary()
-# clean way to include/exclude optional parts
-# exclude and only inject if needed -> .py file with all the text variables needed
 # include per batch metrics? custom callback needed
 # delete or keep images after report creation?
 
@@ -38,21 +35,41 @@ class QuartoReport:
         "trainable_params": "TRAINABLE_PARAMS",
         "non_trainable_params": "NT_PARAMS",
         "layer_information": "LAYER_TABLE",
-        "data_placeholder": "DATA_SECTION_PLACEHOLDER"
+        "data_placeholder": "DATA_SECTION_PLACEHOLDER",
+        "train_placeholder": "TRAIN_SECTION_PLACEHOLDER",
+        "val_placeholder": "VAL_SECTION_PLACEHOLDER"
     }
 
     DATA_SECTION = """
 # Data
 The following section is showing a simple explorative data analysis of the used dataset. The first histogram shows the
 distribution of peptide lengths in the data set, while the second histogram shows the distribution of indexed retention
-times.
+times. The first density plot shows the density of retention time per peptide length. The second density plot depicts the density of Levenshtein distances per petide length.
 
 ![Data plots](DATA_PLOTS_PATH)
 {{< pagebreak >}}
     """
 
+    TRAIN_SECTION = """
+# Train metrics per epoch
+The following section shows the different metrics that were used to track the training. All used metrics are added by
+default. The resolution of this section is per epoch.
+
+![Plots of training metrics](TRAIN_PLOTS_PATH)
+{{< pagebreak >}}
+    """
+
+    VAL_SECTION = """
+# Validation metrics per epoch
+The following section shows the different metrics that were used to track the validation. All used metrics are added by
+default. The resolution of this section is per epoch.
+
+![Plots of validation metrics](VAL_PLOTS_PATH)
+{{< pagebreak >}}
+    """
+
     def __init__(self, history, data=None, test_targets=None, predictions=None, model=None,
-                 title="Retention time report", fold_code=True,
+                 title="Retention time report", fold_code=True, train_section=False, val_section=False,
                  output_path="/Users/andi/PycharmProjects/dlomix_repo/dlomix/reports/quarto/"):
         self.title = title
         self.fold_code = fold_code
@@ -62,6 +79,8 @@ times.
         self.model = model
         self.test_targets = test_targets
         self.predictions = predictions
+        self.train_section = train_section
+        self.val_section = val_section
 
         subfolders = ['train', 'val', 'train_val']
 
@@ -214,16 +233,23 @@ times.
             self.qmd_content = self.qmd_content.replace(QuartoReport.REPLACEMENT_KEYS["data_plots"], data_image_path)
 
         else:
-            # delete plot command to avoid error
             self.qmd_content = self.qmd_content.replace(QuartoReport.REPLACEMENT_KEYS["data_placeholder"], "")
 
-        train_plots_path = self.plot_all_train_metrics()
-        train_image_path = self.create_plot_image(train_plots_path)
-        self.qmd_content = self.qmd_content.replace(QuartoReport.REPLACEMENT_KEYS["train_plots"], train_image_path)
+        if self.train_section:
+            train_plots_path = self.plot_all_train_metrics()
+            train_image_path = self.create_plot_image(train_plots_path)
+            self.qmd_content = self.qmd_content.replace(QuartoReport.REPLACEMENT_KEYS["train_placeholder"],
+                                                        QuartoReport.TRAIN_SECTION)
+            self.qmd_content = self.qmd_content.replace(QuartoReport.REPLACEMENT_KEYS["train_plots"], train_image_path)
+        else:
+            self.qmd_content = self.qmd_content.replace(QuartoReport.REPLACEMENT_KEYS["train_placeholder"], "")
 
-        val_plots_path = self.plot_all_val_metrics()
-        val_image_path = self.create_plot_image(val_plots_path)
-        self.qmd_content = self.qmd_content.replace(QuartoReport.REPLACEMENT_KEYS["val_plots"], val_image_path)
+        if self.val_section:
+            val_plots_path = self.plot_all_val_metrics()
+            val_image_path = self.create_plot_image(val_plots_path)
+            self.qmd_content = self.qmd_content.replace(QuartoReport.REPLACEMENT_KEYS["val_plots"], val_image_path)
+        else:
+            self.qmd_content = self.qmd_content.replace(QuartoReport.REPLACEMENT_KEYS["val_placeholder"], "")
 
         train_val_plots_path = self.plot_all_train_val_metrics()
         train_val_image_path = self.create_plot_image(train_val_plots_path)
