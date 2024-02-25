@@ -12,8 +12,7 @@ from dlomix.reports.postprocessing import normalize_intensity_predictions
 import seaborn as sns
 
 
-# make data optional
-# make prediction optional
+# what data plots to include?
 # val/test violin plots
 #   - concatenate val/test
 #   - add flag column whether val/test
