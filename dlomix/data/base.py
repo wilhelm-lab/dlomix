@@ -91,7 +91,7 @@ class AbstractPeptideDataset(abc.ABC):
             data_files_available_splits[
                 AbstractPeptideDataset.DEFAULT_SPLIT_NAMES[1]
             ] = self.val_data_source
-        if self.val_data_source is not None:
+        if self.test_data_source is not None:
             data_files_available_splits[
                 AbstractPeptideDataset.DEFAULT_SPLIT_NAMES[2]
             ] = self.test_data_source

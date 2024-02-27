@@ -25,6 +25,7 @@ setuptools.setup(
         "matplotlib",
         "scikit-learn",
         "tensorflow",
+        "tensorflow_probability",
         "pyarrow",
         "seaborn",
     ],
