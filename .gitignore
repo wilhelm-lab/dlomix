@@ -135,8 +135,13 @@ dmypy.json
 # test notebooks are stored in /notebooks/ and named with a leading underscore
 notebooks/_*
 
-# wand outputs
+# globally ignore notebooks with __
+__*.ipynb
+
+# wand outputs in notebooks and root
 notebooks/wandb
+wandb
+
 
 # output folders
 /notebooks/output*/
@@ -163,6 +168,7 @@ metadata.parquet
 
 # pycharm
 .idea
+
 
 # personal logbook
 log_book.md

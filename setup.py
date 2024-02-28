@@ -39,7 +39,12 @@ setuptools.setup(
         ],
         "wandb": [
             "wandb >= 0.15",
-        ]
+        ],
+        "quarto":
+        [
+            "tabulate", # for converting dataframes to markdown tables
+            "quarto-cli", # experimental from Quarto!
+        ],
     },
     classifiers=[
         "Programming Language :: Python :: 3",

@@ -28,6 +28,12 @@ If you would like to use [Weights & Biases](wandb.ai) for experiment tracking an
 $ pip install dlomix[wandb]
 ```
 
+If you would like to use [Quarto](quarto.org) for generating offline reports using Markdown, please install the optional `quarto` python dependency with `dlomix` by running:
+
+```bash
+$ pip install dlomix[quarto]
+```
+
 **General Overview**
 -  `data`: structures for modeling the input data, currently based on `tf.Dataset`
 -  `eval`: classes for evaluating models and reporting results
