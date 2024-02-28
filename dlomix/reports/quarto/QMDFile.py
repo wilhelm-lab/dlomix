@@ -69,7 +69,7 @@ class QMDFile:
 
         section_content = f"\n{'#' * header_level} {section_title}"
         if section_text:
-            section_content += f"\n{section_text}"
+            section_content += f"{section_text}"
         self.add_content(section_content, page_break=page_break)
 
     def insert_text_block(self, text, page_break=False):
@@ -168,57 +168,3 @@ class QMDFile:
         """
         with open(file_path, "w") as f:
             f.write(self._generate_qmd_content())
-
-
-if __name__ == "__main__":
-    import pandas as pd
-
-    ## todo: extract and place in the quarto report class
-    def get_model_summary_df(model):
-        import re
-
-        # code adapted from https://stackoverflow.com/questions/63843093/neural-network-summary-to-dataframe
-
-        stringlist = []
-        model.summary(print_fn=lambda x: stringlist.append(x))
-        summ_string = "\n".join(stringlist)
-
-        # take every other element and remove appendix
-        table = stringlist[1:-5][1::2]
-
-        new_table = []
-        for entry in table:
-            entry = re.split(r"\s{2,}", entry)[:-1]  # remove whitespace
-            new_table.append(entry)
-
-        return pd.DataFrame(new_table[1:], columns=new_table[0])
-
-    # just an example of creating a model on the fly, can be removed
-    from tensorflow.keras.layers import Conv2D, Dense, Flatten
-    from tensorflow.keras.models import Sequential
-
-    # Create the model
-    model = Sequential()
-    model.add(
-        Conv2D(32, kernel_size=(3, 3), activation="relu", input_shape=(10, 200, 200))
-    )
-    model.add(Conv2D(64, kernel_size=(3, 3), activation="relu"))
-    model.add(Conv2D(128, kernel_size=(3, 3), activation="relu"))
-    model.add(Flatten())
-    model.add(Dense(128, activation="relu"))
-    model.add(Dense(2, activation="softmax"))
-
-    summary_df = get_model_summary_df(model)
-
-    # example of using the QMDFile class
-    qmd = QMDFile("Quarto Base QMD")
-    qmd.insert_section_block("Section 1", "This is a sample section.")
-
-    ref = qmd.insert_image("quarto_logo.jpg", "Quarto logo")
-    qmd.insert_text_block(f"This is a sample text block referencing the figure @{ref}")
-
-    ref = qmd.insert_table_from_df(summary_df, "Keras model summary")
-    qmd.insert_text_block(
-        f"This is a sample text block referencing the keras model summary @{ref}"
-    )
-    qmd.write_qmd_file("quarto_base.qmd")
