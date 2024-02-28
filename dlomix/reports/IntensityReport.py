@@ -36,36 +36,36 @@ class IntensityReport(Report):
 
         # make custom plots
         self.plot_spectral_angle(predictions_df)
-        
+
         self._compile_report_resources_add_pdf_pages()
         self.pdf_file.output(join(self._output_path, "intensity_Report.pdf"), "F")
-
 
     def generate_intensity_results_df(self, dataset, predictions):
         predictions_df = pd.DataFrame()
 
-        predictions_df['sequences'] = dataset.sequences
-        predictions_df['intensities_pred'] = predictions.tolist()
-        predictions_df['precursor_charge_onehot'] = dataset.precursor_charge.tolist()
-        predictions_df['intensities_raw'] = dataset.intensities.tolist()
+        predictions_df["sequences"] = dataset.sequences
+        predictions_df["intensities_pred"] = predictions.tolist()
+        predictions_df["precursor_charge_onehot"] = dataset.precursor_charge.tolist()
+        predictions_df["intensities_raw"] = dataset.intensities.tolist()
 
         return predictions_df
 
-    def plot_spectral_angle(
-        self,
-        predictions_df
-        ):
+    def plot_spectral_angle(self, predictions_df):
         """Create spectral  plot
 
         Arguments
         ---------
             predictions_df:  dataframe with raw intensities, predictions, sequences, precursor_charges
         """
-        
-        predictions_acc = normalize_intensity_predictions(predictions_df, self.batch_size)
-        violin_plot = sns.violinplot(predictions_acc['spectral_angle'])
-        
-        save_path = join(self._output_path, "violin_spectral_angle_plot" + self._figures_ext)
+
+        predictions_acc = normalize_intensity_predictions(
+            predictions_df, self.batch_size
+        )
+        violin_plot = sns.violinplot(predictions_acc["spectral_angle"])
+
+        save_path = join(
+            self._output_path, "violin_spectral_angle_plot" + self._figures_ext
+        )
 
         fig = violin_plot.get_figure()
         fig.savefig(save_path)

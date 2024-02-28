@@ -40,7 +40,7 @@ def masked_pearson_correlation_distance(y_true, y_pred):
 
     mx = tf.math.reduce_mean(true_masked)
     my = tf.math.reduce_mean(pred_masked)
-    xm, ym = true_masked-mx, pred_masked-my
+    xm, ym = true_masked - mx, pred_masked - my
     r_num = tf.math.reduce_mean(tf.multiply(xm, ym))
     r_den = tf.math.reduce_std(xm) * tf.math.reduce_std(ym)
-    return 1 - (r_num/r_den)
+    return 1 - (r_num / r_den)

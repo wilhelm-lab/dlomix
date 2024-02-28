@@ -1,6 +1,7 @@
 import tensorflow as tf
-from dlomix.constants import ALPHABET_UNMOD
 from tensorflow.keras.layers.experimental import preprocessing
+
+from dlomix.constants import ALPHABET_UNMOD
 
 
 class DeepLCRetentionTimePredictor(tf.keras.Model):
@@ -38,7 +39,6 @@ class DeepLCRetentionTimePredictor(tf.keras.Model):
         )
 
     def _build_diaminoacid_branch(self):
-
         self.diaminoacid_branch = tf.keras.Sequential(
             [
                 self._build_conv_pool_block(n_filters=128, kernel=2, padding="same"),
@@ -87,7 +87,6 @@ class DeepLCRetentionTimePredictor(tf.keras.Model):
         pool_strides=2,
         pool_size=2,
     ):
-
         # leaky relu by default
         activation_fn = self.leaky_relu
 

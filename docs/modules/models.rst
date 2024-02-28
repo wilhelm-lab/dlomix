@@ -1,10 +1,8 @@
-dlomix.models package
-=====================
+:code:`dlomix.models`
+*********************
 
-Submodules
-----------
 
-dlomix.models.base module
+dlomix.models.base
 -------------------------
 
 .. automodule:: dlomix.models.base
@@ -12,7 +10,7 @@ dlomix.models.base module
    :undoc-members:
    :show-inheritance:
 
-dlomix.models.deepLC module
+dlomix.models.deepLC
 ---------------------------
 
 .. automodule:: dlomix.models.deepLC
@@ -20,18 +18,11 @@ dlomix.models.deepLC module
    :undoc-members:
    :show-inheritance:
 
-dlomix.models.prosit module
+dlomix.models.prosit
 ---------------------------
 
 .. automodule:: dlomix.models.prosit
    :members:
    :undoc-members:
    :show-inheritance:
-
-Module contents
----------------
-
-.. automodule:: dlomix.models
-   :members:
-   :undoc-members:
-   :show-inheritance:
+   

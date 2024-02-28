@@ -1,18 +1,15 @@
 dlomix package
 ==============
 
-Subpackages
------------
-
 .. toctree::
    :maxdepth: 4
 
-   dlomix.data
-   dlomix.eval
-   dlomix.layers
-   dlomix.models
-   dlomix.pipelines
-   dlomix.reports
+   modules/data
+   modules/models
+   modules/eval
+   modules/reports
+   modules/layers
+   modules/pipelines
 
 Submodules
 ----------

@@ -17,12 +17,12 @@ class RetentionTimeReport(Report):
 
     def __init__(self, output_path, history, figures_ext="png"):
         super(RetentionTimeReport, self).__init__(output_path, history, figures_ext)
-        
-        warn(f"{self.__class__.__name__} This class is deprecated and will not further developed. Use RetentionTimeReportWandb instead for creating a report with the Weights & Biases Report API.",
-             DeprecationWarning,
-             stacklevel=2
-        )
 
+        warn(
+            f"{self.__class__.__name__} This class is deprecated and will not further developed. Use RetentionTimeReportWandb instead for creating a report with the Weights & Biases Report API.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
 
         self.pdf_file = PDFFile("DLOmix - Retention Time Report")
 

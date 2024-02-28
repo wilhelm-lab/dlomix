@@ -3,17 +3,24 @@ import tensorflow.keras.backend as K
 
 
 class TimeDeltaMetric(tf.keras.metrics.Metric):
-    """Implementation of the time delta metric as a Keras Metric.
+    r"""Implementation of the time delta metric as a Keras Metric.
 
     Parameters
     ----------
-        mean (int, optional): Mean value of the targets in case normalization was performed. Defaults to 0.
-        std (int, optional): Standard deviation value of the targets in case normalization was performed. Defaults to 1.
-        percentage (float, optional): What percentage of the data points to consider, this is specific to the conmputation of the metric. Defaults to 0.95 which corresponds to 95% of the datapoints and is the mostly used value in papers.
-        name (str, optional): Name of the metric so that it can be reported and used later in Keras History objects. Defaults to 'timedelta'.
-        rescale_targets (bool, optional): Whether to rescale (denormalize) targets or not. Defaults to False.
-        rescale_predictions (bool, optional): Whether to rescale (denormalize) predictions or not. Defaults to False.
-        double_delta (bool, optional): Whether to multiple the computed delta by 2 in order to make it two-sided or not. Defaults to False.
+    mean : int, optional
+        Mean value of the targets in case normalization was performed. Defaults to 0.
+    std : int, optional
+        Standard deviation value of the targets in case normalization was performed. Defaults to 1.
+    percentage : float, optional
+        What percentage of the data points to consider, this is specific to the computation of the metric. Defaults to 0.95 which corresponds to 95% of the data points and is the mostly used value in papers.
+    name : str, optional
+        Name of the metric so that it can be reported and used later in Keras History objects. Defaults to 'timedelta'.
+    rescale_targets : bool, optional
+        Whether to rescale (denormalize) targets or not. Defaults to False.
+    rescale_predictions : bool, optional
+        Whether to rescale (denormalize) predictions or not. Defaults to False.
+    double_delta : bool, optional
+        Whether to multiply the computed delta by 2 in order to make it two-sided or not. Defaults to False.
     """
 
     def __init__(
@@ -27,7 +34,6 @@ class TimeDeltaMetric(tf.keras.metrics.Metric):
         double_delta=False,
         **kwargs
     ):
-
         super(TimeDeltaMetric, self).__init__(name=name, **kwargs)
         self.delta = self.add_weight(name="delta", initializer="zeros")
         self.batch_count = self.add_weight(name="batch-count", initializer="zeros")
@@ -66,7 +72,7 @@ class TimeDeltaMetric(tf.keras.metrics.Metric):
         self.delta.assign_add(tf.math.reduce_sum(d))
 
     def result(self):
-        # this is simple averaging over the batches, more complex reduction can be added based on domain expertises
+        # this is simple averaging over the batches, more complex reduction can be added based on domain expertise
         # Examples are: take max or min of both deltas (translates to a strict or a relaxed metric)
         return tf.math.divide(self.delta, self.batch_count)
 

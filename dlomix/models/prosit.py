@@ -1,21 +1,29 @@
 import tensorflow as tf
 from tensorflow.keras.layers.experimental import preprocessing
+
 from dlomix.constants import ALPHABET_UNMOD
 from dlomix.layers.attention import AttentionLayer, DecoderAttentionLayer
 
 
 class PrositRetentionTimePredictor(tf.keras.Model):
-    """Implementation of the Prosit model for retention time prediction.
+    r"""Implementation of the Prosit model for retention time prediction.
 
     Parameters
     -----------
-        embedding_output_dim (int, optional): Size of the embeddings to use. Defaults to 16.
-        seq_length (int, optional): Sequence length of the peptide sequences. Defaults to 30.
-        vocab_dict (dict, optional): Dictionary mapping for the vocabulary (the amino acids in this case). Defaults to ALPHABET_UNMOD.
-        dropout_rate (float, optional): Probability to use for dropout layers in the encoder. Defaults to 0.5.
-        latent_dropout_rate (float, optional): Probability to use for dropout layers in the regressor layers after encoding. Defaults to 0.1.
-        recurrent_layers_sizes (tuple, optional): A tuple of 2 values for the sizes of the two GRU layers in the encoder. Defaults to (256, 512).
-        regressor_layer_size (int, optional): Size of the dense layer in the regressor after the encoder. Defaults to 512.
+    embedding_output_dim: int, optional
+        Size of the embeddings to use. Defaults to 16.
+    seq_length: int, optional
+        Sequence length of the peptide sequences. Defaults to 30.
+    vocab_dict: dict, optional
+        Dictionary mapping for the vocabulary (the amino acids in this case). Defaults to ALPHABET_UNMOD.
+    dropout_rate: float, optional
+        Probability to use for dropout layers in the encoder. Defaults to 0.5.
+    latent_dropout_rate: float, optional
+        Probability to use for dropout layers in the regressor layers after encoding. Defaults to 0.1.
+    recurrent_layers_sizes: tuple, optional
+        A tuple of 2 values for the sizes of the two GRU layers in the encoder. Defaults to (256, 512).
+    regressor_layer_size: int, optional
+        Size of the dense layer in the regressor after the encoder. Defaults to 512.
     """
 
     def __init__(
@@ -87,17 +95,24 @@ class PrositRetentionTimePredictor(tf.keras.Model):
 
 
 class PrositIntensityPredictor(tf.keras.Model):
-    """Implementation of the Prosit model for intensity prediction.
+    r"""Implementation of the Prosit model for intensity prediction.
 
     Parameters
-    -----------
-        embedding_output_dim (int, optional): Size of the embeddings to use. Defaults to 16.
-        seq_length (int, optional): Sequence length of the peptide sequences. Defaults to 30.
-        vocab_dict (dict, optional): Dictionary mapping for the vocabulary (the amino acids in this case). Defaults to ALPHABET_UNMOD.
-        dropout_rate (float, optional): Probability to use for dropout layers in the encoder. Defaults to 0.5.
-        latent_dropout_rate (float, optional): Probability to use for dropout layers in the regressor layers after encoding. Defaults to 0.1.
-        recurrent_layers_sizes (tuple, optional): A tuple of 2 values for the sizes of the two GRU layers in the encoder. Defaults to (256, 512).
-        regressor_layer_size (int, optional): Size of the dense layer in the regressor after the encoder. Defaults to 512.
+    ----------
+    embedding_output_dim : int, optional
+        Size of the embeddings to use. Defaults to 16.
+    seq_length : int, optional
+        Sequence length of the peptide sequences. Defaults to 30.
+    vocab_dict : dict, optional
+        Dictionary mapping for the vocabulary (the amino acids in this case). Defaults to ALPHABET_UNMOD.
+    dropout_rate : float, optional
+        Probability to use for dropout layers in the encoder. Defaults to 0.5.
+    latent_dropout_rate : float, optional
+        Probability to use for dropout layers in the regressor layers after encoding. Defaults to 0.1.
+    recurrent_layers_sizes : tuple, optional
+        A tuple of 2 values for the sizes of the two GRU layers in the encoder. Defaults to (256, 512).
+    regressor_layer_size : int, optional
+        Size of the dense layer in the regressor after the encoder. Defaults to 512.
     """
 
     def __init__(
@@ -159,7 +174,6 @@ class PrositIntensityPredictor(tf.keras.Model):
         )
 
     def _build_encoders(self):
-
         self.meta_encoder = tf.keras.Sequential(
             [
                 tf.keras.layers.Concatenate(name="meta_in"),
