@@ -9,6 +9,7 @@ import matplotlib as mpl
 import matplotlib.image as mpimg
 import matplotlib.pyplot as plt
 import numpy as np
+import report_constants
 import seaborn as sns
 from Levenshtein import distance as levenshtein_distance
 from matplotlib.colors import LogNorm
@@ -26,37 +27,6 @@ from QMDFile import QMDFile
 
 
 class QuartoReport:
-    DATA_SECTION = """
-The following section is showing a simple explorative data analysis of the used dataset. The first histogram shows the
-distribution of peptide lengths in the data set, while the second histogram shows the distribution of indexed retention
-times. The first density plot shows the density of retention time per peptide length. The second density plot depicts the
-density of Levenshtein distances per petide length."""
-
-    TRAIN_SECTION = """
-The following section shows the different metrics that were used to track the training. All used metrics are added by
-default. The resolution of this section is per epoch."""
-
-    VAL_SECTION = """
-The following section shows the different metrics that were used to track the validation. All used metrics are added by
-default. The resolution of this section is per epoch."""
-
-    TRAIN_VAL_SECTION = """
-The following section shows the training metrics in comparision with the validation metrics. The training loss is a metric used to assess how well a model fits the training data. In contrast the validation
-loss assesses the performance of the model on previously unseen data. Plotting both curves in the same plot provides a
-quick way of diagnosing the model for overfitting or underfitting. All used metrics are added by default."""
-
-    RESIDUALS_SECTION = """
-This section shows a histogram of the residuals of the model. Residuals are the difference between the actual values and
-the predicted values of the test set. A histogram of those residuals offers a way of assessing the models performance."""
-
-    DENSITY_SECTION = """
-This section shows the density plot. A better explanation of the density plot is yet to be done."""
-
-    R2_SECTION = """
-The R2 of given predictions is R2_SCORE_VALUE. The R2 score is a metric that is calculated using scikit learns's function
-r2_score. It evaluates the performance of the model on the test set and compares the predicted values with the actual values.
-The best possible score is 1.0. The lower the score the worse the model's prediction."""
-
     def __init__(
         self,
         history,
@@ -147,62 +117,37 @@ The best possible score is 1.0. The lower the score the worse the model's predic
             if not os.path.exists(path):
                 os.makedirs(path)
 
-    def _get_model_data(self):
-        import io
+    def get_model_summary_df(self):
+        import re
 
-        model_summary_buffer = io.StringIO()
-        model.summary(print_fn=lambda x: model_summary_buffer.write(x + "<br>"))
-        model_summary_lines = model_summary_buffer.getvalue().split("<br>")
-
-        lines = [line.rstrip() for line in model_summary_lines]
-
-        # remove formatting lines
-        strings_to_remove = ["____", "===="]
-        cleaned_list = [
-            item
-            for item in lines
-            if not any(string in item for string in strings_to_remove)
-        ]
-
-        # split into words by splitting if there are more than two whitespaces
-        words = []
-        for line in cleaned_list:
-            words.append(re.split(r"\s{2,}", line))
-
-        # remove lines that contain less than 3 characters
-        filtered_list_of_lists = [
-            sublist for sublist in words if all(len(item) > 3 for item in sublist)
-        ]
-
-        # extract layer info and model info
-        layer_info = [sublist for sublist in filtered_list_of_lists if len(sublist) > 2]
-        model_info = [sublist for sublist in filtered_list_of_lists if len(sublist) < 2]
-
-        # flatten model_info and filter entries with length smaller than 5
-        model_info_flat = [item for sublist in model_info for item in sublist]
-        model_info_flat_filtered = [item for item in model_info_flat if len(item) >= 5]
-
-        model_info_dict = {}
-        for item in model_info_flat_filtered:
-            # Split each string by ": "
-            key, value = item.split(": ", 1)
-            # Add the key-value pair to the dictionary
-            model_info_dict[key] = value
-
-        # create layer_info_df
-        column_names = layer_info[0]
-        layer_info_df = pd.DataFrame(layer_info[1:], columns=column_names)
-
-        return model_info_dict, layer_info_df
+        # code adapted from https://stackoverflow.com/questions/63843093/neural-network-summary-to-dataframe
+        stringlist = []
+        self.model.summary(print_fn=lambda x: stringlist.append(x))
+        summ_string = "\n".join(stringlist)
+        # take every other element and remove appendix
+        # code in next line breaks if there is a Stringlookup layer -> "p" in next line -> layer info is removed
+        table = stringlist[1:-5][1::2]
+        new_table = []
+        for entry in table:
+            entry = re.split(r"\s{2,}", entry)[:-1]  # remove whitespace
+            new_table.append(entry)
+        return pd.DataFrame(new_table[1:], columns=new_table[0])
 
     def generate_report(self):
         qmd = QMDFile(title=self.title)
+
+        if self.model is not None:
+            df = self.get_model_summary_df()
+            qmd.insert_section_block(
+                section_title="Model", section_text=report_constants.MODEL_SECTION
+            )
+            qmd.insert_table_from_df(df, "Keras model summary")
 
         if self.data is not None:
             data_plots_path = self.plot_all_data_plots()
             data_image_path = self.create_plot_image(data_plots_path)
             qmd.insert_section_block(
-                section_title="Data", section_text=QuartoReport.DATA_SECTION
+                section_title="Data", section_text=report_constants.DATA_SECTION
             )
             qmd.insert_image(
                 image_path=data_image_path, caption="Data plots", page_break=True
@@ -213,7 +158,7 @@ The best possible score is 1.0. The lower the score the worse the model's predic
             train_image_path = self.create_plot_image(train_plots_path)
             qmd.insert_section_block(
                 section_title="Train metrics per epoch",
-                section_text=QuartoReport.TRAIN_SECTION,
+                section_text=report_constants.TRAIN_SECTION,
             )
             qmd.insert_image(
                 image_path=train_image_path, caption="Train plots", page_break=True
@@ -224,7 +169,7 @@ The best possible score is 1.0. The lower the score the worse the model's predic
             val_image_path = self.create_plot_image(val_plots_path)
             qmd.insert_section_block(
                 section_title="Validation metrics per epoch",
-                section_text=QuartoReport.VAL_SECTION,
+                section_text=report_constants.VAL_SECTION,
             )
             qmd.insert_image(
                 image_path=val_image_path, caption="Validation plots", page_break=True
@@ -234,7 +179,7 @@ The best possible score is 1.0. The lower the score the worse the model's predic
         train_val_image_path = self.create_plot_image(train_val_plots_path)
         qmd.insert_section_block(
             section_title="Train-Validation metrics per epoch",
-            section_text=QuartoReport.TRAIN_VAL_SECTION,
+            section_text=report_constants.TRAIN_VAL_SECTION,
         )
         qmd.insert_image(
             image_path=train_val_image_path,
@@ -247,61 +192,24 @@ The best possible score is 1.0. The lower the score the worse the model's predic
             density_plot_path = self.plot_density()
             r2 = self.calculate_r2(self.test_targets, self.predictions)
             qmd.insert_section_block(
-                section_title="Residuals", section_text=QuartoReport.RESIDUALS_SECTION
+                section_title="Residuals",
+                section_text=report_constants.RESIDUALS_SECTION,
             )
             qmd.insert_image(
                 image_path=residuals_plot_path, caption="Residual plot", page_break=True
             )
 
             qmd.insert_section_block(
-                section_title="Density", section_text=QuartoReport.DENSITY_SECTION
+                section_title="Density", section_text=report_constants.DENSITY_SECTION
             )
             qmd.insert_image(
                 image_path=density_plot_path, caption="Density plot", page_break=True
             )
 
-            r2_text = QuartoReport.R2_SECTION.replace("R2_SCORE_VALUE", str(r2))
+            r2_text = report_constants.R2_SECTION.replace("R2_SCORE_VALUE", str(r2))
             qmd.insert_section_block(section_title="R2", section_text=r2_text)
 
         qmd.write_qmd_file("quarto_base_test.qmd")
-
-    def update_qmd(self):
-        # if self.model is not None:
-        #     model_info_dict, _ = self._get_model_data()
-        #     self.qmd_content = self.qmd_content.replace(QuartoReport.REPLACEMENT_KEYS["model"],
-        #                                                 model_info_dict.get("Model"))
-        #     self.qmd_content = self.qmd_content.replace(QuartoReport.REPLACEMENT_KEYS["total_params"],
-        #                                                 model_info_dict.get("Total params"))
-        #     self.qmd_content = self.qmd_content.replace(QuartoReport.REPLACEMENT_KEYS["trainable_params"],
-        #                                                 model_info_dict.get("Trainable params"))
-        #     self.qmd_content = self.qmd_content.replace(QuartoReport.REPLACEMENT_KEYS["non_trainable_params"],
-        #                                                 model_info_dict.get("Non-trainable params"))
-        #     self.qmd_content = self.qmd_content.replace(QuartoReport.REPLACEMENT_KEYS["layer_information"],
-        #                                                 layer_info_df.to_string())
-
-        if self.test_targets is not None and predictions is not None:
-            residuals_plot_path = self.plot_residuals()
-            self.qmd_content = self.qmd_content.replace(
-                QuartoReport.REPLACEMENT_KEYS["residuals_plot"], residuals_plot_path
-            )
-            density_plot_path = self.plot_density()
-            self.qmd_content = self.qmd_content.replace(
-                QuartoReport.REPLACEMENT_KEYS["density_plot"], density_plot_path
-            )
-            r2 = self.calculate_r2(self.test_targets, self.predictions)
-            self.qmd_content = self.qmd_content.replace(
-                QuartoReport.REPLACEMENT_KEYS["r2_score"], str(r2)
-            )
-
-        else:
-            # delete plot command to avoid error
-            self.qmd_content = self.qmd_content.replace(
-                "![Histogram of model's residuals](RESIDUALS_PLOT_PATH)",
-                "NO DATA PROVIDED!",
-            )
-            self.qmd_content = self.qmd_content.replace(
-                "![Data plots](DATA_PLOTS_PATH)", "NO DATA PROVIDED!"
-            )
 
     def internal_without_mods(self, sequences):
         regex = "\[.*?\]|\-"
@@ -603,3 +511,79 @@ The best possible score is 1.0. The lower the score the worse the model's predic
         plt.savefig(save_path, bbox_inches="tight")
         plt.clf()
         return save_path
+
+
+if __name__ == "__main__":
+    import os
+    import re
+    import warnings
+
+    import keras
+    import matplotlib.pyplot as plt
+
+    # import necessary packages
+    import numpy as np
+    import pandas as pd
+    import tensorflow as tf
+    import wandb
+    from Levenshtein import distance as levenshtein_distance
+
+    import dlomix
+    from dlomix import constants, data, eval, layers, models, pipelines, reports, utils
+    from dlomix.data import RetentionTimeDataset
+    from dlomix.eval import TimeDeltaMetric
+    from dlomix.models import PrositRetentionTimePredictor, RetentionTimePredictor
+
+    # Create config
+    config = {
+        "seq_length": 30,
+        "batch_size": 64,
+        "val_ratio": 0.2,
+        "lr": 0.001,
+        "optimizer": "Adam",
+        "loss": "mse",
+    }
+    # load small train dataset
+    TRAIN_DATAPATH = "https://raw.githubusercontent.com/wilhelm-lab/dlomix-resources/main/example_datasets/RetentionTime/proteomeTools_train_val.csv"
+    # create dataset
+    rtdata = RetentionTimeDataset(
+        data_source=TRAIN_DATAPATH,
+        seq_length=config["seq_length"],
+        batch_size=config["batch_size"],
+        val_ratio=config["val_ratio"],
+        test=False,
+    )
+    # create retention time predictor
+    model = RetentionTimePredictor(seq_length=config["seq_length"])
+    # create the optimizer object
+    optimizer = tf.keras.optimizers.legacy.Adam(learning_rate=config["lr"])
+    # compile the model with the optimizer and the metrics we want to use
+    model.compile(
+        optimizer=optimizer,
+        loss=config["loss"],
+        metrics=["mean_absolute_error", TimeDeltaMetric()],
+    )
+    # train the model
+    history = model.fit(rtdata.train_data, validation_data=rtdata.val_data, epochs=2)
+    # create the dataset object for test data
+    TEST_DATAPATH = "https://raw.githubusercontent.com/wilhelm-lab/dlomix-resources/main/example_datasets/RetentionTime/proteomeTools_test.csv"
+    test_rtdata = RetentionTimeDataset(
+        data_source=TEST_DATAPATH, seq_length=30, batch_size=32, test=True
+    )
+    # use model.predict from keras directly on the testdata
+    predictions = model.predict(test_rtdata.test_data)
+    # we use ravel from numpy to flatten the array (since it comes out as an array of arrays)
+    predictions = predictions.ravel()
+    test_targets = test_rtdata.get_split_targets(split="test")
+
+    report = QuartoReport(
+        title="Test Report",
+        data=rtdata,
+        history=history,
+        model=model,
+        test_targets=test_targets,
+        predictions=predictions,
+        train_section=True,
+        val_section=True,
+    )
+    report.generate_report()
