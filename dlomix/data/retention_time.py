@@ -3,11 +3,11 @@ from typing import Callable, Dict, List, Optional, Union
 from datasets import Dataset
 
 from ..constants import ALPHABET_UNMOD
-from .base import AbstractPeptideDataset
+from .dataset import PeptideDataset
 from .dataset_utils import EncodingScheme
 
 
-class RetentionTimeDataset(AbstractPeptideDataset):
+class RetentionTimeDataset(PeptideDataset):
     DEFAULT_SPLIT_NAMES = ["train", "val", "test"]
 
     def __init__(
@@ -28,6 +28,7 @@ class RetentionTimeDataset(AbstractPeptideDataset):
         padding_value: int = 0,
         vocab: Dict = ALPHABET_UNMOD,
         encoding_scheme: Union[str, EncodingScheme] = EncodingScheme.NO_MODS,
+        processed: bool = False,
     ):
         super().__init__(
             data_source,
@@ -46,25 +47,5 @@ class RetentionTimeDataset(AbstractPeptideDataset):
             padding_value,
             vocab,
             encoding_scheme,
+            processed,
         )
-
-    @staticmethod
-    def load_processed_dataset(
-        dataset: Dataset,
-        batch_size,
-        sequence_column,
-        columns: Optional[List] = None,
-        label: Optional[str] = None,
-    ):
-        """
-        For convenience, load hugging face dataset that is previously processed and ready to be used for training/inference
-        """
-
-        rt_dataset = RetentionTimeDataset(
-            batch_size=batch_size,
-            sequence_column=sequence_column,
-            model_features=columns,
-            label_column=label,
-        )
-        rt_dataset.dataset = dataset
-        return rt_dataset

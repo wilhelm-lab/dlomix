@@ -1,3 +1,6 @@
+# can be removed completely if pyteomics won't be used
+
+
 import abc
 from typing import Optional
 
