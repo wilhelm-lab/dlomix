@@ -40,6 +40,19 @@ class QuartoReport:
         val_section=False,
         output_path="/Users/andi/PycharmProjects/dlomix_repo/dlomix/reports/quarto/",
     ):
+        """
+        Constructor for QuartoReport class
+        :param history: history object from training a keras model
+        :param data: RetentionTimeDataset object containing training data
+        :param test_targets: nd.array containing the targets (retention times) of the test data
+        :param predictions: nd.array containing the predictions of the test data
+        :param model: keras model object
+        :param title: title of the report
+        :param fold_code: boolean indicating whether to show pythong code producing plots in the report or not
+        :param train_section: boolean indicating whether to include training section in the report or not
+        :param val_section: boolean indicating whether to include validation section in the report or not
+        :param output_path: string where the report will be saved
+        """
         self.title = title
         self.fold_code = fold_code
         self.output_path = output_path
@@ -87,6 +100,11 @@ class QuartoReport:
         self._create_plot_folder_structure(subfolders)
 
     def _set_history_dict(self, history):
+        """
+        Function that takes and validates the keras history object. Then sets the report objects history dictionary
+        attribute, containing all the metrics tracked during training.
+        :param history: history object from training a keras model
+        """
         if isinstance(history, dict):
             self._history_dict = history
         elif not isinstance(history, tf.keras.callbacks.History):
@@ -108,6 +126,10 @@ class QuartoReport:
             )
 
     def _create_plot_folder_structure(self, subfolders=None):
+        """
+        Function to create the folder structure where the plot images are saved later.
+        :param subfolders: list of strings representing the subfolders to be created
+        """
         root = join(self.output_path, "plots")
         if not os.path.exists(root):
             os.makedirs(root)
@@ -117,6 +139,11 @@ class QuartoReport:
                 os.makedirs(path)
 
     def get_model_summary_df(self):
+        """
+        Function to convert the layer information contained in keras model.summary() into a pandas dataframe in order to
+        display it in the report.
+        :return: dataframe containing the layer information of keras model.summary()
+        """
         import re
 
         # code adapted from https://stackoverflow.com/questions/63843093/neural-network-summary-to-dataframe
@@ -133,6 +160,10 @@ class QuartoReport:
         return pd.DataFrame(new_table[1:], columns=new_table[0])
 
     def generate_report(self):
+        """
+        Function to generate the report. Adds sections sequentially.
+        Contains the logic to generate the plots and include/exclude user-specified sections.
+        """
         qmd = QMDFile(title=self.title)
 
         if self.model is not None:
@@ -211,10 +242,19 @@ class QuartoReport:
         qmd.write_qmd_file(f"{self.output_path}/quarto_base_test.qmd")
 
     def internal_without_mods(self, sequences):
+        """
+        Function to remove modifications from an iterable of sequences
+        :param sequences: iterable of peptide sequences
+        :return: list of sequences without modifications
+        """
         regex = "\[.*?\]|\-"
         return [re.sub(regex, "", seq) for seq in sequences]
 
     def plot_rt_distribution(self, save_path=""):
+        """
+        Function to plot a histogram of retention times distribution
+        :param save_path: string where to save the plot
+        """
         df = pd.DataFrame(self.data.sequences, columns=["unmod_seq"])
         df["length"] = df["unmod_seq"].str.len()
         df["retention_time"] = self.data.targets
@@ -243,6 +283,11 @@ class QuartoReport:
         plt.clf()
 
     def plot_levenshtein(self, save_path=""):
+        """
+        Function to plot the density of Levenshtein distances between the sequences for different sequence lengths
+        :param save_path: string where to save the plot
+        :return:
+        """
         seqs_wo_mods = self.internal_without_mods(self.data.sequences)
         seqs_wo_dupes = list(dict.fromkeys(seqs_wo_mods))
         df = pd.DataFrame(seqs_wo_dupes, columns=["mod_seq"])
@@ -293,11 +338,10 @@ class QuartoReport:
         plt.clf()
 
     def plot_keras_metric(self, metric_name, save_path=""):
-        """Plot a keras metric given its name and the history object returned by model.fit()
-
-        Arguments
-        ---------
-            metric_name: String with the name of the metric.
+        """
+        Function that creates a basic line plot of a keras metric
+        :param metric_name: name of the metric to plot
+        :param save_path: string where to save the plot
         """
 
         if metric_name.lower() not in self._history_dict.keys():
@@ -323,6 +367,14 @@ class QuartoReport:
         plt.clf()
 
     def plot_histogram(self, x, label="numeric variable", bins=10, save_path=""):
+        """
+        Function to create and save a histogram
+        :param x: x variable of histogram
+        :param label: label of x-axis
+        :param bins: number of bins of histogram
+        :param save_path: string where to save the plot
+        :return:
+        """
         plt.figure(figsize=(8, 6))
         plt.hist(x, edgecolor="black", bins=bins)
         plt.xlabel(label)
@@ -331,7 +383,12 @@ class QuartoReport:
         plt.savefig(f"{save_path}/{label}.png", bbox_inches="tight")
         plt.clf()
 
-    def plot_train_vs_val_keras_metric(self, metric_name, save_path="", save_plot=True):
+    def plot_train_vs_val_keras_metric(self, metric_name, save_path=""):
+        """
+        Function that creates a basic line plot containing two lines of the same metric during training and validation.
+        :param metric_name: name of the metric to plot
+        :param save_path: string where to save the plot
+        """
         # check if val has been run
         if metric_name.lower() not in self._history_dict.keys():
             raise ValueError(
@@ -361,6 +418,10 @@ class QuartoReport:
         plt.clf()
 
     def plot_all_data_plots(self):
+        """
+        Function to plot all data related plots.
+        :return: string path of where the plots are saved
+        """
         save_path = join(self.output_path, "plots/data")
         # count lengths of sequences and plot histogram
         vek_len = np.vectorize(len)
@@ -379,7 +440,10 @@ class QuartoReport:
         return save_path
 
     def plot_all_train_metrics(self):
-        """Plot all training metrics available in self._history_dict."""
+        """
+        Function to plot all the training metrics related plots.
+        :return: string path of where the plots are saved
+        """
         save_path = join(self.output_path, "plots/train")
         train_dict = {
             key: value for key, value in self._history_dict.items() if "val" not in key
@@ -389,7 +453,10 @@ class QuartoReport:
         return save_path
 
     def plot_all_val_metrics(self):
-        """Plot all validation metrics available in self._history_dict."""
+        """
+        Function to plot all the validation metrics related plots.
+        :return: string path of where the plots are saved
+        """
         save_path = join(self.output_path, "plots/val")
         val_dict = {
             key: value for key, value in self._history_dict.items() if "val" in key
@@ -399,7 +466,10 @@ class QuartoReport:
         return save_path
 
     def plot_all_train_val_metrics(self):
-        """Plot all validation metrics available in self._history_dict."""
+        """
+        Function to plot all the training-validation metrics related plots.
+        :return: string path of where the plots are saved
+        """
         save_path = join(self.output_path, "plots/train_val")
         metrics_dict = {
             key: value for key, value in self._history_dict.items() if "val" not in key
@@ -409,6 +479,10 @@ class QuartoReport:
         return save_path
 
     def plot_residuals(self):
+        """
+        Function to plot the residuals of predicted values vs. actual values.
+        :return: string path of where the plot is saved
+        """
         save_path = join(self.output_path, "plots/test")
         file_name = "Residuals.png"
         error = np.ravel(self.test_targets) - np.ravel(self.predictions)
@@ -417,6 +491,10 @@ class QuartoReport:
         return image_path
 
     def plot_density(self):
+        """
+        Function to plot the density of target values vs. predicted values.
+        :return: string path of where the plot is saved
+        """
         save_path = join(self.output_path, "plots/test")
         file_name = "Density.png"
         targets = np.ravel(self.test_targets)
@@ -469,13 +547,24 @@ class QuartoReport:
         return image_path
 
     def calculate_r2(self, targets, predictions):
+        """
+        Function to calculate sklearn r2 score from targets and predictions
+        :param targets: target values
+        :param predictions: predicted values
+        :return: r2 value
+        """
         from sklearn.metrics import r2_score
 
         r2 = r2_score(np.ravel(targets), np.ravel(predictions))
         return r2
 
     def create_plot_image(self, path, n_cols=2):
-        """Create an image that includes all images in a folder and arrange it in 2 columns"""
+        """
+        Function to create one image of all plots included in the provided directory.
+        :param path: string path of where the plot is saved
+        :param n_cols: number of columns to put the plots into
+        :return: string path of image containing the plots
+        """
         images = [
             f
             for f in os.listdir(path)
