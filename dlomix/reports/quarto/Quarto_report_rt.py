@@ -43,7 +43,6 @@ class QuartoReport:
         self.title = title
         self.fold_code = fold_code
         self.output_path = output_path
-        self.qmd_file = None
         self.model = model
         self.test_targets = test_targets
         self.predictions = predictions
@@ -209,7 +208,7 @@ class QuartoReport:
             r2_text = report_constants.R2_SECTION.replace("R2_SCORE_VALUE", str(r2))
             qmd.insert_section_block(section_title="R2", section_text=r2_text)
 
-        qmd.write_qmd_file("quarto_base_test.qmd")
+        qmd.write_qmd_file(f"{self.output_path}/quarto_base_test.qmd")
 
     def internal_without_mods(self, sequences):
         regex = "\[.*?\]|\-"

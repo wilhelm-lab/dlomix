@@ -31,3 +31,7 @@ R2_SECTION = """
 The R2 of given predictions is R2_SCORE_VALUE. The R2 score is a metric that is calculated using scikit learns's function
 r2_score. It evaluates the performance of the model on the test set and compares the predicted values with the actual values.
 The best possible score is 1.0. The lower the score the worse the model's prediction."""
+
+SPECTRAL_ANGLE_SECTION = """
+This is the text for the spectral angle.
+"""
