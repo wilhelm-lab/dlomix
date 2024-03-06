@@ -1,16 +1,12 @@
 import os
 import warnings
-from contextlib import redirect_stdout
 from os.path import join
 
-import matplotlib as mpl
 import matplotlib.image as mpimg
 import matplotlib.pyplot as plt
 import numpy as np
 import report_constants
 import seaborn as sns
-from matplotlib.colors import LogNorm
-from matplotlib.ticker import LogLocator
 from QMDFile import QMDFile
 
 from dlomix.reports.postprocessing import normalize_intensity_predictions
@@ -28,7 +24,7 @@ class IntensityReportQuarto:
         fold_code=True,
         train_section=False,
         val_section=False,
-        output_path="/Users/andi/PycharmProjects/dlomix_repo/dlomix/reports/quarto/int",
+        output_path=".",
     ):
         """
         :param history: history object from training a keras model
@@ -378,3 +374,66 @@ class IntensityReportQuarto:
         fig.savefig(save_path)
         plt.clf()
         return save_path
+
+
+if __name__ == "__main__":
+    # import necessary packages
+    import os
+    import warnings
+
+    import matplotlib.pyplot as plt
+    import numpy as np
+    import pandas as pd
+    import tensorflow as tf
+
+    from dlomix.data import IntensityDataset
+    from dlomix.losses import (
+        masked_pearson_correlation_distance,
+        masked_spectral_distance,
+    )
+    from dlomix.models import PrositIntensityPredictor
+
+    TRAIN_DATAPATH = "https://raw.githubusercontent.com/wilhelm-lab/dlomix-resources/tasks/intensity/example_datasets/Intensity/proteomeTools_train_val.csv"
+    BATCH_SIZE = 128
+
+    int_data = IntensityDataset(
+        data_source=TRAIN_DATAPATH,
+        seq_length=30,
+        batch_size=BATCH_SIZE,
+        collision_energy_col="collision_energy",
+        val_ratio=0.2,
+        test=False,
+    )
+    model = PrositIntensityPredictor(seq_length=30)
+    # create the optimizer object
+    optimizer = tf.keras.optimizers.legacy.Adam(learning_rate=0.001)
+
+    # compile the model  with the optimizer and the metrics we want to use, we can add our custom timedelta metric
+    model.compile(
+        optimizer=optimizer,
+        loss=masked_spectral_distance,
+        metrics=["mse", masked_pearson_correlation_distance],
+    )
+    history = model.fit(
+        int_data.train_data, validation_data=int_data.val_data, epochs=1
+    )
+    # create the dataset object for test data
+    TEST_DATAPATH = "https://raw.githubusercontent.com/wilhelm-lab/dlomix-resources/tasks/intensity/example_datasets/Intensity/proteomeTools_test.csv"
+    test_int_data = IntensityDataset(
+        data_source=TEST_DATAPATH,
+        seq_length=30,
+        collision_energy_col="collision_energy",
+        batch_size=32,
+        test=True,
+    )
+    predictions = model.predict(test_int_data.test_data)
+    test_targets = test_int_data.get_split_targets(split="test")
+    q = IntensityReportQuarto(
+        title="Test Report",
+        history=history,
+        test_data=test_int_data,
+        train_section=True,
+        val_section=True,
+        predictions=predictions,
+    )
+    q.generate_report()
