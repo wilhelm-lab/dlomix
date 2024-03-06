@@ -18,12 +18,7 @@ from QMDFile import QMDFile
 
 # todo:
 # make text of all sections more meaningful + more scientific + more description
-
-# include layer information from summary()
-# include per batch metrics? custom callback needed
 # delete or keep images after report creation?
-
-# look at PROSPECT
 
 
 class QuartoReport:

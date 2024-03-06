@@ -16,10 +16,6 @@ from QMDFile import QMDFile
 from dlomix.reports.postprocessing import normalize_intensity_predictions
 
 # what data plots to include?
-# val/test violin plots
-#   - concatenate val/test
-#   - add flag column whether val/test
-#   - adapt violin plot function
 
 
 class QuartoReportIntensity:
@@ -34,10 +30,19 @@ class QuartoReportIntensity:
         val_section=False,
         output_path="/Users/andi/PycharmProjects/dlomix_repo/dlomix/reports/quarto/int",
     ):
+        """
+        :param history: history object from training a keras model
+        :param test_data: RetentionTimeDataset object containing test data
+        :param predictions: nd.array containing the predictions of the test data
+        :param title: title of the report
+        :param fold_code: boolean indicating whether to show pythong code producing plots in the report or not
+        :param train_section: boolean indicating whether to include training section in the report or not
+        :param val_section: boolean indicating whether to include validation section in the report or not
+        :param output_path: string where the report will be saved
+        """
         self.title = title
         self.fold_code = fold_code
         self.output_path = output_path
-        self.qmd_content = None
         self.test_data = test_data
         self.predictions = predictions
         self.train_section = train_section
@@ -66,6 +71,11 @@ class QuartoReportIntensity:
         self._create_plot_folder_structure(subfolders)
 
     def _set_history_dict(self, history):
+        """
+        Function that takes and validates the keras history object. Then sets the report objects history dictionary
+        attribute, containing all the metrics tracked during training.
+        :param history: history object from training a keras model
+        """
         if isinstance(history, dict):
             self._history_dict = history
         elif not isinstance(history, tf.keras.callbacks.History):
@@ -87,6 +97,10 @@ class QuartoReportIntensity:
             )
 
     def _create_plot_folder_structure(self, subfolders=None):
+        """
+        Function to create the folder structure where the plot images are saved later.
+        :param subfolders: list of strings representing the subfolders to be created
+        """
         root = join(self.output_path, "plots")
         if not os.path.exists(root):
             os.makedirs(root)
@@ -95,7 +109,32 @@ class QuartoReportIntensity:
             if not os.path.exists(path):
                 os.makedirs(path)
 
+    def get_model_summary_df(self):
+        """
+        Function to convert the layer information contained in keras model.summary() into a pandas dataframe in order to
+        display it in the report.
+        :return: dataframe containing the layer information of keras model.summary()
+        """
+        import re
+
+        # code adapted from https://stackoverflow.com/questions/63843093/neural-network-summary-to-dataframe
+        stringlist = []
+        self.model.summary(print_fn=lambda x: stringlist.append(x))
+        summ_string = "\n".join(stringlist)
+        # take every other element and remove appendix
+        # code in next line breaks if there is a Stringlookup layer -> "p" in next line -> layer info is removed
+        table = stringlist[1:-5][1::2]
+        new_table = []
+        for entry in table:
+            entry = re.split(r"\s{2,}", entry)[:-1]  # remove whitespace
+            new_table.append(entry)
+        return pd.DataFrame(new_table[1:], columns=new_table[0])
+
     def generate_report(self):
+        """
+        Function to generate the report. Adds sections sequentially.
+        Contains the logic to generate the plots and include/exclude user-specified sections.
+        """
         qmd = QMDFile(title=self.title)
 
         if self.train_section:
@@ -147,21 +186,11 @@ class QuartoReportIntensity:
         )
         qmd.write_qmd_file(f"{self.output_path}/quarto_report_intensity.qmd")
 
-    def update_qmd(self):
-        results_df = self.generate_intensity_results_df()
-        violin_plots_path = self.plot_spectral_angle(
-            results_df, facet="precursor_charge"
-        )
-        self.qmd_content = self.qmd_content.replace(
-            QuartoReportIntensity.REPLACEMENT_KEYS["violin_plot"], violin_plots_path
-        )
-
     def plot_keras_metric(self, metric_name, save_path=""):
-        """Plot a keras metric given its name and the history object returned by model.fit()
-
-        Arguments
-        ---------
-            metric_name: String with the name of the metric.
+        """
+        Function that creates a basic line plot of a keras metric
+        :param metric_name: name of the metric to plot
+        :param save_path: string where to save the plot
         """
 
         if metric_name.lower() not in self._history_dict.keys():
@@ -187,6 +216,11 @@ class QuartoReportIntensity:
         plt.clf()
 
     def plot_train_vs_val_keras_metric(self, metric_name, save_path="", save_plot=True):
+        """
+        Function that creates a basic line plot containing two lines of the same metric during training and validation.
+        :param metric_name: name of the metric to plot
+        :param save_path: string where to save the plot
+        """
         # check if val has been run
         if metric_name.lower() not in self._history_dict.keys():
             raise ValueError(
@@ -216,7 +250,10 @@ class QuartoReportIntensity:
         plt.clf()
 
     def plot_all_train_metrics(self):
-        """Plot all training metrics available in self._history_dict."""
+        """
+        Function to plot all the training metrics related plots.
+        :return: string path of where the plots are saved
+        """
         save_path = join(self.output_path, "plots/train")
         train_dict = {
             key: value for key, value in self._history_dict.items() if "val" not in key
@@ -226,7 +263,10 @@ class QuartoReportIntensity:
         return save_path
 
     def plot_all_val_metrics(self):
-        """Plot all validation metrics available in self._history_dict."""
+        """
+        Function to plot all the validation metrics related plots.
+        :return: string path of where the plots are saved
+        """
         save_path = join(self.output_path, "plots/val")
         val_dict = {
             key: value for key, value in self._history_dict.items() if "val" in key
@@ -236,7 +276,10 @@ class QuartoReportIntensity:
         return save_path
 
     def plot_all_train_val_metrics(self):
-        """Plot all validation metrics available in self._history_dict."""
+        """
+        Function to plot all the training-validation metrics related plots.
+        :return: string path of where the plots are saved
+        """
         save_path = join(self.output_path, "plots/train_val")
         metrics_dict = {
             key: value for key, value in self._history_dict.items() if "val" not in key
@@ -246,7 +289,12 @@ class QuartoReportIntensity:
         return save_path
 
     def create_plot_image(self, path, n_cols=2):
-        """Create an image that includes all images in a folder and arrange it in 2 columns"""
+        """
+        Function to create one image of all plots included in the provided directory.
+        :param path: string path of where the plot is saved
+        :param n_cols: number of columns to put the plots into
+        :return: string path of image containing the plots
+        """
         images = [
             f
             for f in os.listdir(path)
@@ -283,6 +331,10 @@ class QuartoReportIntensity:
         return save_path
 
     def generate_intensity_results_df(self):
+        """
+        Function to create the dataframe containing the intensity prediction results
+        :return: dataframe
+        """
         predictions_df = pd.DataFrame()
         predictions_df["sequences"] = self.test_data.sequences
         predictions_df["intensities_pred"] = self.predictions.tolist()
@@ -297,11 +349,12 @@ class QuartoReportIntensity:
         return predictions_df
 
     def plot_spectral_angle(self, predictions_df, facet=None):
-        """Create spectral  plot
-
-        Arguments
-        ---------
-            predictions_df:  dataframe with raw intensities, predictions, sequences, precursor_charges
+        """
+        Function to generate a spectral angle plot. If facet is provided the plot will be faceted on the provided
+        feature.
+        :param predictions_df: Dataframe containing the predicted results as well as the test data.
+        :param facet: String to facet the plot on
+        :return: string path of image containing the plots
         """
         plt.figure(figsize=(8, 6))
         predictions_acc = normalize_intensity_predictions(
