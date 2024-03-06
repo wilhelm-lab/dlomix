@@ -1,4 +1,5 @@
 from os.path import join
+from warnings import warn
 
 import numpy as np
 import pandas as pd
@@ -20,6 +21,12 @@ class IntensityReport(Report):
 
     def __init__(self, output_path, history, figures_ext="png", batch_size=0):
         super(IntensityReport, self).__init__(output_path, history, figures_ext)
+
+        warn(
+            f"{self.__class__.__name__} This class is deprecated and will not be further developed. Use wandb/IntensityReportWandb or quarto/IntensityReportQuarto instead for creating a report with either the Weights & Biases Report API or offline using Quarto.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
 
         self.pdf_file = PDFFile("DLOmix - Fragment Ion Intensity Report")
 

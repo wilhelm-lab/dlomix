@@ -18,7 +18,7 @@ from dlomix.reports.postprocessing import normalize_intensity_predictions
 # what data plots to include?
 
 
-class QuartoReportIntensity:
+class IntensityReportQuarto:
     def __init__(
         self,
         history,
@@ -101,7 +101,7 @@ class QuartoReportIntensity:
         Function to create the folder structure where the plot images are saved later.
         :param subfolders: list of strings representing the subfolders to be created
         """
-        root = join(self.output_path, "plots")
+        root = join(self.output_path, report_constants.DEFAULT_LOCAL_PLOTS_DIR)
         if not os.path.exists(root):
             os.makedirs(root)
         for subfolder in subfolders:
@@ -254,7 +254,9 @@ class QuartoReportIntensity:
         Function to plot all the training metrics related plots.
         :return: string path of where the plots are saved
         """
-        save_path = join(self.output_path, "plots/train")
+        save_path = join(
+            self.output_path, report_constants.DEFAULT_LOCAL_PLOTS_DIR, "train"
+        )
         train_dict = {
             key: value for key, value in self._history_dict.items() if "val" not in key
         }
@@ -267,7 +269,9 @@ class QuartoReportIntensity:
         Function to plot all the validation metrics related plots.
         :return: string path of where the plots are saved
         """
-        save_path = join(self.output_path, "plots/val")
+        save_path = join(
+            self.output_path, report_constants.DEFAULT_LOCAL_PLOTS_DIR, "val"
+        )
         val_dict = {
             key: value for key, value in self._history_dict.items() if "val" in key
         }
@@ -280,7 +284,9 @@ class QuartoReportIntensity:
         Function to plot all the training-validation metrics related plots.
         :return: string path of where the plots are saved
         """
-        save_path = join(self.output_path, "plots/train_val")
+        save_path = join(
+            self.output_path, report_constants.DEFAULT_LOCAL_PLOTS_DIR, "train_val"
+        )
         metrics_dict = {
             key: value for key, value in self._history_dict.items() if "val" not in key
         }
@@ -362,7 +368,10 @@ class QuartoReportIntensity:
         )
         violin_plot = sns.violinplot(data=predictions_acc, x=facet, y="spectral_angle")
         save_path = join(
-            self.output_path, "plots/spectral", "violin_spectral_angle_plot.png"
+            self.output_path,
+            report_constants.DEFAULT_LOCAL_PLOTS_DIR,
+            "spectral",
+            "violin_spectral_angle_plot.png",
         )
 
         fig = violin_plot.get_figure()

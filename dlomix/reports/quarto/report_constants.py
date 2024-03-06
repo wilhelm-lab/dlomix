@@ -1,3 +1,5 @@
+DEFAULT_LOCAL_PLOTS_DIR = ".local_quarto_plots"
+
 MODEL_SECTION = """
 The following section shows information about the model. The table below contains information about the models' layers."""
 

@@ -19,7 +19,7 @@ class RetentionTimeReport(Report):
         super(RetentionTimeReport, self).__init__(output_path, history, figures_ext)
 
         warn(
-            f"{self.__class__.__name__} This class is deprecated and will not further developed. Use RetentionTimeReportWandb instead for creating a report with the Weights & Biases Report API.",
+            f"{self.__class__.__name__} This class is deprecated and will not be further developed. Use wandb/RetentionTimeReportWandb or quarto/RetentionTimeReportQuarto instead for creating a report with either the Weights & Biases Report API or offline using Quarto.",
             DeprecationWarning,
             stacklevel=2,
         )

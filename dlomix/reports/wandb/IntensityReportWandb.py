@@ -1,0 +1,2 @@
+class IntensityReportWandb:
+    pass

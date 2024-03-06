@@ -1,5 +1,6 @@
 import itertools
 import os
+import re
 import warnings
 from contextlib import redirect_stdout
 from itertools import combinations
@@ -9,6 +10,7 @@ import matplotlib as mpl
 import matplotlib.image as mpimg
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
 import report_constants
 import seaborn as sns
 from Levenshtein import distance as levenshtein_distance
@@ -21,7 +23,7 @@ from QMDFile import QMDFile
 # delete or keep images after report creation?
 
 
-class QuartoReport:
+class RetentionTimeReportQuarto:
     def __init__(
         self,
         history,
@@ -33,10 +35,10 @@ class QuartoReport:
         fold_code=True,
         train_section=False,
         val_section=False,
-        output_path="/Users/andi/PycharmProjects/dlomix_repo/dlomix/reports/quarto/",
+        output_path=".",
     ):
         """
-        Constructor for QuartoReport class
+        Constructor for RetentionTimeReportQuarto class
         :param history: history object from training a keras model
         :param data: RetentionTimeDataset object containing training data
         :param test_targets: nd.array containing the targets (retention times) of the test data
@@ -125,7 +127,7 @@ class QuartoReport:
         Function to create the folder structure where the plot images are saved later.
         :param subfolders: list of strings representing the subfolders to be created
         """
-        root = join(self.output_path, "plots")
+        root = join(self.output_path, report_constants.DEFAULT_LOCAL_PLOTS_DIR)
         if not os.path.exists(root):
             os.makedirs(root)
         for subfolder in subfolders:
@@ -139,22 +141,25 @@ class QuartoReport:
         display it in the report.
         :return: dataframe containing the layer information of keras model.summary()
         """
-        import re
 
-        # code adapted from https://stackoverflow.com/questions/63843093/neural-network-summary-to-dataframe
+        # code adapted from https://stackoverflow.com/questions/63843093/neural-network-summary-to-dataframe and updated
         stringlist = []
         self.model.summary(print_fn=lambda x: stringlist.append(x))
-        summ_string = "\n".join(stringlist)
+
         # take every other element and remove appendix
         # code in next line breaks if there is a Stringlookup layer -> "p" in next line -> layer info is removed
-        table = stringlist[1:-5][1::2]
+        table = stringlist[1:-5]
+        print(table)
         new_table = []
         for entry in table:
             entry = re.split(r"\s{2,}", entry)[:-1]  # remove whitespace
+            entry_cols = len(entry)
+            if entry_cols < 3:
+                entry.extend([" "] * (3 - entry_cols))
             new_table.append(entry)
         return pd.DataFrame(new_table[1:], columns=new_table[0])
 
-    def generate_report(self):
+    def generate_report(self, qmd_report_filename="quarto_report.qmd"):
         """
         Function to generate the report. Adds sections sequentially.
         Contains the logic to generate the plots and include/exclude user-specified sections.
@@ -234,7 +239,7 @@ class QuartoReport:
             r2_text = report_constants.R2_SECTION.replace("R2_SCORE_VALUE", str(r2))
             qmd.insert_section_block(section_title="R2", section_text=r2_text)
 
-        qmd.write_qmd_file(f"{self.output_path}/quarto_base_test.qmd")
+        qmd.write_qmd_file(f"{self.output_path}/{qmd_report_filename}")
 
     def internal_without_mods(self, sequences):
         """
@@ -417,7 +422,9 @@ class QuartoReport:
         Function to plot all data related plots.
         :return: string path of where the plots are saved
         """
-        save_path = join(self.output_path, "plots/data")
+        save_path = join(
+            self.output_path, report_constants.DEFAULT_LOCAL_PLOTS_DIR, "data"
+        )
         # count lengths of sequences and plot histogram
         vek_len = np.vectorize(len)
         seq_lens = vek_len(self.data.sequences)
@@ -439,7 +446,9 @@ class QuartoReport:
         Function to plot all the training metrics related plots.
         :return: string path of where the plots are saved
         """
-        save_path = join(self.output_path, "plots/train")
+        save_path = join(
+            self.output_path, report_constants.DEFAULT_LOCAL_PLOTS_DIR, "train"
+        )
         train_dict = {
             key: value for key, value in self._history_dict.items() if "val" not in key
         }
@@ -452,7 +461,9 @@ class QuartoReport:
         Function to plot all the validation metrics related plots.
         :return: string path of where the plots are saved
         """
-        save_path = join(self.output_path, "plots/val")
+        save_path = join(
+            self.output_path, report_constants.DEFAULT_LOCAL_PLOTS_DIR, "val"
+        )
         val_dict = {
             key: value for key, value in self._history_dict.items() if "val" in key
         }
@@ -465,7 +476,9 @@ class QuartoReport:
         Function to plot all the training-validation metrics related plots.
         :return: string path of where the plots are saved
         """
-        save_path = join(self.output_path, "plots/train_val")
+        save_path = join(
+            self.output_path, report_constants.DEFAULT_LOCAL_PLOTS_DIR, "train_val"
+        )
         metrics_dict = {
             key: value for key, value in self._history_dict.items() if "val" not in key
         }
@@ -478,7 +491,9 @@ class QuartoReport:
         Function to plot the residuals of predicted values vs. actual values.
         :return: string path of where the plot is saved
         """
-        save_path = join(self.output_path, "plots/test")
+        save_path = join(
+            self.output_path, report_constants.DEFAULT_LOCAL_PLOTS_DIR, "test"
+        )
         file_name = "Residuals.png"
         error = np.ravel(self.test_targets) - np.ravel(self.predictions)
         self.plot_histogram(x=error, label="Residuals", bins=100, save_path=save_path)
@@ -490,7 +505,9 @@ class QuartoReport:
         Function to plot the density of target values vs. predicted values.
         :return: string path of where the plot is saved
         """
-        save_path = join(self.output_path, "plots/test")
+        save_path = join(
+            self.output_path, report_constants.DEFAULT_LOCAL_PLOTS_DIR, "test"
+        )
         file_name = "Density.png"
         targets = np.ravel(self.test_targets)
         predictions = np.ravel(self.predictions)
@@ -594,3 +611,77 @@ class QuartoReport:
         plt.savefig(save_path, bbox_inches="tight")
         plt.clf()
         return save_path
+
+
+if __name__ == "__main__":
+    import os
+    import re
+    import warnings
+
+    import keras
+    import matplotlib.pyplot as plt
+
+    # import necessary packages
+    import numpy as np
+    import pandas as pd
+    import tensorflow as tf
+    from Levenshtein import distance as levenshtein_distance
+
+    import dlomix
+    from dlomix.data import RetentionTimeDataset
+    from dlomix.eval import TimeDeltaMetric
+    from dlomix.models import RetentionTimePredictor
+
+    # Create config
+    config = {
+        "seq_length": 30,
+        "batch_size": 128,
+        "val_ratio": 0.2,
+        "lr": 0.001,
+        "optimizer": "Adam",
+        "loss": "mse",
+    }
+    # load small train dataset
+    TRAIN_DATAPATH = "https://raw.githubusercontent.com/wilhelm-lab/dlomix-resources/main/example_datasets/RetentionTime/proteomeTools_train_val.csv"
+    # create dataset
+    rtdata = RetentionTimeDataset(
+        data_source=TRAIN_DATAPATH,
+        seq_length=config["seq_length"],
+        batch_size=config["batch_size"],
+        val_ratio=config["val_ratio"],
+        test=False,
+    )
+    # create retention time predictor
+    model = RetentionTimePredictor(seq_length=config["seq_length"])
+    # create the optimizer object
+    optimizer = tf.keras.optimizers.legacy.Adam(learning_rate=config["lr"])
+    # compile the model with the optimizer and the metrics we want to use
+    model.compile(
+        optimizer=optimizer,
+        loss=config["loss"],
+        metrics=["mean_absolute_error", TimeDeltaMetric()],
+    )
+    # train the model
+    history = model.fit(rtdata.train_data, validation_data=rtdata.val_data, epochs=1)
+    # create the dataset object for test data
+    TEST_DATAPATH = "https://raw.githubusercontent.com/wilhelm-lab/dlomix-resources/main/example_datasets/RetentionTime/proteomeTools_test.csv"
+    test_rtdata = RetentionTimeDataset(
+        data_source=TEST_DATAPATH, seq_length=30, batch_size=128, test=True
+    )
+    # use model.predict from keras directly on the testdata
+    predictions = model.predict(test_rtdata.test_data)
+    # we use ravel from numpy to flatten the array (since it comes out as an array of arrays)
+    predictions = predictions.ravel()
+    test_targets = test_rtdata.get_split_targets(split="test")
+
+    report = RetentionTimeReportQuarto(
+        title="Test Report",
+        data=rtdata,
+        history=history,
+        model=model,
+        test_targets=test_targets,
+        predictions=predictions,
+        train_section=True,
+        val_section=True,
+    )
+    report.generate_report()

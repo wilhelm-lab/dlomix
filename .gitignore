@@ -143,7 +143,6 @@ __*.ipynb
 
 # wand outputs in notebooks and root
 notebooks/wandb
-wandb
 
 
 # output folders
@@ -178,3 +177,6 @@ metadata.parquet
 log_book.md
 # test assets (will be downloaded the first time tests are run and then ignore by git)
 assets/
+
+# quarto local plots directory
+dlomix/reports/quarto/.local_quarto_plots

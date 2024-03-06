@@ -44,6 +44,7 @@ setuptools.setup(
         "quarto": [
             "tabulate",  # for converting dataframes to markdown tables
             "quarto-cli",  # experimental from Quarto!
+            "levenshtein",  # for plotting the levenshtein distance among the peptide sequences
         ],
     },
     classifiers=[
