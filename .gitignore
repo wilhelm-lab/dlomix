@@ -142,6 +142,7 @@ notebooks/_*
 __*.ipynb
 
 # wand outputs in notebooks and root
+/wandb
 notebooks/wandb
 
 
