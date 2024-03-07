@@ -3,8 +3,10 @@ import os
 import re
 import warnings
 from contextlib import redirect_stdout
+from datetime import datetime
 from itertools import combinations
-from os.path import join
+from os import listdir
+from os.path import isfile, join
 
 import matplotlib as mpl
 import matplotlib.image as mpimg
@@ -149,7 +151,6 @@ class RetentionTimeReportQuarto:
         # take every other element and remove appendix
         # code in next line breaks if there is a Stringlookup layer -> "p" in next line -> layer info is removed
         table = stringlist[1:-5]
-        print(table)
         new_table = []
         for entry in table:
             entry = re.split(r"\s{2,}", entry)[:-1]  # remove whitespace
@@ -165,7 +166,15 @@ class RetentionTimeReportQuarto:
         Contains the logic to generate the plots and include/exclude user-specified sections.
         """
         qmd = QMDFile(title=self.title)
-
+        meta_section = report_constants.META_SECTION.replace(
+            "DATE_PLACEHOLDER", str(datetime.now().date())
+        )
+        meta_section = meta_section.replace(
+            "TIME_PLACEHOLDER", str(datetime.now().strftime("%H:%M:%S"))
+        )
+        qmd.insert_section_block(
+            section_title="Introduction", section_text=meta_section
+        )
         if self.model is not None:
             df = self.get_model_summary_df()
             qmd.insert_section_block(
@@ -175,12 +184,32 @@ class RetentionTimeReportQuarto:
 
         if self.data is not None:
             data_plots_path = self.plot_all_data_plots()
-            data_image_path = self.create_plot_image(data_plots_path)
             qmd.insert_section_block(
                 section_title="Data", section_text=report_constants.DATA_SECTION
             )
             qmd.insert_image(
-                image_path=data_image_path, caption="Data plots", page_break=True
+                image_path=f"{data_plots_path}/Peptide length.png",
+                caption="Histogram of peptide length distribution",
+                cross_reference_id="fig-pep_len",
+                page_break=True,
+            )
+            qmd.insert_image(
+                image_path=f"{data_plots_path}/Indexed retention time.png",
+                caption="Histogram of indexed retention time distribution",
+                cross_reference_id="fig-irt",
+                page_break=True,
+            )
+            qmd.insert_image(
+                image_path=f"{data_plots_path}/rt_dist.png",
+                caption="Density of retention time per peptide length",
+                cross_reference_id="fig-rt_dist",
+                page_break=True,
+            )
+            qmd.insert_image(
+                image_path=f"{data_plots_path}/levenshtein.png",
+                caption="Density of levenshtein distance sequence similarity per peptide length",
+                cross_reference_id="fig-levenshtein",
+                page_break=True,
             )
 
         if self.train_section:
@@ -293,6 +322,15 @@ class RetentionTimeReportQuarto:
         df = pd.DataFrame(seqs_wo_dupes, columns=["mod_seq"])
         df["unmod_seq"] = self.data.sequences
         df["length"] = df["mod_seq"].str.len()
+        palette = itertools.cycle(
+            sns.color_palette("YlOrRd_r", n_colors=len(df.length.unique()))
+        )
+        lengths = sorted(df["length"].unique())
+        plt.figure(figsize=(8, 6))
+        plot = plt.scatter(lengths, lengths, c=lengths, cmap="YlOrRd_r")
+        cbar = plt.colorbar()
+        plt.cla()
+        plot.remove()
         lv_dict = {}
         pep_groups = df.groupby("length")
         available_lengths = df.length.unique()
@@ -309,29 +347,19 @@ class RetentionTimeReportQuarto:
                     levenshtein_distance(pep_tuple[0], pep_tuple[1]) - 1
                 )
             lv_dict[str(length)] = current_list
-        fig = plt.figure(figsize=(8, 6))
-        sns.set_palette("rocket_r", n_colors=36)
 
         for length in available_lengths:
-            fig = sns.kdeplot(
+            ax = sns.kdeplot(
                 np.array(lv_dict[str(length)]),
                 bw_method=0.5,
                 label=str(length),
                 cbar=True,
                 fill=True,
+                color=next(palette),
             )
-        # define order of legend labels
-        handles, labels = plt.gca().get_legend_handles_labels()
-        order = [
-            index for index, value in sorted(enumerate(labels), key=lambda x: int(x[1]))
-        ]
-        plt.legend(
-            [handles[idx] for idx in order],
-            [labels[idx] for idx in order],
-            ncol=3,
-            loc="upper right",
-        )
         # ncol=1, bbox_to_anchor=(1.05, 1.0), loc='upper left'
+        cbar.ax.set_ylabel("peptide length", rotation=270)
+        cbar.ax.yaxis.set_label_coords(3.2, 0.5)
         plt.title("Density of Levenshtein distance per peptide length")
         plt.xlabel("Levenshtein distance")
         plt.savefig(f"{save_path}/levenshtein.png", bbox_inches="tight")
@@ -611,77 +639,3 @@ class RetentionTimeReportQuarto:
         plt.savefig(save_path, bbox_inches="tight")
         plt.clf()
         return save_path
-
-
-if __name__ == "__main__":
-    import os
-    import re
-    import warnings
-
-    import keras
-    import matplotlib.pyplot as plt
-
-    # import necessary packages
-    import numpy as np
-    import pandas as pd
-    import tensorflow as tf
-    from Levenshtein import distance as levenshtein_distance
-
-    import dlomix
-    from dlomix.data import RetentionTimeDataset
-    from dlomix.eval import TimeDeltaMetric
-    from dlomix.models import RetentionTimePredictor
-
-    # Create config
-    config = {
-        "seq_length": 30,
-        "batch_size": 128,
-        "val_ratio": 0.2,
-        "lr": 0.001,
-        "optimizer": "Adam",
-        "loss": "mse",
-    }
-    # load small train dataset
-    TRAIN_DATAPATH = "https://raw.githubusercontent.com/wilhelm-lab/dlomix-resources/main/example_datasets/RetentionTime/proteomeTools_train_val.csv"
-    # create dataset
-    rtdata = RetentionTimeDataset(
-        data_source=TRAIN_DATAPATH,
-        seq_length=config["seq_length"],
-        batch_size=config["batch_size"],
-        val_ratio=config["val_ratio"],
-        test=False,
-    )
-    # create retention time predictor
-    model = RetentionTimePredictor(seq_length=config["seq_length"])
-    # create the optimizer object
-    optimizer = tf.keras.optimizers.legacy.Adam(learning_rate=config["lr"])
-    # compile the model with the optimizer and the metrics we want to use
-    model.compile(
-        optimizer=optimizer,
-        loss=config["loss"],
-        metrics=["mean_absolute_error", TimeDeltaMetric()],
-    )
-    # train the model
-    history = model.fit(rtdata.train_data, validation_data=rtdata.val_data, epochs=1)
-    # create the dataset object for test data
-    TEST_DATAPATH = "https://raw.githubusercontent.com/wilhelm-lab/dlomix-resources/main/example_datasets/RetentionTime/proteomeTools_test.csv"
-    test_rtdata = RetentionTimeDataset(
-        data_source=TEST_DATAPATH, seq_length=30, batch_size=128, test=True
-    )
-    # use model.predict from keras directly on the testdata
-    predictions = model.predict(test_rtdata.test_data)
-    # we use ravel from numpy to flatten the array (since it comes out as an array of arrays)
-    predictions = predictions.ravel()
-    test_targets = test_rtdata.get_split_targets(split="test")
-
-    report = RetentionTimeReportQuarto(
-        title="Test Report",
-        data=rtdata,
-        history=history,
-        model=model,
-        test_targets=test_targets,
-        predictions=predictions,
-        train_section=True,
-        val_section=True,
-    )
-    report.generate_report()

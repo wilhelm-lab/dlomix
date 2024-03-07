@@ -28,7 +28,7 @@ class IntensityReportQuarto:
         fold_code=True,
         train_section=False,
         val_section=False,
-        output_path="/Users/andi/PycharmProjects/dlomix_repo/dlomix/reports/quarto/int",
+        output_path=".",
     ):
         """
         :param history: history object from training a keras model
@@ -130,7 +130,7 @@ class IntensityReportQuarto:
             new_table.append(entry)
         return pd.DataFrame(new_table[1:], columns=new_table[0])
 
-    def generate_report(self):
+    def generate_report(self, qmd_report_filename="quarto_report.qmd"):
         """
         Function to generate the report. Adds sections sequentially.
         Contains the logic to generate the plots and include/exclude user-specified sections.
@@ -184,7 +184,7 @@ class IntensityReportQuarto:
             caption="Violin plots of Spectral angle",
             page_break=True,
         )
-        qmd.write_qmd_file(f"{self.output_path}/quarto_report_intensity.qmd")
+        qmd.write_qmd_file(f"{self.output_path}//{qmd_report_filename}")
 
     def plot_keras_metric(self, metric_name, save_path=""):
         """
