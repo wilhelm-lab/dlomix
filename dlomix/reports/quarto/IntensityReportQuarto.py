@@ -1,5 +1,6 @@
 import os
 import warnings
+from datetime import datetime
 from os.path import join
 
 import matplotlib.image as mpimg
@@ -132,7 +133,15 @@ class IntensityReportQuarto:
         Contains the logic to generate the plots and include/exclude user-specified sections.
         """
         qmd = QMDFile(title=self.title)
-
+        meta_section = report_constants.META_SECTION_INT.replace(
+            "DATE_PLACEHOLDER", str(datetime.now().date())
+        )
+        meta_section = meta_section.replace(
+            "TIME_PLACEHOLDER", str(datetime.now().strftime("%H:%M:%S"))
+        )
+        qmd.insert_section_block(
+            section_title="Introduction", section_text=meta_section, page_break=True
+        )
         if self.train_section:
             train_plots_path = self.plot_all_train_metrics()
             train_image_path = self.create_plot_image(train_plots_path)
@@ -168,19 +177,18 @@ class IntensityReportQuarto:
         )
 
         results_df = self.generate_intensity_results_df()
-        violin_plots_path = self.plot_spectral_angle(
-            results_df, facet="precursor_charge"
-        )
+
+        violin_plot_pc = self.plot_spectral_angle(results_df, facet="precursor_charge")
         qmd.insert_section_block(
-            section_title="Spectral angle",
+            section_title="Spectral angle plots",
             section_text=report_constants.SPECTRAL_ANGLE_SECTION,
         )
         qmd.insert_image(
-            image_path=violin_plots_path,
+            image_path=violin_plot_pc,
             caption="Violin plots of Spectral angle",
             page_break=True,
         )
-        qmd.write_qmd_file(f"{self.output_path}//{qmd_report_filename}")
+        qmd.write_qmd_file(f"{self.output_path}/{qmd_report_filename}")
 
     def plot_keras_metric(self, metric_name, save_path=""):
         """
@@ -415,7 +423,7 @@ if __name__ == "__main__":
         metrics=["mse", masked_pearson_correlation_distance],
     )
     history = model.fit(
-        int_data.train_data, validation_data=int_data.val_data, epochs=1
+        int_data.train_data, validation_data=int_data.val_data, epochs=3
     )
     # create the dataset object for test data
     TEST_DATAPATH = "https://raw.githubusercontent.com/wilhelm-lab/dlomix-resources/tasks/intensity/example_datasets/Intensity/proteomeTools_test.csv"
@@ -436,4 +444,5 @@ if __name__ == "__main__":
         val_section=True,
         predictions=predictions,
     )
+
     q.generate_report()

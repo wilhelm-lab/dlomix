@@ -166,7 +166,7 @@ class RetentionTimeReportQuarto:
         Contains the logic to generate the plots and include/exclude user-specified sections.
         """
         qmd = QMDFile(title=self.title)
-        meta_section = report_constants.META_SECTION.replace(
+        meta_section = report_constants.META_SECTION_RT.replace(
             "DATE_PLACEHOLDER", str(datetime.now().date())
         )
         meta_section = meta_section.replace(
