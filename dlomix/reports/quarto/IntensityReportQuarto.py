@@ -21,6 +21,7 @@ class IntensityReportQuarto:
         history,
         test_data=None,
         predictions=None,
+        model=None,
         title="Intensity report",
         fold_code=True,
         train_section=False,
@@ -44,6 +45,7 @@ class IntensityReportQuarto:
         self.predictions = predictions
         self.train_section = train_section
         self.val_section = val_section
+        self.model = model
 
         subfolders = ["train_val", "spectral"]
 
@@ -58,6 +60,11 @@ class IntensityReportQuarto:
         if test_data is None or predictions is None:
             warnings.warn(
                 "Either the test data or the predictions passed is None, no spectral angle can be reported."
+            )
+
+        if model is None:
+            warnings.warn(
+                "The passed model object is None, no model related information can be reported."
             )
 
         if self.train_section:
@@ -112,18 +119,20 @@ class IntensityReportQuarto:
         display it in the report.
         :return: dataframe containing the layer information of keras model.summary()
         """
-        import re
 
-        # code adapted from https://stackoverflow.com/questions/63843093/neural-network-summary-to-dataframe
+        # code adapted from https://stackoverflow.com/questions/63843093/neural-network-summary-to-dataframe and updated
         stringlist = []
         self.model.summary(print_fn=lambda x: stringlist.append(x))
-        summ_string = "\n".join(stringlist)
+
         # take every other element and remove appendix
         # code in next line breaks if there is a Stringlookup layer -> "p" in next line -> layer info is removed
-        table = stringlist[1:-5][1::2]
+        table = stringlist[1:-5]
         new_table = []
         for entry in table:
             entry = re.split(r"\s{2,}", entry)[:-1]  # remove whitespace
+            entry_cols = len(entry)
+            if entry_cols < 3:
+                entry.extend([" "] * (3 - entry_cols))
             new_table.append(entry)
         return pd.DataFrame(new_table[1:], columns=new_table[0])
 
@@ -142,6 +151,12 @@ class IntensityReportQuarto:
         qmd.insert_section_block(
             section_title="Introduction", section_text=meta_section, page_break=True
         )
+        if self.model is not None:
+            df = self.get_model_summary_df()
+            qmd.insert_section_block(
+                section_title="Model", section_text=report_constants.MODEL_SECTION
+            )
+            qmd.insert_table_from_df(df, "Keras model summary")
         if self.train_section:
             train_plots_path = self.plot_all_train_metrics()
             train_image_path = self.create_plot_image(train_plots_path)
@@ -386,3 +401,71 @@ class IntensityReportQuarto:
         fig.savefig(save_path)
         plt.clf()
         return save_path
+
+
+if __name__ == "__main__":
+    # import necessary packages
+    import os
+    import re
+    import warnings
+
+    import keras
+    import matplotlib.pyplot as plt
+    import numpy as np
+    import pandas as pd
+    import tensorflow as tf
+
+    import dlomix
+    from dlomix import constants, data, eval, layers, models, pipelines, reports, utils
+    from dlomix.data import IntensityDataset
+    from dlomix.losses import (
+        masked_pearson_correlation_distance,
+        masked_spectral_distance,
+    )
+    from dlomix.models import PrositIntensityPredictor
+
+    TRAIN_DATAPATH = "https://raw.githubusercontent.com/wilhelm-lab/dlomix-resources/tasks/intensity/example_datasets/Intensity/proteomeTools_train_val.csv"
+    BATCH_SIZE = 64
+
+    int_data = IntensityDataset(
+        data_source=TRAIN_DATAPATH,
+        seq_length=30,
+        batch_size=BATCH_SIZE,
+        collision_energy_col="collision_energy",
+        val_ratio=0.2,
+        test=False,
+    )
+    model = PrositIntensityPredictor(seq_length=30)
+    # create the optimizer object
+    optimizer = tf.keras.optimizers.legacy.Adam(learning_rate=0.001)
+
+    # compile the model  with the optimizer and the metrics we want to use, we can add our custom timedelta metric
+    model.compile(
+        optimizer=optimizer,
+        loss=masked_spectral_distance,
+        metrics=["mse", masked_pearson_correlation_distance],
+    )
+    history = model.fit(
+        int_data.train_data, validation_data=int_data.val_data, epochs=1
+    )
+    # create the dataset object for test data
+    TEST_DATAPATH = "https://raw.githubusercontent.com/wilhelm-lab/dlomix-resources/tasks/intensity/example_datasets/Intensity/proteomeTools_test.csv"
+    test_int_data = IntensityDataset(
+        data_source=TEST_DATAPATH,
+        seq_length=30,
+        collision_energy_col="collision_energy",
+        batch_size=32,
+        test=True,
+    )
+    predictions = model.predict(test_int_data.test_data)
+    test_targets = test_int_data.get_split_targets(split="test")
+    q = IntensityReportQuarto(
+        title="Test Report",
+        history=history,
+        test_data=test_int_data,
+        model=model,
+        train_section=True,
+        val_section=True,
+        predictions=predictions,
+    )
+    q.generate_report()
