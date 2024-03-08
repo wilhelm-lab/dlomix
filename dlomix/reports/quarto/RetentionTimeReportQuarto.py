@@ -220,7 +220,9 @@ class RetentionTimeReportQuarto:
                 section_text=report_constants.TRAIN_SECTION,
             )
             qmd.insert_image(
-                image_path=train_image_path, caption="Train plots", page_break=True
+                image_path=train_image_path,
+                caption="Plots of all metrics logged during training",
+                page_break=True,
             )
 
         if self.val_section:
@@ -231,7 +233,9 @@ class RetentionTimeReportQuarto:
                 section_text=report_constants.VAL_SECTION,
             )
             qmd.insert_image(
-                image_path=val_image_path, caption="Validation plots", page_break=True
+                image_path=val_image_path,
+                caption="Plots of all metrics logged during validation",
+                page_break=True,
             )
 
         train_val_plots_path = self.plot_all_train_val_metrics()
@@ -242,7 +246,7 @@ class RetentionTimeReportQuarto:
         )
         qmd.insert_image(
             image_path=train_val_image_path,
-            caption="Train-Validation plots",
+            caption="Plots of training metrics in comparison with validation metrics",
             page_break=True,
         )
 

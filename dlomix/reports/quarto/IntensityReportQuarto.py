@@ -150,7 +150,9 @@ class IntensityReportQuarto:
                 section_text=report_constants.TRAIN_SECTION,
             )
             qmd.insert_image(
-                image_path=train_image_path, caption="Train plots", page_break=True
+                image_path=train_image_path,
+                caption="Plots of all metrics logged during training",
+                page_break=True,
             )
 
         if self.val_section:
@@ -161,7 +163,9 @@ class IntensityReportQuarto:
                 section_text=report_constants.VAL_SECTION,
             )
             qmd.insert_image(
-                image_path=val_image_path, caption="Validation plots", page_break=True
+                image_path=val_image_path,
+                caption="Plots of all metrics logged during validation",
+                page_break=True,
             )
 
         train_val_plots_path = self.plot_all_train_val_metrics()
@@ -172,7 +176,7 @@ class IntensityReportQuarto:
         )
         qmd.insert_image(
             image_path=train_val_image_path,
-            caption="Train-Validation plots",
+            caption="Plots of training metrics in comparison with validation metrics",
             page_break=True,
         )
 
@@ -185,7 +189,7 @@ class IntensityReportQuarto:
         )
         qmd.insert_image(
             image_path=violin_plot_pc,
-            caption="Violin plots of Spectral angle",
+            caption="Violin plot of spectral angle faceted by precursor charge",
             page_break=True,
         )
         qmd.write_qmd_file(f"{self.output_path}/{qmd_report_filename}")
@@ -382,67 +386,3 @@ class IntensityReportQuarto:
         fig.savefig(save_path)
         plt.clf()
         return save_path
-
-
-if __name__ == "__main__":
-    # import necessary packages
-    import os
-    import warnings
-
-    import matplotlib.pyplot as plt
-    import numpy as np
-    import pandas as pd
-    import tensorflow as tf
-
-    from dlomix.data import IntensityDataset
-    from dlomix.losses import (
-        masked_pearson_correlation_distance,
-        masked_spectral_distance,
-    )
-    from dlomix.models import PrositIntensityPredictor
-
-    TRAIN_DATAPATH = "https://raw.githubusercontent.com/wilhelm-lab/dlomix-resources/tasks/intensity/example_datasets/Intensity/proteomeTools_train_val.csv"
-    BATCH_SIZE = 128
-
-    int_data = IntensityDataset(
-        data_source=TRAIN_DATAPATH,
-        seq_length=30,
-        batch_size=BATCH_SIZE,
-        collision_energy_col="collision_energy",
-        val_ratio=0.2,
-        test=False,
-    )
-    model = PrositIntensityPredictor(seq_length=30)
-    # create the optimizer object
-    optimizer = tf.keras.optimizers.legacy.Adam(learning_rate=0.001)
-
-    # compile the model  with the optimizer and the metrics we want to use, we can add our custom timedelta metric
-    model.compile(
-        optimizer=optimizer,
-        loss=masked_spectral_distance,
-        metrics=["mse", masked_pearson_correlation_distance],
-    )
-    history = model.fit(
-        int_data.train_data, validation_data=int_data.val_data, epochs=3
-    )
-    # create the dataset object for test data
-    TEST_DATAPATH = "https://raw.githubusercontent.com/wilhelm-lab/dlomix-resources/tasks/intensity/example_datasets/Intensity/proteomeTools_test.csv"
-    test_int_data = IntensityDataset(
-        data_source=TEST_DATAPATH,
-        seq_length=30,
-        collision_energy_col="collision_energy",
-        batch_size=32,
-        test=True,
-    )
-    predictions = model.predict(test_int_data.test_data)
-    test_targets = test_int_data.get_split_targets(split="test")
-    q = IntensityReportQuarto(
-        title="Test Report",
-        history=history,
-        test_data=test_int_data,
-        train_section=True,
-        val_section=True,
-        predictions=predictions,
-    )
-
-    q.generate_report()
