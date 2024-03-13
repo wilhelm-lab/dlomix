@@ -24,7 +24,6 @@ class IntensityReportQuarto:
         history,
         test_data=None,
         train_data=None,
-        predictions=None,
         model=None,
         title="Intensity report",
         fold_code=True,
@@ -47,7 +46,6 @@ class IntensityReportQuarto:
         self.output_path = output_path
         self.test_data = test_data
         self.train_data = train_data
-        self.predictions = predictions
         self.train_section = train_section
         self.val_section = val_section
         self.model = model
@@ -62,10 +60,7 @@ class IntensityReportQuarto:
         else:
             self._set_history_dict(history)
 
-        if train_data is None:
-            warnings.warn("The passed train data object is None.")
-
-        if test_data is None or predictions is None:
+        if test_data is None or train_data is None:
             warnings.warn(
                 "Either the test data or the predictions passed is None, no spectral angle can be reported."
             )
@@ -338,6 +333,7 @@ class IntensityReportQuarto:
         predictions_acc = normalize_intensity_predictions(
             predictions_df, self.test_data.batch_size
         )
+
         return predictions_acc
 
     def plot_keras_metric(self, metric_name, save_path=""):
@@ -554,24 +550,6 @@ class IntensityReportQuarto:
         plt.clf()
         return save_path
 
-    def generate_intensity_results_df(self):
-        """
-        Function to create the dataframe containing the intensity prediction results
-        :return: dataframe
-        """
-        predictions_df = pd.DataFrame()
-        predictions_df["sequences"] = self.test_data.sequences
-        predictions_df["intensities_pred"] = self.predictions.tolist()
-        predictions_df[
-            "precursor_charge_onehot"
-        ] = self.test_data.precursor_charge.tolist()
-        predictions_df["precursor_charge"] = (
-            np.argmax(self.test_data.precursor_charge, axis=1) + 1
-        )
-        predictions_df["intensities_raw"] = self.test_data.intensities.tolist()
-        predictions_df["collision_energy"] = self.test_data.collision_energy
-        return predictions_df
-
     def plot_spectral_angle(self, predictions_df, facet=None):
         """
         Function to generate a spectral angle plot. If facet is provided the plot will be faceted on the provided
@@ -656,8 +634,7 @@ if __name__ == "__main__":
         batch_size=32,
         test=True,
     )
-    predictions = model.predict(test_int_data.test_data)
-    test_targets = test_int_data.get_split_targets(split="test")
+
     q = IntensityReportQuarto(
         title="Test Report",
         history=history,
@@ -666,6 +643,5 @@ if __name__ == "__main__":
         model=model,
         train_section=True,
         val_section=True,
-        predictions=predictions,
     )
     q.generate_report()
