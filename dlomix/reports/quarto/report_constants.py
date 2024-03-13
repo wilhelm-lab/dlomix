@@ -21,6 +21,10 @@ distribution of peptide lengths in the data set, while the second histogram (see
 times. The first density plot (see @fig-rt_dist) shows the density of retention time per peptide length. The second density plot (see @fig-levenshtein) depicts the
 density of Levenshtein distances per petide length."""
 
+DATA_SECTION_INT = """
+The following section is showing a simple explorative data analysis of the used test dataset. The first density plot (see @fig-levenshtein) depicts the
+density of Levenshtein distances per petide length."""
+
 TRAIN_SECTION = """
 The following section shows the different metrics that were used to track the training. All used metrics are added by
 default. The resolution of this section is per epoch."""

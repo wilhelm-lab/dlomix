@@ -1,6 +1,8 @@
+import itertools
 import os
 import warnings
 from datetime import datetime
+from itertools import combinations
 from os.path import join
 
 import matplotlib.image as mpimg
@@ -8,6 +10,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import report_constants
 import seaborn as sns
+from Levenshtein import distance as levenshtein_distance
 from QMDFile import QMDFile
 
 from dlomix.reports.postprocessing import normalize_intensity_predictions
@@ -20,6 +23,7 @@ class IntensityReportQuarto:
         self,
         history,
         test_data=None,
+        train_data=None,
         predictions=None,
         model=None,
         title="Intensity report",
@@ -42,6 +46,7 @@ class IntensityReportQuarto:
         self.fold_code = fold_code
         self.output_path = output_path
         self.test_data = test_data
+        self.train_data = train_data
         self.predictions = predictions
         self.train_section = train_section
         self.val_section = val_section
@@ -57,6 +62,9 @@ class IntensityReportQuarto:
         else:
             self._set_history_dict(history)
 
+        if train_data is None:
+            warnings.warn("The passed train data object is None.")
+
         if test_data is None or predictions is None:
             warnings.warn(
                 "Either the test data or the predictions passed is None, no spectral angle can be reported."
@@ -71,6 +79,8 @@ class IntensityReportQuarto:
             subfolders.append("train")
         if self.val_section:
             subfolders.append("val")
+        if self.test_data:
+            subfolders.append("data")
 
         self._create_plot_folder_structure(subfolders)
 
@@ -113,6 +123,15 @@ class IntensityReportQuarto:
             if not os.path.exists(path):
                 os.makedirs(path)
 
+    def internal_without_mods(self, sequences):
+        """
+        Function to remove modifications from an iterable of sequences
+        :param sequences: iterable of peptide sequences
+        :return: list of sequences without modifications
+        """
+        regex = "\[.*?\]|\-"
+        return [re.sub(regex, "", seq) for seq in sequences]
+
     def get_model_summary_df(self):
         """
         Function to convert the layer information contained in keras model.summary() into a pandas dataframe in order to
@@ -151,6 +170,19 @@ class IntensityReportQuarto:
         qmd.insert_section_block(
             section_title="Introduction", section_text=meta_section, page_break=True
         )
+
+        if self.test_data is not None:
+            data_plots_path = self.plot_all_data_plots()
+            qmd.insert_section_block(
+                section_title="Data", section_text=report_constants.DATA_SECTION_INT
+            )
+            qmd.insert_image(
+                image_path=f"{data_plots_path}/levenshtein.png",
+                caption="Density of levenshtein distance sequence similarity per peptide length",
+                cross_reference_id="fig-levenshtein",
+                page_break=True,
+            )
+
         if self.model is not None:
             df = self.get_model_summary_df()
             qmd.insert_section_block(
@@ -195,19 +227,118 @@ class IntensityReportQuarto:
             page_break=True,
         )
 
-        results_df = self.generate_intensity_results_df()
-
+        results_df = self.generate_prediction_df()
+        violin_plot = self.plot_spectral_angle(results_df)
         violin_plot_pc = self.plot_spectral_angle(results_df, facet="precursor_charge")
+        violin_plot_ce = self.plot_spectral_angle(results_df, facet="collision_energy")
+        results_df["unmod_seq"] = self.internal_without_mods(results_df["sequences"])
+        results_df["peptide_length"] = results_df["unmod_seq"].str.len()
+        violin_plot_pl = self.plot_spectral_angle(results_df, facet="peptide_length")
         qmd.insert_section_block(
             section_title="Spectral angle plots",
             section_text=report_constants.SPECTRAL_ANGLE_SECTION,
+        )
+        qmd.insert_image(
+            image_path=violin_plot,
+            caption="Violin plot of spectral angle",
+            page_break=True,
         )
         qmd.insert_image(
             image_path=violin_plot_pc,
             caption="Violin plot of spectral angle faceted by precursor charge",
             page_break=True,
         )
+        qmd.insert_image(
+            image_path=violin_plot_ce,
+            caption="Violin plot of spectral angle faceted by collision energy",
+            page_break=True,
+        )
+        qmd.insert_image(
+            image_path=violin_plot_pl,
+            caption="Violin plot of spectral angle faceted by peptide length",
+            page_break=True,
+        )
         qmd.write_qmd_file(f"{self.output_path}/{qmd_report_filename}")
+
+    def generate_prediction_df(self):
+        """
+        Function to create the dataframe containing the intensity prediction results
+        :return: dataframe
+        """
+        predictions_df_test = pd.DataFrame()
+        predictions_df_test["sequences"] = self.test_data.sequences
+        predictions_test = self.model.predict(self.test_data.test_data)
+        predictions_df_test["intensities_pred"] = predictions_test.tolist()
+        predictions_df_test["precursor_charge"] = (
+            np.argmax(self.test_data.precursor_charge, axis=1) + 1
+        )
+        predictions_df_test[
+            "precursor_charge_onehot"
+        ] = self.test_data.precursor_charge.tolist()
+        predictions_df_test["collision_energy"] = self.test_data.collision_energy
+        predictions_df_test["intensities_raw"] = self.test_data.intensities.tolist()
+        predictions_df_test["set"] = "test"
+
+        l = []
+        for a in self.train_data.val_data.take(-1):
+            for b in a:
+                l.append(b)
+
+        seqs = []
+        for sequences in l[::2]:
+            seqs.append(sequences.get("sequence").numpy().astype(str))
+
+        result_seqs = []
+        for arr in seqs:
+            for row in arr:
+                # Convert row elements to strings
+                row_str = np.char.decode(row.astype("|S"), "utf-8")
+
+                # Concatenate characters into a single string and remove whitespace
+                result_string = "".join(row_str).replace(" ", "")
+
+                # Append the result to the list
+                result_seqs.append(result_string)
+
+        ce = []
+        for sequences in l[::2]:
+            ce.append(sequences.get("collision_energy").numpy())
+
+        result_ce = [item for array in ce for item in array.tolist()]
+        result_ce = [item for sublist in result_ce for item in sublist]
+
+        pc = []
+        for sequences in l[::2]:
+            pc.append(sequences.get("precursor_charge").numpy())
+        pc_one_hot = np.concatenate(pc).tolist()
+        pc = np.argmax(pc_one_hot, axis=1) + 1
+        result_pc = pc.tolist()
+
+        int = []
+        for intensities in l[1::2]:
+            int.append(intensities.numpy())
+        result_int = np.concatenate(int).tolist()
+
+        predictions_df_val = pd.DataFrame(
+            {
+                "sequences": result_seqs,
+                "precursor_charge": result_pc,
+                "collision_energy": result_ce,
+                "intensities_raw": result_int,
+                "precursor_charge_onehot": pc_one_hot,
+            }
+        )
+        predictions_df_val["set"] = "val"
+        predictions_val = self.model.predict(self.train_data.val_data)
+        predictions_df_val["intensities_pred"] = predictions_val.tolist()
+        pd.set_option("display.max_columns", None)
+        predictions_df = pd.concat(
+            [predictions_df_test, predictions_df_val], ignore_index=True
+        )
+        predictions_acc = normalize_intensity_predictions(
+            predictions_df, self.test_data.batch_size
+        )
+        return predictions_acc
 
     def plot_keras_metric(self, metric_name, save_path=""):
         """
@@ -237,6 +368,17 @@ class IntensityReportQuarto:
         # Save the plot
         plt.savefig(f"{save_path}/{metric_name}.png", bbox_inches="tight")
         plt.clf()
+
+    def plot_all_data_plots(self):
+        """
+        Function to plot all data related plots.
+        :return: string path of where the plots are saved
+        """
+        save_path = join(
+            self.output_path, report_constants.DEFAULT_LOCAL_PLOTS_DIR, "data"
+        )
+        self.plot_levenshtein(save_path=save_path)
+        return save_path
 
     def plot_train_vs_val_keras_metric(self, metric_name, save_path="", save_plot=True):
         """
@@ -317,6 +459,59 @@ class IntensityReportQuarto:
             self.plot_train_vs_val_keras_metric(key, save_path)
         return save_path
 
+    def plot_levenshtein(self, save_path=""):
+        """
+        Function to plot the density of Levenshtein distances between the sequences for different sequence lengths
+        :param save_path: string where to save the plot
+        :return:
+        """
+        seqs_wo_mods = self.internal_without_mods(self.test_data.sequences)
+        seqs_wo_dupes = list(dict.fromkeys(seqs_wo_mods))
+        df = pd.DataFrame(seqs_wo_dupes, columns=["mod_seq"])
+        df["length"] = df["mod_seq"].str.len()
+        palette = itertools.cycle(
+            sns.color_palette("YlOrRd_r", n_colors=len(df.length.unique()))
+        )
+        lengths = sorted(df["length"].unique())
+        plt.figure(figsize=(8, 6))
+        plot = plt.scatter(lengths, lengths, c=lengths, cmap="YlOrRd_r")
+        cbar = plt.colorbar()
+        plt.cla()
+        plot.remove()
+        lv_dict = {}
+        pep_groups = df.groupby("length")
+        available_lengths = df.length.unique()
+
+        for length, peptides in pep_groups:
+            current_list = []
+            if len(peptides.index) > 1000:
+                samples = peptides["mod_seq"].sample(n=1000, random_state=1)
+            else:
+                samples = peptides["mod_seq"].values
+            a = combinations(samples, 2)
+            for pep_tuple in a:
+                current_list.append(
+                    levenshtein_distance(pep_tuple[0], pep_tuple[1]) - 1
+                )
+            lv_dict[str(length)] = current_list
+
+        for length in available_lengths:
+            ax = sns.kdeplot(
+                np.array(lv_dict[str(length)]),
+                bw_method=0.5,
+                label=str(length),
+                cbar=True,
+                fill=True,
+                color=next(palette),
+            )
+        # ncol=1, bbox_to_anchor=(1.05, 1.0), loc='upper left'
+        cbar.ax.set_ylabel("peptide length", rotation=270)
+        cbar.ax.yaxis.set_label_coords(3.2, 0.5)
+        plt.title("Density of Levenshtein distance per peptide length")
+        plt.xlabel("Levenshtein distance")
+        plt.savefig(f"{save_path}/levenshtein.png", bbox_inches="tight")
+        plt.clf()
+
     def create_plot_image(self, path, n_cols=2):
         """
         Function to create one image of all plots included in the provided directory.
@@ -386,15 +581,19 @@ class IntensityReportQuarto:
         :return: string path of image containing the plots
         """
         plt.figure(figsize=(8, 6))
-        predictions_acc = normalize_intensity_predictions(
-            predictions_df, self.test_data.batch_size
+        violin_plot = sns.violinplot(
+            data=predictions_df,
+            x=facet,
+            y="spectral_angle",
+            hue="set",
+            split=True,
+            inner="quart",
         )
-        violin_plot = sns.violinplot(data=predictions_acc, x=facet, y="spectral_angle")
         save_path = join(
             self.output_path,
             report_constants.DEFAULT_LOCAL_PLOTS_DIR,
             "spectral",
-            "violin_spectral_angle_plot.png",
+            f"violin_spectral_angle_plot_{facet}.png",
         )
 
         fig = violin_plot.get_figure()
@@ -463,6 +662,7 @@ if __name__ == "__main__":
         title="Test Report",
         history=history,
         test_data=test_int_data,
+        train_data=int_data,
         model=model,
         train_section=True,
         val_section=True,

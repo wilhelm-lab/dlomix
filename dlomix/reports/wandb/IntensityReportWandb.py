@@ -1,4 +1,4 @@
-class IntensityReport:
+class IntensityReportWandb:
     def __init__(
         self,
         project: str,
@@ -268,7 +268,3 @@ class IntensityReport:
             wr.HorizontalRule(),
         ]
         return spectral_angle_block
-
-
-class IntensityReportWandb:
-    pass
