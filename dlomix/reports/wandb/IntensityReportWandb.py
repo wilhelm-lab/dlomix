@@ -1,11 +1,24 @@
+import numpy as np
+import pandas as pd
+import plotly.express as px
+import report_constants
+import seaborn as sns
+import tensorflow as tf
+import wandb
+import wandb.apis.reports as wr
+from wandb.keras import WandbCallback, WandbMetricsLogger
+
+import dlomix
+from dlomix import constants, data, eval, layers, models, pipelines, reports, utils
+from dlomix.data import IntensityDataset
+from dlomix.losses import masked_pearson_correlation_distance, masked_spectral_distance
+from dlomix.models import PrositIntensityPredictor
+from dlomix.reports.postprocessing import normalize_intensity_predictions
+
+
 class IntensityReportWandb:
     def __init__(
-        self,
-        project: str,
-        title: str,
-        description: str,
-        test_dataset: IntensityDataset,
-        predictions,
+        self, project: str, title: str, description: str, test_dataset, predictions
     ):
         self.entity = wandb.apis.PublicApi().default_entity
         self.project = project
@@ -137,6 +150,28 @@ class IntensityReportWandb:
         fig = violin_plot.get_figure()
         wandb.log({"chart": wandb.Image(fig), "table": table})
 
+    def log_spectral_angle_table(self):
+        name_plot = "spectral_angle"
+        predictions_df = self.generate_intensity_results_df()
+        predictions_acc = normalize_intensity_predictions(
+            predictions_df, self.test_dataset.batch_size
+        )
+        wb_table = pd.DataFrame()
+        wb_table["spectral_angle"] = predictions_df["spectral_angle"]
+        wb_table["precursor_charge"] = predictions_df["precursor_charge"]
+        table = wandb.Table(dataframe=wb_table)
+        spectral_angle_plot = wandb.plot_table(
+            vega_spec_name=f"master_praktikum/spectral_angle_plot",
+            data_table=table,
+            fields={
+                "spectral_angle": "spectral_angle",
+                "precursor_charge": "precursor_charge",
+            },
+        )
+        wandb.log({name_plot: spectral_angle_plot})
+        name_spec_table = name_plot + "_table"
+        return name_spec_table
+
     def config_section(self):
         config_block = [
             wr.H1(text="Config"),
@@ -172,9 +207,7 @@ class IntensityReportWandb:
             )
         train_block = [
             wr.H1(text="Training metrics"),
-            wr.P(
-                "Lorem ipsum dolor sit amet. Aut laborum perspiciatis sit odit omnis aut aliquam voluptatibus ut rerum molestiae sed assumenda nulla ut minus illo sit sunt explicabo? Sed quia architecto est voluptatem magni sit molestiae dolores. Non animi repellendus ea enim internos et iste itaque quo labore mollitia aut omnis totam."
-            ),
+            wr.P(report_constants.TRAIN_SECTION_WANDB),
             wr.H2(text="per batch"),
             wr.PanelGrid(
                 runsets=[
@@ -206,9 +239,7 @@ class IntensityReportWandb:
             )
         val_block = [
             wr.H1(text="Validation metrics"),
-            wr.P(
-                "Lorem ipsum dolor sit amet. Aut laborum perspiciatis sit odit omnis aut aliquam voluptatibus ut rerum molestiae sed assumenda nulla ut minus illo sit sunt explicabo? Sed quia architecto est voluptatem magni sit molestiae dolores. Non animi repellendus ea enim internos et iste itaque quo labore mollitia aut omnis totam."
-            ),
+            wr.P(report_constants.VAL_SECTION_WANDB),
             wr.H2(text="per epoch"),
             wr.PanelGrid(
                 runsets=[
@@ -233,9 +264,7 @@ class IntensityReportWandb:
             )
         train_val_block = [
             wr.H1(text="Train - Validation metrics"),
-            wr.P(
-                "Lorem ipsum dolor sit amet. Aut laborum perspiciatis sit odit omnis aut aliquam voluptatibus ut rerum molestiae sed assumenda nulla ut minus illo sit sunt explicabo? Sed quia architecto est voluptatem magni sit molestiae dolores. Non animi repellendus ea enim internos et iste itaque quo labore mollitia aut omnis totam."
-            ),
+            wr.P(report_constants.TRAIN_VAL_SECTION_WANDB),
             wr.H2(text="per epoch"),
             wr.PanelGrid(
                 runsets=[
@@ -249,22 +278,115 @@ class IntensityReportWandb:
 
     def spectral_angle_section(self):
         width = 24
-        self.log_spectral_angle_image()
+        plot_name = self.log_spectral_angle_table()
         spectral_angle_block = [
             wr.H1(text="Spectral Angle"),
-            wr.P(
-                "Lorem ipsum dolor sit amet. Aut laborum perspiciatis sit odit omnis aut aliquam voluptatibus ut rerum molestiae sed assumenda nulla ut minus illo sit sunt explicabo? Sed quia architecto est voluptatem magni sit molestiae dolores. Non animi repellendus ea enim internos et iste itaque quo labore mollitia aut omnis totam."
-            ),
+            wr.P(report_constants.SPECTRAL_ANGLE_SECTION_WANDB),
             wr.PanelGrid(
                 runsets=[
                     wr.Runset(self.entity, self.project),
                 ],
                 panels=[
-                    wr.MediaBrowser(
-                        media_keys="chart", num_columns=1, layout={"w": width}
+                    wr.CustomChart(
+                        query={"summaryTable": {"tableKey": plot_name}},
+                        chart_name=f"master_praktikum/spectral_angle_plot",
                     )
                 ],
             ),
             wr.HorizontalRule(),
         ]
         return spectral_angle_block
+
+
+if __name__ == "__main__":
+    # import necessary packages
+    import os
+    import re
+    import warnings
+
+    import keras
+    import matplotlib.pyplot as plt
+    import numpy as np
+    import pandas as pd
+    import tensorflow as tf
+
+    import dlomix
+    from dlomix import constants, data, eval, layers, models, pipelines, reports, utils
+    from dlomix.data import IntensityDataset
+    from dlomix.losses import (
+        masked_pearson_correlation_distance,
+        masked_spectral_distance,
+    )
+    from dlomix.models import PrositIntensityPredictor
+# Create config
+config = {
+    "seq_length": 30,
+    "batch_size": 64,
+    "val_ratio": 0.2,
+    "lr": 0.0001,
+    "optimizer": "ADAM",
+    "loss": "mse",
+}
+
+# Initialize WANDB
+PROJECT = "Demo_IntensityTimeReport"
+RUN = "test_2"
+wandb.init(project=PROJECT, name=RUN, config=config)
+
+TRAIN_DATAPATH = "https://raw.githubusercontent.com/wilhelm-lab/dlomix-resources/tasks/intensity/example_datasets/Intensity/proteomeTools_train_val.csv"
+BATCH_SIZE = 64
+
+int_data = IntensityDataset(
+    data_source=TRAIN_DATAPATH,
+    seq_length=30,
+    batch_size=BATCH_SIZE,
+    collision_energy_col="collision_energy",
+    val_ratio=0.2,
+    test=False,
+)
+
+model = PrositIntensityPredictor(seq_length=30)
+tf.get_logger().setLevel("ERROR")
+# create the optimizer object
+optimizer = tf.keras.optimizers.legacy.Adam(learning_rate=0.001)
+
+# compile the model  with the optimizer and the metrics we want to use, we can add our custom timedelta metric
+model.compile(
+    optimizer=optimizer,
+    loss=masked_spectral_distance,
+    metrics=["mse", masked_pearson_correlation_distance],
+)
+history = model.fit(
+    int_data.train_data,
+    validation_data=int_data.val_data,
+    epochs=1,
+    callbacks=[WandbMetricsLogger(log_freq="batch")],
+)
+# Mark the run as finished
+
+# create the dataset object for test data
+
+TEST_DATAPATH = "https://raw.githubusercontent.com/wilhelm-lab/dlomix-resources/tasks/intensity/example_datasets/Intensity/proteomeTools_test.csv"
+
+test_int_data = IntensityDataset(
+    data_source=TEST_DATAPATH,
+    seq_length=30,
+    collision_energy_col="collision_energy",
+    batch_size=32,
+    test=True,
+)
+
+# use model.predict from keras directly on the testdata
+
+predictions = model.predict(test_int_data.test_data)
+
+# Create a report
+report = IntensityReportWandb(
+    project="Demo_IntensityTimeReport",
+    title="Comparison of different optimizers",
+    description="Comparison of two optimizers Adam and RMSprop",
+    test_dataset=test_int_data,
+    predictions=predictions,
+)
+
+report.create_report()

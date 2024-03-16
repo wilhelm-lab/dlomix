@@ -59,3 +59,9 @@ The closer to 0 the more different the spectra are. It is computed as follows fo
 being the observed and predicted intensity vectors:
 $$SA = 1 - \\frac{2}{\pi} \cos^{-1}({\\frac{V_{a} \cdot V_{b}}{\left|\left|V_{a}\\right|\\right| \cdot \left|\left|V_{b}\\right|\\right|}})$$
 """
+
+SPECTRAL_ANGLE_SECTION_WANDB = """
+The spectral angle plot shows the spectral angle between the predicted intensities and the actual intensities faceted by
+precursor charge. The spectral angle is an evaluation metric for spectra. The closer to 1 the more similar the spectra are.
+The closer to 0 the more different the spectra are.
+"""
