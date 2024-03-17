@@ -166,10 +166,25 @@ class IntensityReportQuarto:
             section_title="Introduction", section_text=meta_section, page_break=True
         )
 
-        if self.test_data is not None:
+        if self.test_data is not None and self.train_data is not None:
             data_plots_path = self.plot_all_data_plots()
+            dataset = ["Train", "Test"]
+            peptides = [
+                str((len(self.train_data.sequences))),
+                str((len(self.test_data.sequences))),
+            ]
+            spectra = [
+                str((len(np.unique(self.train_data.sequences)))),
+                str((len(np.unique(self.test_data.sequences)))),
+            ]
+            df = pd.DataFrame(
+                {"Dataset": dataset, "Unique peptides": peptides, "Spectra": spectra}
+            )
             qmd.insert_section_block(
                 section_title="Data", section_text=report_constants.DATA_SECTION_INT
+            )
+            qmd.insert_table_from_df(
+                df, "Information on the used data", cross_reference_id="tbl-data"
             )
             qmd.insert_image(
                 image_path=f"{data_plots_path}/levenshtein.png",
@@ -183,7 +198,7 @@ class IntensityReportQuarto:
             qmd.insert_section_block(
                 section_title="Model", section_text=report_constants.MODEL_SECTION
             )
-            qmd.insert_table_from_df(df, "Keras model summary")
+            qmd.insert_table_from_df(df, "Keras model summary", page_break=True)
         if self.train_section:
             train_plots_path = self.plot_all_train_metrics()
             train_image_path = self.create_plot_image(train_plots_path)

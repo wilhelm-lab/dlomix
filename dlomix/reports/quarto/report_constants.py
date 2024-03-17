@@ -19,11 +19,13 @@ DATA_SECTION = """
 The following section is showing a simple explorative data analysis of the used dataset. The first histogram (see @fig-pep_len) shows the
 distribution of peptide lengths in the data set, while the second histogram (see @fig-irt) shows the distribution of indexed retention
 times. The first density plot (see @fig-rt_dist) shows the density of retention time per peptide length. The second density plot (see @fig-levenshtein) depicts the
-density of Levenshtein distances per petide length."""
+density of Levenshtein distances per peptide length."""
 
 DATA_SECTION_INT = """
-The following section is showing a simple explorative data analysis of the used test dataset. The first density plot (see @fig-levenshtein) depicts the
-density of Levenshtein distances per petide length."""
+The following section is showing a simple explorative data analysis of the used datasets. The first density plot (see @fig-levenshtein) depicts the
+density of Levenshtein distances per peptide length of the test dataset. @tbl-data shows the number of unique peptides as well as well as how many spectra
+there are per dataset.
+"""
 
 TRAIN_SECTION = """
 The following section shows the different metrics that were used to track the training. All used metrics are added by
