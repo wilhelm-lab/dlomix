@@ -1,14 +1,22 @@
-from .feature_tables import PTM_LOSS_LOOKUP, PTM_MOD_ATOM_LOOKUP
+from .feature_tables import PTM_LOSS_LOOKUP, PTM_MOD_DELTA_MASS_LOOKUP, PTM_GAIN_LOOKUP, PTM_ATOM_COUNT_LOOKUP
 from .processors import FunctionProcessor, PeptideDatasetBaseProcessor
 
 FEATURE_EXTRACTORS_PARAMETERS = {
     "mod_loss": {
-        "feature_default_value": [0, 0, 0, 0, 0, 0],
+        "feature_default_value": [1, 1, 1, 1, 1, 1],
         "lookup_table": PTM_LOSS_LOOKUP,
     },
-    "mod_atom": {
+    "delta_mass": {
         "feature_default_value": 0,
-        "lookup_table": PTM_MOD_ATOM_LOOKUP,
+        "lookup_table": PTM_MOD_DELTA_MASS_LOOKUP,
+    },
+     "mod_gain": {
+        "feature_default_value": [1, 1, 1, 1, 1, 1],
+        "lookup_table": PTM_GAIN_LOOKUP,
+    },
+     "atom_count": {
+        "feature_default_value": [1, 1, 1, 1, 1, 1],
+        "lookup_table": PTM_ATOM_COUNT_LOOKUP,
     },
 }
 
