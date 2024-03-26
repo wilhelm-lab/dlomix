@@ -18,7 +18,7 @@ class PeptideDatasetBaseProcessor(abc.ABC):
     def __call__(self, input_data, **kwargs):
         return self.process(input_data, **kwargs)
 
-    def __repr__(self) -> str:
+    def __repr__(self):
         members = [
             attr
             for attr in vars(self)
@@ -131,33 +131,31 @@ class SequencePaddingProcessor(PeptideDatasetBaseProcessor):
         input_data[SequencePaddingProcessor.KEEP_COLUMN_NAME] = [True] * len(
             input_data[self.sequence_column_name]
         )
+
         for index, sequence in enumerate(input_data[self.sequence_column_name]):
-            length = len(sequence)
-            if length <= self.max_length:
-                input_data[self.sequence_column_name][index].extend(
-                    [self.padding_value] * (self.max_length - length)
-                )
-            else:
-                input_data[self.sequence_column_name][index] = sequence[
-                    : self.max_length
-                ]
-                input_data[SequencePaddingProcessor.KEEP_COLUMN_NAME][index] = False
+            (
+                input_data[self.sequence_column_name][index],
+                keep_sequence,
+            ) = self._pad_sequence(sequence)
+            input_data[SequencePaddingProcessor.KEEP_COLUMN_NAME][index] = keep_sequence
 
         return input_data
 
     def single_process(self, input_data, **kwargs):
-        input_data[SequencePaddingProcessor.KEEP_COLUMN_NAME] = True
-        length = len(input_data[self.sequence_column_name])
-        if length <= self.max_length:
-            input_data[self.sequence_column_name].extend(
-                [self.padding_value] * (self.max_length - length)
-            )
-        else:
-            input_data[self.sequence_column_name] = input_data[
-                self.sequence_column_name
-            ][: self.max_length]
-            input_data[SequencePaddingProcessor.KEEP_COLUMN_NAME] = False
+        input_data[self.sequence_column_name], keep_sequence = self._pad_sequence(
+            input_data[self.sequence_column_name]
+        )
+
+        input_data[SequencePaddingProcessor.KEEP_COLUMN_NAME] = keep_sequence
+
         return input_data
+
+    def _pad_sequence(self, sequence):
+        length = len(sequence)
+        if length <= self.max_length:
+            return sequence + [self.padding_value] * (self.max_length - length), True
+        else:
+            return sequence[: self.max_length], False
 
 
 class SequenceEncodingProcessor(PeptideDatasetBaseProcessor):
@@ -169,19 +167,21 @@ class SequenceEncodingProcessor(PeptideDatasetBaseProcessor):
         self.alphabet = alphabet
 
     def batch_process(self, input_data, **kwargs):
-        for index, sequence in enumerate(input_data[self.sequence_column_name]):
-            input_data[self.sequence_column_name][index] = [
-                self.alphabet.get(amino_acid) for amino_acid in sequence
+        return {
+            self.sequence_column_name: [
+                self._encode(seq) for seq in input_data[self.sequence_column_name]
             ]
-
-        return input_data
+        }
 
     def single_process(self, input_data, **kwargs):
-        input_data[self.sequence_column_name] = [
-            self.alphabet.get(amino_acid)
-            for amino_acid in input_data[self.sequence_column_name]
-        ]
-        return input_data
+        return {
+            self.sequence_column_name: self._encode(
+                input_data[self.sequence_column_name]
+            )
+        }
+
+    def _encode(self, sequence):
+        return [self.alphabet.get(amino_acid) for amino_acid in sequence]
 
 
 class FunctionProcessor(PeptideDatasetBaseProcessor):

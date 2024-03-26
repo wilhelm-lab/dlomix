@@ -23,11 +23,12 @@ class RetentionTimeDataset(PeptideDataset):
         dataset_type: str = "tf",
         batch_size: int = 256,
         model_features: Optional[List[str]] = None,
+        dataset_columns_to_keep: Optional[List[str]] = None,
         features_to_extract: Optional[List[Union[Callable, str]]] = None,
         pad: bool = True,
         padding_value: int = 0,
         vocab: Dict = ALPHABET_UNMOD,
-        encoding_scheme: Union[str, EncodingScheme] = EncodingScheme.NO_MODS,
+        encoding_scheme: Union[str, EncodingScheme] = EncodingScheme.UNMOD,
         processed: bool = False,
     ):
         super().__init__(
@@ -42,6 +43,7 @@ class RetentionTimeDataset(PeptideDataset):
             dataset_type,
             batch_size,
             model_features,
+            dataset_columns_to_keep,
             features_to_extract,
             pad,
             padding_value,

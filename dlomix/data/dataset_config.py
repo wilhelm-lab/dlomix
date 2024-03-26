@@ -1,4 +1,5 @@
 import json
+import os
 from dataclasses import dataclass, field
 from typing import Callable, Dict, List, Optional, Union
 
@@ -18,6 +19,7 @@ class DatasetConfig:
     dataset_type: str
     batch_size: int
     model_features: List[str]
+    dataset_columns_to_keep: Optional[List[str]]
     features_to_extract: Optional[List[Union[Callable, str]]]
     pad: bool
     padding_value: int
@@ -27,6 +29,7 @@ class DatasetConfig:
     _additional_data: dict = field(default_factory=dict)
 
     def save_config_json(self, path: str):
+        os.makedirs(os.path.dirname(path), exist_ok=True)
         with open(path, "w") as f:
             json.dump(self.__dict__, f, default=lambda obj: repr(obj))
 

@@ -1,3 +1,6 @@
+# adjust encoding schemes workflow --> check ppt for details
+# check if config can wrap all the parameters and be used to manage the attributes of the class, reduce the assignment of attributes in the init method
+
 import os
 import warnings
 from typing import Callable, Dict, List, Optional, Union
@@ -37,13 +40,14 @@ class PeptideDataset:
         dataset_type: str,
         batch_size: int,
         model_features: List[str],
+        dataset_columns_to_keep: Optional[List[str]],
         features_to_extract: Optional[List[Union[Callable, str]]] = None,
         pad: bool = True,
         padding_value: int = 0,
         vocab: Dict = ALPHABET_UNMOD,
-        encoding_scheme: Union[str, EncodingScheme] = EncodingScheme.NO_MODS,
+        encoding_scheme: Union[str, EncodingScheme] = EncodingScheme.UNMOD,
         processed: bool = False,
-        disable_cache: bool = True,
+        disable_cache: bool = False,
     ):
         super(PeptideDataset, self).__init__()
         self.data_source = data_source
@@ -60,6 +64,10 @@ class PeptideDataset:
         self.dataset_type = dataset_type
         self.batch_size = batch_size
         self.model_features = model_features
+
+        # to be kept in the hf dataset, but not returned in the tensor dataset
+        self.dataset_columns_to_keep = dataset_columns_to_keep
+
         self.features_to_extract = features_to_extract
         self.pad = pad
         self.padding_value = padding_value
@@ -81,7 +89,8 @@ class PeptideDataset:
             self._default_batch_processing_size = 1000
             self._load_dataset()
 
-            self._relevant_columns = None
+            self._relevant_columns = []
+            self._extracted_features_columns = []
 
             if not self._empty_dataset_mode:
                 self._processors = []
@@ -113,6 +122,7 @@ class PeptideDataset:
             dataset_type=self.dataset_type,
             batch_size=self.batch_size,
             model_features=self.model_features,
+            dataset_columns_to_keep=self.dataset_columns_to_keep,
             features_to_extract=self.features_to_extract,
             pad=self.pad,
             padding_value=self.padding_value,
@@ -132,18 +142,11 @@ class PeptideDataset:
     def _load_dataset(self):
         data_files_available_splits = {}
 
-        if self.data_source is not None:
-            data_files_available_splits[
-                PeptideDataset.DEFAULT_SPLIT_NAMES[0]
-            ] = self.data_source
-        if self.val_data_source is not None:
-            data_files_available_splits[
-                PeptideDataset.DEFAULT_SPLIT_NAMES[1]
-            ] = self.val_data_source
-        if self.test_data_source is not None:
-            data_files_available_splits[
-                PeptideDataset.DEFAULT_SPLIT_NAMES[2]
-            ] = self.test_data_source
+        data_sources = [self.data_source, self.val_data_source, self.test_data_source]
+
+        for split_name, source in zip(PeptideDataset.DEFAULT_SPLIT_NAMES, data_sources):
+            if source is not None:
+                data_files_available_splits[split_name] = source
 
         if len(data_files_available_splits) == 0:
             self._empty_dataset_mode = True
@@ -169,13 +172,12 @@ class PeptideDataset:
         if self.model_features is not None:
             self._relevant_columns.extend(self.model_features)
 
-        # select only relevant columns
-        self.hf_dataset = self.hf_dataset.select_columns(self._relevant_columns)
+        if self.dataset_columns_to_keep is not None:
+            # additional columns to keep in the hugging face dataset only and not return as tensors
+            self._relevant_columns.extend(self.dataset_columns_to_keep)
 
-        # remove label column
-        self._relevant_columns = list(
-            set(self._relevant_columns) - set(self.label_column)
-        )
+        # select only relevant columns from the Hugging Face Dataset (includes label column)
+        self.hf_dataset = self.hf_dataset.select_columns(self._relevant_columns)
 
     def _split_dataset(self):
         # logic to split
@@ -188,7 +190,7 @@ class PeptideDataset:
             del self.hf_dataset["test"]
 
     def _parse_sequences(self):
-        if self.encoding_scheme == EncodingScheme.NO_MODS:
+        if self.encoding_scheme == EncodingScheme.UNMOD:
             warnings.warn(
                 f"""
                           Encoding scheme is {self.encoding_scheme}, this enforces removing all occurences of PTMs in the sequences.
@@ -215,10 +217,15 @@ class PeptideDataset:
             # get the extended vocab from the parser
             # self.extended_vocab = self.parser.extended_vocab
 
+            parsed_column_names = ["raw_sequence", "n_terminal_mods", "c_terminal_mods"]
+
             sequence_parsing_processor = SequenceParsingProcessor(
-                self.sequence_column, batched=True
+                self.sequence_column,
+                batched=True,
+                new_column_names=parsed_column_names,
             )
 
+            self.dataset_columns_to_keep.extend(parsed_column_names)
             self._processors.append(sequence_parsing_processor)
 
     def _configure_processing_pipeline(self):
@@ -227,28 +234,23 @@ class PeptideDataset:
         self._configure_feature_extraction_step()
 
     def _configure_encoding_step(self):
-        # ToDo: add sequence encoder
         encoding_processor = None
 
-        if self.encoding_scheme == EncodingScheme.NO_MODS:
-            encoding_processor = SequenceEncodingProcessor(
-                sequence_column_name=self.sequence_column,
-                alphabet=self.vocab,
-                batched=True,
-            )
-
-        elif self.encoding_scheme == EncodingScheme.NAIVE_MODS:
-            warnings.warn(
-                "Naive encoding for PTMs: please use the dataset attribute extended_vocab for the full alphabet and pass it to the model if needed. \nUsage: dataset.extended_vocab"
-            )
-
-            # encode proforma sequence with the extended vocab provided by the parser
-            # ToDo: double check if that is needed, if not, this can be independent of the encoding scheme
+        if (
+            self.encoding_scheme == EncodingScheme.UNMOD
+            or self.encoding_scheme == EncodingScheme.NAIVE_MODS
+        ):
             encoding_processor = SequenceEncodingProcessor(
                 sequence_column_name=self.sequence_column,
                 alphabet=self.extended_vocab,
                 batched=True,
             )
+
+        # elif self.encoding_scheme == EncodingScheme.NAIVE_MODS:
+        #    warnings.warn(
+        #        "Naive encoding for PTMs: please use the dataset attribute extended_vocab for the full alphabet and pass it to the model if needed. \nUsage: dataset.extended_vocab"
+        #    )
+
         else:
             raise NotImplementedError(
                 f"Encoding scheme {self.encoding_scheme} is not implemented. Available encoding schemes are: {list(EncodingScheme.__members__)}."
@@ -259,7 +261,7 @@ class PeptideDataset:
     def _configure_padding_step(self):
         if not self.pad:
             warnings.warn(
-                "Padding is turned off, sequences will have a variable length."
+                "Padding is turned off, sequences will have variable lengths. Converting this dataset to tensors will cause errors unless proper stacking of examples is done."
             )
             return
 
@@ -315,16 +317,16 @@ class PeptideDataset:
                 raise ValueError(
                     f"Feature extractor {feature} is not a valid type. Please provide a function or a string that is a valid feature extractor name."
                 )
-            self._relevant_columns.append(feature_name)
-            self.model_features.append(feature_name)
+
+            self._extracted_features_columns.append(feature_name)
             self._processors.append(feature_extactor)
 
     def _apply_processing_pipeline(self):
         for processor in self._processors:
-            print(f"Applying processor:\n {processor}...")
+            print(f"Applying step:\n {processor}...")
             self.hf_dataset = self.hf_dataset.map(
                 processor,
-                desc=f"Applying {processor.__class__.__name__}",
+                desc=f"Mapping {processor.__class__.__name__}",
                 batched=processor.batched,
                 batch_size=self._default_batch_processing_size,
                 num_proc=self._default_num_proc,
@@ -333,7 +335,7 @@ class PeptideDataset:
             if isinstance(processor, SequencePaddingProcessor):
                 for split in self.hf_dataset.keys():
                     if split != "test":
-                        print(f"Truncating sequences in the {split} split ...")
+                        print(f"Removing truncated sequences in the {split} split ...")
 
                         self.hf_dataset[split] = self.hf_dataset[split].filter(
                             lambda batch: batch[processor.KEEP_COLUMN_NAME],
@@ -345,24 +347,21 @@ class PeptideDataset:
                     processor.KEEP_COLUMN_NAME
                 )
 
-            print("-" * 100)
-
-    def __getitem__(self, index):
-        return self.hf_dataset[index]
-
     def save_to_disk(self, path: str):
-        self.hf_dataset.save_to_disk(path)
         self._config.save_config_json(
             os.path.join(path, PeptideDataset.CONFIG_JSON_NAME)
         )
 
+        self.hf_dataset.save_to_disk(path)
+
     @classmethod
     def load_from_disk(cls, path: str):
-        hf_dataset = load_from_disk(path)
         config = DatasetConfig.load_config_json(
             os.path.join(path, PeptideDataset.CONFIG_JSON_NAME)
         )
-        print(config)
+
+        hf_dataset = load_from_disk(path)
+
         dataset = cls.from_dataset_config(config)
         dataset.hf_dataset = hf_dataset
         return dataset
@@ -381,6 +380,7 @@ class PeptideDataset:
             dataset_type=config.dataset_type,
             batch_size=config.batch_size,
             model_features=config.model_features,
+            dataset_columns_to_keep=config.dataset_columns_to_keep,
             features_to_extract=config.features_to_extract,
             pad=config.pad,
             padding_value=config.padding_value,
@@ -395,11 +395,49 @@ class PeptideDataset:
         d._refresh_config()
         return d
 
+    def __getitem__(self, index):
+        return self.hf_dataset[index]
+
+    def __str__(self):
+        return self.hf_dataset.__str__()
+
+    def __repr__(self):
+        return self.hf_dataset.__repr__()
+
+    def __len__(self):
+        return len(self.hf_dataset)
+
+    def __iter__(self):
+        return iter(self.hf_dataset)
+
+    def __getattr__(self, attr):
+        if attr not in self.__dict__:
+            return getattr(self.hf_dataset, attr)
+        else:
+            return self.__dict__[attr]
+
+    def _get_input_tensor_column_names(self):
+        # return a list of columns to be used as input tensors
+        input_tensor_columns = self._relevant_columns.copy()
+
+        # remove the label column from the input tensor columns since the to_tf_dataset method has a separate label_cols argument
+        input_tensor_columns.remove(self.label_column)
+
+        # remove the columns that are not needed in the tensor dataset
+        input_tensor_columns = list(
+            set(input_tensor_columns) - set(self.dataset_columns_to_keep)
+        )
+
+        # add the extracted features columns to the input tensor columns
+        input_tensor_columns.extend(self._extracted_features_columns)
+
+        return input_tensor_columns
+
     @property
     def tensor_train_data(self):
         """TensorFlow Dataset object for the training data"""
         return self.hf_dataset["train"].to_tf_dataset(
-            columns=self._relevant_columns,
+            columns=self._get_input_tensor_column_names(),
             label_cols=self.label_column,
             shuffle=False,
             batch_size=self.batch_size,
@@ -409,7 +447,7 @@ class PeptideDataset:
     def tensor_val_data(self):
         """TensorFlow Dataset object for the val data"""
         return self.hf_dataset["val"].to_tf_dataset(
-            columns=self._relevant_columns,
+            columns=self._get_input_tensor_column_names(),
             label_cols=self.label_column,
             shuffle=False,
             batch_size=self.batch_size,
@@ -419,7 +457,7 @@ class PeptideDataset:
     def tensor_test_data(self):
         """TensorFlow Dataset object for the test data"""
         return self.hf_dataset["test"].to_tf_dataset(
-            columns=self._relevant_columns,
+            columns=self._get_input_tensor_column_names(),
             label_cols=self.label_column,
             shuffle=False,
             batch_size=self.batch_size,

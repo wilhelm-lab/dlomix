@@ -7,7 +7,7 @@ from .sequence_utils import parse_sequence_native, rebuild_proforma_sequence
 
 
 class EncodingScheme(str, Enum):
-    NO_MODS = "unmod"
+    UNMOD = "unmod"
     NAIVE_MODS = "naive-mods"
 
     @classmethod

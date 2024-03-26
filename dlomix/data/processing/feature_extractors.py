@@ -1,22 +1,31 @@
-from .feature_tables import PTM_LOSS_LOOKUP, PTM_MOD_DELTA_MASS_LOOKUP, PTM_GAIN_LOOKUP, PTM_ATOM_COUNT_LOOKUP
-from .processors import FunctionProcessor, PeptideDatasetBaseProcessor
+from .feature_tables import (
+    PTM_ATOM_COUNT_LOOKUP,
+    PTM_GAIN_LOOKUP,
+    PTM_LOSS_LOOKUP,
+    PTM_MOD_DELTA_MASS_LOOKUP,
+)
+from .processors import PeptideDatasetBaseProcessor
 
 FEATURE_EXTRACTORS_PARAMETERS = {
     "mod_loss": {
         "feature_default_value": [1, 1, 1, 1, 1, 1],
         "lookup_table": PTM_LOSS_LOOKUP,
+        "description": "Loss of atoms due to PTM.",
     },
     "delta_mass": {
         "feature_default_value": 0,
         "lookup_table": PTM_MOD_DELTA_MASS_LOOKUP,
+        "description": "Delta mass of PTM.",
     },
-     "mod_gain": {
+    "mod_gain": {
         "feature_default_value": [1, 1, 1, 1, 1, 1],
         "lookup_table": PTM_GAIN_LOOKUP,
+        "description": "Gain of atoms due to PTM.",
     },
-     "atom_count": {
+    "atom_count": {
         "feature_default_value": [1, 1, 1, 1, 1, 1],
         "lookup_table": PTM_ATOM_COUNT_LOOKUP,
+        "description": "Atom count of PTM.",
     },
 }
 
@@ -29,12 +38,14 @@ class FeatureExtractor(PeptideDatasetBaseProcessor):
         sequence_column_name: str,
         feature_column_name: str,
         feature_default_value,
+        description: str,
         max_length: int = 30,
         batched: bool = False,
     ):
         super().__init__(sequence_column_name, batched)
         self.feature_column_name = feature_column_name
         self.feature_default_value = feature_default_value
+        self.description = description
         self.max_length = max_length
 
     def pad_feature_to_seq_length(self, single_feature):
@@ -58,6 +69,7 @@ class LookupFeatureExtractor(FeatureExtractor):
         feature_column_name: str,
         feature_default_value,
         lookup_table: dict,
+        description: str = "",
         max_length: int = 30,
         batched: bool = False,
     ):
@@ -65,28 +77,30 @@ class LookupFeatureExtractor(FeatureExtractor):
             sequence_column_name,
             feature_column_name,
             feature_default_value,
+            description,
             max_length,
             batched,
         )
 
         self.lookup_table = lookup_table
+        self.description = description
 
     def batch_process(self, input_data, **kwargs):
-        input_data[self.feature_column_name] = []
+        feature_column = []
 
         for sequence in input_data[self.sequence_column_name]:
-            feature = [
-                self.lookup_table.get(aa, self.feature_default_value) for aa in sequence
-            ]
-            input_data[self.feature_column_name].append(
-                self.pad_feature_to_seq_length(feature)
-            )
+            feature = self._extract_feature(sequence)
+            feature_column.append(feature)
 
-        return input_data
+        return {self.feature_column_name: feature_column}
 
     def single_process(self, input_data, **kwargs):
-        input_data[self.feature_column_name] = [
-            self.lookup_table.get(aa, self.feature_default_value)
-            for aa in input_data[self.sequence_column_name]
+        feature = self._extract_feature(input_data[self.sequence_column_name])
+        return {self.feature_column_name: feature}
+
+    def _extract_feature(self, sequence):
+        feature = [
+            self.lookup_table.get(aa, self.feature_default_value) for aa in sequence
         ]
-        return input_data
+        feature = self.pad_feature_to_seq_length(feature)
+        return feature
