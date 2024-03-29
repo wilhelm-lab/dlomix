@@ -15,8 +15,6 @@ from QMDFile import QMDFile
 
 from dlomix.reports.postprocessing import normalize_intensity_predictions
 
-# what data plots to include?
-
 
 class IntensityReportQuarto:
     def __init__(

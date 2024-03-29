@@ -10,8 +10,6 @@ from wandb.keras import WandbCallback, WandbMetricsLogger
 
 from ..data import RetentionTimeDataset
 
-# ToDo: add R2 plot, TimeDelta plot, residuals
-
 
 class RetentionTimeReportRunComparisonWandb:
     """Create WandB report for comparing runs.

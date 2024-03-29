@@ -17,6 +17,9 @@ from dlomix.reports.postprocessing import normalize_intensity_predictions
 
 
 class IntensityReportWandb:
+    # Wilhelmlab WandB account that has all VEGA presets required for the reports
+    VEGA_LITE_PRESETS_ID = "prosit-compms"
+
     def __init__(
         self, project: str, title: str, description: str, test_dataset, predictions
     ):
@@ -288,7 +291,7 @@ class IntensityReportWandb:
                 panels=[
                     wr.CustomChart(
                         query={"summaryTable": {"tableKey": plot_name}},
-                        chart_name=f"master_praktikum/spectral_angle_plot",
+                        chart_name=f"{RetentionTimeReportRunComparisonWandb.VEGA_LITE_PRESETS_ID}/spectral_angle_plot",
                     )
                 ],
             ),

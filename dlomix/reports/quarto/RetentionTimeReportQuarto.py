@@ -20,10 +20,6 @@ from matplotlib.colors import LogNorm
 from matplotlib.ticker import LogLocator
 from QMDFile import QMDFile
 
-# todo:
-# make text of all sections more meaningful + more scientific + more description
-# delete or keep images after report creation?
-
 
 class RetentionTimeReportQuarto:
     def __init__(
