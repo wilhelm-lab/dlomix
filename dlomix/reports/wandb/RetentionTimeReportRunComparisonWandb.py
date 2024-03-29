@@ -3,6 +3,7 @@ import re
 
 import numpy as np
 import pandas as pd
+import report_constants_wandb
 import wandb
 import wandb.apis.reports as wr
 from wandb.keras import WandbCallback, WandbMetricsLogger
@@ -22,13 +23,6 @@ class RetentionTimeReportRunComparisonWandb:
         description (str): Description of the report in wandb.
         dataset (RetentionTimeDataset, optional): The retention time dataset if logging the data is desired. Defaults to None, no logging of input data.
     """
-
-    METRICS_TO_EXCLUDE = [
-        "epoch/learning_rate",
-        "epoch/epoch",
-        "batch/learning_rate",
-        "batch/batch_step",
-    ]
 
     # Wilhelmlab WandB account that has all VEGA presets required for the reports
     VEGA_LITE_PRESETS_ID = "prosit-compms"
@@ -127,7 +121,7 @@ class RetentionTimeReportRunComparisonWandb:
         epoch_val_metrics_names = list(filter(lambda x: "val" in x.lower(), metrics))
 
         # filter strings from train metrics that are 'epoch/learning_rate' and 'epoch/epoch'
-        strings_to_filter = RetentionTimeReportRunComparisonWandb.METRICS_TO_EXCLUDE
+        strings_to_filter = report_constants_wandb.METRICS_TO_EXCLUDE
         batch_train_metrics_names = [
             string
             for string in batch_train_metrics_names
@@ -172,9 +166,7 @@ class RetentionTimeReportRunComparisonWandb:
     def _build_data_section(self):
         data_block = [
             wr.H1(text="Data"),
-            wr.P(
-                "The following section is showing a simple explorative data analysis of the used dataset. The first histogram shows the distribution of peptide lengths in the data set, while the second histogram shows the distribution of indexed retention times."
-            ),
+            wr.P(report_constants.DATA_SECTION_WANDB),
             wr.PanelGrid(
                 runsets=[
                     wr.Runset(self.entity, self.project),
@@ -210,9 +202,7 @@ class RetentionTimeReportRunComparisonWandb:
             panel_list_epoch.append(wr.LinePlot(x="Step", y=[name]))
         train_block = [
             wr.H1(text="Training metrics"),
-            wr.P(
-                "The following section shows the different metrics that were used to track the training. All used metrics are added by default. The first subsection shows the metrics per epoch, whereas the second subsection show the metrics per batch."
-            ),
+            wr.P(report_constants.TRAIN_SECTION_WANDB),
             wr.H2(text="per batch"),
             wr.PanelGrid(
                 runsets=[
@@ -238,9 +228,7 @@ class RetentionTimeReportRunComparisonWandb:
             panel_list_epoch.append(wr.LinePlot(x="Step", y=[name]))
         val_block = [
             wr.H1(text="Validation metrics"),
-            wr.P(
-                "The following section shows the different metrics that were used to track the validation. All used metrics are added by default. The metrics are shown per epoch."
-            ),
+            wr.P(report_constants.VAL_SECTION_WANDB),
             wr.H2(text="per epoch"),
             wr.PanelGrid(
                 runsets=[
@@ -255,9 +243,7 @@ class RetentionTimeReportRunComparisonWandb:
     def _build_model_section(self):
         model_block = [
             wr.H1(text="Model information"),
-            wr.P(
-                "The following section shows information about the model. The table below contains information about the models' layers."
-            ),
+            wr.P(report_constants.MODEL_SECTION_WANDB),
             wr.UnorderedList(items=self.model_info),
             wr.PanelGrid(
                 runsets=[
@@ -276,9 +262,7 @@ class RetentionTimeReportRunComparisonWandb:
             panel_list_epoch.append(wr.LinePlot(x="Step", y=list(name)))
         train_val_block = [
             wr.H1(text="Train - Validation metrics"),
-            wr.P(
-                "The following section shows the different metrics for both training and validation in comaprison. All used metrics are added by default. The metrics are shown per epoch."
-            ),
+            wr.P(report_constants.TRAIN_VAL_SECTION_WANDB),
             wr.H2(text="per epoch"),
             wr.PanelGrid(
                 runsets=[

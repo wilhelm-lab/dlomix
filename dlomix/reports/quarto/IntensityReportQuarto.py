@@ -518,7 +518,7 @@ class IntensityReportQuarto:
         # ncol=1, bbox_to_anchor=(1.05, 1.0), loc='upper left'
         cbar.ax.set_ylabel("peptide length", rotation=270)
         cbar.ax.yaxis.set_label_coords(3.2, 0.5)
-        plt.title("Density of Levenshtein distance per peptide length")
+        plt.title("Density of Levenshtein distance per peptide length - test set")
         plt.xlabel("Levenshtein distance")
         plt.savefig(f"{save_path}/levenshtein.png", bbox_inches="tight")
         plt.clf()

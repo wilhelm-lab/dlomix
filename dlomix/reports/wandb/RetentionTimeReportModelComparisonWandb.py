@@ -3,6 +3,7 @@ import re
 
 import numpy as np
 import pandas as pd
+import report_constants_wandb
 import wandb
 import wandb.apis.reports as wr
 
@@ -95,9 +96,7 @@ class RetentionTimeReportModelComparisonWandb:
     def _build_data_section(self):
         data_block = [
             wr.H1(text="Data"),
-            wr.P(
-                "The following section is showing a simple explorative data analysis of the used dataset. The first histogram shows the distribution of peptide lengths in the data set, while the second histogram shows the distribution of indexed retention times."
-            ),
+            wr.P(report_constants.DATA_SECTION_WANDB),
             wr.PanelGrid(
                 runsets=[
                     wr.Runset(self.entity, self.project),
@@ -132,9 +131,7 @@ class RetentionTimeReportModelComparisonWandb:
 
         residuals_block = [
             wr.H1(text="Residuals"),
-            wr.P(
-                "This section shows the residuals histograms. Each plot shows the residuals of each of the compared models"
-            ),
+            wr.P(report_constants.RESIDUALS_SECTION_WANDB),
             wr.PanelGrid(
                 runsets=[
                     wr.Runset(self.entity, self.project),
@@ -149,9 +146,7 @@ class RetentionTimeReportModelComparisonWandb:
     def _build_r2_section(self):
         r2_block = [
             wr.H1(text="R2"),
-            wr.P(
-                "The following plot displays the R2 score for all the compared models."
-            ),
+            wr.P(report_constants.R2_SECTION_WANDB),
             wr.PanelGrid(
                 runsets=[
                     wr.Runset(self.entity, self.project),
@@ -193,7 +188,7 @@ class RetentionTimeReportModelComparisonWandb:
 
         density_block = [
             wr.H1(text="Density"),
-            wr.P("This section displays the density plots for all compared models."),
+            wr.P(report_constants.DENSITY_SECTION_WANDB),
             wr.PanelGrid(
                 runsets=[
                     wr.Runset(self.entity, self.project),

@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 import plotly.express as px
-import report_constants
+import report_constants_wandb
 import seaborn as sns
 import tensorflow as tf
 import wandb
@@ -57,7 +57,7 @@ class IntensityReportWandb:
         report.save()
 
     # get metrics of last run in project or from specified run_id
-    def get_metrics(self, run_id=None):
+    def _get_metrics(self, run_id=None):
         if run_id:
             # run is specified by <entity>/<project>/<run_id>
             run = self.api.run(path=f"{self.entity}/{self.project}/{run_id}")
@@ -72,8 +72,8 @@ class IntensityReportWandb:
             return metrics_dataframe
 
     # get metric names split into train/val, train is further split into batch/epoch
-    def get_metrics_names(self):
-        metrics = self.get_metrics()
+    def _get_metrics_names(self):
+        metrics = self._get_metrics()
         # filter strings from list that are not starting with "_" and do not contain "val"
         pre_filter = [string for string in metrics if not string.startswith("_")]
         batch_train_metrics_names = [
@@ -93,12 +93,7 @@ class IntensityReportWandb:
         # filter strings from list that contain "val"
         epoch_val_metrics_names = list(filter(lambda x: "val" in x.lower(), metrics))
         # filter strings from train metrics that are 'epoch/learning_rate' and 'epoch/epoch'
-        strings_to_filter = [
-            "epoch/learning_rate",
-            "epoch/epoch",
-            "batch/learning_rate",
-            "batch/batch_step",
-        ]
+        strings_to_filter = report_constants_wandb.METRICS_TO_EXCLUDE
         batch_train_metrics_names = [
             string
             for string in epoch_train_metrics_names
@@ -116,7 +111,11 @@ class IntensityReportWandb:
         )
 
     def get_train_val_metrics_names(self):
-        _, epoch_train_metrics_names, epoch_val_metrics_names = self.get_metrics_names()
+        (
+            _,
+            epoch_train_metrics_names,
+            epoch_val_metrics_names,
+        ) = self._get_metrics_names()
         epoch_train_metrics_names.sort()
         epoch_val_metrics_names.sort()
         return list(zip(epoch_train_metrics_names, epoch_val_metrics_names))
@@ -190,7 +189,7 @@ class IntensityReportWandb:
             batch_train_metrics_names,
             epoch_train_metrics_names,
             _,
-        ) = self.get_metrics_names()
+        ) = self._get_metrics_names()
         panel_list_batch = []
         panel_list_epoch = []
         if len(batch_train_metrics_names) > 3:
@@ -227,7 +226,7 @@ class IntensityReportWandb:
         return train_block
 
     def val_section(self):
-        _, _, epoch_val_metrics_names = self.get_metrics_names()
+        _, _, epoch_val_metrics_names = self._get_metrics_names()
         panel_list_epoch = []
         if len(epoch_val_metrics_names) > 3:
             width = 8

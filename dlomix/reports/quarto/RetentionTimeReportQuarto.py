@@ -273,6 +273,9 @@ class RetentionTimeReportQuarto:
             qmd.insert_section_block(section_title="R2", section_text=r2_text)
 
         qmd.write_qmd_file(f"{self.output_path}/{qmd_report_filename}")
+        print(
+            f"File Saved to disk under: {self.output_path}.\nUse Quarto to render the report by running:\n\nquarto render {self.output_path}{qmd_report_filename} --to pdf"
+        )
 
     def internal_without_mods(self, sequences):
         """
