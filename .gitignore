@@ -168,3 +168,5 @@ metadata.parquet
 
 # test assets (will be downloaded the first time tests are run and then ignore by git)
 assets/
+
+dlomix/reports/quarto/.local_quarto_plots
