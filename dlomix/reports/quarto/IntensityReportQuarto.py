@@ -8,6 +8,7 @@ from os.path import join
 import matplotlib.image as mpimg
 import matplotlib.pyplot as plt
 import numpy as np
+import quarto_utils
 import report_constants
 import seaborn as sns
 from Levenshtein import distance as levenshtein_distance
@@ -56,7 +57,7 @@ class IntensityReportQuarto:
             )
             self._history_dict = {}
         else:
-            self._set_history_dict(history)
+            self._history_dict = quarto_utils.set_history_dict(history)
 
         if test_data is None or train_data is None:
             warnings.warn(
@@ -75,78 +76,7 @@ class IntensityReportQuarto:
         if self.test_data:
             subfolders.append("data")
 
-        self._create_plot_folder_structure(subfolders)
-
-    def _set_history_dict(self, history):
-        """
-        Function that takes and validates the keras history object. Then sets the report objects history dictionary
-        attribute, containing all the metrics tracked during training.
-        :param history: history object from training a keras model
-        """
-        if isinstance(history, dict):
-            self._history_dict = history
-        elif not isinstance(history, tf.keras.callbacks.History):
-            raise ValueError(
-                "Reporting requires a History object (tf.keras.callbacks.History) or its history dict attribute (History.history), which is returned from a call to "
-                "model.fit(). Passed history argument is of type {} ",
-                type(history),
-            )
-        elif not hasattr(history, "history"):
-            raise ValueError(
-                "The passed History object does not have a history attribute, which is a dict with results."
-            )
-        else:
-            self._history_dict = history.history
-
-        if len(self._history_dict.keys()) == 0:
-            warnings.warn(
-                "The passed History object contains an empty history dict, no training was done."
-            )
-
-    def _create_plot_folder_structure(self, subfolders=None):
-        """
-        Function to create the folder structure where the plot images are saved later.
-        :param subfolders: list of strings representing the subfolders to be created
-        """
-        root = join(self.output_path, report_constants.DEFAULT_LOCAL_PLOTS_DIR)
-        if not os.path.exists(root):
-            os.makedirs(root)
-        for subfolder in subfolders:
-            path = os.path.join(root, subfolder)
-            if not os.path.exists(path):
-                os.makedirs(path)
-
-    def internal_without_mods(self, sequences):
-        """
-        Function to remove modifications from an iterable of sequences
-        :param sequences: iterable of peptide sequences
-        :return: list of sequences without modifications
-        """
-        regex = "\[.*?\]|\-"
-        return [re.sub(regex, "", seq) for seq in sequences]
-
-    def get_model_summary_df(self):
-        """
-        Function to convert the layer information contained in keras model.summary() into a pandas dataframe in order to
-        display it in the report.
-        :return: dataframe containing the layer information of keras model.summary()
-        """
-
-        # code adapted from https://stackoverflow.com/questions/63843093/neural-network-summary-to-dataframe and updated
-        stringlist = []
-        self.model.summary(print_fn=lambda x: stringlist.append(x))
-
-        # take every other element and remove appendix
-        # code in next line breaks if there is a Stringlookup layer -> "p" in next line -> layer info is removed
-        table = stringlist[1:-5]
-        new_table = []
-        for entry in table:
-            entry = re.split(r"\s{2,}", entry)[:-1]  # remove whitespace
-            entry_cols = len(entry)
-            if entry_cols < 3:
-                entry.extend([" "] * (3 - entry_cols))
-            new_table.append(entry)
-        return pd.DataFrame(new_table[1:], columns=new_table[0])
+        quarto_utils.create_plot_folder_structure(self.output_path, subfolders)
 
     def generate_report(self, qmd_report_filename="quarto_report.qmd"):
         """
@@ -192,14 +122,16 @@ class IntensityReportQuarto:
             )
 
         if self.model is not None:
-            df = self.get_model_summary_df()
+            df = quarto_utils.get_model_summary_df(self.model)
             qmd.insert_section_block(
                 section_title="Model", section_text=report_constants.MODEL_SECTION
             )
             qmd.insert_table_from_df(df, "Keras model summary", page_break=True)
         if self.train_section:
-            train_plots_path = self.plot_all_train_metrics()
-            train_image_path = self.create_plot_image(train_plots_path)
+            train_plots_path = quarto_utils.plot_all_train_metrics(
+                self.output_path, self._history_dict
+            )
+            train_image_path = quarto_utils.create_plot_image(train_plots_path)
             qmd.insert_section_block(
                 section_title="Train metrics per epoch",
                 section_text=report_constants.TRAIN_SECTION,
@@ -211,8 +143,10 @@ class IntensityReportQuarto:
             )
 
         if self.val_section:
-            val_plots_path = self.plot_all_val_metrics()
-            val_image_path = self.create_plot_image(val_plots_path)
+            val_plots_path = quarto_utils.plot_all_val_metrics(
+                self.output_path, self._history_dict
+            )
+            val_image_path = quarto_utils.create_plot_image(val_plots_path)
             qmd.insert_section_block(
                 section_title="Validation metrics per epoch",
                 section_text=report_constants.VAL_SECTION,
@@ -223,8 +157,10 @@ class IntensityReportQuarto:
                 page_break=True,
             )
 
-        train_val_plots_path = self.plot_all_train_val_metrics()
-        train_val_image_path = self.create_plot_image(train_val_plots_path)
+        train_val_plots_path = quarto_utils.plot_all_train_val_metrics(
+            self.output_path, self._history_dict
+        )
+        train_val_image_path = quarto_utils.create_plot_image(train_val_plots_path)
         qmd.insert_section_block(
             section_title="Train-Validation metrics per epoch",
             section_text=report_constants.TRAIN_VAL_SECTION,
@@ -239,7 +175,9 @@ class IntensityReportQuarto:
         violin_plot = self.plot_spectral_angle(results_df)
         violin_plot_pc = self.plot_spectral_angle(results_df, facet="precursor_charge")
         violin_plot_ce = self.plot_spectral_angle(results_df, facet="collision_energy")
-        results_df["unmod_seq"] = self.internal_without_mods(results_df["sequences"])
+        results_df["unmod_seq"] = quarto_utils.internal_without_mods(
+            results_df["sequences"]
+        )
         results_df["peptide_length"] = results_df["unmod_seq"].str.len()
         violin_plot_pl = self.plot_spectral_angle(results_df, facet="peptide_length")
         qmd.insert_section_block(
@@ -349,35 +287,6 @@ class IntensityReportQuarto:
 
         return predictions_acc
 
-    def plot_keras_metric(self, metric_name, save_path=""):
-        """
-        Function that creates a basic line plot of a keras metric
-        :param metric_name: name of the metric to plot
-        :param save_path: string where to save the plot
-        """
-
-        if metric_name.lower() not in self._history_dict.keys():
-            raise ValueError(
-                "Metric name to plot is not available in the history dict. Available metrics to plot are {}",
-                self._history_dict.keys(),
-            )
-
-        y = self._history_dict.get(metric_name)
-        x = range(1, len(y) + 1)
-
-        plt.figure(figsize=(8, 6))
-        # Create a basic line plot
-        plt.plot(x, y)
-
-        # Add labels and title
-        plt.xlabel("Epoch")
-        plt.ylabel(metric_name)
-        plt.title(f"{metric_name}/epoch")
-
-        # Save the plot
-        plt.savefig(f"{save_path}/{metric_name}.png", bbox_inches="tight")
-        plt.clf()
-
     def plot_all_data_plots(self):
         """
         Function to plot all data related plots.
@@ -386,140 +295,8 @@ class IntensityReportQuarto:
         save_path = join(
             self.output_path, report_constants.DEFAULT_LOCAL_PLOTS_DIR, "data"
         )
-        self.plot_levenshtein(save_path=save_path)
+        quarto_utils.plot_levenshtein(self.test_data.sequences, save_path=save_path)
         return save_path
-
-    def plot_train_vs_val_keras_metric(self, metric_name, save_path="", save_plot=True):
-        """
-        Function that creates a basic line plot containing two lines of the same metric during training and validation.
-        :param metric_name: name of the metric to plot
-        :param save_path: string where to save the plot
-        """
-        # check if val has been run
-        if metric_name.lower() not in self._history_dict.keys():
-            raise ValueError(
-                "Metric name to plot is not available in the history dict. Available metrics to plot are {}",
-                self._history_dict.keys(),
-            )
-        y_1 = self._history_dict.get(metric_name)
-        y_2 = self._history_dict.get(f"val_{metric_name}")
-        x = range(1, len(y_1) + 1)
-
-        plt.figure(figsize=(8, 6))
-
-        # Create a basic line plot
-        plt.plot(x, y_1, label="Validation loss")
-        plt.plot(x, y_2, label="Training loss")
-
-        # Add labels and title
-        plt.xlabel("Epoch")
-        plt.ylabel(metric_name)
-        plt.title(metric_name)
-
-        # Show the plot
-        plt.legend()
-
-        # Save the plot
-        plt.savefig(f"{save_path}/train_val_{metric_name}.png", bbox_inches="tight")
-        plt.clf()
-
-    def plot_all_train_metrics(self):
-        """
-        Function to plot all the training metrics related plots.
-        :return: string path of where the plots are saved
-        """
-        save_path = join(
-            self.output_path, report_constants.DEFAULT_LOCAL_PLOTS_DIR, "train"
-        )
-        train_dict = {
-            key: value for key, value in self._history_dict.items() if "val" not in key
-        }
-        for key in train_dict:
-            self.plot_keras_metric(key, save_path)
-        return save_path
-
-    def plot_all_val_metrics(self):
-        """
-        Function to plot all the validation metrics related plots.
-        :return: string path of where the plots are saved
-        """
-        save_path = join(
-            self.output_path, report_constants.DEFAULT_LOCAL_PLOTS_DIR, "val"
-        )
-        val_dict = {
-            key: value for key, value in self._history_dict.items() if "val" in key
-        }
-        for key in val_dict:
-            self.plot_keras_metric(key, save_path)
-        return save_path
-
-    def plot_all_train_val_metrics(self):
-        """
-        Function to plot all the training-validation metrics related plots.
-        :return: string path of where the plots are saved
-        """
-        save_path = join(
-            self.output_path, report_constants.DEFAULT_LOCAL_PLOTS_DIR, "train_val"
-        )
-        metrics_dict = {
-            key: value for key, value in self._history_dict.items() if "val" not in key
-        }
-        for key in metrics_dict:
-            self.plot_train_vs_val_keras_metric(key, save_path)
-        return save_path
-
-    def plot_levenshtein(self, save_path=""):
-        """
-        Function to plot the density of Levenshtein distances between the sequences for different sequence lengths
-        :param save_path: string where to save the plot
-        :return:
-        """
-        seqs_wo_mods = self.internal_without_mods(self.test_data.sequences)
-        seqs_wo_dupes = list(dict.fromkeys(seqs_wo_mods))
-        df = pd.DataFrame(seqs_wo_dupes, columns=["mod_seq"])
-        df["length"] = df["mod_seq"].str.len()
-        palette = itertools.cycle(
-            sns.color_palette("YlOrRd_r", n_colors=len(df.length.unique()))
-        )
-        lengths = sorted(df["length"].unique())
-        plt.figure(figsize=(8, 6))
-        plot = plt.scatter(lengths, lengths, c=lengths, cmap="YlOrRd_r")
-        cbar = plt.colorbar()
-        plt.cla()
-        plot.remove()
-        lv_dict = {}
-        pep_groups = df.groupby("length")
-        available_lengths = df.length.unique()
-
-        for length, peptides in pep_groups:
-            current_list = []
-            if len(peptides.index) > 1000:
-                samples = peptides["mod_seq"].sample(n=1000, random_state=1)
-            else:
-                samples = peptides["mod_seq"].values
-            a = combinations(samples, 2)
-            for pep_tuple in a:
-                current_list.append(
-                    levenshtein_distance(pep_tuple[0], pep_tuple[1]) - 1
-                )
-            lv_dict[str(length)] = current_list
-
-        for length in available_lengths:
-            ax = sns.kdeplot(
-                np.array(lv_dict[str(length)]),
-                bw_method=0.5,
-                label=str(length),
-                cbar=True,
-                fill=True,
-                color=next(palette),
-            )
-        # ncol=1, bbox_to_anchor=(1.05, 1.0), loc='upper left'
-        cbar.ax.set_ylabel("peptide length", rotation=270)
-        cbar.ax.yaxis.set_label_coords(3.2, 0.5)
-        plt.title("Density of Levenshtein distance per peptide length - test set")
-        plt.xlabel("Levenshtein distance")
-        plt.savefig(f"{save_path}/levenshtein.png", bbox_inches="tight")
-        plt.clf()
 
     def create_plot_image(self, path, n_cols=2):
         """
@@ -591,3 +368,70 @@ class IntensityReportQuarto:
         fig.savefig(save_path)
         plt.clf()
         return save_path
+
+
+if __name__ == "__main__":
+    # import necessary packages
+    import os
+    import re
+    import warnings
+
+    import keras
+    import matplotlib.pyplot as plt
+    import numpy as np
+    import pandas as pd
+    import tensorflow as tf
+
+    import dlomix
+    from dlomix import constants, data, eval, layers, models, pipelines, reports, utils
+    from dlomix.data import IntensityDataset
+    from dlomix.losses import (
+        masked_pearson_correlation_distance,
+        masked_spectral_distance,
+    )
+    from dlomix.models import PrositIntensityPredictor
+
+    TRAIN_DATAPATH = "https://raw.githubusercontent.com/wilhelm-lab/dlomix-resources/tasks/intensity/example_datasets/Intensity/proteomeTools_train_val.csv"
+    BATCH_SIZE = 64
+
+    int_data = IntensityDataset(
+        data_source=TRAIN_DATAPATH,
+        seq_length=30,
+        batch_size=BATCH_SIZE,
+        collision_energy_col="collision_energy",
+        val_ratio=0.2,
+        test=False,
+    )
+    model = PrositIntensityPredictor(seq_length=30)
+    # create the optimizer object
+    optimizer = tf.keras.optimizers.legacy.Adam(learning_rate=0.001)
+
+    # compile the model  with the optimizer and the metrics we want to use, we can add our custom timedelta metric
+    model.compile(
+        optimizer=optimizer,
+        loss=masked_spectral_distance,
+        metrics=["mse", masked_pearson_correlation_distance],
+    )
+    history = model.fit(
+        int_data.train_data, validation_data=int_data.val_data, epochs=1
+    )
+    # create the dataset object for test data
+    TEST_DATAPATH = "https://raw.githubusercontent.com/wilhelm-lab/dlomix-resources/tasks/intensity/example_datasets/Intensity/proteomeTools_test.csv"
+    test_int_data = IntensityDataset(
+        data_source=TEST_DATAPATH,
+        seq_length=30,
+        collision_energy_col="collision_energy",
+        batch_size=32,
+        test=True,
+    )
+
+    q = IntensityReportQuarto(
+        title="Test Report",
+        history=history,
+        test_data=test_int_data,
+        train_data=int_data,
+        model=model,
+        train_section=True,
+        val_section=True,
+    )
+    q.generate_report()
