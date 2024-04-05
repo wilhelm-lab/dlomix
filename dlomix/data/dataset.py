@@ -100,6 +100,7 @@ class PeptideDataset:
 
                 self._configure_processing_pipeline()
                 self._apply_processing_pipeline()
+                #self._remove_itms()
                 self.processed = True
                 self._refresh_config()
 
@@ -137,6 +138,14 @@ class PeptideDataset:
                 for k, v in self.__dict__.items()
                 if k.startswith("_") and k != "_config"
             }
+        )
+
+    def _remove_itms(self):
+        # Keep only FTMS
+        self.hf_dataset = self.hf_dataset.filter(
+            lambda x: x["mass_analyzer"] != "ITMS",
+            desc="Removing ITMS...",
+            num_proc=self._default_num_proc,          
         )
 
     def _load_dataset(self):
