@@ -6,8 +6,9 @@ import pandas as pd
 import report_constants_wandb
 import wandb
 import wandb.apis.reports as wr
+import wandb_utils
 
-from ..data.RetentionTimeDataset import RetentionTimeDataset
+from dlomix.data.RetentionTimeDataset import RetentionTimeDataset
 
 
 class RetentionTimeReportModelComparisonWandb:
@@ -27,9 +28,6 @@ class RetentionTimeReportModelComparisonWandb:
         The test dataset object to compare the predictions of models on.
     """
 
-    # Wilhelmlab WandB account that has all VEGA presets required for the reports
-    VEGA_LITE_PRESETS_ID = "prosit-compms"
-
     def __init__(
         self,
         models: dict,
@@ -44,7 +42,7 @@ class RetentionTimeReportModelComparisonWandb:
         self.models = models
         self.test_dataset = test_dataset
         self.entity = wandb.apis.PublicApi().default_entity
-        self.api = wandb.Api()
+        self.wandb_api = wandb.Api()
 
     def create_report(
         self,
@@ -73,7 +71,14 @@ class RetentionTimeReportModelComparisonWandb:
         report.blocks = [wr.TableOfContents()]
 
         if add_data_section:
-            report.blocks += self._build_data_section()
+            report.blocks += wandb_utils.build_data_section(
+                self.entity,
+                self.project,
+                self.table_key_len,
+                self.table_key_rt,
+                self.test_dataset.sequence_col,
+                self.test_dataset.target_col,
+            )
         if add_residuals_section:
             report.blocks += self._build_residuals_section()
         if add_r2_section:
@@ -93,45 +98,20 @@ class RetentionTimeReportModelComparisonWandb:
         residuals = predictions - targets
         return residuals
 
-    def _build_data_section(self):
-        data_block = [
-            wr.H1(text="Data"),
-            wr.P(report_constants.DATA_SECTION_WANDB),
-            wr.PanelGrid(
-                runsets=[
-                    wr.Runset(self.entity, self.project),
-                ],
-                panels=[
-                    wr.CustomChart(
-                        query={"summaryTable": {"tableKey": self.table_key_len}},
-                        chart_name=f"{RetentionTimeReportModelComparisonWandb.VEGA_LITE_PRESETS_ID}/histogram_peptide_length",
-                        chart_fields={"value": self.test_dataset.sequence_col},
-                    ),
-                    wr.CustomChart(
-                        query={"summaryTable": {"tableKey": self.table_key_rt}},
-                        chart_name=f"{RetentionTimeReportModelComparisonWandb.VEGA_LITE_PRESETS_ID}/histogram_irt",
-                        chart_fields={"value": self.test_dataset.target_col},
-                    ),
-                ],
-            ),
-            wr.HorizontalRule(),
-        ]
-        return data_block
-
     def _build_residuals_section(self):
         panel_list_models = []
         for model in self.models:
             panel_list_models.append(
                 wr.CustomChart(
                     query={"summaryTable": {"tableKey": f"results_table_{model}"}},
-                    chart_name=f"{RetentionTimeReportModelComparisonWandb.VEGA_LITE_PRESETS_ID}/histogram_residuals_irt",
+                    chart_name=f"{report_constants_wandb.VEGA_LITE_PRESETS_ID}/histogram_residuals_irt",
                     chart_fields={"value": "residuals", "name": model},
                 )
             )
 
         residuals_block = [
             wr.H1(text="Residuals"),
-            wr.P(report_constants.RESIDUALS_SECTION_WANDB),
+            wr.P(report_constants_wandb.RESIDUAL_SECTION_WANDB),
             wr.PanelGrid(
                 runsets=[
                     wr.Runset(self.entity, self.project),
@@ -146,7 +126,7 @@ class RetentionTimeReportModelComparisonWandb:
     def _build_r2_section(self):
         r2_block = [
             wr.H1(text="R2"),
-            wr.P(report_constants.R2_SECTION_WANDB),
+            wr.P(report_constants_wandb.R2_SECTION_WANDB),
             wr.PanelGrid(
                 runsets=[
                     wr.Runset(self.entity, self.project),
@@ -176,7 +156,7 @@ class RetentionTimeReportModelComparisonWandb:
             panel_list_models.append(
                 wr.CustomChart(
                     query={"summaryTable": {"tableKey": f"results_table_{model}"}},
-                    chart_name=f"{RetentionTimeReportModelComparisonWandb.VEGA_LITE_PRESETS_ID}/density_plot_irt",
+                    chart_name=f"{report_constants_wandb.VEGA_LITE_PRESETS_ID}/density_plot_irt",
                     chart_fields={
                         "measured": "irt",
                         "predicted": "predicted_irt",
@@ -188,7 +168,7 @@ class RetentionTimeReportModelComparisonWandb:
 
         density_block = [
             wr.H1(text="Density"),
-            wr.P(report_constants.DENSITY_SECTION_WANDB),
+            wr.P(report_constants_wandb.DENSITY_SECTION_WANDB),
             wr.PanelGrid(
                 runsets=[
                     wr.Runset(self.entity, self.project),
@@ -205,7 +185,6 @@ class RetentionTimeReportModelComparisonWandb:
             # initialize WANDB
             current_model = model
             wandb.init(project=self.project, name=current_model)
-
             # predict on test_dataset
             predictions = self.models[model].predict(self.test_dataset.test_data)
             predictions = predictions.ravel()
@@ -232,48 +211,6 @@ class RetentionTimeReportModelComparisonWandb:
             # finish run
             wandb.finish()
 
-    # function to log sequence length table to wandb
-    def log_sequence_length_table(
-        self, data: pd.DataFrame, seq_col: str = "modified_sequence"
-    ):
-        name_hist = "counts_hist"
-        counts = self.count_seq_length(data, seq_col)
-        # convert to df for easier handling
-        counts_df = counts.to_frame()
-        table = wandb.Table(dataframe=counts_df)
-        # log to wandb
-        hist = wandb.plot_table(
-            vega_spec_name=f"{RetentionTimeReportModelComparisonWandb.VEGA_LITE_PRESETS_ID}/histogram_peptide_length",
-            data_table=table,
-            fields={"value": seq_col},
-        )
-        wandb.log({name_hist: hist})
-        name_hist_table = name_hist + "_table"
-        return name_hist_table
-
-    # function to count sequence length
-    def count_seq_length(self, data: pd.DataFrame, seq_col: str) -> pd.Series:
-        pattern = re.compile(r"\[UNIMOD:.*\]", re.IGNORECASE)
-        data[seq_col].replace(pattern, "", inplace=True)
-        return data[seq_col].str.len()
-
-    # function to log retention time table to wandb
-    def log_rt_table(self, data: pd.DataFrame, rt_col: str = "indexed_retention_time"):
-        name_hist = "rt_hist"
-        rt = data.loc[:, rt_col]
-        # convert to df for easier handling
-        rt_df = rt.to_frame()
-        table = wandb.Table(dataframe=rt_df)
-        # log to wandb
-        hist = wandb.plot_table(
-            vega_spec_name=f"{RetentionTimeReportModelComparisonWandb.VEGA_LITE_PRESETS_ID}/histogram_irt",
-            data_table=table,
-            fields={"value": rt_col},
-        )
-        wandb.log({name_hist: hist})
-        name_hist_table = name_hist + "_table"
-        return name_hist_table
-
     def log_data(self):
         wandb.init(project=self.project, name="data_run")
         # check if datasource is a string
@@ -290,10 +227,12 @@ class RetentionTimeReportModelComparisonWandb:
                     self.test_dataset.data_source, engine="fastparquet"
                 )
 
-            self.table_key_len = self.log_sequence_length_table(
+            self.table_key_len = wandb_utils.log_sequence_length_table(
                 data, self.test_dataset.sequence_col
             )
-            self.table_key_rt = self.log_rt_table(data, self.test_dataset.target_col)
+            self.table_key_rt = wandb_utils.log_rt_table(
+                data, self.test_dataset.target_col
+            )
 
         # check if datasource is a tuple of two ndarrays or two lists
         if (
@@ -310,10 +249,12 @@ class RetentionTimeReportModelComparisonWandb:
                     self.test_dataset.target_col: self.test_dataset.data_source[1],
                 }
             )
-            self.table_key_len = self.log_sequence_length_table(
+            self.table_key_len = wandb_utils.log_sequence_length_table(
                 data, self.test_dataset.sequence_col
             )
-            self.table_key_rt = self.log_rt_table(data, self.test_dataset.target_col)
+            self.table_key_rt = wandb_utils.log_rt_table(
+                data, self.test_dataset.target_col
+            )
 
         # check if datasource is a single ndarray or list
         # does not work? maybe error in RetentionTimeDataset
@@ -321,7 +262,7 @@ class RetentionTimeReportModelComparisonWandb:
             data = pd.DataFrame(
                 {self.test_dataset.sequence_col: self.test_dataset.data_source}
             )
-            self.table_key_len = self.log_sequence_length_table(
+            self.table_key_len = wandb_utils.log_sequence_length_table(
                 data, self.test_dataset.sequence_col
             )
         wandb.finish()

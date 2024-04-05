@@ -37,3 +37,5 @@ METRICS_TO_EXCLUDE = [
     "batch/learning_rate",
     "batch/batch_step",
 ]
+
+VEGA_LITE_PRESETS_ID = "prosit-compms"

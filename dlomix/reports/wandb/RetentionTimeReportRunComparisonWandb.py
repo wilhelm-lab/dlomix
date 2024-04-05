@@ -6,9 +6,10 @@ import pandas as pd
 import report_constants_wandb
 import wandb
 import wandb.apis.reports as wr
+import wandb_utils
 from wandb.keras import WandbCallback, WandbMetricsLogger
 
-from ..data import RetentionTimeDataset
+from dlomix.data import RetentionTimeDataset
 
 
 class RetentionTimeReportRunComparisonWandb:
@@ -21,9 +22,6 @@ class RetentionTimeReportRunComparisonWandb:
         description (str): Description of the report in wandb.
         dataset (RetentionTimeDataset, optional): The retention time dataset if logging the data is desired. Defaults to None, no logging of input data.
     """
-
-    # Wilhelmlab WandB account that has all VEGA presets required for the reports
-    VEGA_LITE_PRESETS_ID = "prosit-compms"
 
     def __init__(
         self,
@@ -72,81 +70,28 @@ class RetentionTimeReportRunComparisonWandb:
         if add_config_section:
             report.blocks += self._build_config_section()
         if add_data_section and self.dataset is not None:
-            report.blocks += self._build_data_section()
+            report.blocks += wandb_utils.build_data_section(
+                self.entity,
+                self.project,
+                self.table_key_len,
+                self.table_key_rt,
+                self.dataset.sequence_col,
+                self.dataset.target_col,
+            )
         if add_train_section:
-            report.blocks += self._build_train_section()
+            report.blocks += wandb_utils.build_train_section(
+                self.wandb_api, self.entity, self.project
+            )
         if add_val_section:
-            report.blocks += self._build_val_section()
+            report.blocks += wandb_utils.build_val_section(
+                self.wandb_api, self.entity, self.project
+            )
         if add_train_val_section:
-            report.blocks += self._build_train_val_section()
+            report.blocks += wandb_utils.build_train_val_section(
+                self.wandb_api, self.entity, self.project
+            )
 
         report.save()
-
-    # get metrics of last run in project or from specified run_id
-    def _get_metrics(self, run_id=None):
-        if run_id:
-            # run is specified by <entity>/<project>/<run_id>
-            run = self.wandb_api.run(path=f"{self.entity}/{self.project}/{run_id}")
-            metrics_dataframe = run.history()
-            return metrics_dataframe
-        else:
-            # get metrics of latest run
-            runs = self.wandb_api.runs(path=f"{self.entity}/{self.project}")
-            run = runs[0]
-            metrics_dataframe = run.history()
-            return metrics_dataframe
-
-    # get metric names split into train/val, train is further split into batch/epoch
-    def _get_metrics_names(self):
-        metrics = self._get_metrics()
-        # filter strings from list that are not starting with "_" and do not contain "val"
-        pre_filter = [string for string in metrics if not string.startswith("_")]
-        batch_train_metrics_names = [
-            string
-            for string in pre_filter
-            if ("val" not in string.lower())
-            & ("epoch" not in string.lower())
-            & ("table" not in string.lower())
-        ]
-        epoch_train_metrics_names = [
-            string
-            for string in pre_filter
-            if ("val" not in string.lower())
-            & ("batch" not in string.lower())
-            & ("table" not in string.lower())
-        ]
-        # filter strings from list that contain "val"
-        epoch_val_metrics_names = list(filter(lambda x: "val" in x.lower(), metrics))
-
-        # filter strings from train metrics that are 'epoch/learning_rate' and 'epoch/epoch'
-        strings_to_filter = report_constants_wandb.METRICS_TO_EXCLUDE
-        batch_train_metrics_names = [
-            string
-            for string in batch_train_metrics_names
-            if string not in strings_to_filter
-        ]
-        epoch_train_metrics_names = [
-            string
-            for string in epoch_train_metrics_names
-            if string not in strings_to_filter
-        ]
-        batch_train_metrics_names.sort()
-        epoch_train_metrics_names.sort()
-        return (
-            batch_train_metrics_names,
-            epoch_train_metrics_names,
-            epoch_val_metrics_names,
-        )
-
-    def get_train_val_metrics_names(self):
-        (
-            _,
-            epoch_train_metrics_names,
-            epoch_val_metrics_names,
-        ) = self._get_metrics_names()
-        epoch_train_metrics_names.sort()
-        epoch_val_metrics_names.sort()
-        return list(zip(epoch_train_metrics_names, epoch_val_metrics_names))
 
     def _build_config_section(self):
         config_block = [
@@ -161,87 +106,10 @@ class RetentionTimeReportRunComparisonWandb:
         ]
         return config_block
 
-    def _build_data_section(self):
-        data_block = [
-            wr.H1(text="Data"),
-            wr.P(report_constants.DATA_SECTION_WANDB),
-            wr.PanelGrid(
-                runsets=[
-                    wr.Runset(self.entity, self.project),
-                ],
-                panels=[
-                    wr.CustomChart(
-                        query={"summaryTable": {"tableKey": self.table_key_len}},
-                        chart_name=f"{RetentionTimeReportRunComparisonWandb.VEGA_LITE_PRESETS_ID}/histogram_peptide_length",
-                        chart_fields={"value": self.dataset.sequence_col},
-                    ),
-                    wr.CustomChart(
-                        query={"summaryTable": {"tableKey": self.table_key_rt}},
-                        chart_name=f"{RetentionTimeReportRunComparisonWandb.VEGA_LITE_PRESETS_ID}/histogram_irt",
-                        chart_fields={"value": self.dataset.target_col},
-                    ),
-                ],
-            ),
-            wr.HorizontalRule(),
-        ]
-        return data_block
-
-    def _build_train_section(self):
-        (
-            batch_train_metrics_names,
-            epoch_train_metrics_names,
-            _,
-        ) = self._get_metrics_names()
-        panel_list_batch = []
-        panel_list_epoch = []
-        for name in batch_train_metrics_names:
-            panel_list_batch.append(wr.LinePlot(x="Step", y=[name]))
-        for name in epoch_train_metrics_names:
-            panel_list_epoch.append(wr.LinePlot(x="Step", y=[name]))
-        train_block = [
-            wr.H1(text="Training metrics"),
-            wr.P(report_constants.TRAIN_SECTION_WANDB),
-            wr.H2(text="per batch"),
-            wr.PanelGrid(
-                runsets=[
-                    wr.Runset(self.entity, self.project),
-                ],
-                panels=panel_list_batch,
-            ),
-            wr.H2(text="per epoch"),
-            wr.PanelGrid(
-                runsets=[
-                    wr.Runset(self.entity, self.project),
-                ],
-                panels=panel_list_epoch,
-            ),
-            wr.HorizontalRule(),
-        ]
-        return train_block
-
-    def _build_val_section(self):
-        _, _, epoch_val_metrics_names = self._get_metrics_names()
-        panel_list_epoch = []
-        for name in epoch_val_metrics_names:
-            panel_list_epoch.append(wr.LinePlot(x="Step", y=[name]))
-        val_block = [
-            wr.H1(text="Validation metrics"),
-            wr.P(report_constants.VAL_SECTION_WANDB),
-            wr.H2(text="per epoch"),
-            wr.PanelGrid(
-                runsets=[
-                    wr.Runset(self.entity, self.project),
-                ],
-                panels=panel_list_epoch,
-            ),
-            wr.HorizontalRule(),
-        ]
-        return val_block
-
     def _build_model_section(self):
         model_block = [
             wr.H1(text="Model information"),
-            wr.P(report_constants.MODEL_SECTION_WANDB),
+            wr.P(report_constants_wandb.MODEL_SECTION_WANDB),
             wr.UnorderedList(items=self.model_info),
             wr.PanelGrid(
                 runsets=[
@@ -252,75 +120,6 @@ class RetentionTimeReportRunComparisonWandb:
             wr.HorizontalRule(),
         ]
         return model_block
-
-    def _build_train_val_section(self):
-        train_val_metrics_names = self.get_train_val_metrics_names()
-        panel_list_epoch = []
-        for name in train_val_metrics_names:
-            panel_list_epoch.append(wr.LinePlot(x="Step", y=list(name)))
-        train_val_block = [
-            wr.H1(text="Train - Validation metrics"),
-            wr.P(report_constants.TRAIN_VAL_SECTION_WANDB),
-            wr.H2(text="per epoch"),
-            wr.PanelGrid(
-                runsets=[
-                    wr.Runset(self.entity, self.project),
-                ],
-                panels=panel_list_epoch,
-            ),
-            wr.HorizontalRule(),
-        ]
-        return train_val_block
-
-    def log_sequence_length_table(
-        self, data: pd.DataFrame, seq_col: str = "modified_sequence"
-    ):
-        """Log sequence length table to wandb
-
-        Args:
-            data (pd.DataFrame): input data
-            seq_col (str, optional): Name of the column containing the sequences in the data frame. Defaults to "modified_sequence".
-
-        Returns:
-            str: Name of the histogram created by wandb after logging the data.
-        """
-        name_hist = "counts_hist"
-        counts = self.count_seq_length(data, seq_col)
-        # convert to df for easier handling
-        counts_df = counts.to_frame()
-        table = wandb.Table(dataframe=counts_df)
-        # log to wandb
-        hist = wandb.plot_table(
-            vega_spec_name=f"{RetentionTimeReportRunComparisonWandb.VEGA_LITE_PRESETS_ID}/histogram_peptide_length",
-            data_table=table,
-            fields={"value": seq_col},
-        )
-        wandb.log({name_hist: hist})
-        name_hist_table = name_hist + "_table"
-        return name_hist_table
-
-    # function to count sequence length
-    def count_seq_length(self, data: pd.DataFrame, seq_col: str):
-        pattern = re.compile(r"\[UNIMOD:.*\]", re.IGNORECASE)
-        data[seq_col].replace(pattern, "", inplace=True)
-        return data[seq_col].str.len()
-
-    # function to log retention time table to wandb
-    def log_rt_table(self, data: pd.DataFrame, rt_col: str = "indexed_retention_time"):
-        name_hist = "rt_hist"
-        rt = data.loc[:, rt_col]
-        # convert to df for easier handling
-        rt_df = rt.to_frame()
-        table = wandb.Table(dataframe=rt_df)
-        # log to wandb
-        hist = wandb.plot_table(
-            vega_spec_name=f"{RetentionTimeReportRunComparisonWandb.VEGA_LITE_PRESETS_ID}/histogram_irt",
-            data_table=table,
-            fields={"value": rt_col},
-        )
-        wandb.log({name_hist: hist})
-        name_hist_table = name_hist + "_table"
-        return name_hist_table
 
     def log_data(self):
         # check if datasource is a string
@@ -334,10 +133,10 @@ class RetentionTimeReportRunComparisonWandb:
                 data = pd.read_json(self.dataset.data_source)
             if file_extension == ".parquet":
                 data = pd.read_parquet(self.dataset.data_source, engine="fastparquet")
-            self.table_key_len = self.log_sequence_length_table(
+            self.table_key_len = wandb_utils.log_sequence_length_table(
                 data, self.dataset.sequence_col
             )
-            self.table_key_rt = self.log_rt_table(data, self.dataset.target_col)
+            self.table_key_rt = wandb_utils.log_rt_table(data, self.dataset.target_col)
 
         # check if datasource is a tuple of two ndarrays or two lists
         if (
@@ -354,16 +153,16 @@ class RetentionTimeReportRunComparisonWandb:
                     self.dataset.target_col: self.dataset.data_source[1],
                 }
             )
-            self.table_key_len = self.log_sequence_length_table(
+            self.table_key_len = wandb_utils.log_sequence_length_table(
                 data, self.dataset.sequence_col
             )
-            self.table_key_rt = self.log_rt_table(data, self.dataset.target_col)
+            self.table_key_rt = wandb_utils.log_rt_table(data, self.dataset.target_col)
 
         # check if datasource is a single ndarray or list
         # does not work? maybe error in RetentionTimeDataset
         if isinstance(self.dataset.data_source, (np.ndarray, list)):
             data = pd.DataFrame({self.dataset.sequence_col: self.dataset.data_source})
-            self.table_key_len = self.log_sequence_length_table(
+            self.table_key_len = wandb_utils.log_sequence_length_table(
                 data, self.dataset.sequence_col
             )
 

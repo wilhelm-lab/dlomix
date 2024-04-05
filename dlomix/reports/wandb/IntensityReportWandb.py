@@ -6,6 +6,7 @@ import seaborn as sns
 import tensorflow as tf
 import wandb
 import wandb.apis.reports as wr
+import wandb_utils
 from wandb.keras import WandbCallback, WandbMetricsLogger
 
 import dlomix
@@ -49,79 +50,21 @@ class IntensityReportWandb:
         if add_config_section:
             report.blocks += self.config_section()
         if add_train_section:
-            report.blocks += self.train_section()
+            report.blocks += wandb_utils.build_train_section(
+                self.api, self.entity, self.project
+            )
         if add_val_section:
-            report.blocks += self.val_section()
+            report.blocks += wandb_utils.build_val_section(
+                self.api, self.entity, self.project
+            )
         if add_train_val_section:
-            report.blocks += self.train_val_section()
+            report.blocks += wandb_utils.build_train_val_section(
+                self.api, self.entity, self.project
+            )
         if add_spectral_angle_section:
             report.blocks += self.spectral_angle_section()
 
         report.save()
-
-    # get metrics of last run in project or from specified run_id
-    def _get_metrics(self, run_id=None):
-        if run_id:
-            # run is specified by <entity>/<project>/<run_id>
-            run = self.api.run(path=f"{self.entity}/{self.project}/{run_id}")
-            metrics_dataframe = run.history()
-            return metrics_dataframe
-        else:
-            # get metrics of latest run
-            # api.runs seems to have a delay
-            runs = self.api.runs(path=f"{self.entity}/{self.project}")
-            run = runs[0]
-            metrics_dataframe = run.history()
-            return metrics_dataframe
-
-    # get metric names split into train/val, train is further split into batch/epoch
-    def _get_metrics_names(self):
-        metrics = self._get_metrics()
-        # filter strings from list that are not starting with "_" and do not contain "val"
-        pre_filter = [string for string in metrics if not string.startswith("_")]
-        batch_train_metrics_names = [
-            string
-            for string in pre_filter
-            if ("val" not in string.lower())
-            & ("epoch" not in string.lower())
-            & ("table" not in string.lower())
-        ]
-        epoch_train_metrics_names = [
-            string
-            for string in pre_filter
-            if ("val" not in string.lower())
-            & ("batch" not in string.lower())
-            & ("table" not in string.lower())
-        ]
-        # filter strings from list that contain "val"
-        epoch_val_metrics_names = list(filter(lambda x: "val" in x.lower(), metrics))
-        # filter strings from train metrics that are 'epoch/learning_rate' and 'epoch/epoch'
-        strings_to_filter = report_constants_wandb.METRICS_TO_EXCLUDE
-        batch_train_metrics_names = [
-            string
-            for string in epoch_train_metrics_names
-            if string not in strings_to_filter
-        ]
-        epoch_train_metrics_names = [
-            string
-            for string in epoch_train_metrics_names
-            if string not in strings_to_filter
-        ]
-        return (
-            batch_train_metrics_names,
-            epoch_train_metrics_names,
-            epoch_val_metrics_names,
-        )
-
-    def get_train_val_metrics_names(self):
-        (
-            _,
-            epoch_train_metrics_names,
-            epoch_val_metrics_names,
-        ) = self._get_metrics_names()
-        epoch_train_metrics_names.sort()
-        epoch_val_metrics_names.sort()
-        return list(zip(epoch_train_metrics_names, epoch_val_metrics_names))
 
     def generate_intensity_results_df(self):
         predictions_df = pd.DataFrame()
@@ -187,103 +130,12 @@ class IntensityReportWandb:
         ]
         return config_block
 
-    def train_section(self):
-        (
-            batch_train_metrics_names,
-            epoch_train_metrics_names,
-            _,
-        ) = self._get_metrics_names()
-        panel_list_batch = []
-        panel_list_epoch = []
-        if len(batch_train_metrics_names) > 3:
-            width = 8
-        else:
-            width = 24 / len(batch_train_metrics_names)
-        for name in batch_train_metrics_names:
-            panel_list_batch.append(
-                wr.LinePlot(x="Step", y=[name], layout={"w": width})
-            )
-        for name in epoch_train_metrics_names:
-            panel_list_epoch.append(
-                wr.LinePlot(x="Step", y=[name], layout={"w": width})
-            )
-        train_block = [
-            wr.H1(text="Training metrics"),
-            wr.P(report_constants.TRAIN_SECTION_WANDB),
-            wr.H2(text="per batch"),
-            wr.PanelGrid(
-                runsets=[
-                    wr.Runset(self.entity, self.project),
-                ],
-                panels=panel_list_batch,
-            ),
-            wr.H2(text="per epoch"),
-            wr.PanelGrid(
-                runsets=[
-                    wr.Runset(self.entity, self.project),
-                ],
-                panels=panel_list_epoch,
-            ),
-            wr.HorizontalRule(),
-        ]
-        return train_block
-
-    def val_section(self):
-        _, _, epoch_val_metrics_names = self._get_metrics_names()
-        panel_list_epoch = []
-        if len(epoch_val_metrics_names) > 3:
-            width = 8
-        else:
-            width = 24 / len(epoch_val_metrics_names)
-        for name in epoch_val_metrics_names:
-            panel_list_epoch.append(
-                wr.LinePlot(x="Step", y=[name], layout={"w": width})
-            )
-        val_block = [
-            wr.H1(text="Validation metrics"),
-            wr.P(report_constants.VAL_SECTION_WANDB),
-            wr.H2(text="per epoch"),
-            wr.PanelGrid(
-                runsets=[
-                    wr.Runset(self.entity, self.project),
-                ],
-                panels=panel_list_epoch,
-            ),
-            wr.HorizontalRule(),
-        ]
-        return val_block
-
-    def train_val_section(self):
-        train_val_metrics_names = self.get_train_val_metrics_names()
-        panel_list_epoch = []
-        if len(train_val_metrics_names) > 3:
-            width = 8
-        else:
-            width = 24 / len(train_val_metrics_names)
-        for name in train_val_metrics_names:
-            panel_list_epoch.append(
-                wr.LinePlot(x="Step", y=list(name), layout={"w": width})
-            )
-        train_val_block = [
-            wr.H1(text="Train - Validation metrics"),
-            wr.P(report_constants.TRAIN_VAL_SECTION_WANDB),
-            wr.H2(text="per epoch"),
-            wr.PanelGrid(
-                runsets=[
-                    wr.Runset(self.entity, self.project),
-                ],
-                panels=panel_list_epoch,
-            ),
-            wr.HorizontalRule(),
-        ]
-        return train_val_block
-
     def spectral_angle_section(self):
         width = 24
         plot_name = self.log_spectral_angle_table()
         spectral_angle_block = [
             wr.H1(text="Spectral Angle"),
-            wr.P(report_constants.SPECTRAL_ANGLE_SECTION_WANDB),
+            wr.P(report_constants_wandb.SPECTRAL_ANGLE_SECTION_WANDB),
             wr.PanelGrid(
                 runsets=[
                     wr.Runset(self.entity, self.project),
@@ -291,10 +143,104 @@ class IntensityReportWandb:
                 panels=[
                     wr.CustomChart(
                         query={"summaryTable": {"tableKey": plot_name}},
-                        chart_name=f"{RetentionTimeReportRunComparisonWandb.VEGA_LITE_PRESETS_ID}/spectral_angle_plot",
+                        chart_name=f"{IntensityReportWandb.VEGA_LITE_PRESETS_ID}/spectral_angle_plot",
                     )
                 ],
             ),
             wr.HorizontalRule(),
         ]
         return spectral_angle_block
+
+
+if __name__ == "__main__":
+    # import necessary packages
+    import os
+    import re
+    import warnings
+
+    import keras
+    import matplotlib.pyplot as plt
+    import numpy as np
+    import pandas as pd
+    import tensorflow as tf
+
+    import dlomix
+    from dlomix import constants, data, eval, layers, models, pipelines, reports, utils
+    from dlomix.data import IntensityDataset
+    from dlomix.losses import (
+        masked_pearson_correlation_distance,
+        masked_spectral_distance,
+    )
+    from dlomix.models import PrositIntensityPredictor
+# Create config
+config = {
+    "seq_length": 30,
+    "batch_size": 64,
+    "val_ratio": 0.2,
+    "lr": 0.0001,
+    "optimizer": "ADAM",
+    "loss": "mse",
+}
+
+# Initialize WANDB
+PROJECT = "Demo_IntensityTimeReport"
+RUN = "test_2"
+wandb.init(project=PROJECT, name=RUN, config=config)
+
+TRAIN_DATAPATH = "https://raw.githubusercontent.com/wilhelm-lab/dlomix-resources/tasks/intensity/example_datasets/Intensity/proteomeTools_train_val.csv"
+BATCH_SIZE = 64
+
+int_data = IntensityDataset(
+    data_source=TRAIN_DATAPATH,
+    seq_length=30,
+    batch_size=BATCH_SIZE,
+    collision_energy_col="collision_energy",
+    val_ratio=0.2,
+    test=False,
+)
+
+model = PrositIntensityPredictor(seq_length=30)
+tf.get_logger().setLevel("ERROR")
+# create the optimizer object
+optimizer = tf.keras.optimizers.legacy.Adam(learning_rate=0.001)
+
+# compile the model  with the optimizer and the metrics we want to use, we can add our custom timedelta metric
+model.compile(
+    optimizer=optimizer,
+    loss=masked_spectral_distance,
+    metrics=["mse", masked_pearson_correlation_distance],
+)
+history = model.fit(
+    int_data.train_data,
+    validation_data=int_data.val_data,
+    epochs=1,
+    callbacks=[WandbMetricsLogger(log_freq="batch")],
+)
+# Mark the run as finished
+
+# create the dataset object for test data
+
+TEST_DATAPATH = "https://raw.githubusercontent.com/wilhelm-lab/dlomix-resources/tasks/intensity/example_datasets/Intensity/proteomeTools_test.csv"
+
+test_int_data = IntensityDataset(
+    data_source=TEST_DATAPATH,
+    seq_length=30,
+    collision_energy_col="collision_energy",
+    batch_size=32,
+    test=True,
+)
+
+# use model.predict from keras directly on the testdata
+
+predictions = model.predict(test_int_data.test_data)
+
+# Create a report
+report = IntensityReportWandb(
+    project="Demo_IntensityTimeReport",
+    title="Comparison of different optimizers",
+    description="Comparison of two optimizers Adam and RMSprop",
+    test_dataset=test_int_data,
+    predictions=predictions,
+)
+
+report.create_report()
