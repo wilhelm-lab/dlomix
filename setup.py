@@ -17,6 +17,8 @@ setuptools.setup(
     long_description_content_type="text/markdown",
     url=META_DATA["github_url"],
     packages=setuptools.find_packages(),
+    package_data={'dlomix.data.processing': ['pickled_feature_dicts/*.pkl']},  # Include all .pkl files in pickled_feature_dicts directory
+    include_package_data=True,
     install_requires=[
         "datasets",
         "fpdf",

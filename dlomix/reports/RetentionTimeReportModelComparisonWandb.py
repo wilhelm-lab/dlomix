@@ -6,7 +6,7 @@ import pandas as pd
 import wandb
 import wandb.apis.reports as wr
 
-from ..data.RetentionTimeDataset import RetentionTimeDataset
+from ..data.retention_time import RetentionTimeDataset
 
 
 class RetentionTimeReportModelComparisonWandb:

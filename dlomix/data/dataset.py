@@ -296,7 +296,7 @@ class PeptideDataset:
                     continue
 
                 feature_extactor = LookupFeatureExtractor(
-                    sequence_column_name="raw_sequence",
+                    sequence_column_name=self.sequence_column,
                     feature_column_name=feature_name,
                     **FEATURE_EXTRACTORS_PARAMETERS[feature_name],
                     max_length=self.max_seq_len,
@@ -424,9 +424,10 @@ class PeptideDataset:
         input_tensor_columns.remove(self.label_column)
 
         # remove the columns that are not needed in the tensor dataset
-        input_tensor_columns = list(
-            set(input_tensor_columns) - set(self.dataset_columns_to_keep)
-        )
+        if self.dataset_columns_to_keep is not None:
+            input_tensor_columns = list(
+                set(input_tensor_columns) - set(self.dataset_columns_to_keep)
+            )
 
         # add the extracted features columns to the input tensor columns
         input_tensor_columns.extend(self._extracted_features_columns)
