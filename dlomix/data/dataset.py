@@ -154,20 +154,24 @@ class PeptideDataset:
         if len(data_files_available_splits) == 0:
             self._empty_dataset_mode = True
             warnings.warn(
-                "No data files provided, please provide at least one data source if you plan to use this dataset directly. You can later load data into this empty dataset"
+                "No data files provided, please provide at least one data source if you plan to use this dataset directly. Otherwise, you can later load data into this empty dataset"
             )
-        if len(data_files_available_splits) > 1:
-            self._is_predefined_split = True
-            warnings.warn(
-                f"""
-                Multiple data sources provided {data_files_available_splits}, please ensure that the data sources are already split into train, val and test sets
-                since no splitting will happen. If not, please provide only one data source and set the val_ratio to split the data into train and val sets."
-                """
-            )
+            return
+        else:
+            self._empty_dataset_mode = False
 
-        self.hf_dataset = load_dataset(
-            self.data_format, data_files=data_files_available_splits
-        )
+            if len(data_files_available_splits) > 1:
+                self._is_predefined_split = True
+                warnings.warn(
+                    f"""
+                    Multiple data sources provided {data_files_available_splits}, please ensure that the data sources are already split into train, val and test sets
+                    since no splitting will happen. If not, please provide only one data source and set the val_ratio to split the data into train and val sets."
+                    """
+                )
+
+            self.hf_dataset = load_dataset(
+                self.data_format, data_files=data_files_available_splits
+            )
 
     def _remove_unnecessary_columns(self):
         self._relevant_columns = [self.sequence_column, self.label_column]
