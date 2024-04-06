@@ -20,6 +20,8 @@ retention_time_pipeline_parameters.update(
 
 _ALPHABET_UNMOD_ORDERED = "ACDEFGHIKLMNPQRSTVWY"
 ALPHABET_UNMOD = {k: v for v, k in enumerate(_ALPHABET_UNMOD_ORDERED, start=1)}
+ALPHABET_UNMOD.update({"[]-": 21, "-[]": 22})
+ALPHABET_UNMOD.update({"[UNIMOD:737]-": 21})
 
 _ALPHABET_NAIVE_MODS_ORDERED = ["C[UNIMOD:4]", "M[UNIMOD:35]"]
 ALPHABET_NAIVE_MODS = {
@@ -51,6 +53,7 @@ PTMS_ALPHABET = {
     "Y": 20,
     "[]-": 21,
     "-[]": 22,
+    "[UNIMOD:737]-": 56,
     "M[UNIMOD:35]": 23,
     "S[UNIMOD:21]": 24,
     "T[UNIMOD:21]": 25,
@@ -79,6 +82,7 @@ PTMS_ALPHABET = {
     "K[UNIMOD:1363]": 48,
     "K[UNIMOD:1849]": 49,
     "K[UNIMOD:3]": 50,
+    "K[UNIMOD:737]": 55,
     "R[UNIMOD:36]": 51,
     "R[UNIMOD:36a]": 52,
     "P[UNIMOD:35]": 53,

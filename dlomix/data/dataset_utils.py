@@ -110,13 +110,6 @@ def update_sequence_with_splitted_proforma_format(
     return example
 
 
-def remove_ptms(example, sequence_column_name):
-    example[sequence_column_name] = re.sub(
-        r"\[UNIMOD:\d+\]", "", example[sequence_column_name]
-    )
-    return example
-
-
 def encode_sequence(example, sequence_column_name, alphabet):
     # encode with alphabet
     example[sequence_column_name] = [

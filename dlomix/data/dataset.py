@@ -9,7 +9,7 @@ from datasets import Dataset, DatasetDict, load_dataset, load_from_disk
 
 from ..constants import ALPHABET_UNMOD
 from .dataset_config import DatasetConfig
-from .dataset_utils import EncodingScheme, get_num_processors, remove_ptms
+from .dataset_utils import EncodingScheme, get_num_processors
 from .processing.feature_extractors import (
     AVAILABLE_FEATURE_EXTRACTORS,
     FEATURE_EXTRACTORS_PARAMETERS,
@@ -20,6 +20,7 @@ from .processing.processors import (
     SequenceEncodingProcessor,
     SequencePaddingProcessor,
     SequenceParsingProcessor,
+    SequencePTMRemovalProcessor,
 )
 
 
@@ -67,6 +68,8 @@ class PeptideDataset:
 
         # to be kept in the hf dataset, but not returned in the tensor dataset
         self.dataset_columns_to_keep = dataset_columns_to_keep
+        if self.dataset_columns_to_keep is None:
+            self.dataset_columns_to_keep = []
 
         self.features_to_extract = features_to_extract
         self.pad = pad
@@ -190,6 +193,19 @@ class PeptideDataset:
             del self.hf_dataset["test"]
 
     def _parse_sequences(self):
+        # parse sequence in all encoding schemes
+        # raw_sequence would be the original sequence with the PTMs kept for later feature extraction and reference
+        parsed_column_names = ["raw_sequence", "n_terminal_mods", "c_terminal_mods"]
+
+        sequence_parsing_processor = SequenceParsingProcessor(
+            self.sequence_column,
+            batched=True,
+            new_column_names=parsed_column_names,
+        )
+
+        self.dataset_columns_to_keep.extend(parsed_column_names)
+        self._processors.append(sequence_parsing_processor)
+
         if self.encoding_scheme == EncodingScheme.UNMOD:
             warnings.warn(
                 f"""
@@ -198,12 +214,11 @@ class PeptideDataset:
                           """
             )
 
-            # ensure no ptm info is present
-            # ToDo: convert to processor style and decide on flow, whether this is a valid use-case or not
-            self.hf_dataset = self.hf_dataset.map(
-                lambda x: remove_ptms(x, self.sequence_column), desc="Removing PTMs..."
+            self._processors.append(
+                SequencePTMRemovalProcessor(
+                    sequence_column_name=self.sequence_column, batched=True
+                )
             )
-        else:
             # parse sequences only if encoding scheme is not unmod
             # here naive mods is the only other option for now (hence, extend the vocabulary)
             # self.parser = ProformaParser(build_naive_vocab=True, base_vocab=self.vocab)
@@ -216,17 +231,6 @@ class PeptideDataset:
 
             # get the extended vocab from the parser
             # self.extended_vocab = self.parser.extended_vocab
-
-            parsed_column_names = ["raw_sequence", "n_terminal_mods", "c_terminal_mods"]
-
-            sequence_parsing_processor = SequenceParsingProcessor(
-                self.sequence_column,
-                batched=True,
-                new_column_names=parsed_column_names,
-            )
-
-            self.dataset_columns_to_keep.extend(parsed_column_names)
-            self._processors.append(sequence_parsing_processor)
 
     def _configure_processing_pipeline(self):
         self._configure_encoding_step()
@@ -308,6 +312,7 @@ class PeptideDataset:
                         f"Using custom feature extractor from the user function {feature.__name__}"
                         "please ensure that the provided function pads the feature to the sequence length"
                         "so that all tensors have the same sequence length dimension."
+                        # inform the user about using the raw_sequence if needed for custom feature extraction since it will always have the PTM information
                     )
                 )
 

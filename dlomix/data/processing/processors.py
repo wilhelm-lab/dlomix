@@ -70,16 +70,11 @@ class SequenceParsingProcessor(PeptideDatasetBaseProcessor):
             n_term += "-"
             c_term = "-" + c_term
 
-        seq = re.findall(r"[A-Za-z](?:\[UNIMOD:\d+\])?|[^\[\]]", seq)
+        seq = re.findall(r"[A-Za-z](?:\[UNIMOD:\d+\])*|[^\[\]]", seq)
         return n_term, seq, c_term
 
     def _add_terminal_mods(self, seq, n_terms, c_terms):
-        updated_seq = seq
-        if n_terms != "[]-":
-            updated_seq = [n_terms] + updated_seq
-        if c_terms != "-[]":
-            updated_seq = updated_seq + [c_terms]
-        return updated_seq
+        return [n_terms] + seq + [c_terms]
 
     def batch_process(self, input_data, **kwargs):
         for new_column in self.new_column_names:
@@ -147,7 +142,6 @@ class SequencePaddingProcessor(PeptideDatasetBaseProcessor):
         )
 
         input_data[SequencePaddingProcessor.KEEP_COLUMN_NAME] = keep_sequence
-
         return input_data
 
     def _pad_sequence(self, sequence):
@@ -181,7 +175,37 @@ class SequenceEncodingProcessor(PeptideDatasetBaseProcessor):
         }
 
     def _encode(self, sequence):
-        return [self.alphabet.get(amino_acid) for amino_acid in sequence]
+        encoded = [self.alphabet.get(amino_acid) for amino_acid in sequence]
+
+        return encoded
+
+
+class SequencePTMRemovalProcessor(PeptideDatasetBaseProcessor):
+    def __init__(self, sequence_column_name: str, batched: bool = False):
+        super().__init__(sequence_column_name, batched)
+
+    def batch_process(self, input_data, **kwargs):
+        return {
+            self.sequence_column_name: [
+                self._remove_ptms(seq) for seq in input_data[self.sequence_column_name]
+            ]
+        }
+
+    def single_process(self, input_data, **kwargs):
+        return {
+            self.sequence_column_name: self._remove_ptms(
+                input_data[self.sequence_column_name]
+            )
+        }
+
+    def _remove_ptms(self, sequence):
+        if not isinstance(sequence, list):
+            raise ValueError("Sequence must be a list of amino acids")
+        n_terms = sequence[0]
+        c_terms = sequence[-1]
+        aa_sequence = sequence[1:-1]
+        ptm_filtered_sequence = re.sub(r"\[UNIMOD:\d+\]", "", "".join(aa_sequence))
+        return [n_terms] + list(ptm_filtered_sequence) + [c_terms]
 
 
 class FunctionProcessor(PeptideDatasetBaseProcessor):
@@ -194,4 +218,4 @@ class FunctionProcessor(PeptideDatasetBaseProcessor):
         raise NotImplementedError("FunctionProcessor does not support batch processing")
 
     def single_process(self, input_data, **kwargs):
-        return self.function(input_data)
+        return self.function(input_data, **kwargs)

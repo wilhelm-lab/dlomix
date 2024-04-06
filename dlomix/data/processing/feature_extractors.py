@@ -88,14 +88,23 @@ class LookupFeatureExtractor(FeatureExtractor):
     def batch_process(self, input_data, **kwargs):
         feature_column = []
 
-        for sequence in input_data[self.sequence_column_name]:
-            feature = self._extract_feature(sequence)
+        for n_term, sequence, c_term in zip(
+            input_data["n_terminal_mods"],
+            input_data[self.sequence_column_name],
+            input_data["c_terminal_mods"],
+        ):
+            feature = self._extract_feature([n_term] + sequence + [c_term])
             feature_column.append(feature)
 
         return {self.feature_column_name: feature_column}
 
     def single_process(self, input_data, **kwargs):
-        feature = self._extract_feature(input_data[self.sequence_column_name])
+        seq_with_terms = (
+            [input_data["n_terminal_mods"]]
+            + input_data[self.sequence_column_name]
+            + [input_data["c_terminal_mods"]]
+        )
+        feature = self._extract_feature(seq_with_terms)
         return {self.feature_column_name: feature}
 
     def _extract_feature(self, sequence):

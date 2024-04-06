@@ -1,7 +1,8 @@
 import os
 import pickle
 
-PKL_BASE_PATH = "pickled_feature_dicts"
+MODULE_PATH = os.path.abspath(os.path.dirname(__file__))
+PKL_BASE_PATH = os.path.join(MODULE_PATH, "pickled_feature_dicts")
 
 with open(os.path.join(PKL_BASE_PATH, "saved_loss_atoms.pkl"), "rb") as f:
     PTM_LOSS_LOOKUP = pickle.load(f)
