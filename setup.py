@@ -3,7 +3,7 @@ import setuptools
 with open("README.md", "r") as fh:
     long_description = fh.read()
 
-from dlomix import META_DATA, __version__
+from src.dlomix import META_DATA, __version__
 
 VERSION = __version__
 
@@ -16,7 +16,10 @@ setuptools.setup(
     long_description=long_description,
     long_description_content_type="text/markdown",
     url=META_DATA["github_url"],
-    packages=setuptools.find_packages(),
+    packages=setuptools.find_packages(where="src"),
+    package_dir={"": "src"},
+    include_package_data=True,
+    package_data={"": ["data/processing/pickled_feature_dicts/*"]},
     install_requires=[
         "datasets",
         "fpdf",

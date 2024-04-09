@@ -5,10 +5,10 @@ from os.path import dirname, join, splitext
 import numpy as np
 import requests
 
-from dlomix.constants import retention_time_pipeline_parameters
-from dlomix.data.RetentionTimeDataset import RetentionTimeDataset
-from dlomix.models.base import RetentionTimePredictor
-from dlomix.reports import RetentionTimeReport
+from ..constants import retention_time_pipeline_parameters
+from ..data import RetentionTimeDataset
+from ..models.base import RetentionTimePredictor
+from ..reports import RetentionTimeReport
 
 # pipelines can be used to train the model further or from scratch given a dataset
 # add string arguments (e.g. prosit to create the model, data source to create the dataset)

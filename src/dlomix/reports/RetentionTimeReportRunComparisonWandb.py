@@ -5,9 +5,8 @@ import numpy as np
 import pandas as pd
 import wandb
 import wandb.apis.reports as wr
-from wandb.keras import WandbCallback, WandbMetricsLogger
 
-from ..data import RetentionTimeDataset
+from ..data.retention_time import RetentionTimeDataset
 
 # ToDo: add R2 plot, TimeDelta plot, residuals
 

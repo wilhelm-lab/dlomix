@@ -6,7 +6,7 @@ from matplotlib import pyplot as plt
 from matplotlib.colors import LogNorm
 from matplotlib.ticker import LogLocator
 
-from dlomix.reports.Report import PDFFile, Report
+from ..reports.Report import PDFFile, Report
 
 
 class RetentionTimeReport(Report):

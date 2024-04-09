@@ -3,8 +3,6 @@ import tensorflow.keras.backend as K
 import tensorflow_probability as tfp
 
 
-
-
 class TimeDeltaMetric(tf.keras.metrics.Metric):
     r"""Implementation of the time delta metric as a Keras Metric.
 
@@ -91,17 +89,18 @@ def delta95_metric(y_true, y_pred):
     norm_range = K.max(y_true) - K.min(y_true)
     return (delta * 2) / (norm_range)
 
+
 def TimeDeltaMetric2():
-    """ 95th percentile of absolute error between label and prediction """
+    """95th percentile of absolute error between label and prediction"""
 
     def calc_metric(y_true, y_pred, sample_weight=None):
-
         # compute residuals and sort
         abs_error = tf.abs(y_true - y_pred)
         return tfp.stats.percentile(abs_error, 95)
 
-    calc_metric.__name__ = 'delta95'
+    calc_metric.__name__ = "delta95"
     return calc_metric
+
 
 METRICS_DICT = {
     "delta95": TimeDeltaMetric(),

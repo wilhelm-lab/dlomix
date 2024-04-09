@@ -1,6 +1,6 @@
 import tensorflow as tf
 
-from dlomix.constants import ALPHABET_UNMOD
+from ..constants import ALPHABET_UNMOD
 
 
 class DeepLCRetentionTimePredictor(tf.keras.Model):

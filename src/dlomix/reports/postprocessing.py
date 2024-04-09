@@ -3,7 +3,7 @@ import functools
 import numpy as np
 import tensorflow as tf
 
-import dlomix.losses as losses
+from ..losses import masked_spectral_distance
 
 
 def reshape_dims(array):
@@ -59,7 +59,7 @@ def get_spectral_angle(true, pred, batch_size=600):
     for i, t_b, p_b in iterate():
         tf.compat.v1.reset_default_graph()
         with tf.compat.v1.Session() as s:
-            sa_graph = losses.masked_spectral_distance(t_b, p_b)
+            sa_graph = masked_spectral_distance(t_b, p_b)
             sa_b = 1 - s.run(sa_graph)
             sa[i * batch_size : i * batch_size + sa_b.shape[0]] = sa_b
     sa = np.nan_to_num(sa)

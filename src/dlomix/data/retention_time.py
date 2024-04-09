@@ -1,7 +1,5 @@
 from typing import Callable, Dict, List, Optional, Union
 
-from datasets import Dataset
-
 from ..constants import ALPHABET_UNMOD
 from .dataset import PeptideDataset
 from .dataset_utils import EncodingScheme

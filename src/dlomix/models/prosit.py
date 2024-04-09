@@ -1,7 +1,7 @@
 import tensorflow as tf
 
-from dlomix.constants import ALPHABET_UNMOD
-from dlomix.layers.attention import AttentionLayer, DecoderAttentionLayer
+from ..constants import ALPHABET_UNMOD
+from ..layers.attention import AttentionLayer, DecoderAttentionLayer
 
 
 class PrositRetentionTimePredictor(tf.keras.Model):
@@ -208,14 +208,14 @@ class PrositIntensityPredictor(tf.keras.Model):
         precursor_charge_in = inputs["precursor_charge_onehot"]
         fragmentation_method_in = inputs["method_nbr"]
 
-
-
         collision_energy_in = tf.expand_dims(collision_energy_in, axis=1)
         precursor_charge_in = tf.cast(precursor_charge_in, tf.float32)
         fragmentation_method_in = tf.expand_dims(fragmentation_method_in, axis=1)
         fragmentation_method_in = tf.cast(fragmentation_method_in, tf.float32)
 
-        encoded_meta = self.meta_encoder([collision_energy_in, precursor_charge_in,fragmentation_method_in])
+        encoded_meta = self.meta_encoder(
+            [collision_energy_in, precursor_charge_in, fragmentation_method_in]
+        )
 
         x = self.embedding(peptides_in)
         x = self.sequence_encoder(x)

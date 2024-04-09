@@ -1,6 +1,5 @@
 # most of this can go away, as it is not used anymore
 
-import re
 from enum import Enum
 
 from .sequence_utils import parse_sequence_native, rebuild_proforma_sequence
