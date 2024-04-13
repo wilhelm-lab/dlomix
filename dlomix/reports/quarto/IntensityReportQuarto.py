@@ -205,6 +205,9 @@ class IntensityReportQuarto:
             page_break=True,
         )
         qmd.write_qmd_file(f"{self.output_path}/{qmd_report_filename}")
+        print(
+            f"File Saved to disk under: {self.output_path}.\nUse Quarto to render the report by running:\n\nquarto render {self.output_path}/{qmd_report_filename} --to pdf"
+        )
 
     def generate_prediction_df(self):
         """
@@ -368,3 +371,72 @@ class IntensityReportQuarto:
         fig.savefig(save_path)
         plt.clf()
         return save_path
+
+
+if __name__ == "__main__":
+    # import necessary packages
+    import os
+    import re
+    import warnings
+
+    import keras
+    import matplotlib.pyplot as plt
+    import numpy as np
+    import pandas as pd
+    import tensorflow as tf
+
+    import dlomix
+    from dlomix import constants, data, eval, layers, models, pipelines, reports, utils
+    from dlomix.data import IntensityDataset
+    from dlomix.losses import (
+        masked_pearson_correlation_distance,
+        masked_spectral_distance,
+    )
+    from dlomix.models import PrositIntensityPredictor
+
+    TRAIN_DATAPATH = "https://raw.githubusercontent.com/wilhelm-lab/dlomix-resources/tasks/intensity/example_datasets/Intensity/proteomeTools_train_val.csv"
+    BATCH_SIZE = 64
+
+    int_data = IntensityDataset(
+        data_source=TRAIN_DATAPATH,
+        seq_length=30,
+        batch_size=BATCH_SIZE,
+        collision_energy_col="collision_energy",
+        val_ratio=0.2,
+        test=False,
+    )
+    model = PrositIntensityPredictor(seq_length=30)
+    # create the optimizer object
+    optimizer = tf.keras.optimizers.legacy.Adam(learning_rate=0.001)
+
+    # compile the model  with the optimizer and the metrics we want to use, we can add our custom timedelta metric
+    model.compile(
+        optimizer=optimizer,
+        loss=masked_spectral_distance,
+        metrics=["mse", masked_pearson_correlation_distance],
+    )
+    history = model.fit(
+        int_data.train_data, validation_data=int_data.val_data, epochs=3
+    )
+    # create the dataset object for test data
+    TEST_DATAPATH = "https://raw.githubusercontent.com/wilhelm-lab/dlomix-resources/tasks/intensity/example_datasets/Intensity/proteomeTools_test.csv"
+    test_int_data = IntensityDataset(
+        data_source=TEST_DATAPATH,
+        seq_length=30,
+        collision_energy_col="collision_energy",
+        batch_size=32,
+        test=True,
+    )
+
+    report = IntensityReportQuarto(
+        title="Demo Intensity Report",
+        history=history,
+        test_data=test_int_data,
+        train_data=int_data,
+        model=model,
+        train_section=True,
+        val_section=True,
+        output_path=".",
+    )
+
+    report.generate_report("Demo_Intensity_Report.qmd")

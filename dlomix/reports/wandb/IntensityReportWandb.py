@@ -184,7 +184,7 @@ config = {
 
 # Initialize WANDB
 PROJECT = "Demo_IntensityTimeReport"
-RUN = "test_2"
+RUN = "demo_run"
 wandb.init(project=PROJECT, name=RUN, config=config)
 
 TRAIN_DATAPATH = "https://raw.githubusercontent.com/wilhelm-lab/dlomix-resources/tasks/intensity/example_datasets/Intensity/proteomeTools_train_val.csv"
@@ -213,7 +213,7 @@ model.compile(
 history = model.fit(
     int_data.train_data,
     validation_data=int_data.val_data,
-    epochs=1,
+    epochs=3,
     callbacks=[WandbMetricsLogger(log_freq="batch")],
 )
 # Mark the run as finished
@@ -237,8 +237,8 @@ predictions = model.predict(test_int_data.test_data)
 # Create a report
 report = IntensityReportWandb(
     project="Demo_IntensityTimeReport",
-    title="Comparison of different optimizers",
-    description="Comparison of two optimizers Adam and RMSprop",
+    title="Demo Intensity Report",
+    description="This is a small demo intensity report.",
     test_dataset=test_int_data,
     predictions=predictions,
 )
