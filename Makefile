@@ -28,14 +28,14 @@ test-local:
 
 
 format:
-	black ./dlomix/*
+	black ./src/dlomix/*
 	isort --profile black .
-	black ./dlomix/*.py
+	black ./src/dlomix/*.py
 	black ./run_scripts/*.py
 	black ./tests/*.py
 
 lint:
-	pylint --disable=R,C ./dlomix/*
+	pylint --disable=R,C ./src/dlomix/*
 
 build-docs:
 	cd docs && make clean html
