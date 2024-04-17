@@ -223,18 +223,6 @@ class PeptideDataset:
                     sequence_column_name=self.sequence_column, batched=True
                 )
             )
-            # parse sequences only if encoding scheme is not unmod
-            # here naive mods is the only other option for now (hence, extend the vocabulary)
-            # self.parser = ProformaParser(build_naive_vocab=True, base_vocab=self.vocab)
-            # self.dataset = self.dataset.map(
-            #    lambda x: add_parsed_sequence_info(
-            #        x, self.sequence_column, self.parser
-            #    ),
-            #    desc="Parsing sequences...",
-            # )
-
-            # get the extended vocab from the parser
-            # self.extended_vocab = self.parser.extended_vocab
 
     def _configure_processing_pipeline(self):
         self._configure_encoding_step()
@@ -445,7 +433,7 @@ class PeptideDataset:
     @property
     def tensor_train_data(self):
         """TensorFlow Dataset object for the training data"""
-        return self.hf_dataset["train"].to_tf_dataset(
+        return self.hf_dataset[PeptideDataset.DEFAULT_SPLIT_NAMES[0]].to_tf_dataset(
             columns=self._get_input_tensor_column_names(),
             label_cols=self.label_column,
             shuffle=False,
@@ -455,7 +443,7 @@ class PeptideDataset:
     @property
     def tensor_val_data(self):
         """TensorFlow Dataset object for the val data"""
-        return self.hf_dataset["val"].to_tf_dataset(
+        return self.hf_dataset[PeptideDataset.DEFAULT_SPLIT_NAMES[1]].to_tf_dataset(
             columns=self._get_input_tensor_column_names(),
             label_cols=self.label_column,
             shuffle=False,
@@ -465,7 +453,7 @@ class PeptideDataset:
     @property
     def tensor_test_data(self):
         """TensorFlow Dataset object for the test data"""
-        return self.hf_dataset["test"].to_tf_dataset(
+        return self.hf_dataset[PeptideDataset.DEFAULT_SPLIT_NAMES[2]].to_tf_dataset(
             columns=self._get_input_tensor_column_names(),
             label_cols=self.label_column,
             shuffle=False,
