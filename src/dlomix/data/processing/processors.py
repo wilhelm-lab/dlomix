@@ -45,15 +45,18 @@ class PeptideDatasetBaseProcessor(abc.ABC):
 
 
 class SequenceParsingProcessor(PeptideDatasetBaseProcessor):
+    PARSED_COL_NAMES = {
+        "seq": "_parsed_sequence",
+        "n_term": "_n_term_mods",
+        "c_term": "_c_term_mods",
+    }
+
     def __init__(
         self,
         sequence_column_name: str,
         batched: bool = False,
-        new_column_names: list = ["raw_sequence", "n_terminal_mods", "c_terminal_mods"],
     ):
         super().__init__(sequence_column_name, batched)
-
-        self.new_column_names = new_column_names
 
     def _parse_proforma_sequence(self, sequence_string):
         splitted = sequence_string.split("-")
@@ -73,22 +76,22 @@ class SequenceParsingProcessor(PeptideDatasetBaseProcessor):
         seq = re.findall(r"[A-Za-z](?:\[UNIMOD:\d+\])*|[^\[\]]", seq)
         return n_term, seq, c_term
 
-    def _add_terminal_mods(self, seq, n_terms, c_terms):
-        return [n_terms] + seq + [c_terms]
-
     def batch_process(self, input_data, **kwargs):
-        for new_column in self.new_column_names:
+        for new_column in SequenceParsingProcessor.PARSED_COL_NAMES.values():
             input_data[new_column] = []
 
         for index, sequence in enumerate(input_data[self.sequence_column_name]):
             n_terms, seq, c_terms = self._parse_proforma_sequence(sequence)
-            input_data[self.new_column_names[0]].append(seq)
-            input_data[self.new_column_names[1]].append(n_terms)
-            input_data[self.new_column_names[2]].append(c_terms)
-
-            input_data[self.sequence_column_name][index] = self._add_terminal_mods(
-                seq, n_terms, c_terms
+            input_data[SequenceParsingProcessor.PARSED_COL_NAMES["seq"]].append(seq)
+            input_data[SequenceParsingProcessor.PARSED_COL_NAMES["n_term"]].append(
+                n_terms
             )
+            input_data[SequenceParsingProcessor.PARSED_COL_NAMES["c_term"]].append(
+                c_terms
+            )
+
+            # Replace the original sequence with the parsed sequence + terminal mods
+            input_data[self.sequence_column_name][index] = [n_terms] + seq + [c_terms]
 
         return input_data
 
@@ -96,13 +99,12 @@ class SequenceParsingProcessor(PeptideDatasetBaseProcessor):
         n_terms, seq, c_terms = self._parse_proforma_sequence(
             input_data[self.sequence_column_name]
         )
-        input_data[self.new_column_names[0]] = seq
-        input_data[self.new_column_names[1]] = n_terms
-        input_data[self.new_column_names[2]] = c_terms
+        input_data[SequenceParsingProcessor.PARSED_COL_NAMES["seq"]] = seq
+        input_data[SequenceParsingProcessor.PARSED_COL_NAMES["n_term"]] = n_terms
+        input_data[SequenceParsingProcessor.PARSED_COL_NAMES["c_term"]] = c_terms
 
-        input_data[self.sequence_column_name] = self._add_terminal_mods(
-            seq, n_terms, c_terms
-        )
+        # Replace the original sequence with the parsed sequence + terminal mods
+        input_data[self.sequence_column_name] = [n_terms] + seq + [c_terms]
 
         return input_data
 

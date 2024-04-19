@@ -1,6 +1,7 @@
 # adjust encoding schemes workflow --> check ppt for details
 # check if config can wrap all the parameters and be used to manage the attributes of the class, reduce the assignment of attributes in the init method
 
+import logging
 import os
 import warnings
 from typing import Callable, Dict, List, Optional, Union
@@ -22,6 +23,8 @@ from .processing.processors import (
     SequenceParsingProcessor,
     SequencePTMRemovalProcessor,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class PeptideDataset:
@@ -67,9 +70,10 @@ class PeptideDataset:
         self.model_features = model_features
 
         # to be kept in the hf dataset, but not returned in the tensor dataset
-        self.dataset_columns_to_keep = dataset_columns_to_keep
-        if self.dataset_columns_to_keep is None:
+        if dataset_columns_to_keep is None:
             self.dataset_columns_to_keep = []
+        else:
+            self.dataset_columns_to_keep = dataset_columns_to_keep
 
         self.features_to_extract = features_to_extract
         self.pad = pad
@@ -198,16 +202,14 @@ class PeptideDataset:
 
     def _parse_sequences(self):
         # parse sequence in all encoding schemes
-        # raw_sequence would be the original sequence with the PTMs kept for later feature extraction and reference
-        parsed_column_names = ["raw_sequence", "n_terminal_mods", "c_terminal_mods"]
-
         sequence_parsing_processor = SequenceParsingProcessor(
             self.sequence_column,
             batched=True,
-            new_column_names=parsed_column_names,
         )
 
-        self.dataset_columns_to_keep.extend(parsed_column_names)
+        self.dataset_columns_to_keep.extend(
+            SequenceParsingProcessor.PARSED_COL_NAMES.values()
+        )
         self._processors.append(sequence_parsing_processor)
 
         if self.encoding_scheme == EncodingScheme.UNMOD:
@@ -291,8 +293,11 @@ class PeptideDataset:
                     )
                     continue
 
+                # We pass here the parsed sequence to the feature extractor since it will always be a list with AA+PTM as elements
                 feature_extactor = LookupFeatureExtractor(
-                    sequence_column_name="raw_sequence",
+                    sequence_column_name=SequenceParsingProcessor.PARSED_COL_NAMES[
+                        "seq"
+                    ],
                     feature_column_name=feature_name,
                     **FEATURE_EXTRACTORS_PARAMETERS[feature_name],
                     max_length=self.max_seq_len,
@@ -304,7 +309,6 @@ class PeptideDataset:
                         f"Using custom feature extractor from the user function {feature.__name__}"
                         "please ensure that the provided function pads the feature to the sequence length"
                         "so that all tensors have the same sequence length dimension."
-                        # inform the user about using the raw_sequence if needed for custom feature extraction since it will always have the PTM information
                     )
                 )
 
@@ -320,7 +324,8 @@ class PeptideDataset:
 
     def _apply_processing_pipeline(self):
         for processor in self._processors:
-            print(f"Applying step:\n {processor}...")
+            logger.info(f"Applying step: {processor.__class__.__name__}...")
+            logger.debug(f"Applying step with arguments:\n\n{processor}...")
             self.hf_dataset = self.hf_dataset.map(
                 processor,
                 desc=f"Mapping {processor.__class__.__name__}",
@@ -328,11 +333,14 @@ class PeptideDataset:
                 batch_size=self._default_batch_processing_size,
                 num_proc=self._default_num_proc,
             )
+            logger.info(f"Done with step: {processor.__class__.__name__}.\n")
 
             if isinstance(processor, SequencePaddingProcessor):
                 for split in self.hf_dataset.keys():
                     if split != "test":
-                        print(f"Removing truncated sequences in the {split} split ...")
+                        logger.info(
+                            f"Removing truncated sequences in the {split} split ..."
+                        )
 
                         self.hf_dataset[split] = self.hf_dataset[split].filter(
                             lambda batch: batch[processor.KEEP_COLUMN_NAME],

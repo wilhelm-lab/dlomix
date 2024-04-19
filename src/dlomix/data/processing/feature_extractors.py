@@ -4,7 +4,7 @@ from .feature_tables import (
     PTM_LOSS_LOOKUP,
     PTM_MOD_DELTA_MASS_LOOKUP,
 )
-from .processors import PeptideDatasetBaseProcessor
+from .processors import PeptideDatasetBaseProcessor, SequenceParsingProcessor
 
 FEATURE_EXTRACTORS_PARAMETERS = {
     "mod_loss": {
@@ -89,9 +89,9 @@ class LookupFeatureExtractor(FeatureExtractor):
         feature_column = []
 
         for n_term, sequence, c_term in zip(
-            input_data["n_terminal_mods"],
+            input_data[SequenceParsingProcessor.PARSED_COL_NAMES["n_term"]],
             input_data[self.sequence_column_name],
-            input_data["c_terminal_mods"],
+            input_data[SequenceParsingProcessor.PARSED_COL_NAMES["c_term"]],
         ):
             feature = self._extract_feature([n_term] + sequence + [c_term])
             feature_column.append(feature)
@@ -100,9 +100,9 @@ class LookupFeatureExtractor(FeatureExtractor):
 
     def single_process(self, input_data, **kwargs):
         seq_with_terms = (
-            [input_data["n_terminal_mods"]]
+            [input_data[SequenceParsingProcessor.PARSED_COL_NAMES["n_term"]]]
             + input_data[self.sequence_column_name]
-            + [input_data["c_terminal_mods"]]
+            + [input_data[SequenceParsingProcessor.PARSED_COL_NAMES["c_term"]]]
         )
         feature = self._extract_feature(seq_with_terms)
         return {self.feature_column_name: feature}
