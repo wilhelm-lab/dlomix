@@ -31,10 +31,11 @@ print(d)
 
 model = PrositIntensityPredictor(
     seq_length=30,
-    sequence_input_name="sequence",
-    collision_energy_input_name="collision_energy_aligned_normed",
-    precursor_charge_input_name="precursor_charge_onehot",
-    # fragmentation_method_input_name="method_nbr",
+    input_keys={
+        "SEQUENCE_KEY": "sequence",
+        "COLLISION_ENERGY_KEY": "collision_energy_aligned_normed",
+        "PRECURSOR_CHARGE_KEY": "precursor_charge_onehot",
+    },
 )
 
 model.compile(optimizer=optimizer, loss=masked_spectral_distance, metrics=["mse"])

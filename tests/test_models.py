@@ -15,10 +15,13 @@ def test_prosit_retention_time_model():
 
 def test_prosit_intensity_model():
     model = PrositIntensityPredictor(
-        sequence_input_name="sequence",
-        collision_energy_input_name="collision_energy",
-        precursor_charge_input_name="precursor_charge",
+        input_keys={
+            "SEQUENCE_KEY": "sequence",
+            "COLLISION_ENERGY_KEY": "collision_energy",
+            "PRECURSOR_CHARGE_KEY": "precursor_charge",
+        },
     )
+
     seq_len = model.seq_length
     model.build(
         {
@@ -44,9 +47,9 @@ def test_prosit_intensity_model_ptm_on_input():
                 None,
                 seq_len,
             ),
-            "collision_energy": (None, 1),
+            "collision_energy": (None,),
             "precursor_charge": (None, 6),
-            "fragmentation_type": (None, 1),
+            "fragmentation_type": (None,),
             PrositIntensityPredictor.PTM_INPUT_KEYS[0]: (
                 None,
                 seq_len,
@@ -60,7 +63,6 @@ def test_prosit_intensity_model_ptm_on_input():
             PrositIntensityPredictor.PTM_INPUT_KEYS[2]: (
                 None,
                 seq_len,
-                1,
             ),
         }
     )
@@ -80,9 +82,9 @@ def test_prosit_intensity_model_ptm_on_missing():
                     None,
                     seq_len,
                 ),
-                "collision_energy": (None, 1),
+                "collision_energy": (None,),
                 "precursor_charge": (None, 6),
-                "fragmentation_type": (None, 1),
+                "fragmentation_type": (None,),
                 # no PTM features
             }
         )
