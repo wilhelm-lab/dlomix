@@ -60,6 +60,8 @@ html_theme_options = {
     "logo": {
         "image_dark": "assets/logo_dark.jpg",
     },
+    "navigation_depth": 2,
+    "show_toc_level": 2,
 }
 
 html_logo = "assets/logo.jpg"
@@ -71,6 +73,7 @@ html_copy_source = False  # Don't need sources
 html_permalinks = True
 # html_permalinks_icon = Icons.permalinks_icon
 add_module_names = False
+
 
 sitemap_url_scheme = "{link}"
 
