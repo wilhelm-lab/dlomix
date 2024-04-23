@@ -1,31 +1,42 @@
 import os
-import pickle
 import sys
 
-import pandas as pd
 import tensorflow as tf
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
 
 
-from dlomix.data import IntensityDataset
+from dlomix.data import FragmentIonIntensityDataset
 from dlomix.losses import masked_spectral_distance
 from dlomix.models import PrositIntensityPredictor
 
 # consider the use-case for starting from a saved model
 
-model = PrositIntensityPredictor(seq_length=30)
+optimizer = tf.keras.optimizers.Adam(learning_rate=0.0001)
 
-optimizer = tf.keras.optimizers.Adam(learning_rate=0.0001, decay=1e-7)
+TRAIN_DATAPATH = "../example_dataset/intensity/intensity_data.parquet"
 
-TRAIN_DATAPATH = "../example_dataset/intensity/intensity_data.csv"
-# TEST_DATAPATH = '../example_dataset/proteomTools_test.csv'
-
-d = IntensityDataset(
-    data_source=TRAIN_DATAPATH, seq_length=30, batch_size=128, val_ratio=0.3
+d = FragmentIonIntensityDataset(
+    data_format="parquet",
+    data_source=TRAIN_DATAPATH,
+    sequence_column="sequence",
+    label_column="intensities",
+    model_features=["precursor_charge_onehot", "collision_energy_aligned_normed"],
+    max_seq_len=30,
+    batch_size=128,
+    val_ratio=0.2,
 )
 
-# continue here: test dataset ???
+print(d)
+
+model = PrositIntensityPredictor(
+    seq_length=30,
+    input_keys={
+        "SEQUENCE_KEY": "sequence",
+        "COLLISION_ENERGY_KEY": "collision_energy_aligned_normed",
+        "PRECURSOR_CHARGE_KEY": "precursor_charge_onehot",
+    },
+)
 
 model.compile(optimizer=optimizer, loss=masked_spectral_distance, metrics=["mse"])
 
@@ -41,12 +52,14 @@ callbacks = [checkpoint, early_stop, decay]
 
 
 history = model.fit(
-    d.train_data, epochs=5, validation_data=d.val_data, callbacks=callbacks
+    d.tensor_train_data,
+    epochs=5,
+    validation_data=d.tensor_val_data,
+    callbacks=callbacks,
 )
 
 
-predictions = model.predict(d.val_data)
-# predictions = d.denormalize_targets(predictions)
+predictions = model.predict(d.tensor_val_data)
 
 print(predictions.shape)
 print(predictions[0])

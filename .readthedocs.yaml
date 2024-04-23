@@ -10,11 +10,18 @@ build:
   os: ubuntu-20.04
   tools:
     python: "3.8"
-    
+  jobs:
+  # Build the rst files in case API has changed or modules has been added
+    pre_build:
+    # M Modules first, E no headers, f force overwrite, o output directory
+      - sphinx-apidoc -M -E -f -o docs/modules src/dlomix/
+      - python docs/codify_package_titles.py
+
+
 # Build documentation in the docs/ directory with Sphinx
 sphinx:
    configuration: docs/conf.py
-   
+
 python:
   install:
     - requirements: docs/requirements.txt

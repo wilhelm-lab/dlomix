@@ -26,16 +26,16 @@ jobs:
           pip install build
       - name: Build package
         run: python -m build
-      - name: publish_pypi
+      - name: Publish to PyPI
+        id: publishpypi
         uses: pypa/gh-action-pypi-publish@27b31702a0e7fc50959f5ad993c78deac1bdfc29
         with:
           user: __token__
           password: ${{ secrets.SECRET_PYPI }}
       - name: Create Github release
-        if: steps.publish_pypi.outcome == 'success'
+        if: steps.publishpypi.outcome == 'success'
         env:
           GITHUB_TOKEN: ${{ secrets.CLI_GH_TOKEN }}
         run: |
           VERSION=$(python setup.py --version)
           gh release create v$VERSION --title $VERSION --generate-notes
-        
