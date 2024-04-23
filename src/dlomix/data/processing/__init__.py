@@ -33,8 +33,8 @@ When writing your own feature extractor, you can either
     (1) use the FeatureExtractor class or
     (2) write a function that can be mapped to the Hugging Face dataset.
 In both cases, you can access the parsed sequence information from the dataset using the following keys, which all provide python lists:
-    - {SequenceParsingProcessor.PARSED_COL_NAMES["seq"]}: The parsed sequence
-    - {SequenceParsingProcessor.PARSED_COL_NAMES["n_term"]}: The N-terminal modifications
-    - {SequenceParsingProcessor.PARSED_COL_NAMES["c_term"]}: The C-terminal modifications
+    - {SequenceParsingProcessor.PARSED_COL_NAMES["seq"]}: parsed sequence
+    - {SequenceParsingProcessor.PARSED_COL_NAMES["n_term"]}: N-terminal modifications
+    - {SequenceParsingProcessor.PARSED_COL_NAMES["c_term"]}: C-terminal modifications
 """
 )
