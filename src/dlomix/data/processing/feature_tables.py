@@ -4,14 +4,27 @@ import pickle
 MODULE_PATH = os.path.abspath(os.path.dirname(__file__))
 PKL_BASE_PATH = os.path.join(MODULE_PATH, "pickled_feature_dicts")
 
-with open(os.path.join(PKL_BASE_PATH, "saved_loss_atoms.pkl"), "rb") as f:
-    PTM_LOSS_LOOKUP = pickle.load(f)
 
-with open(os.path.join(PKL_BASE_PATH, "mz_diff.pkl"), "rb") as f:
-    PTM_MOD_DELTA_MASS_LOOKUP = pickle.load(f)
+def load_pickled_feature(pickle_filename: str):
+    """
+    Load a pickled feature dictionary.
 
-with open(os.path.join(PKL_BASE_PATH, "saved_gained_atoms.pkl"), "rb") as f:
-    PTM_GAIN_LOOKUP = pickle.load(f)
+    Parameters
+    ----------
+    pickle_filename : str
+        Name of the pickled file.
 
-with open(os.path.join(PKL_BASE_PATH, "saved_ac_count.pkl"), "rb") as f:
-    PTM_ATOM_COUNT_LOOKUP = pickle.load(f)
+    Returns
+    -------
+    dict
+        Loaded pickled dictionary.
+    """
+
+    with open(os.path.join(PKL_BASE_PATH, pickle_filename), "rb") as f:
+        return pickle.load(f)
+
+
+PTM_LOSS_LOOKUP = load_pickled_feature("saved_loss_atoms.pkl")
+PTM_MOD_DELTA_MASS_LOOKUP = load_pickled_feature("mz_diff.pkl")
+PTM_GAIN_LOOKUP = load_pickled_feature("saved_gained_atoms.pkl")
+PTM_ATOM_COUNT_LOOKUP = load_pickled_feature("saved_ac_count.pkl")

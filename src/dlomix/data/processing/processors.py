@@ -3,6 +3,17 @@ import re
 
 
 class PeptideDatasetBaseProcessor(abc.ABC):
+    """
+    Base class for peptide dataset processors.
+
+    Parameters
+    ----------
+    sequence_column_name : str
+        Name of the column containing the peptide sequence.
+    batched : bool (default=False)
+        Whether to process data in batches.
+    """
+
     def __init__(self, sequence_column_name: str = "", batched: bool = False):
         self.sequence_column_name = sequence_column_name
         self.batched = batched
@@ -45,6 +56,17 @@ class PeptideDatasetBaseProcessor(abc.ABC):
 
 
 class SequenceParsingProcessor(PeptideDatasetBaseProcessor):
+    """
+    Processor for parsing peptide sequences in ProForma format.
+
+    Parameters
+    ----------
+    sequence_column_name : str
+        Name of the column containing the peptide sequence.
+    batched : bool (default=False)
+        Whether to process data in batches.
+    """
+
     PARSED_COL_NAMES = {
         "seq": "_parsed_sequence",
         "n_term": "_n_term_mods",
@@ -110,6 +132,21 @@ class SequenceParsingProcessor(PeptideDatasetBaseProcessor):
 
 
 class SequencePaddingProcessor(PeptideDatasetBaseProcessor):
+    """
+    Processor for padding peptide sequences to a fixed length.
+
+    Parameters
+    ----------
+    sequence_column_name : str
+        Name of the column containing the peptide sequence.
+    batched : bool (default=False)
+        Whether to process data in batches.
+    padding_value : int (default=0)
+        Value to use for padding the sequences.
+    max_length : int (default=30)
+        Maximum length of the sequences.
+    """
+
     KEEP_COLUMN_NAME = "_KEEP"
 
     def __init__(
@@ -155,6 +192,19 @@ class SequencePaddingProcessor(PeptideDatasetBaseProcessor):
 
 
 class SequenceEncodingProcessor(PeptideDatasetBaseProcessor):
+    """
+    Processor for encoding peptide sequences using an alphabet.
+
+    Parameters
+    ----------
+    sequence_column_name : str
+        Name of the column containing the peptide sequence.
+    alphabet : dict
+        Dictionary mapping amino acids to integers.
+    batched : bool (default=False)
+        Whether to process data in batches.
+    """
+
     def __init__(
         self, sequence_column_name: str, alphabet: dict, batched: bool = False
     ):
@@ -183,6 +233,17 @@ class SequenceEncodingProcessor(PeptideDatasetBaseProcessor):
 
 
 class SequencePTMRemovalProcessor(PeptideDatasetBaseProcessor):
+    """
+    Processor for removing PTMs from peptide sequences.
+
+    Parameters
+    ----------
+    sequence_column_name : str
+        Name of the column containing the peptide sequence.
+    batched : bool (default=False)
+        Whether to process data in batches.
+    """
+
     def __init__(self, sequence_column_name: str, batched: bool = False):
         super().__init__(sequence_column_name, batched)
 
@@ -211,6 +272,17 @@ class SequencePTMRemovalProcessor(PeptideDatasetBaseProcessor):
 
 
 class FunctionProcessor(PeptideDatasetBaseProcessor):
+    """
+    Processor for applying a function to the input data.
+
+    Parameters
+    ----------
+    function : callable
+        Function to apply to the input data.
+    name : str (default="")
+        Name of the processor.
+    """
+
     def __init__(self, function, name: str = ""):
         super().__init__(batched=False)
         self.function = function

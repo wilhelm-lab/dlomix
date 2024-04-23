@@ -4,6 +4,10 @@ from enum import Enum
 
 
 class EncodingScheme(str, Enum):
+    """
+    Enum for encoding schemes.
+    """
+
     UNMOD = "unmod"
     NAIVE_MODS = "naive-mods"
 
@@ -15,6 +19,15 @@ class EncodingScheme(str, Enum):
 
 
 def get_num_processors():
+    """
+    Get the number of processors available on the system.
+
+    Returns
+    -------
+    int
+        Number of processors available.
+    """
+
     import multiprocessing
 
     return multiprocessing.cpu_count()

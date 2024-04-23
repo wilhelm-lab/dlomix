@@ -33,6 +33,25 @@ AVAILABLE_FEATURE_EXTRACTORS = list(FEATURE_EXTRACTORS_PARAMETERS.keys())
 
 
 class FeatureExtractor(PeptideDatasetBaseProcessor):
+    """
+    Base class for feature extractors.
+
+    Parameters
+    ----------
+    sequence_column_name : str
+        Name of the column containing the peptide sequence.
+    feature_column_name : str
+        Name of the column to store the extracted feature.
+    feature_default_value : int or list
+        Default value to use for padding the feature.
+    description : str
+        Description of the feature.
+    max_length : int (default=30)
+        Maximum length of the feature.
+    batched : bool (default=False)
+        Whether to process data in batches.
+    """
+
     def __init__(
         self,
         sequence_column_name: str,
@@ -49,6 +68,20 @@ class FeatureExtractor(PeptideDatasetBaseProcessor):
         self.max_length = max_length
 
     def pad_feature_to_seq_length(self, single_feature):
+        """
+        Pad the feature to the maximum sequence length.
+
+        Parameters
+        ----------
+        single_feature : list
+            List of feature values.
+
+        Returns
+        -------
+        list
+            Padded feature list.
+        """
+
         feature_length = len(single_feature)
 
         if feature_length > self.max_length:
@@ -63,6 +96,27 @@ class FeatureExtractor(PeptideDatasetBaseProcessor):
 
 
 class LookupFeatureExtractor(FeatureExtractor):
+    """
+    Feature extractor that uses a lookup table to extract features.
+
+    Parameters
+    ----------
+    sequence_column_name : str
+        Name of the column containing the peptide sequence.
+    feature_column_name : str
+        Name of the column to store the extracted feature.
+    feature_default_value : int or list
+        Default value to use for padding the feature.
+    lookup_table : dict
+        Lookup table for extracting features.
+    description : str
+        Description of the feature.
+    max_length : int (default=30)
+        Maximum length of the sequences.
+    batched : bool (default=False)
+        Whether to process data in batches.
+    """
+
     def __init__(
         self,
         sequence_column_name: str,

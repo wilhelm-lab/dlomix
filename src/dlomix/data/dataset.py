@@ -28,6 +28,53 @@ logger = logging.getLogger(__name__)
 
 
 class PeptideDataset:
+    """
+    PeptideDataset class to handle peptide datasets for deep learning models.
+    The class is designed to handle peptide datasets in various formats and process them into a format that can be used by deep learning models.
+    The class is built on top of the Hugging Face datasets library and provides a simple interface to load, process and save peptide datasets.
+
+    Parameters
+    ----------
+    data_source : Union[str, List]
+        Path to the data source file or list of paths to the data source files.
+    val_data_source : Union[str, List]
+        Path to the validation data source file or list of paths to the validation data source files.
+    test_data_source : Union[str, List]
+        Path to the test data source file or list of paths to the test data source files.
+    data_format : str
+        Format of the data source file(s). Example formats are 'csv', 'json', 'parquet', etc.
+    sequence_column : str
+        Name of the column in the data source file that contains the peptide sequences.
+    label_column : str
+        Name of the column in the data source file that contains the labels.
+    val_ratio : float
+        Ratio of the validation data to the training data. The value should be between 0 and 1.
+    max_seq_len : int
+        Maximum sequence length to pad the sequences to. If set to 0, the sequences will not be padded.
+    dataset_type : str
+        Type of the tensor dataset to be generated afterwards. Possible values are "tf" and "pt" for TensorFlow and PyTorch respectively.
+    batch_size : int
+        Batch size for the tensor dataset.
+    model_features : List[str]
+        List of column names in the data source file that contain features to be used by the model.
+    dataset_columns_to_keep : Optional[List[str]]
+        List of column names in the data source file that should be kept in the Hugging Face dataset but not returned as tensors.
+    features_to_extract : Optional[List[Union[Callable, str]]]
+        List of feature extractors to be applied to the sequences. The feature extractors can be either a function or a string that corresponds to a predefined feature extractor.
+    pad : bool
+        Flag to indicate whether to pad the sequences to the maximum sequence length.
+    padding_value : int
+        Value to use for padding the sequences.
+    alphabet : Dict
+        Alphabet to use for encoding the amino acids in the sequences.
+    encoding_scheme : Union[str, EncodingScheme]
+        Encoding scheme to use for encoding the sequences. Possible values are "unmod" and "naive-mods" for unmodified sequences and sequences with PTMs respectively.
+    processed : bool
+        Flag to indicate whether the dataset has been processed or not.
+    disable_cache : bool
+        Flag to indicate whether to disable Hugging Face Datasets caching.
+    """
+
     DEFAULT_SPLIT_NAMES = ["train", "val", "test"]
     CONFIG_JSON_NAME = "dlomix_peptide_dataset_config.json"
 
@@ -367,6 +414,16 @@ If you prefer to encode the (amino-acids)+PTM combinations as tokens in the voca
                 )
 
     def save_to_disk(self, path: str):
+        """
+        Save the dataset to disk.
+
+        Parameters
+        ----------
+        path : str
+            Path to save the dataset to.
+
+        """
+
         self._config.save_config_json(
             os.path.join(path, PeptideDataset.CONFIG_JSON_NAME)
         )
@@ -375,6 +432,20 @@ If you prefer to encode the (amino-acids)+PTM combinations as tokens in the voca
 
     @classmethod
     def load_from_disk(cls, path: str):
+        """
+        Load the dataset from disk.
+
+        Parameters
+        ----------
+        path : str
+            Path to load the dataset from.
+
+        Returns
+        -------
+        PeptideDataset
+            PeptideDataset object loaded from disk.
+        """
+
         config = DatasetConfig.load_config_json(
             os.path.join(path, PeptideDataset.CONFIG_JSON_NAME)
         )
