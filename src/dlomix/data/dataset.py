@@ -48,7 +48,7 @@ class PeptideDataset:
         features_to_extract: Optional[List[Union[Callable, str]]] = None,
         pad: bool = True,
         padding_value: int = 0,
-        vocab: Dict = ALPHABET_UNMOD,
+        alphabet: Dict = ALPHABET_UNMOD,
         encoding_scheme: Union[str, EncodingScheme] = EncodingScheme.UNMOD,
         processed: bool = False,
         disable_cache: bool = False,
@@ -78,13 +78,13 @@ class PeptideDataset:
         self.features_to_extract = features_to_extract
         self.pad = pad
         self.padding_value = padding_value
-        self.vocab = vocab
+        self.alphabet = alphabet
         self.encoding_scheme = EncodingScheme(encoding_scheme)
         self.processed = processed
         self.disable_cache = disable_cache
         self._set_hf_cache_management()
 
-        self.extended_vocab = self.vocab.copy()
+        self.extended_alphabet = self.alphabet.copy()
 
         self._refresh_config()
 
@@ -133,7 +133,7 @@ class PeptideDataset:
             features_to_extract=self.features_to_extract,
             pad=self.pad,
             padding_value=self.padding_value,
-            vocab=self.vocab,
+            alphabet=self.alphabet,
             encoding_scheme=self.encoding_scheme,
             processed=self.processed,
         )
@@ -240,13 +240,13 @@ class PeptideDataset:
         ):
             encoding_processor = SequenceEncodingProcessor(
                 sequence_column_name=self.sequence_column,
-                alphabet=self.extended_vocab,
+                alphabet=self.extended_alphabet,
                 batched=True,
             )
 
         # elif self.encoding_scheme == EncodingScheme.NAIVE_MODS:
         #    warnings.warn(
-        #        "Naive encoding for PTMs: please use the dataset attribute extended_vocab for the full alphabet and pass it to the model if needed. \nUsage: dataset.extended_vocab"
+        #        "Naive encoding for PTMs: please use the dataset attribute extended_alphabet for the full alphabet and pass it to the model if needed. \nUsage: dataset.extended_alphabet"
         #    )
 
         else:
@@ -389,7 +389,7 @@ class PeptideDataset:
             features_to_extract=config.features_to_extract,
             pad=config.pad,
             padding_value=config.padding_value,
-            vocab=config.vocab,
+            alphabet=config.alphabet,
             encoding_scheme=config.encoding_scheme,
             processed=config.processed,
         )

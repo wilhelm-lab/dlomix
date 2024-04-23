@@ -13,8 +13,8 @@ class PrositRetentionTimePredictor(tf.keras.Model):
         Size of the embeddings to use. Defaults to 16.
     seq_length: int, optional
         Sequence length of the peptide sequences. Defaults to 30.
-    vocab_dict: dict, optional
-        Dictionary mapping for the vocabulary (the amino acids in this case). Defaults to ALPHABET_UNMOD.
+    alphabet: dict, optional
+        Dictionary mapping for the alphabet (the amino acids in this case). Defaults to ALPHABET_UNMOD.
     dropout_rate: float, optional
         Probability to use for dropout layers in the encoder. Defaults to 0.5.
     latent_dropout_rate: float, optional
@@ -29,7 +29,7 @@ class PrositRetentionTimePredictor(tf.keras.Model):
         self,
         embedding_output_dim=16,
         seq_length=30,
-        vocab_dict=ALPHABET_UNMOD,
+        alphabet=ALPHABET_UNMOD,
         dropout_rate=0.5,
         latent_dropout_rate=0.1,
         recurrent_layers_sizes=(256, 512),
@@ -38,7 +38,7 @@ class PrositRetentionTimePredictor(tf.keras.Model):
         super(PrositRetentionTimePredictor, self).__init__()
 
         # tie the count of embeddings to the size of the vocabulary (count of amino acids)
-        self.embeddings_count = len(vocab_dict) + 2
+        self.embeddings_count = len(alphabet) + 2
 
         self.dropout_rate = dropout_rate
         self.latent_dropout_rate = latent_dropout_rate
@@ -97,8 +97,8 @@ class PrositIntensityPredictor(tf.keras.Model):
         Size of the embeddings to use. Defaults to 16.
     seq_length : int, optional
         Sequence length of the peptide sequences. Defaults to 30.
-    vocab_dict : dict, optional
-        Dictionary mapping for the vocabulary (the amino acids in this case). Defaults to ALPHABET_UNMOD.
+    alphabet : dict, optional
+        Dictionary mapping for the alphabet (the amino acids in this case). Defaults to ALPHABET_UNMOD.
     dropout_rate : float, optional
         Probability to use for dropout layers in the encoder. Defaults to 0.5.
     latent_dropout_rate : float, optional
@@ -114,7 +114,7 @@ class PrositIntensityPredictor(tf.keras.Model):
         embedding_output_dim=16,
         seq_length=30,
         len_fion=6,
-        vocab_dict=ALPHABET_UNMOD,
+        alphabet=ALPHABET_UNMOD,
         dropout_rate=0.2,
         latent_dropout_rate=0.1,
         recurrent_layers_sizes=(256, 512),
@@ -123,7 +123,7 @@ class PrositIntensityPredictor(tf.keras.Model):
         super(PrositIntensityPredictor, self).__init__()
 
         # tie the count of embeddings to the size of the vocabulary (count of amino acids)
-        self.embeddings_count = len(vocab_dict) + 2
+        self.embeddings_count = len(alphabet) + 2
 
         self.dropout_rate = dropout_rate
         self.latent_dropout_rate = latent_dropout_rate

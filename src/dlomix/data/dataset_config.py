@@ -23,7 +23,7 @@ class DatasetConfig:
     features_to_extract: Optional[List[Union[Callable, str]]]
     pad: bool
     padding_value: int
-    vocab: Dict
+    alphabet: Dict
     encoding_scheme: Union[str, EncodingScheme]
     processed: bool
     _additional_data: dict = field(default_factory=dict)

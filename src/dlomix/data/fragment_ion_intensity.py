@@ -26,7 +26,7 @@ class FragmentIonIntensityDataset(PeptideDataset):
         features_to_extract: Optional[List[Union[Callable, str]]] = None,
         pad: bool = True,
         padding_value: int = 0,
-        vocab: Dict = ALPHABET_UNMOD,
+        alphabet: Dict = ALPHABET_UNMOD,
         encoding_scheme: Union[str, EncodingScheme] = EncodingScheme.UNMOD,
         processed: bool = False,
     ):
@@ -46,7 +46,7 @@ class FragmentIonIntensityDataset(PeptideDataset):
             features_to_extract,
             pad,
             padding_value,
-            vocab,
+            alphabet,
             encoding_scheme,
             processed,
         )

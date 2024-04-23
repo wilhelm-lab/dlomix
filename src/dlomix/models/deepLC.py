@@ -5,7 +5,7 @@ from ..constants import ALPHABET_UNMOD
 
 class DeepLCRetentionTimePredictor(tf.keras.Model):
     def __init__(
-        self, seq_length=60, vocab_dict=ALPHABET_UNMOD, use_global_features=False
+        self, seq_length=60, alphabet=ALPHABET_UNMOD, use_global_features=False
     ):
         super(DeepLCRetentionTimePredictor, self).__init__()
         self.seq_length = seq_length

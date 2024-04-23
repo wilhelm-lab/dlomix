@@ -31,6 +31,25 @@ def masked_spectral_distance(y_true, y_pred):
 
 
 def masked_pearson_correlation_distance(y_true, y_pred):
+    """
+    Calculates the masked Pearson correlation distance between true and predicted intensity vectors.
+    The masked Pearson correlation distance is a metric for comparing the similarity between two intensity vectors,
+    taking into account only the non-negative values in the true values tensor (which represent valid peaks).
+    Parameters:
+    -----------
+    y_true : tf.Tensor
+        A tensor containing the true values, with shape `(batch_size, num_values)`.
+    y_pred : tf.Tensor
+        A tensor containing the predicted values, with the same shape as `y_true`.
+    Returns:
+    --------
+    tf.Tensor
+        A tensor containing the masked Pearson correlation distance between `y_true` and `y_pred`.
+    Raises:
+    -------
+    ValueError
+        If `y_true` and `y_pred` have different shapes.
+    """
     epsilon = K.epsilon()
 
     # Masking: we multiply values by (true + 1) because then the peaks that cannot

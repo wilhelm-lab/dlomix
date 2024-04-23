@@ -14,8 +14,8 @@ class RetentionTimePredictor(tf.keras.Model):
             Sequence length of the peptide sequences. Defaults to ``30``.
         encoder: str, optional
             String for specifying the decoder to use, either based on 1D conv-layers or LSTMs. Defaults to ``conv1d``.
-        vocab_dict: dict, optional
-            Dictionary mapping for the vocabulary (the amino acids in this case). Defaults to ``ALPHABET_UNMOD``.
+        alphabet: dict, optional
+            Dictionary mapping for the alphabet (the amino acids in this case). Defaults to ``ALPHABET_UNMOD``.
     """
 
     def __init__(
@@ -23,12 +23,12 @@ class RetentionTimePredictor(tf.keras.Model):
         embedding_dim=16,
         seq_length=30,
         encoder="conv1d",
-        vocab_dict=ALPHABET_UNMOD,
+        alphabet=ALPHABET_UNMOD,
     ):
         super(RetentionTimePredictor, self).__init__()
 
         # tie the count of embeddings to the size of the vocabulary (count of amino acids)
-        self.embeddings_count = len(vocab_dict) + 2
+        self.embeddings_count = len(alphabet) + 2
 
         self.embedding = tf.keras.layers.Embedding(
             input_dim=self.embeddings_count,
