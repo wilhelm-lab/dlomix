@@ -92,6 +92,7 @@ class PeptideDataset:
             self.hf_dataset: Optional[Union[Dataset, DatasetDict]] = None
             self._empty_dataset_mode = False
             self._is_predefined_split = False
+            self._test_set_only = False
             self._default_num_proc = get_num_processors()
             self._default_batch_processing_size = 1000
             self._load_dataset()
@@ -161,10 +162,17 @@ class PeptideDataset:
                 "No data files provided, please provide at least one data source if you plan to use this dataset directly. Otherwise, you can later load data into this empty dataset"
             )
             return
+
         else:
             self._empty_dataset_mode = False
 
-            if len(data_files_available_splits) > 1:
+            if (
+                len(data_files_available_splits) == 1
+                and self.test_data_source is not None
+            ):
+                self._test_set_only = True
+
+            if len(data_files_available_splits) > 2:
                 self._is_predefined_split = True
                 warnings.warn(
                     f"""
@@ -191,14 +199,21 @@ class PeptideDataset:
         self.hf_dataset = self.hf_dataset.select_columns(self._relevant_columns)
 
     def _split_dataset(self):
-        # logic to split
-        if not self._is_predefined_split:
-            # only a train dataset is availble in the DatasetDict
-            self.hf_dataset = self.hf_dataset[
-                PeptideDataset.DEFAULT_SPLIT_NAMES[0]
-            ].train_test_split(test_size=self.val_ratio)
-            self.hf_dataset["val"] = self.hf_dataset["test"]
-            del self.hf_dataset["test"]
+        if self._is_predefined_split or self._test_set_only:
+            return
+
+        # only a train dataset or a train and a test but no val -> split train into train/val
+
+        splitted_dataset = self.hf_dataset[
+            PeptideDataset.DEFAULT_SPLIT_NAMES[0]
+        ].train_test_split(test_size=self.val_ratio)
+
+        self.hf_dataset["train"] = splitted_dataset["train"]
+        self.hf_dataset["val"] = splitted_dataset["test"]
+
+        del splitted_dataset["train"]
+        del splitted_dataset["test"]
+        del splitted_dataset
 
     def _parse_sequences(self):
         # parse sequence in all encoding schemes
@@ -214,10 +229,9 @@ class PeptideDataset:
 
         if self.encoding_scheme == EncodingScheme.UNMOD:
             warnings.warn(
-                f"""
-                          Encoding scheme is {self.encoding_scheme}, this enforces removing all occurences of PTMs in the sequences.
-                          If you prefer to encode the sequence+PTM combinations as new tokens in the vocabulary, please use the encoding scheme 'naive-mods'.
-                          """
+                f"""Encoding scheme is {self.encoding_scheme}, this enforces removing all occurences of PTMs in the sequences.
+If you prefer to encode the (amino-acids)+PTM combinations as tokens in the vocabulary, please use the encoding scheme 'naive-mods'.
+"""
             )
 
             self._processors.append(

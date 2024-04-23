@@ -8,6 +8,4 @@ from .RetentionTimeReportRunComparisonWandb import RetentionTimeReportRunCompari
 __all__ = [
     "RetentionTimeReport",
     "IntensityReport",
-    "RetentionTimeReportRunComparisonWandb",
-    "RetentionTimeReportModelComparisonWandb",
 ]

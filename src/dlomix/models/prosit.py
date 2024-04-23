@@ -115,6 +115,10 @@ class PrositIntensityPredictor(tf.keras.Model):
         seq_length=30,
         len_fion=6,
         alphabet=ALPHABET_UNMOD,
+        sequence_input_name="sequence",
+        collision_energy_input_name="collision_energy_aligned_normed",
+        precursor_charge_input_name="precursor_charge_onehot",
+        fragmentation_method_input_name="method_nbr",
         dropout_rate=0.2,
         latent_dropout_rate=0.1,
         recurrent_layers_sizes=(256, 512),
@@ -131,6 +135,11 @@ class PrositIntensityPredictor(tf.keras.Model):
         self.recurrent_layers_sizes = recurrent_layers_sizes
         self.seq_length = seq_length
         self.len_fion = len_fion
+
+        self.sequence_input_name = sequence_input_name
+        self.collision_energy_input_name = collision_energy_input_name
+        self.precursor_charge_input_name = precursor_charge_input_name
+        self.fragmentation_method_input_name = fragmentation_method_input_name
 
         # maximum number of fragment ions
         self.max_ion = self.seq_length - 1
@@ -203,18 +212,18 @@ class PrositIntensityPredictor(tf.keras.Model):
         )
 
     def call(self, inputs, **kwargs):
-        peptides_in = inputs["modified_sequence"]
-        collision_energy_in = inputs["aligned_collision_energy"]
-        precursor_charge_in = inputs["precursor_charge_onehot"]
-        fragmentation_method_in = inputs["method_nbr"]
+        peptides_in = inputs[self.sequence_input_name]
+        collision_energy_in = inputs[self.collision_energy_input_name]
+        precursor_charge_in = inputs[self.precursor_charge_input_name]
+        # fragmentation_method_in = inputs[self.fragmentation_method_input_name]
 
         collision_energy_in = tf.expand_dims(collision_energy_in, axis=1)
         precursor_charge_in = tf.cast(precursor_charge_in, tf.float32)
-        fragmentation_method_in = tf.expand_dims(fragmentation_method_in, axis=1)
-        fragmentation_method_in = tf.cast(fragmentation_method_in, tf.float32)
+        # fragmentation_method_in = tf.expand_dims(fragmentation_method_in, axis=1)
+        # fragmentation_method_in = tf.cast(fragmentation_method_in, tf.float32)
 
         encoded_meta = self.meta_encoder(
-            [collision_energy_in, precursor_charge_in, fragmentation_method_in]
+            [collision_energy_in, precursor_charge_in]  # , fragmentation_method_in]
         )
 
         x = self.embedding(peptides_in)
