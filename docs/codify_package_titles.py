@@ -1,7 +1,7 @@
 import glob
 import os
 
-files = glob.glob("docs/modules/dlomix*.rst")
+files = glob.glob("docs/dlomix*.rst")
 
 
 # Function to replace the first line of each .rst file

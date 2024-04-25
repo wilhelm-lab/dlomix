@@ -47,7 +47,7 @@ The goal of DLOmix is to be easy to use and flexible, while still providing the 
    :maxdepth: 2
    :caption: Package Reference
 
-   modules/dlomix
+   dlomix
 
 
 
