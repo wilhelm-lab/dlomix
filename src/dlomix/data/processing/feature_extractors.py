@@ -3,6 +3,7 @@ from .feature_tables import (
     PTM_GAIN_LOOKUP,
     PTM_LOSS_LOOKUP,
     PTM_MOD_DELTA_MASS_LOOKUP,
+    PTM_RED_SMILES_LOOKUP,
 )
 from .processors import PeptideDatasetBaseProcessor, SequenceParsingProcessor
 
@@ -26,6 +27,11 @@ FEATURE_EXTRACTORS_PARAMETERS = {
         "feature_default_value": [1, 1, 1, 1, 1, 1],
         "lookup_table": PTM_ATOM_COUNT_LOOKUP,
         "description": "Atom count of PTM.",
+    },
+    "red_smiles": {
+        "feature_default_value": [0] * 60,
+        "lookup_table": PTM_RED_SMILES_LOOKUP,
+        "description": "Reduced SMILES representation of PTM.",
     },
 }
 

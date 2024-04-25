@@ -90,7 +90,7 @@ def normalize_intensity_predictions(data, batch_size=600):
     m_idx = intensities == -1
     intensities = normalize_base_peak(intensities)
     intensities[m_idx] = -1
-    data["intensities_pred"] = intensities
+    data["intensities_pred"] = intensities.tolist()
 
     if "intensities_raw" in data:
         data["spectral_angle"] = get_spectral_angle(
