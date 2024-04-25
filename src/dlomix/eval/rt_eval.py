@@ -4,7 +4,8 @@ import tensorflow_probability as tfp
 
 
 class TimeDeltaMetric(tf.keras.metrics.Metric):
-    r"""Implementation of the time delta metric as a Keras Metric.
+    """
+    Implementation of the time delta metric as a Keras Metric.
 
     Parameters
     ----------
@@ -46,6 +47,19 @@ class TimeDeltaMetric(tf.keras.metrics.Metric):
         self.double_delta = double_delta
 
     def update_state(self, y_true, y_pred, sample_weight=None):
+        """
+        Update the metric state.
+
+        Parameters
+        ----------
+        y_true : tf.Tensor
+            True values of the target.
+        y_pred : tf.Tensor
+            Predicted values of the target.
+        sample_weight : tf.Tensor, optional
+            Sample weights. Defaults to None.
+        """
+
         # rescale
         if self.rescale_targets:
             y_true = y_true * self.std + self.mean
@@ -91,7 +105,10 @@ def delta95_metric(y_true, y_pred):
 
 
 def TimeDeltaMetric2():
-    """95th percentile of absolute error between label and prediction"""
+    """
+    The 95th percentile of absolute error between label and prediction
+
+    """
 
     def calc_metric(y_true, y_pred, sample_weight=None):
         # compute residuals and sort

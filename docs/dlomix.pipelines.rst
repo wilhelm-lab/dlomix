@@ -1,5 +1,5 @@
-``dlomix.pipelines`` package
-========================
+``dlomix.pipelines``
+=====================
 
 .. automodule:: dlomix.pipelines
    :members:

@@ -1,5 +1,5 @@
-``dlomix.layers`` package
-=====================
+``dlomix.layers``
+==================
 
 .. automodule:: dlomix.layers
    :members:

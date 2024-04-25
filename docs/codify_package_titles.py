@@ -9,9 +9,11 @@ def replace_first_line(filename):
     with open(filename, "r+") as file:
         lines = file.readlines()
         first_word = lines[0].split()[0]
-        lines[0] = f"``{first_word}`` package\n"
+        lines[0] = f"``{first_word}``\n"
+        lines[1] = "=" * len(lines[0]) + "\n"
         file.seek(0)
         file.writelines(lines)
+        file.truncate()
 
 
 # Replace the first line for each .rst file

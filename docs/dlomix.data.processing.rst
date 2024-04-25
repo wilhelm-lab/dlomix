@@ -1,5 +1,5 @@
-``dlomix.data.processing`` package
-==============================
+``dlomix.data.processing``
+===========================
 
 .. automodule:: dlomix.data.processing
    :members:

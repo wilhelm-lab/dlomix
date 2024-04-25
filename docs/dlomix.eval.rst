@@ -1,5 +1,5 @@
-``dlomix.eval`` package
-===================
+``dlomix.eval``
+================
 
 .. automodule:: dlomix.eval
    :members:

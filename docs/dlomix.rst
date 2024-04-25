@@ -1,5 +1,5 @@
-``dlomix`` package
-==============
+``dlomix``
+===========
 
 .. automodule:: dlomix
    :members:

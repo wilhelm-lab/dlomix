@@ -1,5 +1,5 @@
-``dlomix.models`` package
-=====================
+``dlomix.models``
+==================
 
 .. automodule:: dlomix.models
    :members:

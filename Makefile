@@ -38,6 +38,8 @@ lint:
 	pylint --disable=R,C ./src/dlomix/*
 
 build-docs:
+	sphinx-apidoc -M -f -E -o docs/ src/dlomix/
+	python docs/codify_package_titles.py
 	cd docs && make clean html
 	cd docs/_build/html/ && open index.html
 
