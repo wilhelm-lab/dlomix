@@ -43,8 +43,8 @@ The goal of DLOmix is to be easy to use and flexible, while still providing the 
 
 
 .. toctree::
-    :hidden:
-   :maxdepth: 1
+   :glob:
+   :maxdepth: 2
    :caption: Package Reference
 
    modules/dlomix
