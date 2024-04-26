@@ -1,7 +1,7 @@
-``dlomix.pipelines`` package
-========================
+``dlomix.layers``
+==================
 
-.. automodule:: dlomix.pipelines
+.. automodule:: dlomix.layers
    :members:
    :undoc-members:
    :show-inheritance:
@@ -10,7 +10,7 @@ Submodules
 ----------
 
 
-.. automodule:: dlomix.pipelines.pipeline
+.. automodule:: dlomix.layers.attention
    :members:
    :undoc-members:
    :show-inheritance:

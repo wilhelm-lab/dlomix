@@ -1,5 +1,5 @@
-``dlomix`` package
-==============
+``dlomix``
+===========
 
 .. automodule:: dlomix
    :members:
@@ -25,12 +25,6 @@ Submodules
 
 
 .. automodule:: dlomix.constants
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-
-.. automodule:: dlomix.utils
    :members:
    :undoc-members:
    :show-inheritance:

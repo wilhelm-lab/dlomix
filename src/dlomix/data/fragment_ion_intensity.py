@@ -6,6 +6,31 @@ from .dataset_utils import EncodingScheme
 
 
 class FragmentIonIntensityDataset(PeptideDataset):
+    """
+    A dataset class for handling fragment ion intensity data.
+
+    Args:
+        data_source (Optional[Union[str, List]]): The path or list of paths to the data source file(s).
+        val_data_source (Optional[Union[str, List]]): The path or list of paths to the validation data source file(s).
+        test_data_source (Optional[Union[str, List]]): The path or list of paths to the test data source file(s).
+        data_format (str): The format of the data source file(s).
+        sequence_column (str): The name of the column containing the peptide sequences.
+        label_column (str): The name of the column containing the intensity labels.
+        val_ratio (float): The ratio of validation data to split from the training data.
+        max_seq_len (Union[int, str]): The maximum length of the peptide sequences.
+        dataset_type (str): The type of dataset to use (e.g., "tf" for TensorFlow dataset).
+        batch_size (int): The batch size for training and evaluation.
+        model_features (Optional[List[str]]): The list of features to use for the model.
+        dataset_columns_to_keep (Optional[List[str]]): The list of columns to keep in the dataset.
+        features_to_extract (Optional[List[Union[Callable, str]]]): The list of features to extract from the dataset.
+        pad (bool): Whether to pad the sequences to the maximum length.
+        padding_value (int): The value to use for padding.
+        alphabet (Dict): The mapping of characters to integers for encoding the sequences.
+        encoding_scheme (Union[str, EncodingScheme]): The encoding scheme to use for encoding the sequences.
+        processed (bool): Whether the data has been preprocessed before or not.
+
+    """
+
     def __init__(
         self,
         data_source: Optional[Union[str, List]] = None,

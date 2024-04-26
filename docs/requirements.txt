@@ -4,4 +4,4 @@ sphinx==6.1.3
 # security issue with readthedocs-sphinx-search < 0.3.2
 readthedocs-sphinx-search==0.3.2
 sphinx-book-theme==1.0.1
-dlomix
+.[wandb] # install from the current dlomix codebase and not from PyPI + wandb

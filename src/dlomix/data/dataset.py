@@ -73,6 +73,22 @@ class PeptideDataset:
         Flag to indicate whether the dataset has been processed or not.
     disable_cache : bool
         Flag to indicate whether to disable Hugging Face Datasets caching.
+
+    Attributes
+    ----------
+    DEFAULT_SPLIT_NAMES : List[str]
+        Default split names for the dataset.
+    CONFIG_JSON_NAME : str
+        Name of the configuration JSON file.
+
+    Methods
+    -------
+    save_to_disk(path: str)
+        Save the dataset to disk.
+    load_from_disk(path: str)
+        Load the dataset from disk.
+    from_dataset_config(config: DatasetConfig)
+        Create a PeptideDataset object from a DatasetConfig object.
     """
 
     DEFAULT_SPLIT_NAMES = ["train", "val", "test"]

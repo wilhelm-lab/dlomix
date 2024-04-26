@@ -1,5 +1,5 @@
-``dlomix.losses`` package
-=====================
+``dlomix.losses``
+==================
 
 .. automodule:: dlomix.losses
    :members:

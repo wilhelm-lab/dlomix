@@ -1,54 +1,46 @@
-``dlomix.data`` package
+``dlomix.reports``
 ===================
 
-.. automodule:: dlomix.data
+.. automodule:: dlomix.reports
    :members:
    :undoc-members:
    :show-inheritance:
-
-Subpackages
------------
-
-.. toctree::
-   :maxdepth: 4
-
-   dlomix.data.processing
 
 Submodules
 ----------
 
 
-.. automodule:: dlomix.data.charge_state
+.. automodule:: dlomix.reports.IntensityReport
    :members:
    :undoc-members:
    :show-inheritance:
 
 
-.. automodule:: dlomix.data.dataset
+.. automodule:: dlomix.reports.Report
    :members:
    :undoc-members:
    :show-inheritance:
 
 
-.. automodule:: dlomix.data.dataset_config
+.. automodule:: dlomix.reports.RetentionTimeReport
    :members:
    :undoc-members:
    :show-inheritance:
 
 
-.. automodule:: dlomix.data.dataset_utils
+.. automodule:: dlomix.reports.RetentionTimeReportModelComparisonWandb
    :members:
    :undoc-members:
    :show-inheritance:
 
 
-.. automodule:: dlomix.data.fragment_ion_intensity
+.. automodule:: dlomix.reports.RetentionTimeReportRunComparisonWandb
    :members:
    :undoc-members:
    :show-inheritance:
 
 
-.. automodule:: dlomix.data.retention_time
+.. automodule:: dlomix.reports.postprocessing
    :members:
    :undoc-members:
    :show-inheritance:
