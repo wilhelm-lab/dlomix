@@ -8,6 +8,10 @@ from .dataset_utils import EncodingScheme
 
 @dataclass
 class DatasetConfig:
+    """
+    Configuration class for the dataset.
+    """
+
     data_source: Union[str, List]
     val_data_source: Union[str, List]
     test_data_source: Union[str, List]
@@ -29,12 +33,29 @@ class DatasetConfig:
     _additional_data: dict = field(default_factory=dict)
 
     def save_config_json(self, path: str):
+        """
+        Save the configuration to a json file.
+
+        Args:
+            path (str): Path to the json file.
+        """
+
         os.makedirs(os.path.dirname(path), exist_ok=True)
         with open(path, "w") as f:
             json.dump(self.__dict__, f, default=lambda obj: repr(obj))
 
     @staticmethod
     def load_config_json(path: str):
+        """
+        Load the configuration from a json file.
+
+        Args:
+            path (str): Path to the json file.
+
+        Returns:
+            DatasetConfig: The configuration object.
+        """
+
         with open(path, "r") as f:
             config = json.load(f)
         return DatasetConfig(**config)

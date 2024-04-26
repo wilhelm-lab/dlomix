@@ -1,3 +1,5 @@
+""" Module to load pickled feature dictionaries. """
+
 import os
 import pickle
 

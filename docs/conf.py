@@ -39,6 +39,10 @@ release = __version__
 
 extensions = ["sphinx.ext.napoleon", "sphinx.ext.autodoc", "sphinx.ext.viewcode"]
 
+autodoc_default_options = {"members": True, "undoc-members": False}
+
+highlight_language = "pycon"
+
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ["_templates"]
 
@@ -63,8 +67,14 @@ html_theme_options = {
     "logo": {
         "image_dark": "assets/logo_dark.jpg",
     },
-    "navigation_depth": 2,
-    "show_toc_level": 2,
+    # toc on the right side
+    "show_toc_level": 1,
+    "toc_title": "",
+    "home_page_in_toc": True,
+    # nav bar depth on the left
+    "show_navbar_depth": 2,
+    "path_to_docs": "docs/",
+    "use_edit_page_button": True,
 }
 
 html_logo = "assets/logo.jpg"
@@ -74,8 +84,12 @@ html_use_index = False  # Don't create index
 html_domain_indices = False  # Don't need module indices
 html_copy_source = False  # Don't need sources
 html_permalinks = True
-# html_permalinks_icon = Icons.permalinks_icon
-add_module_names = False
+html_permalinks_icon = "🔗"
+add_module_names = True
+option_emphasise_placeholders = True
+html_show_sphinx = False
+
+python_use_unqualified_type_names = True
 
 
 sitemap_url_scheme = "{link}"

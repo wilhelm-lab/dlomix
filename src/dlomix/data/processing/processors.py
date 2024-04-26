@@ -65,6 +65,22 @@ class SequenceParsingProcessor(PeptideDatasetBaseProcessor):
         Name of the column containing the peptide sequence.
     batched : bool (default=False)
         Whether to process data in batches.
+
+    Attributes
+    ----------
+    PARSED_COL_NAMES : dict
+        Dictionary mapping the parsed sequence parts to new column names.
+
+    Examples
+    --------
+    >>> processor = SequenceParsingProcessor("sequence")
+    >>> data = {"sequence": "[]-IGGPC[UNIMOD:4]AHC[UNIMOD:4]AAWEGVR-[]"}
+    >>> processor(data)
+    {'sequence': ['[]', 'I', 'G', 'G', 'P', 'C', 'A', 'H', 'C', 'A', 'A', 'W', 'E', 'G', 'V', 'R', '-[]'],
+     '_parsed_sequence': ['I', 'G', 'G', 'P', 'C', 'A', 'H', 'C', 'A', 'A', 'W', 'E', 'G', 'V', 'R'],
+     '_n_term_mods': '[]-',
+     '_c_term_mods': '-[]'}
+
     """
 
     PARSED_COL_NAMES = {
@@ -145,6 +161,11 @@ class SequencePaddingProcessor(PeptideDatasetBaseProcessor):
         Value to use for padding the sequences.
     max_length : int (default=30)
         Maximum length of the sequences.
+
+    Attributes
+    ----------
+    KEEP_COLUMN_NAME : str
+        Name of the column indicating whether to keep the sequence or not (truncated sequences should be dropped from train/val sets).
     """
 
     KEEP_COLUMN_NAME = "_KEEP"
