@@ -158,7 +158,10 @@ class PeptideDataset:
             self._test_set_only = False
             self._default_num_proc = get_num_processors()
             self._default_batch_processing_size = 1000
+
+            self._data_files_available_splits = {}
             self._load_dataset()
+            self._decide_on_splitting()
 
             self._relevant_columns = []
             self._extracted_features_columns = []
@@ -211,41 +214,46 @@ class PeptideDataset:
         )
 
     def _load_dataset(self):
-        data_files_available_splits = {}
-
         data_sources = [self.data_source, self.val_data_source, self.test_data_source]
 
         for split_name, source in zip(PeptideDataset.DEFAULT_SPLIT_NAMES, data_sources):
             if source is not None:
-                data_files_available_splits[split_name] = source
+                self._data_files_available_splits[split_name] = source
 
-        if len(data_files_available_splits) == 0:
+        if len(self._data_files_available_splits) == 0:
             self._empty_dataset_mode = True
             warnings.warn(
                 "No data files provided, please provide at least one data source if you plan to use this dataset directly. Otherwise, you can later load data into this empty dataset"
             )
-            return
 
         else:
             self._empty_dataset_mode = False
 
-            if (
-                len(data_files_available_splits) == 1
-                and self.test_data_source is not None
-            ):
-                self._test_set_only = True
-
-            if len(data_files_available_splits) > 2:
-                self._is_predefined_split = True
-                warnings.warn(
-                    f"""
-                    Multiple data sources provided {data_files_available_splits}, please ensure that the data sources are already split into train, val and test sets
-                    since no splitting will happen. If not, please provide only one data source and set the val_ratio to split the data into train and val sets."
-                    """
-                )
-
             self.hf_dataset = load_dataset(
-                self.data_format, data_files=data_files_available_splits
+                self.data_format, data_files=self._data_files_available_splits
+            )
+
+    def _decide_on_splitting(self):
+        count_loaded_data_sources = len(self._data_files_available_splits)
+
+        # one non-train data source provided -> if test, then test only, if val, then do not split
+        if count_loaded_data_sources == 1:
+            if self.test_data_source is not None:
+                self._test_set_only = True
+            if self.val_data_source is not None:
+                self._is_predefined_split = True
+
+        # two or more data sources provided -> no splitting in all cases
+        if count_loaded_data_sources >= 2:
+            if self.val_data_source is not None:
+                self._is_predefined_split = True
+
+        if self._is_predefined_split:
+            warnings.warn(
+                f"""
+                Multiple data sources or a single non-train data source provided {self._data_files_available_splits}, please ensure that the data sources are already split into train, val and test sets
+                since no splitting will happen. If not, please provide only one data_source and set the val_ratio to split the data into train and val sets."
+                """
             )
 
     def _remove_unnecessary_columns(self):
@@ -542,6 +550,8 @@ If you prefer to encode the (amino-acids)+PTM combinations as tokens in the voca
     @property
     def tensor_train_data(self):
         """TensorFlow Dataset object for the training data"""
+        self._check_split_exists(PeptideDataset.DEFAULT_SPLIT_NAMES[0])
+
         return self.hf_dataset[PeptideDataset.DEFAULT_SPLIT_NAMES[0]].to_tf_dataset(
             columns=self._get_input_tensor_column_names(),
             label_cols=self.label_column,
@@ -552,6 +562,7 @@ If you prefer to encode the (amino-acids)+PTM combinations as tokens in the voca
     @property
     def tensor_val_data(self):
         """TensorFlow Dataset object for the val data"""
+        self._check_split_exists(PeptideDataset.DEFAULT_SPLIT_NAMES[1])
         return self.hf_dataset[PeptideDataset.DEFAULT_SPLIT_NAMES[1]].to_tf_dataset(
             columns=self._get_input_tensor_column_names(),
             label_cols=self.label_column,
@@ -562,9 +573,18 @@ If you prefer to encode the (amino-acids)+PTM combinations as tokens in the voca
     @property
     def tensor_test_data(self):
         """TensorFlow Dataset object for the test data"""
+        self._check_split_exists(PeptideDataset.DEFAULT_SPLIT_NAMES[2])
+
         return self.hf_dataset[PeptideDataset.DEFAULT_SPLIT_NAMES[2]].to_tf_dataset(
             columns=self._get_input_tensor_column_names(),
             label_cols=self.label_column,
             shuffle=False,
             batch_size=self.batch_size,
         )
+
+    def _check_split_exists(self, split_name: str):
+        existing_splits = list(self.hf_dataset.keys())
+        if split_name not in existing_splits:
+            raise ValueError(
+                f"Split '{split_name}' does not exist in the dataset. Available splits are: {existing_splits}"
+            )
