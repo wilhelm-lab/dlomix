@@ -28,9 +28,3 @@ Submodules
    :members:
    :undoc-members:
    :show-inheritance:
-
-
-.. automodule:: dlomix.utils
-   :members:
-   :undoc-members:
-   :show-inheritance:

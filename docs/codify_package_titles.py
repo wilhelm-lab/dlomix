@@ -8,6 +8,8 @@ files = glob.glob("docs/dlomix*.rst")
 def replace_first_line(filename):
     with open(filename, "r+") as file:
         lines = file.readlines()
+        if not lines[0].startswith("dlomix"):
+            return
         first_word = lines[0].split()[0]
         lines[0] = f"``{first_word}``\n"
         lines[1] = "=" * len(lines[0]) + "\n"
