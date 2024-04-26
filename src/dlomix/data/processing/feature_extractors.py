@@ -3,29 +3,40 @@ from .feature_tables import (
     PTM_GAIN_LOOKUP,
     PTM_LOSS_LOOKUP,
     PTM_MOD_DELTA_MASS_LOOKUP,
+    PTM_RED_SMILES_LOOKUP,
 )
 from .processors import PeptideDatasetBaseProcessor, SequenceParsingProcessor
 
 FEATURE_EXTRACTORS_PARAMETERS = {
     "mod_loss": {
-        "feature_default_value": [1, 1, 1, 1, 1, 1],
+        # Default value is 1 for all SIX atoms
+        "feature_default_value": [1] * 6,
         "lookup_table": PTM_LOSS_LOOKUP,
         "description": "Loss of atoms due to PTM.",
     },
     "delta_mass": {
+        # Default value is 0 for the whole sequence
         "feature_default_value": 0,
         "lookup_table": PTM_MOD_DELTA_MASS_LOOKUP,
         "description": "Delta mass of PTM.",
     },
     "mod_gain": {
-        "feature_default_value": [1, 1, 1, 1, 1, 1],
+        # Default value is 1 for all SIX atoms
+        "feature_default_value": [1] * 6,
         "lookup_table": PTM_GAIN_LOOKUP,
         "description": "Gain of atoms due to PTM.",
     },
     "atom_count": {
-        "feature_default_value": [1, 1, 1, 1, 1, 1],
+        # Default value is 1 for all SIX atoms
+        "feature_default_value": [1] * 6,
         "lookup_table": PTM_ATOM_COUNT_LOOKUP,
         "description": "Atom count of PTM.",
+    },
+    "red_smiles": {
+        # Default value is 0 for the whole PTM smiles representation (currently 60)
+        "feature_default_value": [0] * 60,
+        "lookup_table": PTM_RED_SMILES_LOOKUP,
+        "description": "Reduced SMILES representation of PTM.",
     },
 }
 
