@@ -270,8 +270,6 @@ class PeptideDataset:
     def _remove_unnecessary_columns(self):
         self._relevant_columns = [self.sequence_column, self.label_column]
 
-        print("model features: ", self.model_features)
-
         if self.model_features is not None:
             self._relevant_columns.extend(self.model_features)
 
@@ -280,7 +278,6 @@ class PeptideDataset:
             self._relevant_columns.extend(self.dataset_columns_to_keep)
 
         # select only relevant columns from the Hugging Face Dataset (includes label column)
-        print("Relevant columns: ", self._relevant_columns)
         self.hf_dataset = self.hf_dataset.select_columns(self._relevant_columns)
 
     def _split_dataset(self):

@@ -323,19 +323,14 @@ class PrositIntensityPredictor(tf.keras.Model):
                 )
 
         x = self.embedding(peptides_in)
-        print("after embedding: ", x.shape)
 
         # fusion of PTMs (before going into the GRU sequence encoder)
         if self.ptm_aa_fusion and encoded_ptm is not None:
             x = self.ptm_aa_fusion([x, encoded_ptm])
-            print("after ptm fusion: ", x.shape)
 
         x = self.sequence_encoder(x)
-        print("encoded sequence and ptm if exists: ", x.shape)
 
         x = self.attention(x)
-
-        print("after attention: ", x.shape)
 
         if self.meta_data_fusion_layer and encoded_meta is not None:
             x = self.meta_data_fusion_layer([x, encoded_meta])
@@ -343,11 +338,8 @@ class PrositIntensityPredictor(tf.keras.Model):
             # no metadata -> add a dimension to comply with the shape
             x = tf.expand_dims(x, axis=1)
 
-        print("before decoder: ", x.shape)
         x = self.decoder(x)
-        print("after decoder: ", x.shape)
         x = self.regressor(x)
-        print("after regressor: ", x.shape)
 
         return x
 
