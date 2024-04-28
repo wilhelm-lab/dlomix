@@ -1,11 +1,13 @@
 # adjust encoding schemes workflow --> check ppt for details
 # check if config can wrap all the parameters and be used to manage the attributes of the class, reduce the assignment of attributes in the init method
 
+import importlib
 import logging
 import os
 import warnings
 from typing import Callable, Dict, List, Optional, Union
 
+import numpy as np
 from datasets import Dataset, DatasetDict, load_dataset, load_from_disk
 
 from ..constants import ALPHABET_UNMOD
@@ -73,6 +75,8 @@ class PeptideDataset:
         Flag to indicate whether the dataset has been processed or not.
     disable_cache : bool
         Flag to indicate whether to disable Hugging Face Datasets caching.
+    auto_cleanup_cache : bool
+        Flag to indicate whether to automatically clean up the temporary Hugging Face Datasets cache files.
 
     Attributes
     ----------
@@ -106,7 +110,7 @@ class PeptideDataset:
         max_seq_len: int,
         dataset_type: str,
         batch_size: int,
-        model_features: List[str],
+        model_features: Optional[List[str]],
         dataset_columns_to_keep: Optional[List[str]],
         features_to_extract: Optional[List[Union[Callable, str]]] = None,
         pad: bool = True,
@@ -114,7 +118,8 @@ class PeptideDataset:
         alphabet: Dict = ALPHABET_UNMOD,
         encoding_scheme: Union[str, EncodingScheme] = EncodingScheme.UNMOD,
         processed: bool = False,
-        disable_cache: bool = False,
+        disable_cache: bool = True,
+        auto_cleanup_cache: bool = True,
     ):
         super(PeptideDataset, self).__init__()
         self.data_source = data_source
@@ -145,6 +150,7 @@ class PeptideDataset:
         self.encoding_scheme = EncodingScheme(encoding_scheme)
         self.processed = processed
         self.disable_cache = disable_cache
+        self.auto_cleanup_cache = auto_cleanup_cache
         self._set_hf_cache_management()
 
         self.extended_alphabet = self.alphabet.copy()
@@ -174,6 +180,9 @@ class PeptideDataset:
 
                 self._configure_processing_pipeline()
                 self._apply_processing_pipeline()
+                if self.model_features is not None:
+                    self._cast_model_feature_types_expand_zero_dims()
+                self._cleanup_temp_dataset_cache_files()
                 self.processed = True
                 self._refresh_config()
 
@@ -212,6 +221,8 @@ class PeptideDataset:
                 if k.startswith("_") and k != "_config"
             }
         )
+
+        self._config._additional_data.update({"cls": self.__class__.__name__})
 
     def _load_dataset(self):
         data_sources = [self.data_source, self.val_data_source, self.test_data_source]
@@ -259,6 +270,8 @@ class PeptideDataset:
     def _remove_unnecessary_columns(self):
         self._relevant_columns = [self.sequence_column, self.label_column]
 
+        print("model features: ", self.model_features)
+
         if self.model_features is not None:
             self._relevant_columns.extend(self.model_features)
 
@@ -267,6 +280,7 @@ class PeptideDataset:
             self._relevant_columns.extend(self.dataset_columns_to_keep)
 
         # select only relevant columns from the Hugging Face Dataset (includes label column)
+        print("Relevant columns: ", self._relevant_columns)
         self.hf_dataset = self.hf_dataset.select_columns(self._relevant_columns)
 
     def _split_dataset(self):
@@ -437,6 +451,29 @@ If you prefer to encode the (amino-acids)+PTM combinations as tokens in the voca
                     processor.KEEP_COLUMN_NAME
                 )
 
+    def _cast_model_feature_types_expand_zero_dims(self):
+        def __cast_types_expand_zero_dims(example, column):
+            np_casted = np.array(example[column], dtype=np.float16)
+
+            # model features (metadata in prosit) are expected to be have at least 1 dimension + batch_size
+            if np_casted.ndim == 0:
+                np_casted = np.expand_dims(np_casted, axis=-1)
+            example[column] = np_casted
+            return example
+
+        for c in self.model_features:
+            self.hf_dataset = self.hf_dataset.map(
+                lambda x: __cast_types_expand_zero_dims(x, c),
+                batched=False,
+                num_proc=self._default_num_proc,
+                desc=f"Casting model feature {c} to float ...",
+            )
+
+    def _cleanup_temp_dataset_cache_files(self):
+        if self.auto_cleanup_cache:
+            cleaned_up = self.hf_dataset.cleanup_cache_files()
+            logger.info(f"Cleaned up cache files: {cleaned_up}.")
+
     def save_to_disk(self, path: str):
         """
         Save the dataset to disk.
@@ -552,34 +589,45 @@ If you prefer to encode the (amino-acids)+PTM combinations as tokens in the voca
         """TensorFlow Dataset object for the training data"""
         self._check_split_exists(PeptideDataset.DEFAULT_SPLIT_NAMES[0])
 
-        return self.hf_dataset[PeptideDataset.DEFAULT_SPLIT_NAMES[0]].to_tf_dataset(
-            columns=self._get_input_tensor_column_names(),
-            label_cols=self.label_column,
-            shuffle=False,
-            batch_size=self.batch_size,
+        return (
+            self.hf_dataset[PeptideDataset.DEFAULT_SPLIT_NAMES[0]]
+            .to_tf_dataset(
+                columns=self._get_input_tensor_column_names(),
+                label_cols=self.label_column,
+                shuffle=False,
+                batch_size=self.batch_size,
+            )
+            .cache()
         )
 
     @property
     def tensor_val_data(self):
         """TensorFlow Dataset object for the val data"""
         self._check_split_exists(PeptideDataset.DEFAULT_SPLIT_NAMES[1])
-        return self.hf_dataset[PeptideDataset.DEFAULT_SPLIT_NAMES[1]].to_tf_dataset(
-            columns=self._get_input_tensor_column_names(),
-            label_cols=self.label_column,
-            shuffle=False,
-            batch_size=self.batch_size,
+        return (
+            self.hf_dataset[PeptideDataset.DEFAULT_SPLIT_NAMES[1]]
+            .to_tf_dataset(
+                columns=self._get_input_tensor_column_names(),
+                label_cols=self.label_column,
+                shuffle=False,
+                batch_size=self.batch_size,
+            )
+            .cache()
         )
 
     @property
     def tensor_test_data(self):
         """TensorFlow Dataset object for the test data"""
         self._check_split_exists(PeptideDataset.DEFAULT_SPLIT_NAMES[2])
-
-        return self.hf_dataset[PeptideDataset.DEFAULT_SPLIT_NAMES[2]].to_tf_dataset(
-            columns=self._get_input_tensor_column_names(),
-            label_cols=self.label_column,
-            shuffle=False,
-            batch_size=self.batch_size,
+        return (
+            self.hf_dataset[PeptideDataset.DEFAULT_SPLIT_NAMES[2]]
+            .to_tf_dataset(
+                columns=self._get_input_tensor_column_names(),
+                label_cols=self.label_column,
+                shuffle=False,
+                batch_size=self.batch_size,
+            )
+            .cache()
         )
 
     def _check_split_exists(self, split_name: str):
@@ -588,3 +636,31 @@ If you prefer to encode the (amino-acids)+PTM combinations as tokens in the voca
             raise ValueError(
                 f"Split '{split_name}' does not exist in the dataset. Available splits are: {existing_splits}"
             )
+
+
+def load_processed_dataset(path: str):
+    """
+    Load a processed peptide dataset from a given path.
+
+    Parameters
+    ----------
+    path : str
+        Path to the peptide dataset.
+
+    Returns
+    -------
+    dlomix.data.PeptideDataset or one of its child classes
+        Peptide dataset.
+    """
+
+    module = importlib.import_module("dlomix.data")
+
+    config = DatasetConfig.load_config_json(
+        os.path.join(path, PeptideDataset.CONFIG_JSON_NAME)
+    )
+    class_obj = getattr(module, config._additional_data.get("cls", "PeptideDataset"))
+    hf_dataset = load_from_disk(path)
+
+    dataset = class_obj.from_dataset_config(config)
+    dataset.hf_dataset = hf_dataset
+    return dataset

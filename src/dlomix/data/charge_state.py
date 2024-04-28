@@ -28,6 +28,7 @@ class ChargeStateDataset(PeptideDataset):
         alphabet (Dict): The mapping of characters to integers for encoding the sequences. Default is ALPHABET_UNMOD.
         encoding_scheme (Union[str, EncodingScheme]): The encoding scheme to use for encoding the sequences. Default is EncodingScheme.UNMOD.
         processed (bool): Whether the data has been preprocessed. Default is False.
+        disable_cache (bool): Whether to disable caching the dataset. Default is True.
     """
 
     def __init__(
@@ -50,6 +51,7 @@ class ChargeStateDataset(PeptideDataset):
         alphabet: Dict = ALPHABET_UNMOD,
         encoding_scheme: Union[str, EncodingScheme] = EncodingScheme.UNMOD,
         processed: bool = False,
+        disable_cache: bool = True,
     ):
         super().__init__(
             data_source,
@@ -70,4 +72,5 @@ class ChargeStateDataset(PeptideDataset):
             alphabet,
             encoding_scheme,
             processed,
+            disable_cache,
         )

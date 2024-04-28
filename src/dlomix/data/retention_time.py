@@ -50,6 +50,7 @@ class RetentionTimeDataset(PeptideDataset):
         alphabet: Dict = ALPHABET_UNMOD,
         encoding_scheme: Union[str, EncodingScheme] = EncodingScheme.UNMOD,
         processed: bool = False,
+        disable_cache: bool = True,
     ):
         super().__init__(
             data_source,
@@ -70,4 +71,5 @@ class RetentionTimeDataset(PeptideDataset):
             alphabet,
             encoding_scheme,
             processed,
+            disable_cache,
         )

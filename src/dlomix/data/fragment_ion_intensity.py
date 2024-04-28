@@ -28,6 +28,7 @@ class FragmentIonIntensityDataset(PeptideDataset):
         alphabet (Dict): The mapping of characters to integers for encoding the sequences.
         encoding_scheme (Union[str, EncodingScheme]): The encoding scheme to use for encoding the sequences.
         processed (bool): Whether the data has been preprocessed before or not.
+        disable_cache (bool): Whether to disable caching the dataset or not.
 
     """
 
@@ -43,10 +44,7 @@ class FragmentIonIntensityDataset(PeptideDataset):
         max_seq_len: Union[int, str] = 30,
         dataset_type: str = "tf",
         batch_size: int = 64,
-        model_features: Optional[List[str]] = [
-            "precursor_charge_onehot",
-            "collision_energy_aligned_normed",
-        ],
+        model_features: Optional[List[str]] = None,
         dataset_columns_to_keep: Optional[List[str]] = None,
         features_to_extract: Optional[List[Union[Callable, str]]] = None,
         pad: bool = True,
@@ -54,6 +52,7 @@ class FragmentIonIntensityDataset(PeptideDataset):
         alphabet: Dict = ALPHABET_UNMOD,
         encoding_scheme: Union[str, EncodingScheme] = EncodingScheme.UNMOD,
         processed: bool = False,
+        disable_cache: bool = True,
     ):
         super().__init__(
             data_source,
@@ -74,4 +73,5 @@ class FragmentIonIntensityDataset(PeptideDataset):
             alphabet,
             encoding_scheme,
             processed,
+            disable_cache,
         )

@@ -11,12 +11,15 @@ from dlomix.models import PrositIntensityPredictor
 
 model = PrositIntensityPredictor(
     seq_length=30,
-    use_ptm_counts=True,
+    use_prosit_ptm_features=True,
     input_keys={
         "SEQUENCE_KEY": "modified_sequence",
+    },
+    meta_data_keys={
         "COLLISION_ENERGY_KEY": "collision_energy_aligned_normed",
         "PRECURSOR_CHARGE_KEY": "precursor_charge_onehot",
     },
+    with_termini=False,
 )
 
 optimizer = tf.keras.optimizers.Adam(learning_rate=0.0001)
@@ -34,12 +37,6 @@ d = FragmentIonIntensityDataset(
     features_to_extract=["mod_loss", "delta_mass"],
 )
 
-for x in d.tensor_train_data:
-    print(x[0].keys())
-    print(x[1].shape)
-    print(x)
-    break
-
 model.compile(optimizer=optimizer, loss=masked_spectral_distance, metrics=["mse"])
 
 weights_file = "./prosit_intensity_test"
@@ -55,7 +52,7 @@ callbacks = [checkpoint, early_stop, decay]
 
 history = model.fit(
     d.tensor_train_data,
-    epochs=2,
+    epochs=20,
     validation_data=d.tensor_val_data,
     callbacks=callbacks,
 )
