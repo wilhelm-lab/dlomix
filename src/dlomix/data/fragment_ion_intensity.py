@@ -28,7 +28,8 @@ class FragmentIonIntensityDataset(PeptideDataset):
         alphabet (Dict): The mapping of characters to integers for encoding the sequences.
         encoding_scheme (Union[str, EncodingScheme]): The encoding scheme to use for encoding the sequences.
         processed (bool): Whether the data has been preprocessed before or not.
-        disable_cache (bool): Whether to disable caching the dataset or not.
+        enable_tf_dataset_cache (bool): Flag to indicate whether to enable TensorFlow Dataset caching (call `.cahce()` on the generate TF Datasets).
+        disable_cache (bool): Whether to disable Hugging Face datasets caching. Default is True.
 
     """
 
@@ -52,6 +53,7 @@ class FragmentIonIntensityDataset(PeptideDataset):
         alphabet: Dict = ALPHABET_UNMOD,
         encoding_scheme: Union[str, EncodingScheme] = EncodingScheme.UNMOD,
         processed: bool = False,
+        enable_tf_dataset_cache: bool = False,
         disable_cache: bool = True,
     ):
         super().__init__(
@@ -73,5 +75,6 @@ class FragmentIonIntensityDataset(PeptideDataset):
             alphabet,
             encoding_scheme,
             processed,
+            enable_tf_dataset_cache,
             disable_cache,
         )

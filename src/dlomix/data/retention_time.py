@@ -28,6 +28,8 @@ class RetentionTimeDataset(PeptideDataset):
         alphabet (Dict): The alphabet used for encoding sequences. Defaults to ALPHABET_UNMOD.
         encoding_scheme (Union[str, EncodingScheme]): The encoding scheme to use for sequences. Defaults to EncodingScheme.UNMOD.
         processed (bool): Whether the dataset has been preprocessed. Defaults to False.
+        enable_tf_dataset_cache (bool): Flag to indicate whether to enable TensorFlow Dataset caching (call `.cahce()` on the generate TF Datasets).
+        disable_cache (bool): Whether to disable Hugging Face datasets caching. Default is True.
     """
 
     def __init__(
@@ -50,6 +52,7 @@ class RetentionTimeDataset(PeptideDataset):
         alphabet: Dict = ALPHABET_UNMOD,
         encoding_scheme: Union[str, EncodingScheme] = EncodingScheme.UNMOD,
         processed: bool = False,
+        enable_tf_dataset_cache: bool = False,
         disable_cache: bool = True,
     ):
         super().__init__(
@@ -71,5 +74,6 @@ class RetentionTimeDataset(PeptideDataset):
             alphabet,
             encoding_scheme,
             processed,
+            enable_tf_dataset_cache,
             disable_cache,
         )

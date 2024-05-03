@@ -73,6 +73,8 @@ class PeptideDataset:
         Encoding scheme to use for encoding the sequences. Possible values are "unmod" and "naive-mods" for unmodified sequences and sequences with PTMs respectively.
     processed : bool
         Flag to indicate whether the dataset has been processed or not.
+    enable_tf_dataset_cache : bool
+        Flag to indicate whether to enable TensorFlow Dataset caching (call `.cahce()` on the generate TF Datasets).
     disable_cache : bool
         Flag to indicate whether to disable Hugging Face Datasets caching.
     auto_cleanup_cache : bool
@@ -118,6 +120,7 @@ class PeptideDataset:
         alphabet: Dict = ALPHABET_UNMOD,
         encoding_scheme: Union[str, EncodingScheme] = EncodingScheme.UNMOD,
         processed: bool = False,
+        enable_tf_dataset_cache: bool = False,
         disable_cache: bool = True,
         auto_cleanup_cache: bool = True,
     ):
@@ -149,6 +152,7 @@ class PeptideDataset:
         self.alphabet = alphabet
         self.encoding_scheme = EncodingScheme(encoding_scheme)
         self.processed = processed
+        self.enable_tf_dataset_cache = enable_tf_dataset_cache
         self.disable_cache = disable_cache
         self.auto_cleanup_cache = auto_cleanup_cache
         self._set_hf_cache_management()
@@ -339,11 +343,6 @@ If you prefer to encode the (amino-acids)+PTM combinations as tokens in the voca
                 alphabet=self.extended_alphabet,
                 batched=True,
             )
-
-        # elif self.encoding_scheme == EncodingScheme.NAIVE_MODS:
-        #    warnings.warn(
-        #        "Naive encoding for PTMs: please use the dataset attribute extended_alphabet for the full alphabet and pass it to the model if needed. \nUsage: dataset.extended_alphabet"
-        #    )
 
         else:
             raise NotImplementedError(
@@ -584,48 +583,32 @@ If you prefer to encode the (amino-acids)+PTM combinations as tokens in the voca
     @property
     def tensor_train_data(self):
         """TensorFlow Dataset object for the training data"""
-        self._check_split_exists(PeptideDataset.DEFAULT_SPLIT_NAMES[0])
+        tf_dataset = self._get_split_tf_dataset(PeptideDataset.DEFAULT_SPLIT_NAMES[0])
 
-        return (
-            self.hf_dataset[PeptideDataset.DEFAULT_SPLIT_NAMES[0]]
-            .to_tf_dataset(
-                columns=self._get_input_tensor_column_names(),
-                label_cols=self.label_column,
-                shuffle=False,
-                batch_size=self.batch_size,
-            )
-            .cache()
-        )
+        if self.enable_tf_dataset_cache:
+            tf_dataset = tf_dataset.cache()
+
+        return tf_dataset
 
     @property
     def tensor_val_data(self):
         """TensorFlow Dataset object for the val data"""
-        self._check_split_exists(PeptideDataset.DEFAULT_SPLIT_NAMES[1])
-        return (
-            self.hf_dataset[PeptideDataset.DEFAULT_SPLIT_NAMES[1]]
-            .to_tf_dataset(
-                columns=self._get_input_tensor_column_names(),
-                label_cols=self.label_column,
-                shuffle=False,
-                batch_size=self.batch_size,
-            )
-            .cache()
-        )
+        tf_dataset = self._get_split_tf_dataset(PeptideDataset.DEFAULT_SPLIT_NAMES[1])
+
+        if self.enable_tf_dataset_cache:
+            tf_dataset = tf_dataset.cache()
+
+        return tf_dataset
 
     @property
     def tensor_test_data(self):
         """TensorFlow Dataset object for the test data"""
-        self._check_split_exists(PeptideDataset.DEFAULT_SPLIT_NAMES[2])
-        return (
-            self.hf_dataset[PeptideDataset.DEFAULT_SPLIT_NAMES[2]]
-            .to_tf_dataset(
-                columns=self._get_input_tensor_column_names(),
-                label_cols=self.label_column,
-                shuffle=False,
-                batch_size=self.batch_size,
-            )
-            .cache()
-        )
+        tf_dataset = self._get_split_tf_dataset(PeptideDataset.DEFAULT_SPLIT_NAMES[2])
+
+        if self.enable_tf_dataset_cache:
+            tf_dataset = tf_dataset.cache()
+
+        return tf_dataset
 
     def _check_split_exists(self, split_name: str):
         existing_splits = list(self.hf_dataset.keys())
@@ -633,6 +616,16 @@ If you prefer to encode the (amino-acids)+PTM combinations as tokens in the voca
             raise ValueError(
                 f"Split '{split_name}' does not exist in the dataset. Available splits are: {existing_splits}"
             )
+
+    def _get_split_tf_dataset(self, split_name: str):
+        self._check_split_exists(split_name)
+
+        return self.hf_dataset[split_name].to_tf_dataset(
+            columns=self._get_input_tensor_column_names(),
+            label_cols=self.label_column,
+            shuffle=False,
+            batch_size=self.batch_size,
+        )
 
 
 def load_processed_dataset(path: str):
