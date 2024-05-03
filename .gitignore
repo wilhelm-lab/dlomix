@@ -54,8 +54,8 @@ coverage.xml
 .hypothesis/
 .pytest_cache/
 
-# put all coverage in one place
-cov/
+# put all test results and coverage in one place
+.test_results/
 
 # Translations
 *.mo

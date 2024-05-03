@@ -1,3 +1,5 @@
+import numpy as np
+
 from .feature_tables import (
     PTM_ATOM_COUNT_LOOKUP,
     PTM_GAIN_LOOKUP,
@@ -103,6 +105,14 @@ class FeatureExtractor(PeptideDatasetBaseProcessor):
         padding_length = self.max_length - feature_length
         single_feature += [self.feature_default_value] * padding_length
 
+        single_feature = self._cast_expand_dims(single_feature)
+        return single_feature
+
+    def _cast_expand_dims(self, single_feature):
+        single_feature = np.array(single_feature).astype(np.float32)
+
+        if single_feature.ndim == 1:
+            single_feature = np.expand_dims(single_feature, axis=-1)
         return single_feature
 
 
