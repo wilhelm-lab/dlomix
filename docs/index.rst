@@ -33,28 +33,18 @@ The goal of DLOmix is to be easy to use and flexible, while still providing the 
 
 .. toctree::
    :glob:
-   :maxdepth: 1
+   :reversed:
+   :maxdepth: 2
    :caption: How To
 
-
-   notes/installation
-   notes/quickstart
-..   notes/citation
+   notes/*
 
 
 .. toctree::
-   :glob:
-   :maxdepth: 1
+   :maxdepth: 2
    :caption: Package Reference
 
-
-   modules/data
-   modules/models
-   modules/losses
-   modules/eval
-   modules/reports
-   modules/layers
-   modules/pipelines
+   dlomix
 
 
 Indices and tables

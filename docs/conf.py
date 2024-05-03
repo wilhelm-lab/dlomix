@@ -13,15 +13,18 @@
 import os
 import sys
 
-sys.path.insert(0, os.path.abspath('..'))
+sys.path.insert(0, os.path.abspath(".."))
+sys.path.insert(0, os.path.abspath("../src/"))
+sys.path.insert(0, os.path.abspath("../src/dlomix/"))
+
 
 # -- Project information -----------------------------------------------------
 
-from dlomix import META_DATA, __version__
+from src.dlomix import META_DATA, __version__
 
-project = META_DATA['package_name']
-copyright = META_DATA['copyright_text']
-author = META_DATA['author']
+project = META_DATA["package_name"]
+copyright = META_DATA["copyright_text"]
+author = META_DATA["author"]
 
 # The full version, including alpha/beta/rc tags
 
@@ -34,19 +37,19 @@ release = __version__
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
 # ones.
 
-extensions = [
-    'sphinx.ext.napoleon',
-    'sphinx.ext.autodoc',
-    'sphinx.ext.viewcode'
-]
+extensions = ["sphinx.ext.napoleon", "sphinx.ext.autodoc", "sphinx.ext.viewcode"]
+
+autodoc_default_options = {"members": True, "undoc-members": False}
+
+highlight_language = "pycon"
 
 # Add any paths that contain templates here, relative to this directory.
-templates_path = ['_templates']
+templates_path = ["_templates"]
 
 # List of patterns, relative to source directory, that match files and
 # directories to ignore when looking for source files.
 # This pattern also affects html_static_path and html_extra_path.
-exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
+exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]
 
 
 # -- Options for HTML output -------------------------------------------------
@@ -55,7 +58,7 @@ exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
 # a list of builtin themes.
 #
 
-html_theme = 'sphinx_book_theme'
+html_theme = "sphinx_book_theme"
 
 # book theme
 html_theme_options = {
@@ -64,24 +67,37 @@ html_theme_options = {
     "logo": {
         "image_dark": "assets/logo_dark.jpg",
     },
+    # toc on the right side
+    "show_toc_level": 1,
+    "toc_title": "",
+    "home_page_in_toc": True,
+    # nav bar depth on the left
+    "show_navbar_depth": 2,
+    "path_to_docs": "docs/",
+    "use_edit_page_button": True,
 }
 
-html_logo = 'assets/logo.jpg'
+html_logo = "assets/logo.jpg"
 
 html_title = f"DLOmix | v{release}"
 html_use_index = False  # Don't create index
 html_domain_indices = False  # Don't need module indices
 html_copy_source = False  # Don't need sources
 html_permalinks = True
-#html_permalinks_icon = Icons.permalinks_icon
-add_module_names = False
+html_permalinks_icon = "🔗"
+add_module_names = True
+option_emphasise_placeholders = True
+html_show_sphinx = False
+
+python_use_unqualified_type_names = True
+
 
 sitemap_url_scheme = "{link}"
 
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,
 # so a file named "default.css" will overwrite the builtin "default.css".
-html_static_path = ['_static']
+html_static_path = ["_static"]
 
 
 # -- Extension configuration -------------------------------------------------

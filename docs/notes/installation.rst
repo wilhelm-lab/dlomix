@@ -15,14 +15,14 @@ DLOmix can be installed via pip:
 
   pip install dlomix
 
-To get the dev version, you can install directly from GitHub:
+To get the dev version, you can install directly from GitHub (develop branch):
 
 .. code-block:: bash
 
-  pip install git+https://github.com/wilhelmlab/dlomix.git
+  pip install git+https://github.com/wilhelm-lab/dlomix.git@develop
 
-If you decide to use Weights & Biases for reporting, you can use the extra install command: 
+If you decide to use Weights & Biases for reporting, you can use the extra install command:
 
-.. code-block:: bash 
-  
+.. code-block:: bash
+
   pip install dlomix[wandb]

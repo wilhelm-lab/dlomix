@@ -1,6 +1,5 @@
-from dlomix.constants import ALPHABET_UNMOD
 from dlomix.data import RetentionTimeDataset
-from dlomix.eval import TimeDeltaMetric
+from dlomix.eval import TimeDeltaMetric, TimeDeltaMetric2
 
 # data path
 from dlomix.models import RetentionTimePredictor
@@ -15,11 +14,11 @@ create dataset:
     - performs train/val split if needed
 """
 d = RetentionTimeDataset(
+    data_format="csv",
     data_source=DATAPATH,
-    sequence_col="sequence",
-    target_col="irt",
-    seq_length=40,
-    normalize_targets=True,
+    sequence_column="sequence",
+    label_column="irt",
+    max_seq_len=40,
     batch_size=128,
     val_ratio=0.2,
 )
@@ -46,7 +45,7 @@ model.compile(
     optimizer="adam", loss="mse", metrics=["mean_absolute_error", TimeDeltaMetric()]
 )
 
-history = model.fit(d.train_data, epochs=15, validation_data=d.val_data)
+history = model.fit(d.tensor_train_data, epochs=5, validation_data=d.tensor_val_data)
 
 """
 

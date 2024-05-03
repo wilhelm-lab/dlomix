@@ -13,11 +13,11 @@ on:
 jobs:
   release:
     runs-on: ubuntu-latest
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    if: ${{ github.event.workflow_run.conclusion == 'success' && github.ref == 'refs/heads/main'}}
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
       - name: Set up Python
-        uses: actions/setup-python@v2
+        uses: actions/setup-python@v5
         with:
           python-version: '3.8'
       - name: Install dependencies
@@ -26,16 +26,16 @@ jobs:
           pip install build
       - name: Build package
         run: python -m build
-      - name: publish_pypi
-        uses: pypa/gh-action-pypi-publish@27b31702a0e7fc50959f5ad993c78deac1bdfc29
+      - name: Publish to PyPI
+        id: publishpypi
+        uses: pypa/gh-action-pypi-publish@release/v1
         with:
           user: __token__
           password: ${{ secrets.SECRET_PYPI }}
       - name: Create Github release
-        if: steps.publish_pypi.outcome == 'success'
+        if: steps.publishpypi.outcome == 'success'
         env:
           GITHUB_TOKEN: ${{ secrets.CLI_GH_TOKEN }}
         run: |
           VERSION=$(python setup.py --version)
           gh release create v$VERSION --title $VERSION --generate-notes
-        
