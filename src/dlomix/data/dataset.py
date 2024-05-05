@@ -76,9 +76,13 @@ class PeptideDataset:
     enable_tf_dataset_cache : bool
         Flag to indicate whether to enable TensorFlow Dataset caching (call `.cahce()` on the generate TF Datasets).
     disable_cache : bool
-        Flag to indicate whether to disable Hugging Face Datasets caching.
+        Flag to indicate whether to disable Hugging Face Datasets caching. Default is False.
     auto_cleanup_cache : bool
-        Flag to indicate whether to automatically clean up the temporary Hugging Face Datasets cache files.
+        Flag to indicate whether to automatically clean up the temporary Hugging Face Datasets cache files. Default is True.
+    num_proc : Optional[int]
+        Number of processes to use for processing the dataset. Default is None, no multi-processing.
+    batch_processing_size : Optional[int]
+        Batch size for processing the dataset, passed to the HuggingFace `Dataset.map()` function calls. Default is 1000.
 
     Attributes
     ----------
@@ -121,8 +125,10 @@ class PeptideDataset:
         encoding_scheme: Union[str, EncodingScheme] = EncodingScheme.UNMOD,
         processed: bool = False,
         enable_tf_dataset_cache: bool = False,
-        disable_cache: bool = True,
+        disable_cache: bool = False,
         auto_cleanup_cache: bool = True,
+        num_proc: Optional[int] = None,
+        batch_processing_size: Optional[int] = 1000,
     ):
         super(PeptideDataset, self).__init__()
         self.data_source = data_source
@@ -166,8 +172,9 @@ class PeptideDataset:
             self._empty_dataset_mode = False
             self._is_predefined_split = False
             self._test_set_only = False
-            self._default_num_proc = get_num_processors()
-            self._default_batch_processing_size = 1000
+            self._num_proc = num_proc
+            self._set_num_proc()
+            self._batch_processing_size = batch_processing_size
 
             self._data_files_available_splits = {}
             self._load_dataset()
@@ -189,6 +196,15 @@ class PeptideDataset:
                 self._cleanup_temp_dataset_cache_files()
                 self.processed = True
                 self._refresh_config()
+
+    def _set_num_proc(self):
+        if self._num_proc:
+            n_processors = get_num_processors()
+            if self._num_proc > n_processors:
+                warnings.warn(
+                    f"Number of processors provided is greater than the available processors. Using the maximum number of processors available: {n_processors}."
+                )
+                self._num_proc = n_processors
 
     def _set_hf_cache_management(self):
         if self.disable_cache:
@@ -425,8 +441,8 @@ If you prefer to encode the (amino-acids)+PTM combinations as tokens in the voca
                 processor,
                 desc=f"Mapping {processor.__class__.__name__}",
                 batched=processor.batched,
-                batch_size=self._default_batch_processing_size,
-                num_proc=self._default_num_proc,
+                batch_size=self._batch_processing_size,
+                num_proc=self._num_proc,
             )
             logger.info(f"Done with step: {processor.__class__.__name__}.\n")
 
@@ -440,28 +456,30 @@ If you prefer to encode the (amino-acids)+PTM combinations as tokens in the voca
                         self.hf_dataset[split] = self.hf_dataset[split].filter(
                             lambda batch: batch[processor.KEEP_COLUMN_NAME],
                             batched=True,
-                            num_proc=self._default_num_proc,
-                            batch_size=self._default_batch_processing_size,
+                            num_proc=self._num_proc,
+                            batch_size=self._batch_processing_size,
                         )
                 self.hf_dataset = self.hf_dataset.remove_columns(
                     processor.KEEP_COLUMN_NAME
                 )
 
     def _cast_model_feature_types_expand_zero_dims(self):
-        def __cast_types_expand_zero_dims(example, column):
-            np_casted = np.array(example[column], dtype=np.float16)
+        def __cast_types_expand_zero_dims(batch, column):
+            for index, value in enumerate(batch[column]):
+                np_casted = np.array(value, dtype=np.float16)
 
-            # model features (metadata in prosit) are expected to be have at least 1 dimension + batch_size
-            if np_casted.ndim == 0:
-                np_casted = np.expand_dims(np_casted, axis=-1)
-            example[column] = np_casted
-            return example
+                # model features (metadata in prosit) are expected to be have at least 1 dimension along with the batch_size = (batch_size, 1)
+                if np_casted.ndim == 0:
+                    np_casted = np.expand_dims(np_casted, axis=-1)
+                batch[column][index] = np_casted
+            return batch
 
         for c in self.model_features:
             self.hf_dataset = self.hf_dataset.map(
                 lambda x: __cast_types_expand_zero_dims(x, c),
-                batched=False,
-                num_proc=self._default_num_proc,
+                batched=True,
+                batch_size=self._batch_processing_size,
+                num_proc=self._num_proc,
                 desc=f"Casting model feature {c} to float ...",
             )
 
@@ -610,15 +628,12 @@ If you prefer to encode the (amino-acids)+PTM combinations as tokens in the voca
 
         return tf_dataset
 
-    def _check_split_exists(self, split_name: str):
+    def _get_split_tf_dataset(self, split_name: str):
         existing_splits = list(self.hf_dataset.keys())
         if split_name not in existing_splits:
             raise ValueError(
                 f"Split '{split_name}' does not exist in the dataset. Available splits are: {existing_splits}"
             )
-
-    def _get_split_tf_dataset(self, split_name: str):
-        self._check_split_exists(split_name)
 
         return self.hf_dataset[split_name].to_tf_dataset(
             columns=self._get_input_tensor_column_names(),

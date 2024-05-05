@@ -6,9 +6,6 @@ on:
     workflows: ["Build"]
     types:
       - completed
-  push:
-    branches:
-      - main
 
 jobs:
   release:
