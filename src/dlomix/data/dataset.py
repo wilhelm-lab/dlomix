@@ -7,8 +7,7 @@ import os
 import warnings
 from typing import Callable, Dict, List, Optional, Union
 
-import numpy as np
-from datasets import Dataset, DatasetDict, load_dataset, load_from_disk
+from datasets import Dataset, DatasetDict, Sequence, Value, load_dataset, load_from_disk
 
 from ..constants import ALPHABET_UNMOD
 from .dataset_config import DatasetConfig
@@ -192,7 +191,7 @@ class PeptideDataset:
                 self._configure_processing_pipeline()
                 self._apply_processing_pipeline()
                 if self.model_features is not None:
-                    self._cast_model_feature_types_expand_zero_dims()
+                    self._cast_model_feature_types_to_float()
                 self._cleanup_temp_dataset_cache_files()
                 self.processed = True
                 self._refresh_config()
@@ -463,24 +462,25 @@ If you prefer to encode the (amino-acids)+PTM combinations as tokens in the voca
                     processor.KEEP_COLUMN_NAME
                 )
 
-    def _cast_model_feature_types_expand_zero_dims(self):
-        def __cast_types_expand_zero_dims(batch, column):
-            for index, value in enumerate(batch[column]):
-                np_casted = np.array(value, dtype=np.float16)
+    def _cast_model_feature_types_to_float(self):
+        for split in self.hf_dataset.keys():
+            new_features = self.hf_dataset[split].features.copy()
 
-                # model features (metadata in prosit) are expected to be have at least 1 dimension along with the batch_size = (batch_size, 1)
-                if np_casted.ndim == 0:
-                    np_casted = np.expand_dims(np_casted, axis=-1)
-                batch[column][index] = np_casted
-            return batch
+            for feature_name, feature_type in self.hf_dataset[split].features.items():
+                # ensure model features are casted to float for concatenation later
+                if feature_name not in self.model_features:
+                    continue
+                if feature_type.dtype.startswith("float"):
+                    continue
+                if isinstance(feature_type, Sequence):
+                    new_features[feature_name] = Sequence(Value("float32"))
+                if isinstance(feature_type, Value):
+                    new_features[feature_name] = Value("float32")
 
-        for c in self.model_features:
-            self.hf_dataset = self.hf_dataset.map(
-                lambda x: __cast_types_expand_zero_dims(x, c),
-                batched=True,
-                batch_size=self._batch_processing_size,
+            self.hf_dataset[split] = self.hf_dataset[split].cast(
+                new_features,
                 num_proc=self._num_proc,
-                desc=f"Casting model feature {c} to float ...",
+                batch_size=self._batch_processing_size,
             )
 
     def _cleanup_temp_dataset_cache_files(self):
