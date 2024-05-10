@@ -222,3 +222,35 @@ class PrositIntensityPredictor(tf.keras.Model):
         x = self.regressor(x)
 
         return x
+
+
+class PrositSumIntensityPredictor(PrositIntensityPredictor):
+    def call(self, inputs, **kwargs):
+        sum_intensities_in = inputs["sum_intensities"]
+        peptides_in = inputs["modified_sequence"]
+        collision_energy_in = inputs["aligned_collision_energy"]
+        precursor_charge_in = inputs["precursor_charge_onehot"]
+        method_nbr_in = inputs["method_nbr"]
+
+        collision_energy_in = tf.expand_dims(collision_energy_in, axis=1)
+        
+        sum_intensities_in = tf.expand_dims(sum_intensities_in, axis=1)
+
+        method_nbr_in = tf.cast(method_nbr_in, tf.float32)
+        method_nbr_in = tf.expand_dims(method_nbr_in, axis=1)
+
+        precursor_charge_in = tf.cast(precursor_charge_in, tf.float32)
+
+        encoded_meta = self.meta_encoder([collision_energy_in, precursor_charge_in, sum_intensities_in, method_nbr_in])
+
+        x = self.embedding(peptides_in)
+        x = self.sequence_encoder(x)
+        x = self.attention(x)
+
+        x = self.fusion_layer([x, encoded_meta])
+
+        x = self.decoder(x)
+
+        x = self.regressor(x)
+
+        return x
