@@ -1,18 +1,18 @@
 import tensorflow as tf
+import tensorflow.keras.backend as K
+from tensorflow.keras import activations, constraints, initializers, regularizers
 
 from ..constants import ALPHABET_UNMOD
 
 """
 --------------------------------------------------------------
 TASK MODELS
-TODO: DominantChargeStatePredictor
-    -
+DominantChargeStatePredictor
 
-TODO: ObservedChargeStatePredictor
-    -
+ObservedChargeStatePredictor
 
-TODO: ChargeStateProportionPredictor
-    -
+ChargeStateProportionPredictor
+
 --------------------------------------------------------------
 """
 
@@ -26,10 +26,13 @@ class DominantChargeStatePredictor(tf.keras.Model):
 
     def __init__(
         self,
-        embedding_dim=16,
+        embedding_output_dim=16,
         seq_length=30,
-        encoder="conv1d",
         vocab_dict=ALPHABET_UNMOD,
+        dropout_rate=0.5,
+        latent_dropout_rate=0.1,
+        recurrent_layers_sizes=(256, 512),
+        regressor_layer_size=512,
         num_classes=6,
     ):
         super(DominantChargeStatePredictor, self).__init__()
@@ -37,54 +40,51 @@ class DominantChargeStatePredictor(tf.keras.Model):
         # tie the count of embeddings to the size of the vocabulary (count of amino acids)
         self.embeddings_count = len(vocab_dict) + 2
 
+        self.dropout_rate = dropout_rate
+        self.latent_dropout_rate = latent_dropout_rate
+        self.regressor_layer_size = regressor_layer_size
+        self.recurrent_layers_sizes = recurrent_layers_sizes
+
         self.embedding = tf.keras.layers.Embedding(
             input_dim=self.embeddings_count,
-            output_dim=embedding_dim,
+            output_dim=embedding_output_dim,
             input_length=seq_length,
         )
+        self._build_encoder()
 
-        self._build_encoder(encoder)
+        self.attention = AttentionLayer()
 
-        self.flatten = tf.keras.layers.Flatten()
         self.regressor = tf.keras.Sequential(
             [
-                tf.keras.layers.Dense(128, activation="relu"),
-                tf.keras.layers.Dense(64, activation="relu"),
+                tf.keras.layers.Dense(self.regressor_layer_size, activation="relu"),
+                tf.keras.layers.Dropout(rate=self.latent_dropout_rate),
             ]
         )
 
         self.output_layer = tf.keras.layers.Dense(num_classes, activation="softmax")
 
-    def _build_encoder(self, encoder_type):
-        if encoder_type.lower() == "conv1d":
-            self.encoder = tf.keras.Sequential(
-                [
-                    tf.keras.layers.Conv1D(
-                        filters=256, kernel_size=3, padding="same", activation="relu"
-                    ),
-                    tf.keras.layers.Conv1D(
-                        filters=512, kernel_size=3, padding="valid", activation="relu"
-                    ),
-                    tf.keras.layers.MaxPooling1D(pool_size=2),
-                ]
-            )
-        else:
-            self.encoder = tf.keras.Sequential(
-                [
-                    tf.keras.layers.LSTM(256, return_sequences=True),
-                    tf.keras.layers.LSTM(256),
-                ]
-            )
+    def _build_encoder(self):
+        self.encoder = tf.keras.Sequential(
+            [
+                tf.keras.layers.Bidirectional(
+                    tf.keras.layers.GRU(
+                        units=self.recurrent_layers_sizes[0], return_sequences=True
+                    )
+                ),
+                tf.keras.layers.Dropout(rate=self.dropout_rate),
+                tf.keras.layers.GRU(
+                    units=self.recurrent_layers_sizes[1], return_sequences=True
+                ),
+                tf.keras.layers.Dropout(rate=self.dropout_rate),
+            ]
+        )
 
-    def call(self, inputs, **kwargs):
-        # print("shape of inputs: ", inputs.shape)
+    def call(self, inputs):
         x = self.embedding(inputs)
         x = self.encoder(x)
-        x = self.flatten(x)
+        x = self.attention(x)
         x = self.regressor(x)
         x = self.output_layer(x)
-        # print("shape of output: ", x.shape)
-
         return x
 
 
@@ -96,10 +96,13 @@ class ObservedChargeStatePredictor(tf.keras.Model):
 
     def __init__(
         self,
-        embedding_dim=16,
+        embedding_output_dim=16,
         seq_length=30,
-        encoder="conv1d",
         vocab_dict=ALPHABET_UNMOD,
+        dropout_rate=0.5,
+        latent_dropout_rate=0.1,
+        recurrent_layers_sizes=(256, 512),
+        regressor_layer_size=512,
         num_classes=6,
     ):
         super(ObservedChargeStatePredictor, self).__init__()
@@ -107,57 +110,51 @@ class ObservedChargeStatePredictor(tf.keras.Model):
         # tie the count of embeddings to the size of the vocabulary (count of amino acids)
         self.embeddings_count = len(vocab_dict) + 2
 
+        self.dropout_rate = dropout_rate
+        self.latent_dropout_rate = latent_dropout_rate
+        self.regressor_layer_size = regressor_layer_size
+        self.recurrent_layers_sizes = recurrent_layers_sizes
+
         self.embedding = tf.keras.layers.Embedding(
             input_dim=self.embeddings_count,
-            output_dim=embedding_dim,
+            output_dim=embedding_output_dim,
             input_length=seq_length,
         )
+        self._build_encoder()
 
-        self._build_encoder(encoder)
+        self.attention = AttentionLayer()
 
-        self.flatten = tf.keras.layers.Flatten()
         self.regressor = tf.keras.Sequential(
             [
-                tf.keras.layers.Dense(128, activation="relu"),
-                tf.keras.layers.Dense(64, activation="relu"),
+                tf.keras.layers.Dense(self.regressor_layer_size, activation="relu"),
+                tf.keras.layers.Dropout(rate=self.latent_dropout_rate),
             ]
         )
 
         self.output_layer = tf.keras.layers.Dense(num_classes, activation="sigmoid")
 
-    def _build_encoder(self, encoder_type):
-        if encoder_type.lower() == "conv1d":
-            self.encoder = tf.keras.Sequential(
-                [
-                    tf.keras.layers.Conv1D(
-                        filters=256, kernel_size=3, padding="same", activation="relu"
-                    ),
-                    tf.keras.layers.Conv1D(
-                        filters=512, kernel_size=3, padding="valid", activation="relu"
-                    ),
-                    tf.keras.layers.MaxPooling1D(pool_size=2),
-                ]
-            )
-        else:
-            self.encoder = tf.keras.Sequential(
-                [
-                    tf.keras.layers.LSTM(256, return_sequences=True),
-                    tf.keras.layers.LSTM(256),
-                ]
-            )
+    def _build_encoder(self):
+        self.encoder = tf.keras.Sequential(
+            [
+                tf.keras.layers.Bidirectional(
+                    tf.keras.layers.GRU(
+                        units=self.recurrent_layers_sizes[0], return_sequences=True
+                    )
+                ),
+                tf.keras.layers.Dropout(rate=self.dropout_rate),
+                tf.keras.layers.GRU(
+                    units=self.recurrent_layers_sizes[1], return_sequences=True
+                ),
+                tf.keras.layers.Dropout(rate=self.dropout_rate),
+            ]
+        )
 
-    def call(self, inputs, **kwargs):
-        # print("Input shape:", inputs.shape)
+    def call(self, inputs):
         x = self.embedding(inputs)
-        # print("Post-embedding shape:", x.shape)
         x = self.encoder(x)
-        # print("Post-encoder shape:", x.shape)
-        x = self.flatten(x)
-        # print("Post-flatten shape:", x.shape)
+        x = self.attention(x)
         x = self.regressor(x)
-        # print("Post-regressor shape:", x.shape)
         x = self.output_layer(x)
-        # print("Output shape:", x.shape)
         return x
 
 
@@ -169,10 +166,13 @@ class ChargeStateProportionPredictor(tf.keras.Model):
 
     def __init__(
         self,
-        embedding_dim=16,
+        embedding_output_dim=16,
         seq_length=30,
-        encoder="conv1d",
         vocab_dict=ALPHABET_UNMOD,
+        dropout_rate=0.5,
+        latent_dropout_rate=0.1,
+        recurrent_layers_sizes=(256, 512),
+        regressor_layer_size=512,
         num_classes=6,
     ):
         super(ChargeStateProportionPredictor, self).__init__()
@@ -180,51 +180,142 @@ class ChargeStateProportionPredictor(tf.keras.Model):
         # tie the count of embeddings to the size of the vocabulary (count of amino acids)
         self.embeddings_count = len(vocab_dict) + 2
 
+        self.dropout_rate = dropout_rate
+        self.latent_dropout_rate = latent_dropout_rate
+        self.regressor_layer_size = regressor_layer_size
+        self.recurrent_layers_sizes = recurrent_layers_sizes
+
         self.embedding = tf.keras.layers.Embedding(
             input_dim=self.embeddings_count,
-            output_dim=embedding_dim,
+            output_dim=embedding_output_dim,
             input_length=seq_length,
         )
+        self._build_encoder()
 
-        self._build_encoder(encoder)
+        self.attention = AttentionLayer()
 
-        self.flatten = tf.keras.layers.Flatten()
         self.regressor = tf.keras.Sequential(
             [
-                tf.keras.layers.Dense(128, activation="relu"),
-                tf.keras.layers.Dense(64, activation="relu"),
+                tf.keras.layers.Dense(self.regressor_layer_size, activation="relu"),
+                tf.keras.layers.Dropout(rate=self.latent_dropout_rate),
             ]
         )
 
-        self.output_layer = tf.keras.layers.Dense(num_classes, activation="sigmoid")
+        self.output_layer = tf.keras.layers.Dense(
+            num_classes, activation="linear"
+        )  # alternatively: sigmoid ?
 
-    def _build_encoder(self, encoder_type):
-        if encoder_type.lower() == "conv1d":
-            self.encoder = tf.keras.Sequential(
-                [
-                    tf.keras.layers.Conv1D(
-                        filters=256, kernel_size=3, padding="same", activation="relu"
-                    ),
-                    tf.keras.layers.Conv1D(
-                        filters=512, kernel_size=3, padding="valid", activation="relu"
-                    ),
-                    tf.keras.layers.MaxPooling1D(pool_size=2),
-                ]
-            )
-        else:
-            self.encoder = tf.keras.Sequential(
-                [
-                    tf.keras.layers.LSTM(256, return_sequences=True),
-                    tf.keras.layers.LSTM(256),
-                ]
-            )
+    def _build_encoder(self):
+        self.encoder = tf.keras.Sequential(
+            [
+                tf.keras.layers.Bidirectional(
+                    tf.keras.layers.GRU(
+                        units=self.recurrent_layers_sizes[0], return_sequences=True
+                    )
+                ),
+                tf.keras.layers.Dropout(rate=self.dropout_rate),
+                tf.keras.layers.GRU(
+                    units=self.recurrent_layers_sizes[1], return_sequences=True
+                ),
+                tf.keras.layers.Dropout(rate=self.dropout_rate),
+            ]
+        )
 
-    def call(self, inputs, **kwargs):
+    def call(self, inputs):
         x = self.embedding(inputs)
         x = self.encoder(x)
-        x = self.flatten(x)
+        x = self.attention(x)
         x = self.regressor(x)
         x = self.output_layer(x)
         return x
 
-    pass
+
+class AttentionLayer(tf.keras.layers.Layer):
+    def __init__(
+        self,
+        context=False,
+        W_regularizer=None,
+        b_regularizer=None,
+        u_regularizer=None,
+        W_constraint=None,
+        b_constraint=None,
+        u_constraint=None,
+        bias=True,
+        **kwargs
+    ):
+        self.supports_masking = True
+        self.init = initializers.get("glorot_uniform")
+        self.W_regularizer = regularizers.get(W_regularizer)
+        self.b_regularizer = regularizers.get(b_regularizer)
+        self.u_regularizer = regularizers.get(u_regularizer)
+        self.W_constraint = constraints.get(W_constraint)
+        self.b_constraint = constraints.get(b_constraint)
+        self.u_constraint = constraints.get(u_constraint)
+        self.bias = bias
+        self.context = context
+        super(AttentionLayer, self).__init__(**kwargs)
+
+    def build(self, input_shape):
+        assert len(input_shape) == 3
+        self.W = self.add_weight(
+            shape=(input_shape[-1],),
+            initializer=self.init,
+            name="{}_W".format(self.name),
+            regularizer=self.W_regularizer,
+            constraint=self.W_constraint,
+        )
+        if self.bias:
+            self.b = self.add_weight(
+                shape=(input_shape[1],),
+                initializer="zero",
+                name="{}_b".format(self.name),
+                regularizer=self.b_regularizer,
+                constraint=self.b_constraint,
+            )
+        else:
+            self.b = None
+        if self.context:
+            self.u = self.add_weight(
+                shape=(input_shape[-1],),
+                initializer=self.init,
+                name="{}_u".format(self.name),
+                regularizer=self.u_regularizer,
+                constraint=self.u_constraint,
+            )
+
+        self.built = True
+
+    def compute_mask(self, input, input_mask=None):
+        return None
+
+    def call(self, x, mask=None):
+        a = K.squeeze(K.dot(x, K.expand_dims(self.W)), axis=-1)
+        if self.bias:
+            a += self.b
+        a = K.tanh(a)
+        if self.context:
+            a = K.squeeze(K.dot(x, K.expand_dims(self.u)), axis=-1)
+        a = K.exp(a)
+        if mask is not None:
+            a *= K.cast(mask, K.floatx())
+        a /= K.cast(K.sum(a, axis=1, keepdims=True) + K.epsilon(), K.floatx())
+        a = K.expand_dims(a)
+        weighted_input = x * a
+        return K.sum(weighted_input, axis=1)
+
+    def compute_output_shape(self, input_shape):
+        return input_shape[0], input_shape[-1]
+
+    def get_config(self):
+        config = {
+            "bias": self.bias,
+            "context": self.context,
+            "W_regularizer": regularizers.serialize(self.W_regularizer),
+            "b_regularizer": regularizers.serialize(self.b_regularizer),
+            "u_regularizer": regularizers.serialize(self.u_regularizer),
+            "W_constraint": constraints.serialize(self.W_constraint),
+            "b_constraint": constraints.serialize(self.b_constraint),
+            "u_constraint": constraints.serialize(self.u_constraint),
+        }
+        base_config = super(AttentionLayer, self).get_config()
+        return dict(list(base_config.items()) + list(config.items()))
