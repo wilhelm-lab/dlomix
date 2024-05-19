@@ -37,8 +37,6 @@ $ pip install dlomix[wandb]
 -  `pipelines`: an exemplary high-level pipeline implementation
 -  `reports`: classes for generating reports related to the different tasks
 -  `constants.py`: constants and configuration values
--  `utils.py`: utility functions
-
 
 
 **Use-cases**
