@@ -357,5 +357,7 @@ class PrositIntensityPredictor(tf.keras.Model):
             # get the input under the specified key if exists
             single_input = inputs.get(key_in_inputs, None)
             if single_input is not None:
+                if single_input.ndim == 1:
+                    single_input = tf.expand_dims(single_input, axis=-1)
                 collected_values.append(single_input)
         return collected_values

@@ -1,3 +1,6 @@
+from collections import defaultdict
+from operator import itemgetter
+
 import numpy as np
 
 from .feature_tables import (
@@ -77,10 +80,11 @@ class FeatureExtractor(PeptideDatasetBaseProcessor):
         super().__init__(sequence_column_name, batched)
         self.feature_column_name = feature_column_name
         self.feature_default_value = feature_default_value
+        self._feature_shape = np.array(self.feature_default_value).shape
         self.description = description
         self.max_length = max_length
 
-    def pad_feature_to_seq_length(self, single_feature):
+    def pad_feature_to_seq_length(self, single_feature, unpadded_seq_len):
         """
         Pad the feature to the maximum sequence length.
 
@@ -88,6 +92,8 @@ class FeatureExtractor(PeptideDatasetBaseProcessor):
         ----------
         single_feature : list
             List of feature values.
+        unpadded_seq_len : int
+            Length of the unpadded original sequence.
 
         Returns
         -------
@@ -95,22 +101,18 @@ class FeatureExtractor(PeptideDatasetBaseProcessor):
             Padded feature list.
         """
 
-        feature_length = len(single_feature)
-
-        if feature_length > self.max_length:
+        if unpadded_seq_len > self.max_length:
             raise ValueError(
-                f"Feature length ({len(single_feature)}) is longer than sequence length provided ({self.max_length})."
+                f"Feature length ({unpadded_seq_len}) is longer than sequence length provided ({self.max_length})."
             )
 
-        padding_length = self.max_length - feature_length
-        single_feature += [self.feature_default_value] * padding_length
+        single_feature[unpadded_seq_len:] = self.feature_default_value
 
-        single_feature = self._cast_expand_dims(single_feature)
+        # expand dims if needed
+        single_feature = self._expand_dims(single_feature)
         return single_feature
 
-    def _cast_expand_dims(self, single_feature):
-        single_feature = np.array(single_feature).astype(np.float32)
-
+    def _expand_dims(self, single_feature):
         if single_feature.ndim == 1:
             single_feature = np.expand_dims(single_feature, axis=-1)
         return single_feature
@@ -157,7 +159,10 @@ class LookupFeatureExtractor(FeatureExtractor):
             batched,
         )
 
-        self.lookup_table = lookup_table
+        d = defaultdict(lambda: self.feature_default_value)
+        d.update(lookup_table)
+
+        self.lookup_table = d
         self.description = description
 
     def batch_process(self, input_data, **kwargs):
@@ -183,8 +188,9 @@ class LookupFeatureExtractor(FeatureExtractor):
         return {self.feature_column_name: feature}
 
     def _extract_feature(self, sequence):
-        feature = [
-            self.lookup_table.get(aa, self.feature_default_value) for aa in sequence
-        ]
-        feature = self.pad_feature_to_seq_length(feature)
+        feature = np.empty((self.max_length, *self._feature_shape), dtype=np.float32)
+        feature[: len(sequence)] = itemgetter(*sequence)(self.lookup_table)
+
+        feature = self.pad_feature_to_seq_length(feature, len(sequence))
+
         return feature
