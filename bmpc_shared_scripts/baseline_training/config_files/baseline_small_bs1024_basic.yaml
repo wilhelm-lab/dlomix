@@ -1,0 +1,12 @@
+dataset:
+  hf_home: /cmnfs/proj/prosit_astral/bmpc_dlomix_group/datasets
+  hf_cache: /cmnfs/proj/prosit_astral/bmpc_dlomix_group/datasets/hf_cache
+  parquet_path: /cmnfs/data/proteomics/Prosit_PTMs/Transformer_Train/no_aug
+  processed_path: /cmnfs/proj/prosit_astral/bmpc_dlomix_group/datasets/processed/baseline_dataset_full_bs1024
+  seq_length: 30
+  batch_size: 1024
+training:
+  learning_rate: 1.0e-4
+  num_epochs: 1
+processing:
+  num_proc: 40
