@@ -78,7 +78,7 @@ model.fit(
     dataset.tensor_train_data,
     validation_data=dataset.tensor_val_data,
     epochs=config['training']['num_epochs'],
-    callbacks=[WandbCallback(), early_stopping]
+    callbacks=[WandbCallback(save_model=False), early_stopping]
 )
 
 
