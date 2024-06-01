@@ -1,5 +1,6 @@
 import argparse
 import yaml
+import uuid
 
 parser = argparse.ArgumentParser(prog='Baseline Model Training')
 parser.add_argument('--config', type=str, required=True)
@@ -17,9 +18,14 @@ import wandb
 # from wandb.keras import WandbCallback
 from wandb.integration.keras import WandbCallback
 
-project_name = 'baseline model training'
-wandb.init(project=project_name)
-wandb.config = config
+config['run_id'] = uuid.uuid4()
+
+project_name = f'baseline model training'
+wandb.init(
+    project=project_name,
+    config=config,
+    tags=[config['dataset']['name']]
+)
 
 # load dataset
 from dlomix.data import FragmentIonIntensityDataset
@@ -28,12 +34,12 @@ from dlomix.data import FragmentIonIntensityDataset
 from dlomix.constants import PTMS_ALPHABET
 
 from dlomix.data import load_processed_dataset
-dataset = load_processed_dataset(config['dataset']['processed_path'])
+dataset = load_processed_dataset(wandb.config['dataset']['processed_path'])
 
 
 # initialize relevant stuff for training
 import tensorflow as tf
-optimizer = tf.keras.optimizers.Adam(learning_rate=config['training']['learning_rate'])
+optimizer = tf.keras.optimizers.Adam(learning_rate=wandb.config['training']['learning_rate'])
 
 from dlomix.losses import masked_spectral_distance, masked_pearson_correlation_distance
 
@@ -58,7 +64,7 @@ input_mapping = {
 meta_data_keys=["collision_energy_aligned_normed", "precursor_charge_onehot", "method_nbr"]
 
 model = PrositIntensityPredictor(
-    seq_length=config['dataset']['seq_length'],
+    seq_length=wandb.config['dataset']['seq_length'],
     alphabet=PTMS_ALPHABET,
     use_prosit_ptm_features=False,
     with_termini=False,
@@ -77,9 +83,20 @@ model.compile(
 model.fit(
     dataset.tensor_train_data,
     validation_data=dataset.tensor_val_data,
-    epochs=config['training']['num_epochs'],
-    callbacks=[WandbCallback(save_model=False), early_stopping]
+    epochs=wandb.config['training']['num_epochs'],
+    callbacks=[WandbCallback(save_model=False, log_batch_frequency=True), early_stopping]
 )
+
+out_path = None
+
+if 'save_dir' in wandb.config['model']:
+    out_path = f"{wandb.config['model']['save_dir']}/{wandb.config['dataset']['name']}/{wandb.config['run_id']}"
+
+if 'save_path' in wandb.config['model']:
+    out_path = wandb.config['model']['save_path']
+
+if out_path is not None:
+    model.save(out_path)
 
 
 # finish up training process
