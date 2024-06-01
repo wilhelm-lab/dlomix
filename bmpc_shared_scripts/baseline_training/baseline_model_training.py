@@ -8,6 +8,9 @@ args = parser.parse_args()
 with open(args.config, 'r') as yaml_file:
     config = yaml.safe_load(yaml_file)
 
+import os
+os.environ['HF_HOME'] = config['dataset']['hf_home']
+os.environ['HF_DATASETS_CACHE'] = config['dataset']['hf_cache']
 
 # initialize weights and biases
 import wandb
