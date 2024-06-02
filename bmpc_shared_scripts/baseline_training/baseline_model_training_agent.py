@@ -19,21 +19,23 @@ from tensorflow.keras.callbacks import EarlyStopping
 parser = argparse.ArgumentParser(prog='Baseline Model Training')
 parser.add_argument('--config', type=str, required=True)
 parser.add_argument('--sweep-id', type=str, required=True)
-parser.add_argument('--tf-device', type=str, required=False)
+parser.add_argument('--tf-device-nr', type=str, required=True)
 parser.add_argument('--count', type=int, required=False)
 args = parser.parse_args()
 
-if args.tf_device is None:
-    print("Please select a tf-device")
-    for dev in tf.config.list_physical_devices():
-        print(dev.name)
-    exit()
+# if args.tf_device is None:
+#     print("Please select a tf-device")
+#     for dev in tf.config.list_physical_devices():
+#         print(dev.name)
+#     exit()
 
 with open(args.config, 'r') as yaml_file:
     config = yaml.safe_load(yaml_file)
 
 os.environ['HF_HOME'] = config['dataset']['hf_home']
 os.environ['HF_DATASETS_CACHE'] = config['dataset']['hf_cache']
+
+os.environ["CUDA_VISIBLE_DEVICES"] = args.tf_device_nr
 
 def run():
     config['run_id'] = uuid.uuid4()
@@ -112,6 +114,5 @@ def run():
     wandb.finish()
 
 
-with tf.device(args.tf_device):
-    # start agent
-    wandb.agent(args.sweep_id, run, count=args.count)
+# start agent
+wandb.agent(args.sweep_id, run, count=args.count)

@@ -1,4 +1,5 @@
 dataset:
+  name: noptm_baseline_full_bs1024
   hf_home: /cmnfs/proj/prosit_astral/bmpc_dlomix_group/datasets
   hf_cache: /cmnfs/proj/prosit_astral/bmpc_dlomix_group/datasets/hf_cache
   parquet_path: /cmnfs/data/proteomics/Prosit_unmod/intensity/no_aug
@@ -8,5 +9,7 @@ dataset:
 training:
   learning_rate: 1.0e-4
   num_epochs: 10
+model:
+  save_dir: /cmnfs/proj/prosit_astral/bmpc_dlomix_group/models/baseline_models
 processing:
   num_proc: 40
