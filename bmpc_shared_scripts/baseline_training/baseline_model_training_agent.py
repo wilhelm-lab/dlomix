@@ -23,12 +23,6 @@ parser.add_argument('--tf-device-nr', type=str, required=True)
 parser.add_argument('--count', type=int, required=False)
 args = parser.parse_args()
 
-# if args.tf_device is None:
-#     print("Please select a tf-device")
-#     for dev in tf.config.list_physical_devices():
-#         print(dev.name)
-#     exit()
-
 with open(args.config, 'r') as yaml_file:
     config = yaml.safe_load(yaml_file)
 

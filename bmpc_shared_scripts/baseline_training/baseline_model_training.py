@@ -4,6 +4,7 @@ import uuid
 
 parser = argparse.ArgumentParser(prog='Baseline Model Training')
 parser.add_argument('--config', type=str, required=True)
+parser.add_argument('--tf-device-nr', type=str, required=True)
 args = parser.parse_args()
 
 with open(args.config, 'r') as yaml_file:
@@ -12,6 +13,8 @@ with open(args.config, 'r') as yaml_file:
 import os
 os.environ['HF_HOME'] = config['dataset']['hf_home']
 os.environ['HF_DATASETS_CACHE'] = config['dataset']['hf_cache']
+
+os.environ["CUDA_VISIBLE_DEVICES"] = args.tf_device_nr
 
 # initialize weights and biases
 import wandb
