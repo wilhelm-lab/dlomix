@@ -1,6 +1,18 @@
 import argparse
 import yaml
+import os
 import uuid
+
+import wandb
+from wandb.integration.keras import WandbCallback
+
+from dlomix.constants import PTMS_ALPHABET
+from dlomix.data import load_processed_dataset
+from dlomix.models import PrositIntensityPredictor
+from dlomix.losses import masked_spectral_distance, masked_pearson_correlation_distance
+
+import tensorflow as tf
+from tensorflow.keras.callbacks import EarlyStopping
 
 parser = argparse.ArgumentParser(prog='Baseline Model Training')
 parser.add_argument('--config', type=str, required=True)
@@ -16,10 +28,6 @@ os.environ['HF_DATASETS_CACHE'] = config['dataset']['hf_cache']
 
 os.environ["CUDA_VISIBLE_DEVICES"] = args.tf_device_nr
 
-# initialize weights and biases
-import wandb
-# from wandb.keras import WandbCallback
-from wandb.integration.keras import WandbCallback
 
 config['run_id'] = uuid.uuid4()
 
@@ -31,22 +39,12 @@ wandb.init(
 )
 
 # load dataset
-from dlomix.data import FragmentIonIntensityDataset
-
-# from misc import PTMS_ALPHABET
-from dlomix.constants import PTMS_ALPHABET
-
-from dlomix.data import load_processed_dataset
 dataset = load_processed_dataset(wandb.config['dataset']['processed_path'])
 
-
 # initialize relevant stuff for training
-import tensorflow as tf
 optimizer = tf.keras.optimizers.Adam(learning_rate=wandb.config['training']['learning_rate'])
 
-from dlomix.losses import masked_spectral_distance, masked_pearson_correlation_distance
 
-from tensorflow.keras.callbacks import EarlyStopping
 early_stopping = EarlyStopping(
     monitor="val_loss",
     min_delta=0.001,
@@ -54,26 +52,27 @@ early_stopping = EarlyStopping(
     restore_best_weights=True)
 
 
-# initialize model
-from dlomix.models import PrositIntensityPredictor
+if 'load_path' in wandb.config['model']:
+    print(f"loading model from file {wandb.config['model']['load_path']}")
+    model = tf.keras.models.load_model(wandb.config['model']['load_path'])
+else:
+    input_mapping = {
+            "SEQUENCE_KEY": "modified_sequence",
+            "COLLISION_ENERGY_KEY": "collision_energy_aligned_normed",
+            "PRECURSOR_CHARGE_KEY": "precursor_charge_onehot",
+            "FRAGMENTATION_TYPE_KEY": "method_nbr",
+        }
 
-input_mapping = {
-        "SEQUENCE_KEY": "modified_sequence",
-        "COLLISION_ENERGY_KEY": "collision_energy_aligned_normed",
-        "PRECURSOR_CHARGE_KEY": "precursor_charge_onehot",
-        "FRAGMENTATION_TYPE_KEY": "method_nbr",
-    }
+    meta_data_keys=["collision_energy_aligned_normed", "precursor_charge_onehot", "method_nbr"]
 
-meta_data_keys=["collision_energy_aligned_normed", "precursor_charge_onehot", "method_nbr"]
-
-model = PrositIntensityPredictor(
-    seq_length=wandb.config['dataset']['seq_length'],
-    alphabet=PTMS_ALPHABET,
-    use_prosit_ptm_features=False,
-    with_termini=False,
-    input_keys=input_mapping,
-    meta_data_keys=meta_data_keys
-)
+    model = PrositIntensityPredictor(
+        seq_length=wandb.config['dataset']['seq_length'],
+        alphabet=PTMS_ALPHABET,
+        use_prosit_ptm_features=False,
+        with_termini=False,
+        input_keys=input_mapping,
+        meta_data_keys=meta_data_keys
+    )
 
 model.compile(
     optimizer=optimizer,
@@ -93,7 +92,7 @@ model.fit(
 out_path = None
 
 if 'save_dir' in wandb.config['model']:
-    out_path = f"{wandb.config['model']['save_dir']}/{wandb.config['dataset']['name']}/{wandb.config['run_id']}"
+    out_path = f"{wandb.config['model']['save_dir']}/{wandb.config['dataset']['name']}/{wandb.config['run_id']}.keras"
 
 if 'save_path' in wandb.config['model']:
     out_path = wandb.config['model']['save_path']

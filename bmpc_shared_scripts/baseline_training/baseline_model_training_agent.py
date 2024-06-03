@@ -1,7 +1,6 @@
 import argparse
 import yaml
 import os
-import copy
 import uuid
 
 import wandb
@@ -58,24 +57,28 @@ def run():
         restore_best_weights=True)
 
 
-    # initialize model
-    input_mapping = {
-            "SEQUENCE_KEY": "modified_sequence",
-            "COLLISION_ENERGY_KEY": "collision_energy_aligned_normed",
-            "PRECURSOR_CHARGE_KEY": "precursor_charge_onehot",
-            "FRAGMENTATION_TYPE_KEY": "method_nbr",
-        }
+    if 'load_path' in wandb.config['model']:
+        print(f"loading model from file {wandb.config['model']['load_path']}")
+        model = tf.keras.models.load_model(wandb.config['model']['load_path'])
+    else:
+        # initialize model
+        input_mapping = {
+                "SEQUENCE_KEY": "modified_sequence",
+                "COLLISION_ENERGY_KEY": "collision_energy_aligned_normed",
+                "PRECURSOR_CHARGE_KEY": "precursor_charge_onehot",
+                "FRAGMENTATION_TYPE_KEY": "method_nbr",
+            }
 
-    meta_data_keys=["collision_energy_aligned_normed", "precursor_charge_onehot", "method_nbr"]
+        meta_data_keys=["collision_energy_aligned_normed", "precursor_charge_onehot", "method_nbr"]
 
-    model = PrositIntensityPredictor(
-        seq_length=wandb.config['dataset']['seq_length'],
-        alphabet=PTMS_ALPHABET,
-        use_prosit_ptm_features=False,
-        with_termini=False,
-        input_keys=input_mapping,
-        meta_data_keys=meta_data_keys
-    )
+        model = PrositIntensityPredictor(
+            seq_length=wandb.config['dataset']['seq_length'],
+            alphabet=PTMS_ALPHABET,
+            use_prosit_ptm_features=False,
+            with_termini=False,
+            input_keys=input_mapping,
+            meta_data_keys=meta_data_keys
+        )
 
     model.compile(
         optimizer=optimizer,
@@ -95,7 +98,7 @@ def run():
     out_path = None
 
     if 'save_dir' in wandb.config['model']:
-        out_path = f"{wandb.config['model']['save_dir']}/{wandb.config['dataset']['name']}/{wandb.config['run_id']}"
+        out_path = f"{wandb.config['model']['save_dir']}/{wandb.config['dataset']['name']}/{wandb.config['run_id']}.keras"
 
     if 'save_path' in wandb.config['model']:
         out_path = wandb.config['model']['save_path']
