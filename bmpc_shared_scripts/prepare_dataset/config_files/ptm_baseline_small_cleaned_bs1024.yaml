@@ -1,0 +1,9 @@
+dataset:
+  hf_home: /cmnfs/proj/prosit_astral/bmpc_dlomix_group/datasets
+  hf_cache: /cmnfs/proj/prosit_astral/bmpc_dlomix_group/datasets/hf_cache
+  parquet_path: /cmnfs/proj/prosit_astral/bmpc_dlomix_group/datasets/parquet/ptm_baseline_small_cleaned
+  processed_path: /cmnfs/proj/prosit_astral/bmpc_dlomix_group/datasets/processed/ptm_baseline_small_cleaned_bs1024
+  seq_length: 30
+  batch_size: 1024
+processing:
+  num_proc: 40
