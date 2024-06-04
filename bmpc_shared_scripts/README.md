@@ -6,5 +6,5 @@ Structure is as follows:
 feature/bmpc (group branch)
 - feature/bmpc-lina (Linas branch)
 - feature/bmpc-sylvie (Sylvies branch)
-- feature/bmpc-juli (Julis branch)
+- feature/bmpc-julian (Julian branch)
 - feature/bmpc-finn (Finns branch)
