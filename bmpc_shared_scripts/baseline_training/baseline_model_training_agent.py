@@ -12,7 +12,7 @@ from dlomix.models import PrositIntensityPredictor
 from dlomix.losses import masked_spectral_distance, masked_pearson_correlation_distance
 
 import tensorflow as tf
-from tensorflow.keras.callbacks import EarlyStopping
+from tensorflow.keras.callbacks import EarlyStopping, ReduceLROnPlateau
 
 # parse args
 parser = argparse.ArgumentParser(prog='Baseline Model Training')
@@ -49,14 +49,7 @@ def run():
     # initialize relevant stuff for training
     optimizer = tf.keras.optimizers.Adam(learning_rate=wandb.config['training']['learning_rate'])
 
-
-    early_stopping = EarlyStopping(
-        monitor="val_loss",
-        min_delta=0.001,
-        patience=20,
-        restore_best_weights=True)
-
-
+    # load or create model
     if 'load_path' in wandb.config['model']:
         print(f"loading model from file {wandb.config['model']['load_path']}")
         model = tf.keras.models.load_model(wandb.config['model']['load_path'])
@@ -86,13 +79,41 @@ def run():
         metrics=[masked_pearson_correlation_distance]
     )
 
+    class LearningRateReporter(tf.keras.callbacks.Callback):
+        def on_train_batch_end(self, batch, *args):
+            wandb.log({'learning_rate': self.model.optimizer._learning_rate.numpy()})
+
+    callbacks = [WandbCallback(save_model=False, log_batch_frequency=True, verbose=1), LearningRateReporter()]
+
+    if 'early_stopping' in wandb.config['training']:
+        print("using early stopping")
+        early_stopping = EarlyStopping(
+            monitor="val_loss",
+            min_delta=wandb.config['training']['early_stopping']['min_delta'],
+            patience=wandb.config['training']['early_stopping']['patience'],
+            restore_best_weights=True)
+
+        callbacks.append(early_stopping)
+
+    if 'lr_scheduler_plateau' in wandb.config['training']:
+        print("using lr scheduler plateau")
+        # Reduce LR on Plateau Callback
+        reduce_lr = ReduceLROnPlateau(
+            monitor="val_loss",
+            factor=wandb.config['training']['lr_scheduler_plateau']['factor'],
+            patience=wandb.config['training']['lr_scheduler_plateau']['patience'],
+            min_delta=wandb.config['training']['lr_scheduler_plateau']['min_delta'],
+            cooldown=wandb.config['training']['lr_scheduler_plateau']['cooldown']
+        ) 
+
+        callbacks.append(reduce_lr)
 
     # train model
     model.fit(
         dataset.tensor_train_data,
         validation_data=dataset.tensor_val_data,
         epochs=wandb.config['training']['num_epochs'],
-        callbacks=[WandbCallback(save_model=False, log_batch_frequency=True, verbose=1), early_stopping]
+        callbacks=callbacks
     )
 
     out_path = None
