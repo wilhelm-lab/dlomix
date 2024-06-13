@@ -5,7 +5,7 @@ import uuid
 import wandb
 from wandb.integration.keras import WandbCallback
 
-from dlomix.constants import PTMS_ALPHABET
+from dlomix.constants import PTMS_ALPHABET, ALPHABET_NAIVE_MODS, ALPHABET_UNMOD
 from dlomix.data import load_processed_dataset
 from dlomix.models import PrositIntensityPredictor
 from dlomix.losses import masked_spectral_distance, masked_pearson_correlation_distance
@@ -72,9 +72,22 @@ def model_training(config):
 
             meta_data_keys=["collision_energy_aligned_normed", "precursor_charge_onehot", "method_nbr"]
 
+            # select alphabet
+            if isinstance(wandb.config['dataset']['alphabet'], dict):
+                # this is a custom alphabet
+                alphabet = wandb.config['dataset']['alphabet']
+            elif wandb.config['dataset']['alphabet'] == 'PTMS_ALPHABET':
+                alphabet = PTMS_ALPHABET
+            elif wandb.config['dataset']['alphabet'] == 'ALPHABET_UNMOD':
+                alphabet = ALPHABET_UNMOD
+            elif wandb.config['dataset']['alphabet'] == 'ALPHABET_NAIVE_MODS':
+                alphabet = ALPHABET_NAIVE_MODS
+            else:
+                raise ValueError('unknown alphabet selected')
+
             model = PrositIntensityPredictor(
                 seq_length=wandb.config['dataset']['seq_length'],
-                alphabet=PTMS_ALPHABET,
+                alphabet=alphabet,
                 use_prosit_ptm_features=False,
                 with_termini=False,
                 input_keys=input_mapping,

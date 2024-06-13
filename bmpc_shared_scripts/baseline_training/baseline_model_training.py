@@ -6,7 +6,7 @@ from src.model_training import load_config, model_training, combine_into
 parser = argparse.ArgumentParser(prog='Baseline Model Training')
 parser.add_argument('--config', type=str, required=True)
 parser.add_argument('--cuda-device-nr', type=str, required=False)
-parser.add_argument('--cpu-threads', type=str, required=False)
+parser.add_argument('--cpu-threads', type=int, required=False)
 
 args = parser.parse_args()
 

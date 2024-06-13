@@ -3,21 +3,36 @@ import argparse
 import yaml
 import os
 from dlomix.data import FragmentIonIntensityDataset
-from dlomix.constants import PTMS_ALPHABET
+from dlomix.constants import PTMS_ALPHABET, ALPHABET_UNMOD, ALPHABET_NAIVE_MODS
 
 parser = argparse.ArgumentParser(prog='Prepare a parquet-based dataset for use with DLOmix')
 parser.add_argument('--config', type=str, required=True)
-parser.add_argument('--num-proc', type=str, required=False)
+parser.add_argument('--num-proc', type=int, required=False)
 args = parser.parse_args()
 
 with open(args.config, 'r') as yaml_file:
     config = yaml.safe_load(yaml_file)
 
 if args.num_proc is not None:
-    config['processing']['num_proc'] = args.num_proc
+    config.setdefault('processing', {})['num_proc'] = args.num_proc
 
 os.environ['HF_HOME'] = config['dataset']['hf_home']
 os.environ['HF_DATASETS_CACHE'] = config['dataset']['hf_cache']
+
+
+# select alphabet
+if isinstance(config['dataset']['alphabet'], dict):
+    # this is a custom alphabet
+    alphabet = config['dataset']['alphabet']
+elif config['dataset']['alphabet'] == 'PTMS_ALPHABET':
+    alphabet = PTMS_ALPHABET
+elif config['dataset']['alphabet'] == 'ALPHABET_UNMOD':
+    alphabet = ALPHABET_UNMOD
+elif config['dataset']['alphabet'] == 'ALPHABET_NAIVE_MODS':
+    alphabet = ALPHABET_NAIVE_MODS
+else:
+    raise ValueError('unknown alphabet selected')
+
 
 
 # load dataset
@@ -35,7 +50,7 @@ dataset = FragmentIonIntensityDataset(
     batch_size=config['dataset']['batch_size'],
     max_seq_len=config['dataset']['seq_length'],
     encoding_scheme="naive-mods",
-    alphabet=PTMS_ALPHABET,
+    alphabet=alphabet,
     num_proc=config['processing']['num_proc'],
     model_features=["precursor_charge_onehot", "collision_energy_aligned_normed","method_nbr"]
 )
