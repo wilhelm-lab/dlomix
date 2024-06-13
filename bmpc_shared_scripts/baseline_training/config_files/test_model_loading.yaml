@@ -11,5 +11,3 @@ training:
   num_epochs: 1
 model:
   save_path: /cmnfs/home/f.kapitza/dlomix/finn_notebooks/models/test.keras
-processing:
-  num_proc: 40

@@ -8,5 +8,3 @@ dataset:
 training:
   learning_rate: 1.0e-4
   num_epochs: 1
-processing:
-  num_proc: 40
