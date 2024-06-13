@@ -1,23 +1,26 @@
 # parse config file
 import argparse
 import yaml
+import os
+from dlomix.data import FragmentIonIntensityDataset
+from dlomix.constants import PTMS_ALPHABET
 
 parser = argparse.ArgumentParser(prog='Prepare a parquet-based dataset for use with DLOmix')
 parser.add_argument('--config', type=str, required=True)
+parser.add_argument('--num-proc', type=str, required=False)
 args = parser.parse_args()
 
 with open(args.config, 'r') as yaml_file:
     config = yaml.safe_load(yaml_file)
 
-import os
+if args.num_proc is not None:
+    config['processing']['num_proc'] = args.num_proc
+
 os.environ['HF_HOME'] = config['dataset']['hf_home']
 os.environ['HF_DATASETS_CACHE'] = config['dataset']['hf_cache']
 
 
 # load dataset
-from dlomix.data import FragmentIonIntensityDataset
-from dlomix.constants import PTMS_ALPHABET
-
 datset_base_path = config['dataset']['parquet_path']
 dataset_train_path = f"{datset_base_path}_train.parquet"
 dataset_val_path = f"{datset_base_path}_val.parquet"
