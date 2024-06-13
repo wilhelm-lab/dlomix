@@ -5,6 +5,7 @@ dataset:
   processed_path: /cmnfs/proj/prosit_astral/bmpc_dlomix_group/datasets/processed/ptm_baseline_small_cleaned_bs1024
   seq_length: 30
   batch_size: 1024
+  alphabet: PTMS_ALPHABET
 training:
   learning_rate: 1.0e-4
   num_epochs: 50
