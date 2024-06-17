@@ -5,10 +5,7 @@ import uuid
 import wandb
 from wandb.integration.keras import WandbCallback
 
-from dlomix.constants import PTMS_ALPHABET, ALPHABET_NAIVE_MODS, ALPHABET_UNMOD
-from dlomix.data import load_processed_dataset
-from dlomix.models import PrositIntensityPredictor
-from dlomix.losses import masked_spectral_distance, masked_pearson_correlation_distance
+
 
 import tensorflow as tf
 from tensorflow.keras.callbacks import EarlyStopping, ReduceLROnPlateau, LearningRateScheduler
@@ -49,6 +46,11 @@ def model_training(config):
 
         os.environ['HF_HOME'] = wandb.config['dataset']['hf_home']
         os.environ['HF_DATASETS_CACHE'] = wandb.config['dataset']['hf_cache']
+
+        from dlomix.constants import PTMS_ALPHABET, ALPHABET_NAIVE_MODS, ALPHABET_UNMOD
+        from dlomix.data import load_processed_dataset
+        from dlomix.models import PrositIntensityPredictor
+        from dlomix.losses import masked_spectral_distance, masked_pearson_correlation_distance
 
         # load dataset
         dataset = load_processed_dataset(wandb.config['dataset']['processed_path'])

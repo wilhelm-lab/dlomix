@@ -2,8 +2,6 @@
 import argparse
 import yaml
 import os
-from dlomix.data import FragmentIonIntensityDataset
-from dlomix.constants import PTMS_ALPHABET, ALPHABET_UNMOD, ALPHABET_NAIVE_MODS
 
 parser = argparse.ArgumentParser(prog='Prepare a parquet-based dataset for use with DLOmix')
 parser.add_argument('--config', type=str, required=True)
@@ -18,6 +16,10 @@ if args.num_proc is not None:
 
 os.environ['HF_HOME'] = config['dataset']['hf_home']
 os.environ['HF_DATASETS_CACHE'] = config['dataset']['hf_cache']
+
+# these imports need to come after setting the HF_ environment variables
+from dlomix.data import FragmentIonIntensityDataset
+from dlomix.constants import PTMS_ALPHABET, ALPHABET_UNMOD, ALPHABET_NAIVE_MODS
 
 
 # select alphabet
