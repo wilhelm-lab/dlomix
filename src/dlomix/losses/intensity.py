@@ -1,8 +1,10 @@
 import numpy as np
 import tensorflow as tf
 import tensorflow.keras.backend as K
+import keras
 
 
+@keras.saving.register_keras_serializable()
 def masked_spectral_distance(y_true, y_pred):
     """
     Calculates the masked spectral distance between true and predicted intensity vectors.
@@ -49,6 +51,7 @@ def masked_spectral_distance(y_true, y_pred):
     return 2 * arccos / np.pi
 
 
+@keras.saving.register_keras_serializable()
 def masked_pearson_correlation_distance(y_true, y_pred):
     """
     Calculates the masked Pearson correlation distance between true and predicted intensity vectors.

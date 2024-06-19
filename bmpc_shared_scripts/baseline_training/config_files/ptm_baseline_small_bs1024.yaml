@@ -5,5 +5,6 @@ dataset:
   processed_path: /cmnfs/proj/prosit_astral/bmpc_dlomix_group/datasets/processed/baseline_dataset_small_bs1024
   seq_length: 30
   batch_size: 1024
-processing:
-  num_proc: 40
+training:
+  learning_rate: 1.0e-4
+  num_epochs: 1
