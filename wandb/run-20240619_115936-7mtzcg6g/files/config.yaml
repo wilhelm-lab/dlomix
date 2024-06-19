@@ -1,0 +1,91 @@
+wandb_version: 1
+
+dataset:
+  desc: null
+  value:
+    name: noptm_baseline_small_bs1024
+    hf_home: /cmnfs/proj/prosit_astral/bmpc_dlomix_group/datasets
+    hf_cache: /cmnfs/proj/prosit_astral/bmpc_dlomix_group/datasets/hf_cache
+    parquet_path: /cmnfs/data/proteomics/Prosit_PTMs/Transformer_Train/clean
+    processed_path: /cmnfs/proj/prosit_astral/bmpc_dlomix_group/datasets/processed/noptm_baseline_small_bs1024
+    seq_length: 30
+    batch_size: 1024
+training:
+  desc: null
+  value:
+    learning_rate: 0.0001
+    num_epochs: 2
+model:
+  desc: null
+  value:
+    save_dir: /cmnfs/proj/prosit_astral/bmpc_dlomix_group/models/callback_models
+processing:
+  desc: null
+  value:
+    num_proc: 40
+callbacks:
+  desc: null
+  value:
+    early_stopping:
+      monitor: val_loss
+      min_delta: 0.001
+      patience: 20
+      restore_best_weights: true
+    reduce_lr:
+      monitor: val_loss
+      factor: 0.1
+      patience: 10
+      min_lr: 1e-6
+      mode: auto
+      min_delta: 1e-4
+      verbose: 1
+    learning_rate_scheduler:
+      initial_lr: 0.0001
+      decay_rate: 0.9
+    lambda_callback:
+      on_epoch_end: 'lambda epoch, logs: print(f''Epoch {epoch} ended with logs: {logs}'')'
+    csv_logger:
+      filename: /nfs/home/students/s.baier/mapra/dlomix/bmpc_shared_scripts/refinement_transfer_learning/logs/training_log.csv
+      append: false
+    model_checkpoint:
+      filepath: /nfs/home/students/s.baier/mapra/dlomix/bmpc_shared_scripts/refinement_transfer_learning/checkpoints/model-{epoch:02d}-{val_loss:.2f}.keras
+      monitor: val_loss
+      save_best_only: true
+      save_weights_only: false
+      mode: auto
+      save_freq: epoch
+      verbose: 1
+run_id:
+  desc: null
+  value: 6f622767-6e0d-433c-bb2c-baa57cea250a
+_wandb:
+  desc: null
+  value:
+    python_version: 3.10.14
+    cli_version: 0.17.0
+    framework: keras
+    is_jupyter_run: false
+    is_kaggle_kernel: false
+    start_time: 1718798376
+    t:
+      1:
+      - 2
+      - 3
+      - 49
+      - 51
+      - 55
+      2:
+      - 2
+      - 3
+      - 49
+      - 51
+      - 55
+      3:
+      - 15
+      - 16
+      - 23
+      4: 3.10.14
+      5: 0.17.0
+      8:
+      - 5
+      13: linux-x86_64

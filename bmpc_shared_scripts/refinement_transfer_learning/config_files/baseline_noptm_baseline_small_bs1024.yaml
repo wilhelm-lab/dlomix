@@ -62,12 +62,12 @@ callbacks:
     on_epoch_end: "lambda epoch, logs: print(f'Epoch {epoch} ended with logs: {logs}')"
   csv_logger:
     # Filepath for logging training data into a CSV file
-    filename: /nfs/home/students/s.baier/mapra/dlomix/bmpc_shared_scripts/refinement_transfer_learning_utils/logs/training_log.csv
+    filename: /nfs/home/students/s.baier/mapra/dlomix/bmpc_shared_scripts/refinement_transfer_learning/logs/training_log.csv
     # Append mode; True means append to existing file, False means overwrite
     append: False
   model_checkpoint:
     # Path for saving the model
-    filepath: /nfs/home/students/s.baier/mapra/dlomix/bmpc_shared_scripts/refinement_transfer_learning_utils/checkpoints/model-{epoch:02d}-{val_loss:.2f}.keras
+    filepath: /nfs/home/students/s.baier/mapra/dlomix/bmpc_shared_scripts/refinement_transfer_learning/checkpoints/model-{epoch:02d}-{val_loss:.2f}.keras
     # Metric to monitor for model checkpointing
     monitor: val_loss
     # If True, the latest best model according to the quantity monitored will not be overwritten
