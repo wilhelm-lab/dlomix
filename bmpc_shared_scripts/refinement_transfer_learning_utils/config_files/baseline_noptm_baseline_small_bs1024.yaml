@@ -37,21 +37,6 @@ callbacks:
     patience: 20
     # Whether to restore model weights from the epoch with the best value of the monitored quantity
     restore_best_weights: True
-  model_checkpoint:
-    # Path for saving the model
-    filepath: /nfs/home/students/s.baier/mapra/dlomix/bmpc_shared_scripts/refinement_transfer_learning_utils/saved_models/checkpoints/model-{epoch:02d}-{val_loss:.2f}.hdf5
-    # Metric to monitor for model checkpointing
-    monitor: val_loss
-    # If True, the latest best model according to the quantity monitored will not be overwritten
-    save_best_only: False
-    # If True, then only the model's weights will be saved
-    save_weights_only: True 
-    # Mode for monitoring the quantity ('auto', 'min', 'max')
-    mode: auto
-    # Frequency in terms of number of epochs with which the model is saved
-    save_freq: epoch
-    # Verbosity mode, 0 or 1
-    verbose: 1
   reduce_lr:
     # Metric to monitor for learning rate reduction
     monitor: val_loss
@@ -67,16 +52,31 @@ callbacks:
     min_delta: 1e-4
     # Verbosity mode, 0 or 1
     verbose: 1
-  lambda_callback:
-    # Code to be executed at the end of each epoch
-    on_epoch_end: "lambda epoch, logs: print(f'Epoch {epoch} ended with logs: {logs}')"
-  csv_logger:
-    # Filepath for logging training data into a CSV file
-    filename: /nfs/home/students/s.baier/mapra/dlomix/bmpc_shared_scripts/refinement_transfer_learning_utils/saved_models/logs/training_log.csv
-    # Append mode; True means append to existing file, False means overwrite
-    append: False
   learning_rate_scheduler:
     # Initial learning rate for the scheduler
     initial_lr: 1.0e-4
     # Factor by which to multiply the learning rate at each epoch; new_lr = lr * decay_rate
     decay_rate: 0.9
+  lambda_callback:
+    # Code to be executed at the end of each epoch
+    on_epoch_end: "lambda epoch, logs: print(f'Epoch {epoch} ended with logs: {logs}')"
+  csv_logger:
+    # Filepath for logging training data into a CSV file
+    filename: /nfs/home/students/s.baier/mapra/dlomix/bmpc_shared_scripts/refinement_transfer_learning_utils/logs/training_log.csv
+    # Append mode; True means append to existing file, False means overwrite
+    append: False
+  model_checkpoint:
+    # Path for saving the model
+    filepath: /nfs/home/students/s.baier/mapra/dlomix/bmpc_shared_scripts/refinement_transfer_learning_utils/checkpoints/model-{epoch:02d}-{val_loss:.2f}.keras
+    # Metric to monitor for model checkpointing
+    monitor: val_loss
+    # If True, the latest best model according to the quantity monitored will not be overwritten
+    save_best_only: True
+    # If True, then only the model's weights will be saved
+    save_weights_only: False 
+    # Mode for monitoring the quantity ('auto', 'min', 'max')
+    mode: auto
+    # Frequency in terms of number of epochs with which the model is saved
+    save_freq: epoch
+    # Verbosity mode, 0 or 1
+    verbose: 1
