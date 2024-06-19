@@ -1,0 +1,82 @@
+dataset:
+  # name of the data set
+  name: noptm_baseline_small_bs1024
+  # Directory for Hugging Face datasets
+  hf_home: /cmnfs/proj/prosit_astral/bmpc_dlomix_group/datasets
+  # Cache directory for Hugging Face datasets
+  hf_cache: /cmnfs/proj/prosit_astral/bmpc_dlomix_group/datasets/hf_cache
+  # Path to the directory containing Parquet files
+  parquet_path: /cmnfs/data/proteomics/Prosit_PTMs/Transformer_Train/clean
+  # Directory for storing processed data
+  processed_path: /cmnfs/proj/prosit_astral/bmpc_dlomix_group/datasets/processed/noptm_baseline_small_bs1024
+  # Sequence length for the dataset
+  seq_length: 30
+  # Number of samples in each batch
+  batch_size: 1024
+
+training:
+  # Initial learning rate for training
+  learning_rate: 1.0e-4
+  # Number of epochs to train the model
+  num_epochs: 2
+
+model:
+  save_dir: /cmnfs/proj/prosit_astral/bmpc_dlomix_group/models/callback_models
+
+processing:
+  # Number of processor cores to use for data processing
+  num_proc: 40
+
+callbacks:
+  early_stopping:
+    # Metric to monitor for early stopping
+    monitor: val_loss
+    # Minimum change in the monitored quantity to qualify as an improvement
+    min_delta: 0.001
+    # Number of epochs with no improvement after which training will be stopped
+    patience: 20
+    # Whether to restore model weights from the epoch with the best value of the monitored quantity
+    restore_best_weights: True
+  reduce_lr:
+    # Metric to monitor for learning rate reduction
+    monitor: val_loss
+    # Factor by which the learning rate will be reduced. new_lr = lr * factor
+    factor: 0.1
+    # Number of epochs with no improvement after which learning rate will be reduced
+    patience: 10
+    # Minimum learning rate
+    min_lr: 1e-6
+    # Mode for monitoring the quantity ('auto', 'min', 'max')
+    mode: auto
+    # Minimum change in the monitored quantity to qualify as an improvement
+    min_delta: 1e-4
+    # Verbosity mode, 0 or 1
+    verbose: 1
+  learning_rate_scheduler:
+    # Initial learning rate for the scheduler
+    initial_lr: 1.0e-4
+    # Factor by which to multiply the learning rate at each epoch; new_lr = lr * decay_rate
+    decay_rate: 0.9
+  lambda_callback:
+    # Code to be executed at the end of each epoch
+    on_epoch_end: "lambda epoch, logs: print(f'Epoch {epoch} ended with logs: {logs}')"
+  csv_logger:
+    # Filepath for logging training data into a CSV file
+    filename: /nfs/home/students/s.baier/mapra/dlomix/bmpc_shared_scripts/refinement_transfer_learning/logs/training_log.csv
+    # Append mode; True means append to existing file, False means overwrite
+    append: False
+  model_checkpoint:
+    # Path for saving the model
+    filepath: /nfs/home/students/s.baier/mapra/dlomix/bmpc_shared_scripts/refinement_transfer_learning/checkpoints/model-{epoch:02d}-{val_loss:.2f}.keras
+    # Metric to monitor for model checkpointing
+    monitor: val_loss
+    # If True, the latest best model according to the quantity monitored will not be overwritten
+    save_best_only: True
+    # If True, then only the model's weights will be saved
+    save_weights_only: False 
+    # Mode for monitoring the quantity ('auto', 'min', 'max')
+    mode: auto
+    # Frequency in terms of number of epochs with which the model is saved
+    save_freq: epoch
+    # Verbosity mode, 0 or 1
+    verbose: 1
