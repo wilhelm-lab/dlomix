@@ -15,6 +15,27 @@ from dlomix.models import PrositIntensityPredictor
 from dlomix.constants import PTMS_ALPHABET
 
 
+
+def wandb_callback(save_model: bool, log_batch_frequency: int, log_weights: bool) -> WandbCallback:
+    """
+    Creates a WandbCallback for use with model training.
+
+    Args:
+    save_model (bool): Whether to save the model at the end of every epoch. It requires `val_data` to be part of fit.
+    log_batch_frequency (int): Frequency (in number of batches) at which to log training data. Use None to disable.
+    log_weights (bool): Whether to log model weights to wandb.
+
+    Returns:
+    WandbCallback: The configured WandbCallback.
+    """
+    return WandbCallback(
+        save_model=save_model, 
+        log_batch_frequency=log_batch_frequency,
+        log_weights=log_weights
+    )
+
+
+
 def early_stopping_callback(monitor: str, min_delta: float, patience: int, restore_best_weights: bool) -> EarlyStopping:
     """
     Creates an EarlyStopping callback.
@@ -165,6 +186,10 @@ dataset = load_processed_dataset(wandb.config['dataset']['processed_path'])
 optimizer = tf.keras.optimizers.Adam(learning_rate=wandb.config['training']['learning_rate'])
 
 # Initialize callbacks
+
+# Example of integrating WandbCallback with your model training
+wandb_cb = wandb_callback(save_model=False, log_batch_frequency=10, log_weights=True)
+
 early_stopping = early_stopping_callback(
     monitor=config['callbacks']['early_stopping']['monitor'],
     min_delta=config['callbacks']['early_stopping']['min_delta'],
@@ -204,7 +229,7 @@ model_checkpoint = model_checkpoint_callback(
 
 # Collect all callbacks in a list
 callbacks = [
-    WandbCallback(save_model=False, log_batch_frequency=True),
+    wandb_cb, 
     early_stopping,
     reduce_lr,
     learning_rate_scheduler,
