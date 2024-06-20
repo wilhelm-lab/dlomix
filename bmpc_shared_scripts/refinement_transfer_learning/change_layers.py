@@ -22,13 +22,11 @@ def change_output_layer(model: PrositIntensityPredictor, number_of_ions: int = 2
         [
             tf.keras.layers.TimeDistributed(
                 tf.keras.layers.Dense(model.len_fion), name='time_dense'
-            )
-            tf.keras.layers.LeakyReLU(name='activation'),
-            tf.keras.layers.Flatten(name='out')
-        ], 
+                ), 
+            tf.keras.layers.LeakyReLU(name='activation'), 
+            tf.keras.layers.Flatten(name='out')], 
         name='regressor'
-
-    )
+        )
 
 
 def change_input_layer(model: PrositIntensityPredictor, modifications: list = None) -> None:
