@@ -1,0 +1,75 @@
+import tensorflow as tf
+from dlomix.models import PrositIntensityPredictor
+from tensorflow.keras.constraints import Constraint
+import keras.backend as K
+import keras
+from dlomix.models import PrositIntensityPredictor
+
+
+def change_output_layer(model: PrositIntensityPredictor, number_of_ions: int = 2) -> None:
+    """
+    Change the output layer of a PrositItensityPredictor model
+    This means changing the number of predicted ions to the number of ion types in the dataset.
+    The default PrositIntensityPredictor predicts two ion types (y- and b-ions). 
+    If the number of ions is not given, this function will replace the output layer with a randomly initialized layer the same dimensions as before.
+
+    If the number of ions changes to for example 4, the regressor will have an output dimension of:
+        (batch_size, number_of_ions * charge_states * possible ions) = (batch_size, 4 * 3 * 29) = (batch_size, 348)
+    After changing the output layer, the models needs to be compiled again before training.
+
+    Args:
+        model (PrositIntensityPredictor): the model where the output layer changes
+        number_of_ions (int, optional): Number of ions the model should be able to predict. Defaults to 2.
+    """
+    model.len_fion = 3 * number_of_ions
+    model.regressor = tf.keras.Sequential(
+        [
+            tf.keras.layers.TimeDistributed(
+                tf.keras.layers.Dense(model.len_fion), name='time_dense'
+                ), 
+            tf.keras.layers.LeakyReLU(name='activation'), 
+            tf.keras.layers.Flatten(name='out')], 
+        name='regressor'
+        )
+
+
+@keras.saving.register_keras_serializable()
+class FixWeights(Constraint):
+    def __init__(self, old_weights):
+        self.old_weights = old_weights
+    def __call__(self, w):
+        return K.concatenate([self.old_weights, w[self.old_weights.shape[0]:]], axis=0)
+    
+
+def change_input_layer(model: PrositIntensityPredictor, modifications: list = None, freeze_old_embeds: bool = False) -> None:
+    """Change the input layer of a PrositIntensityPredictor model
+    This means changing the number of embeddings the Embedding layer can produce. This is directly tied to the size of the alphabet of the model.
+    A list of new modifications the model should support is given and the modifications are added to the alphabet, increasing its size.
+    If no new modifications are given, the weights for the Embedding layer are re-initialized.
+
+    This function also allows the user to freeze the old embedding weights trained by the loaded model,
+    meaning it only allows changing the weights for the embeddings of the new modifications.
+
+    After changing the input layer, the models needs to be compiled again before training.
+
+    Args:
+        model (PrositIntensityPredictor): The model, where the input layers needs to be changed
+        modifications (list, optional): List of modifications the model should support. Defaults to None.
+        freeze_old_embeds (bool): If set to True, the old embeddings of the loaded model are not changed during training. Defaults to False.
+    """
+    if modifications:
+        model.alphabet.update({k: i for i, k in enumerate(modifications, start=len(model.alphabet) + 1)})
+        
+    embeddings_constraint = None
+    if freeze_old_embeds:
+        # if added names to the model, replace get_layer index with name 
+        trained_embeds_weights = model.layers[0].get_weights()[0]
+        embeddings_constraint = FixWeights(trained_embeds_weights)
+
+    model.embedding = tf.keras.layers.Embedding(
+        input_dim=len(model.alphabet) + 2,
+        output_dim=model.embedding_output_dim,
+        input_length=model.seq_length,
+        embeddings_constraint=embeddings_constraint,
+        name='embedding'
+        )
