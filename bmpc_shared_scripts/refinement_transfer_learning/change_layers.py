@@ -1,5 +1,9 @@
 import tensorflow as tf
 from dlomix.models import PrositIntensityPredictor
+from tensorflow.keras.constraints import Constraint
+import keras.backend as K
+import keras
+from dlomix.models import PrositIntensityPredictor
 
 
 def change_output_layer(model: PrositIntensityPredictor, number_of_ions: int = 2) -> None:
@@ -29,24 +33,43 @@ def change_output_layer(model: PrositIntensityPredictor, number_of_ions: int = 2
         )
 
 
-def change_input_layer(model: PrositIntensityPredictor, modifications: list = None) -> None:
+@keras.saving.register_keras_serializable()
+class FixWeights(Constraint):
+    def __init__(self, old_weights):
+        self.old_weights = old_weights
+    def __call__(self, w):
+        return K.concatenate([self.old_weights, w[self.old_weights.shape[0]:]], axis=0)
+    
+
+def change_input_layer(model: PrositIntensityPredictor, modifications: list = None, freeze_old_embeds: bool = False) -> None:
     """Change the input layer of a PrositIntensityPredictor model
     This means changing the number of embeddings the Embedding layer can produce. This is directly tied to the size of the alphabet of the model.
     A list of new modifications the model should support is given and the modifications are added to the alphabet, increasing its size.
     If no new modifications are given, the weights for the Embedding layer are re-initialized.
+
+    This function also allows the user to freeze the old embedding weights trained by the loaded model,
+    meaning it only allows changing the weights for the embeddings of the new modifications.
+
     After changing the input layer, the models needs to be compiled again before training.
 
     Args:
         model (PrositIntensityPredictor): The model, where the input layers needs to be changed
         modifications (list, optional): List of modifications the model should support. Defaults to None.
+        freeze_old_embeds (bool): If set to True, the old embeddings of the loaded model are not changed during training. Defaults to False.
     """
     if modifications:
-        for new_mod in modifications:
-            model.alphabet.update({new_mod: max(model.alphabet.values()) + 1})
+        model.alphabet.update({k: i for i, k in enumerate(modifications, start=len(model.alphabet) + 1)})
+        
+    embeddings_constraint = None
+    if freeze_old_embeds:
+        # if added names to the model, replace get_layer index with name 
+        trained_embeds_weights = model.layers[0].get_weights()[0]
+        embeddings_constraint = FixWeights(trained_embeds_weights)
 
     model.embedding = tf.keras.layers.Embedding(
         input_dim=len(model.alphabet) + 2,
         output_dim=model.embedding_output_dim,
         input_length=model.seq_length,
+        embeddings_constraint=embeddings_constraint,
         name='embedding'
-    )
+        )
