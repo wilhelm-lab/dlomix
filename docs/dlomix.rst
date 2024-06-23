@@ -1,39 +1,30 @@
-dlomix package
-==============
+``dlomix``
+===========
+
+.. automodule:: dlomix
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+Subpackages
+-----------
 
 .. toctree::
    :maxdepth: 4
 
-   modules/data
-   modules/models
-   modules/eval
-   modules/reports
-   modules/layers
-   modules/pipelines
+   dlomix.data
+   dlomix.eval
+   dlomix.layers
+   dlomix.losses
+   dlomix.models
+   dlomix.pipelines
+   dlomix.reports
 
 Submodules
 ----------
 
-dlomix.constants module
------------------------
 
 .. automodule:: dlomix.constants
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-dlomix.utils module
--------------------
-
-.. automodule:: dlomix.utils
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-Module contents
----------------
-
-.. automodule:: dlomix
    :members:
    :undoc-members:
    :show-inheritance:

@@ -35,7 +35,7 @@ $ pip install dlomix[quarto]
 ```
 
 **General Overview**
--  `data`: structures for modeling the input data, currently based on `tf.Dataset`
+-  `data`: structures for modeling the input data, processing functions, and feature extractions based on Hugging Face datasets `Dataset` and `DatasetDict`
 -  `eval`: classes for evaluating models and reporting results
 -  `layers`: custom layers used for building models, based on `tf.keras.layers.Layer`
 -  `losses`: custom losses to be used for training with `model.fit()`
@@ -43,14 +43,15 @@ $ pip install dlomix[quarto]
 -  `pipelines`: an exemplary high-level pipeline implementation
 -  `reports`: classes for generating reports related to the different tasks
 -  `constants.py`: constants and configuration values
--  `utils.py`: utility functions
-
 
 
 **Use-cases**
 
-- Retention Time Prediction: 
-    - a regression problem where the retention time of a peptide sequence is to be predicted. 
+- Retention Time Prediction:
+    - a regression problem where the retention time of a peptide sequence is to be predicted.
+
+- Fragment Ion Intensity Prediction:
+    - a multi-output regression problem where the intensity values for fragment ions are predicted given a peptide sequence along with some additional features.
 
 
 
@@ -58,19 +59,24 @@ $ pip install dlomix[quarto]
 
 Functionality:
 - [X] integrate prosit
-- [ ] extend pipeline for different types of models and backbones
-- [ ] extend pipeline to allow for fine-tuning with custom datasets
+- [X] integrate hugging face datasets
+- [X] extend data representation to include modifications
+- [X] add PTM features
 - [X] add residual plots to reporting, possibly other regression analysis tools
 - [X] output reporting results as PDF
-- [ ] extend data representation to include modifications
 - [X] refactor reporting module to use W&B Report API (Retention Time)
+- [ ] extend pipeline for different types of models and backbones
+- [ ] extend pipeline to allow for fine-tuning with custom datasets
+
+
 
 Package structure:
 
 - [X] integrate `deeplc.py` into `models.py`, preferably introduce a package structure (e.g. `models.retention_time`)
 - [X] add references for implemented models in the ReadMe
-- [ ] introduce a style guide and checking (e.g. PEP)
+- [X] introduce formatting and precommit hooks
 - [X] plan documentation (sphinx and readthedocs)
+- [X] refactor following best practices for cleaner install
 
 
 ## Developing DLOmix
@@ -93,4 +99,3 @@ Robbin Bouwmeester, Ralf Gabriels, Niels Hulstaert, Lennart Martens, Sven Degroe
 bioRxiv 2020.03.28.013003; doi: 10.1101/2020.03.28.013003
 
 [3] Bouwmeester, R., Gabriels, R., Hulstaert, N. et al. DeepLC can predict retention times for peptides that carry as-yet unseen modifications. Nat Methods 18, 1363–1369 (2021). https://doi.org/10.1038/s41592-021-01301-5
- 
