@@ -1,4 +1,3 @@
-# Todo: add docstrings
 class QMDFile:
     """QMD File class for generating Quarto reports.
 

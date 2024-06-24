@@ -1,22 +1,18 @@
-# 1. remove self references and parametrize functions
-# 2. add any necessary imports
-# 3. refactor the original calling function
-
 import itertools
 import os
 import re
 from itertools import combinations
-from os import listdir
-from os.path import isfile, join
+from os.path import join
 
 import matplotlib.image as mpimg
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import report_constants
 import seaborn as sns
 import tensorflow as tf
 from Levenshtein import distance as levenshtein_distance
+
+from . import report_constants_quarto
 
 
 def get_model_summary_df(model):
@@ -163,7 +159,7 @@ def create_plot_folder_structure(output_path, subfolders=None):
     Function to create the folder structure where the plot images are saved later.
     :param subfolders: list of strings representing the subfolders to be created
     """
-    root = join(output_path, report_constants.DEFAULT_LOCAL_PLOTS_DIR)
+    root = join(output_path, report_constants_quarto.DEFAULT_LOCAL_PLOTS_DIR)
     if not os.path.exists(root):
         os.makedirs(root)
     for subfolder in subfolders:
@@ -177,7 +173,9 @@ def plot_all_train_metrics(output_path, history_dict):
     Function to plot all the training metrics related plots.
     :return: string path of where the plots are saved
     """
-    save_path = join(output_path, report_constants.DEFAULT_LOCAL_PLOTS_DIR, "train")
+    save_path = join(
+        output_path, report_constants_quarto.DEFAULT_LOCAL_PLOTS_DIR, "train"
+    )
     train_dict = {key: value for key, value in history_dict.items() if "val" not in key}
     for key in train_dict:
         plot_keras_metric(history_dict, key, save_path)
@@ -189,7 +187,9 @@ def plot_all_val_metrics(output_path, history_dict):
     Function to plot all the validation metrics related plots.
     :return: string path of where the plots are saved
     """
-    save_path = join(output_path, report_constants.DEFAULT_LOCAL_PLOTS_DIR, "val")
+    save_path = join(
+        output_path, report_constants_quarto.DEFAULT_LOCAL_PLOTS_DIR, "val"
+    )
     val_dict = {key: value for key, value in history_dict.items() if "val" in key}
     for key in val_dict:
         plot_keras_metric(history_dict, key, save_path)
@@ -201,7 +201,9 @@ def plot_all_train_val_metrics(output_path, history_dict):
     Function to plot all the training-validation metrics related plots.
     :return: string path of where the plots are saved
     """
-    save_path = join(output_path, report_constants.DEFAULT_LOCAL_PLOTS_DIR, "train_val")
+    save_path = join(
+        output_path, report_constants_quarto.DEFAULT_LOCAL_PLOTS_DIR, "train_val"
+    )
     metrics_dict = {
         key: value for key, value in history_dict.items() if "val" not in key
     }

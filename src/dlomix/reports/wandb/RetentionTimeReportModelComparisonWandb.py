@@ -1,14 +1,12 @@
 import os
-import re
 
 import numpy as np
 import pandas as pd
-import report_constants_wandb
 import wandb
 import wandb.apis.reports as wr
-import wandb_utils
 
-from dlomix.data.RetentionTimeDataset import RetentionTimeDataset
+from ...data import RetentionTimeDataset
+from . import report_constants_wandb, wandb_utils
 
 
 class RetentionTimeReportModelComparisonWandb:

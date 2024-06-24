@@ -1,20 +1,18 @@
-import itertools
 import os
 import warnings
 from datetime import datetime
-from itertools import combinations
 from os.path import join
 
 import matplotlib.image as mpimg
 import matplotlib.pyplot as plt
 import numpy as np
-import quarto_utils
-import report_constants
+import pandas as pd
 import seaborn as sns
-from Levenshtein import distance as levenshtein_distance
-from QMDFile import QMDFile
 
-from dlomix.reports.postprocessing import normalize_intensity_predictions
+from ...data.processing import SequenceParsingProcessor
+from ...reports.postprocessing import normalize_intensity_predictions
+from . import quarto_utils, report_constants_quarto
+from .QMDFile import QMDFile
 
 
 class IntensityReportQuarto:
@@ -29,6 +27,8 @@ class IntensityReportQuarto:
         train_section=False,
         val_section=False,
         output_path=".",
+        precursor_charge_column_name="precursor_charge",
+        collision_energy_column_name="collision_energy",
     ):
         """
         :param history: history object from training a keras model
@@ -39,6 +39,8 @@ class IntensityReportQuarto:
         :param train_section: boolean indicating whether to include training section in the report or not
         :param val_section: boolean indicating whether to include validation section in the report or not
         :param output_path: string where the report will be saved
+        :param precursor_charge_column_name: precursor charge column in train and test datasets
+        :param collision_energy_column_name: collision energy column in train and test datasets
         """
         self.title = title
         self.fold_code = fold_code
@@ -48,6 +50,8 @@ class IntensityReportQuarto:
         self.train_section = train_section
         self.val_section = val_section
         self.model = model
+        self.precursor_charge_column_name = precursor_charge_column_name
+        self.collision_energy_column_name = collision_energy_column_name
 
         subfolders = ["train_val", "spectral"]
 
@@ -84,7 +88,7 @@ class IntensityReportQuarto:
         Contains the logic to generate the plots and include/exclude user-specified sections.
         """
         qmd = QMDFile(title=self.title)
-        meta_section = report_constants.META_SECTION_INT.replace(
+        meta_section = report_constants_quarto.META_SECTION_INT.replace(
             "DATE_PLACEHOLDER", str(datetime.now().date())
         )
         meta_section = meta_section.replace(
@@ -96,20 +100,29 @@ class IntensityReportQuarto:
 
         if self.test_data is not None and self.train_data is not None:
             data_plots_path = self.plot_all_data_plots()
+
+            train_data_sequences = self.train_data["train"][
+                SequenceParsingProcessor.PARSED_COL_NAMES["seq"]
+            ]
+            test_data_sequences = self.test_data["test"][
+                SequenceParsingProcessor.PARSED_COL_NAMES["seq"]
+            ]
+
             dataset = ["Train", "Test"]
             peptides = [
-                str((len(self.train_data.sequences))),
-                str((len(self.test_data.sequences))),
+                str((len(train_data_sequences))),
+                str((len(test_data_sequences))),
             ]
             spectra = [
-                str((len(np.unique(self.train_data.sequences)))),
-                str((len(np.unique(self.test_data.sequences)))),
+                str((len(np.unique(train_data_sequences)))),
+                str((len(np.unique(test_data_sequences)))),
             ]
             df = pd.DataFrame(
                 {"Dataset": dataset, "Unique peptides": peptides, "Spectra": spectra}
             )
             qmd.insert_section_block(
-                section_title="Data", section_text=report_constants.DATA_SECTION_INT
+                section_title="Data",
+                section_text=report_constants_quarto.DATA_SECTION_INT,
             )
             qmd.insert_table_from_df(
                 df, "Information on the used data", cross_reference_id="tbl-data"
@@ -124,7 +137,8 @@ class IntensityReportQuarto:
         if self.model is not None:
             df = quarto_utils.get_model_summary_df(self.model)
             qmd.insert_section_block(
-                section_title="Model", section_text=report_constants.MODEL_SECTION
+                section_title="Model",
+                section_text=report_constants_quarto.MODEL_SECTION,
             )
             qmd.insert_table_from_df(df, "Keras model summary", page_break=True)
         if self.train_section:
@@ -134,7 +148,7 @@ class IntensityReportQuarto:
             train_image_path = quarto_utils.create_plot_image(train_plots_path)
             qmd.insert_section_block(
                 section_title="Train metrics per epoch",
-                section_text=report_constants.TRAIN_SECTION,
+                section_text=report_constants_quarto.TRAIN_SECTION,
             )
             qmd.insert_image(
                 image_path=train_image_path,
@@ -149,7 +163,7 @@ class IntensityReportQuarto:
             val_image_path = quarto_utils.create_plot_image(val_plots_path)
             qmd.insert_section_block(
                 section_title="Validation metrics per epoch",
-                section_text=report_constants.VAL_SECTION,
+                section_text=report_constants_quarto.VAL_SECTION,
             )
             qmd.insert_image(
                 image_path=val_image_path,
@@ -163,7 +177,7 @@ class IntensityReportQuarto:
         train_val_image_path = quarto_utils.create_plot_image(train_val_plots_path)
         qmd.insert_section_block(
             section_title="Train-Validation metrics per epoch",
-            section_text=report_constants.TRAIN_VAL_SECTION,
+            section_text=report_constants_quarto.TRAIN_VAL_SECTION,
         )
         qmd.insert_image(
             image_path=train_val_image_path,
@@ -182,7 +196,7 @@ class IntensityReportQuarto:
         violin_plot_pl = self.plot_spectral_angle(results_df, facet="peptide_length")
         qmd.insert_section_block(
             section_title="Spectral angle plots",
-            section_text=report_constants.SPECTRAL_ANGLE_SECTION,
+            section_text=report_constants_quarto.SPECTRAL_ANGLE_SECTION,
         )
         qmd.insert_image(
             image_path=violin_plot,
@@ -214,18 +228,34 @@ class IntensityReportQuarto:
         Function to create the dataframe containing the intensity prediction results
         :return: dataframe
         """
+
+        train_data_sequences = self.train_data["train"][
+            SequenceParsingProcessor.PARSED_COL_NAMES["seq"]
+        ]
+        train_data_labels = self.train_data["train"][self.train_data.label_column]
+
+        test_data_sequences = self.test_data["test"][
+            SequenceParsingProcessor.PARSED_COL_NAMES["seq"]
+        ]
+        test_data_labels = self.test_data["test"][self.test_data.label_column]
+
+        test_data_precursor_charge = self.test_data["test"][
+            self.precursor_charge_column_name
+        ]
+        test_data_collision_energy = self.test_data["test"][
+            self.collision_energy_column_name
+        ]
+
         predictions_df_test = pd.DataFrame()
-        predictions_df_test["sequences"] = self.test_data.sequences
-        predictions_test = self.model.predict(self.test_data.test_data)
+        predictions_df_test["sequences"] = test_data_sequences
+        predictions_test = self.model.predict(self.test_data.tensor_test_data)
         predictions_df_test["intensities_pred"] = predictions_test.tolist()
         predictions_df_test["precursor_charge"] = (
-            np.argmax(self.test_data.precursor_charge, axis=1) + 1
+            np.argmax(test_data_precursor_charge, axis=1) + 1
         )
-        predictions_df_test[
-            "precursor_charge_onehot"
-        ] = self.test_data.precursor_charge.tolist()
-        predictions_df_test["collision_energy"] = self.test_data.collision_energy
-        predictions_df_test["intensities_raw"] = self.test_data.intensities.tolist()
+        predictions_df_test["precursor_charge_onehot"] = test_data_precursor_charge
+        predictions_df_test["collision_energy"] = test_data_collision_energy
+        predictions_df_test["intensities_raw"] = test_data_labels
         predictions_df_test["set"] = "test"
 
         l = []
@@ -295,10 +325,15 @@ class IntensityReportQuarto:
         Function to plot all data related plots.
         :return: string path of where the plots are saved
         """
+
+        test_data_sequences = self.test_data["test"][
+            SequenceParsingProcessor.PARSED_COL_NAMES["seq"]
+        ]
+
         save_path = join(
-            self.output_path, report_constants.DEFAULT_LOCAL_PLOTS_DIR, "data"
+            self.output_path, report_constants_quarto.DEFAULT_LOCAL_PLOTS_DIR, "data"
         )
-        quarto_utils.plot_levenshtein(self.test_data.sequences, save_path=save_path)
+        quarto_utils.plot_levenshtein(test_data_sequences, save_path=save_path)
         return save_path
 
     def create_plot_image(self, path, n_cols=2):
@@ -362,7 +397,7 @@ class IntensityReportQuarto:
         )
         save_path = join(
             self.output_path,
-            report_constants.DEFAULT_LOCAL_PLOTS_DIR,
+            report_constants_quarto.DEFAULT_LOCAL_PLOTS_DIR,
             "spectral",
             f"violin_spectral_angle_plot_{facet}.png",
         )

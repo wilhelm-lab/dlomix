@@ -1,25 +1,20 @@
 import itertools
 import os
-import re
 import warnings
-from contextlib import redirect_stdout
 from datetime import datetime
-from itertools import combinations
-from os import listdir
-from os.path import isfile, join
+from os.path import join
 
 import matplotlib as mpl
 import matplotlib.image as mpimg
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import quarto_utils
-import report_constants
 import seaborn as sns
-from Levenshtein import distance as levenshtein_distance
 from matplotlib.colors import LogNorm
 from matplotlib.ticker import LogLocator
-from QMDFile import QMDFile
+
+from ...data.processing import SequenceParsingProcessor
+from . import QMDFile, quarto_utils, report_constants_quarto
 
 
 class RetentionTimeReportQuarto:
@@ -101,7 +96,7 @@ class RetentionTimeReportQuarto:
         Contains the logic to generate the plots and include/exclude user-specified sections.
         """
         qmd = QMDFile(title=self.title)
-        meta_section = report_constants.META_SECTION_RT.replace(
+        meta_section = report_constants_quarto.META_SECTION_RT.replace(
             "DATE_PLACEHOLDER", str(datetime.now().date())
         )
         meta_section = meta_section.replace(
@@ -113,14 +108,15 @@ class RetentionTimeReportQuarto:
         if self.model is not None:
             df = quarto_utils.get_model_summary_df(self.model)
             qmd.insert_section_block(
-                section_title="Model", section_text=report_constants.MODEL_SECTION
+                section_title="Model",
+                section_text=report_constants_quarto.MODEL_SECTION,
             )
             qmd.insert_table_from_df(df, "Keras model summary")
 
         if self.data is not None:
             data_plots_path = self.plot_all_data_plots()
             qmd.insert_section_block(
-                section_title="Data", section_text=report_constants.DATA_SECTION
+                section_title="Data", section_text=report_constants_quarto.DATA_SECTION
             )
             qmd.insert_image(
                 image_path=f"{data_plots_path}/Peptide length.png",
@@ -154,7 +150,7 @@ class RetentionTimeReportQuarto:
             train_image_path = quarto_utils.create_plot_image(train_plots_path)
             qmd.insert_section_block(
                 section_title="Train metrics per epoch",
-                section_text=report_constants.TRAIN_SECTION,
+                section_text=report_constants_quarto.TRAIN_SECTION,
             )
             qmd.insert_image(
                 image_path=train_image_path,
@@ -169,7 +165,7 @@ class RetentionTimeReportQuarto:
             val_image_path = quarto_utils.create_plot_image(val_plots_path)
             qmd.insert_section_block(
                 section_title="Validation metrics per epoch",
-                section_text=report_constants.VAL_SECTION,
+                section_text=report_constants_quarto.VAL_SECTION,
             )
             qmd.insert_image(
                 image_path=val_image_path,
@@ -183,7 +179,7 @@ class RetentionTimeReportQuarto:
         train_val_image_path = quarto_utils.create_plot_image(train_val_plots_path)
         qmd.insert_section_block(
             section_title="Train-Validation metrics per epoch",
-            section_text=report_constants.TRAIN_VAL_SECTION,
+            section_text=report_constants_quarto.TRAIN_VAL_SECTION,
         )
         qmd.insert_image(
             image_path=train_val_image_path,
@@ -197,20 +193,23 @@ class RetentionTimeReportQuarto:
             r2 = self.calculate_r2(self.test_targets, self.predictions)
             qmd.insert_section_block(
                 section_title="Residuals",
-                section_text=report_constants.RESIDUALS_SECTION,
+                section_text=report_constants_quarto.RESIDUALS_SECTION,
             )
             qmd.insert_image(
                 image_path=residuals_plot_path, caption="Residual plot", page_break=True
             )
 
             qmd.insert_section_block(
-                section_title="Density", section_text=report_constants.DENSITY_SECTION
+                section_title="Density",
+                section_text=report_constants_quarto.DENSITY_SECTION,
             )
             qmd.insert_image(
                 image_path=density_plot_path, caption="Density plot", page_break=True
             )
 
-            r2_text = report_constants.R2_SECTION.replace("R2_SCORE_VALUE", str(r2))
+            r2_text = report_constants_quarto.R2_SECTION.replace(
+                "R2_SCORE_VALUE", str(r2)
+            )
             qmd.insert_section_block(section_title="R2", section_text=r2_text)
 
         qmd.write_qmd_file(f"{self.output_path}/{qmd_report_filename}")
@@ -223,9 +222,15 @@ class RetentionTimeReportQuarto:
         Function to plot a histogram of retention times distribution
         :param save_path: string where to save the plot
         """
-        df = pd.DataFrame(self.data.sequences, columns=["unmod_seq"])
-        df["length"] = df["unmod_seq"].str.len()
-        df["retention_time"] = self.data.targets
+
+        train_data_sequences = self.data["train"][
+            SequenceParsingProcessor.PARSED_COL_NAMES["seq"]
+        ]
+        train_data_labels = self.data["train"][self.data.label_column]
+
+        df = pd.DataFrame(train_data_sequences, columns=["seq"])
+        df["length"] = df["seq"].str.len()
+        df["retention_time"] = train_data_labels
         palette = itertools.cycle(
             sns.color_palette("YlOrRd_r", n_colors=len(df.length.unique()))
         )
@@ -273,21 +278,33 @@ class RetentionTimeReportQuarto:
         :return: string path of where the plots are saved
         """
         save_path = join(
-            self.output_path, report_constants.DEFAULT_LOCAL_PLOTS_DIR, "data"
+            self.output_path, report_constants_quarto.DEFAULT_LOCAL_PLOTS_DIR, "data"
         )
+        if "train" in self.data.keys():
+            train_data_sequences = self.data["train"][
+                SequenceParsingProcessor.PARSED_COL_NAMES["seq"]
+            ]
+            train_data_labels = self.data["train"][self.data.label_column]
+        else:
+            raise ValueError(
+                f"Training Data porovided for reporting does not contain a training split, available splits are {list(self.data.keys())}"
+            )
+
         # count lengths of sequences and plot histogram
+
         vek_len = np.vectorize(len)
-        seq_lens = vek_len(self.data.sequences)
+        seq_lens = vek_len(train_data_sequences)
+
         self.plot_histogram(x=seq_lens, label="Peptide length", save_path=save_path)
 
         # plot irt histogram
         self.plot_histogram(
-            x=rtdata.targets,
+            x=train_data_labels,
             label="Indexed retention time",
             bins=30,
             save_path=save_path,
         )
-        quarto_utils.plot_levenshtein(self.data.sequences, save_path=save_path)
+        quarto_utils.plot_levenshtein(train_data_sequences, save_path=save_path)
         self.plot_rt_distribution(save_path=save_path)
         return save_path
 
@@ -297,7 +314,7 @@ class RetentionTimeReportQuarto:
         :return: string path of where the plot is saved
         """
         save_path = join(
-            self.output_path, report_constants.DEFAULT_LOCAL_PLOTS_DIR, "test"
+            self.output_path, report_constants_quarto.DEFAULT_LOCAL_PLOTS_DIR, "test"
         )
         file_name = "Residuals.png"
         error = np.ravel(self.test_targets) - np.ravel(self.predictions)
@@ -311,7 +328,7 @@ class RetentionTimeReportQuarto:
         :return: string path of where the plot is saved
         """
         save_path = join(
-            self.output_path, report_constants.DEFAULT_LOCAL_PLOTS_DIR, "test"
+            self.output_path, report_constants_quarto.DEFAULT_LOCAL_PLOTS_DIR, "test"
         )
         file_name = "Density.png"
         targets = np.ravel(self.test_targets)

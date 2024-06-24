@@ -1,5 +1,0 @@
-
-# Awesome Quarto report
-This is a Quarto example.
-
-![Quarto logo](quarto.jpg)
