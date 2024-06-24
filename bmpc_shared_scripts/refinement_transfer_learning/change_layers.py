@@ -37,8 +37,11 @@ def change_output_layer(model: PrositIntensityPredictor, number_of_ions: int = 2
 class FixWeights(Constraint):
     def __init__(self, old_weights):
         self.old_weights = old_weights
+        self.freeze_weights = True
     def __call__(self, w):
-        return K.concatenate([self.old_weights, w[self.old_weights.shape[0]:]], axis=0)
+        if self.freeze_weights:
+            return K.concatenate([self.old_weights[:self.old_weights.shape[0] - 1], w[self.old_weights.shape[0] - 1:]], axis=0)
+        return w
     
 
 def change_input_layer(model: PrositIntensityPredictor, modifications: list = None, freeze_old_embeds: bool = False) -> None:
