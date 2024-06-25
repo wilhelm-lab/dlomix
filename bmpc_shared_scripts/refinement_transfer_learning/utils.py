@@ -101,6 +101,43 @@ def freeze_model(model: PrositIntensityPredictor, optimizer:tf.keras.optimizers,
     )
 
 
+def release_model(model:PrositIntensityPredictor, optimizer_config: dict = {"learning_rate":1e-4}, loss:dlomix.losses=masked_spectral_distance, metrics:list=[masked_pearson_correlation_distance]) -> None:
+    '''Unfreezes all layers of a PrositIntensityPredictor model.
+
+        Sets the trainable attribute of every layer to 'True'.
+        Finally, compiles the model with the optimizer, loss, and metrics to make the changes take effect.
+
+        Parameter
+        ---------
+        model                   : dlomix.models.prosit.PrositIntensityPredictor
+                                The model to be unfrozen.
+        optimizer_config        : dict
+                                The initialization parameters for the new optimizer needed for compiling the model.
+        loss                    : dlomix.losses
+                                The loss for compiling the model.
+                                default: masked_spectral_distance
+        metrics                 : list[dlomix.losses]
+                                The metrics for compiling the model.
+                                default: [masked_pearson_correlation_distance] 
+        --------
+        '''
+    model.trainable = True
+
+    for lay in model.layers:
+        try:
+            for sublay in lay.layers:
+                sublay.trainable = True
+        except (AttributeError):
+            lay.trainable = True
+
+    new_optimizer = tf.keras.optimizers.Adam(**optimizer_config)
+    model.compile(
+        optimizer=new_optimizer,
+        loss=loss,
+        metrics=metrics
+    )
+
+
 def wandb_callback(save_model: bool, log_batch_frequency: int, log_weights: bool) -> WandbCallback:
     """
     Creates a WandbCallback for use with model training.
