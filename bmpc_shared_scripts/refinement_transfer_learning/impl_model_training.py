@@ -57,8 +57,6 @@ def model_training(config):
         dataset = load_processed_dataset(wandb.config['dataset']['processed_path'])
 
 
-        # initialize relevant stuff for training
-        optimizer = tf.keras.optimizers.Adam(learning_rate=wandb.config['training']['learning_rate'])
 
         # load or create model
         if 'load_path' in wandb.config['model']:
@@ -97,6 +95,15 @@ def model_training(config):
                 meta_data_keys=meta_data_keys
             )
 
+
+        # initialize relevant stuff for training
+        total_epochs = wandb.config['training']['num_epochs']
+        recompile_callbacks = [{
+            "epoch": total_epochs,
+            "callback": lambda *args: None
+        }]
+        optimizer = tf.keras.optimizers.Adam(learning_rate=wandb.config['training']['learning_rate'])
+
         # refinement/transfer learning configuration
         rl_config = wandb.config['refinement_transfer_learning']
 
@@ -110,20 +117,22 @@ def model_training(config):
                 rl_config['freeze_old_weights']
             )
         
-        # optionally: permanently freeze parts of the model
-        if 'static_freeze' in rl_config:
+        # optionally: freeze layers during training
+        if 'freeze_layers' in rl_config:
             freezing.freeze_model(
                 model, 
-                rl_config['static_freeze']['is_first_layer_trainable'],
-                rl_config['static_freeze']['is_last_layer_trainable']
+                rl_config['freeze_layers']['is_first_layer_trainable'],
+                rl_config['freeze_layers']['is_last_layer_trainable']
             )
 
+            def release_callback():
+                freezing.release_model(model)
 
-        model.compile(
-            optimizer=optimizer,
-            loss=masked_spectral_distance,
-            metrics=[masked_pearson_correlation_distance]
-        )
+            recompile_callbacks.push({
+                'epoch': rl_config['freeze_layers']['release_after_epochs'],
+                'callback': release_callback
+            })
+
 
         class LearningRateReporter(tf.keras.callbacks.Callback):
             def on_train_batch_end(self, batch, *args):
@@ -171,13 +180,42 @@ def model_training(config):
             callbacks.append(lr_warmup_linear)
 
 
-        # train model
-        model.fit(
-            dataset.tensor_train_data,
-            validation_data=dataset.tensor_val_data,
-            epochs=wandb.config['training']['num_epochs'],
-            callbacks=callbacks
-        )
+        # restructure recompile callbacks to form training parts
+        assert not any([x['epoch'] >= total_epochs for x in recompile_callbacks])
+        rcb_dict = {}
+        for rcb in recompile_callbacks:
+            rcb_dict.get(rcb['epoch'], []).push(rcb['callback'])
+        rcb_keys = sorted([int(x) for x in rcb_dict])
+        current_epoch = 0
+        training_parts = []
+        for epoch_key in rcb_keys:
+            training_parts.push({
+                "num_epochs": epoch_key - current_epoch,
+                "callbacks": [rcb_dict[epoch_key]]
+            })
+            current_epoch = epoch_key
+                
+
+        # perform all training runs
+        for training_part in training_parts:
+            model.compile(
+                optimizer=optimizer,
+                loss=masked_spectral_distance,
+                metrics=[masked_pearson_correlation_distance]
+            )
+
+            if training_part['num_epochs'] > 0:
+                # train model
+                model.fit(
+                    dataset.tensor_train_data,
+                    validation_data=dataset.tensor_val_data,
+                    epochs=training_part['num_epochs'],
+                    callbacks=callbacks
+                )
+
+            # call callbacks
+            for cb in training_part['callbacks']:
+                cb()
 
         out_path = None
 
