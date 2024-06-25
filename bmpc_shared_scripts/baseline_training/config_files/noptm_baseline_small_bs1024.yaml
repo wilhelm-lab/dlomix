@@ -1,9 +1,9 @@
 dataset:
   name: noptm_baseline_small_bs1024
-  hf_home: /cmnfs/proj/prosit_astral/bmpc_dlomix_group/datasets
-  hf_cache: /cmnfs/proj/prosit_astral/bmpc_dlomix_group/datasets/hf_cache
-  parquet_path: /cmnfs/proj/prosit_astral/bmpc_dlomix_group/datasets/parquet/noptm_baseline_small
-  processed_path: /cmnfs/proj/prosit_astral/bmpc_dlomix_group/datasets/processed/noptm_baseline_small_bs1024
+  hf_home: /cmnfs/proj/bmpc_dlomix/datasets
+  hf_cache: /cmnfs/proj/bmpc_dlomix/datasets/hf_cache
+  parquet_path: /cmnfs/proj/bmpc_dlomix/datasets/parquet/noptm_baseline_small
+  processed_path: /cmnfs/proj/bmpc_dlomix/datasets/processed/noptm_baseline_small_bs1024
   seq_length: 30
   batch_size: 1024
   alphabet: PTMS_ALPHABET
@@ -11,4 +11,4 @@ training:
   learning_rate: 1.0e-4
   num_epochs: 10
 model:
-  save_dir: /cmnfs/proj/prosit_astral/bmpc_dlomix_group/models/baseline_models
+  save_dir: /cmnfs/proj/bmpc_dlomix/models/baseline_models

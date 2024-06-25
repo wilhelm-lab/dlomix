@@ -1,8 +1,8 @@
 dataset:
-  hf_home: /cmnfs/proj/prosit_astral/bmpc_dlomix_group/datasets
-  hf_cache: /cmnfs/proj/prosit_astral/bmpc_dlomix_group/datasets/hf_cache
+  hf_home: /cmnfs/proj/bmpc_dlomix/datasets
+  hf_cache: /cmnfs/proj/bmpc_dlomix/datasets/hf_cache
   parquet_path: /cmnfs/data/proteomics/Prosit_PTMs/Transformer_Train/no_aug
-  processed_path: /cmnfs/proj/prosit_astral/bmpc_dlomix_group/datasets/processed/baseline_dataset_full_bs1024
+  processed_path: /cmnfs/proj/bmpc_dlomix/datasets/processed/ptm_baseline_bs1024
   seq_length: 30
   batch_size: 1024
   alphabet: PTMS_ALPHABET

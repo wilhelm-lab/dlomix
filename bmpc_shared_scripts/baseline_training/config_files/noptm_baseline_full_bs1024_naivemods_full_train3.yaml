@@ -1,9 +1,9 @@
 dataset:
   name: noptm_baseline_full_bs1024_naivemods
-  hf_home: /cmnfs/proj/prosit_astral/bmpc_dlomix_group/datasets
-  hf_cache: /cmnfs/proj/prosit_astral/bmpc_dlomix_group/datasets/hf_cache
+  hf_home: /cmnfs/proj/bmpc_dlomix/datasets
+  hf_cache: /cmnfs/proj/bmpc_dlomix/datasets/hf_cache
   parquet_path: /cmnfs/data/proteomics/Prosit_unmod/intensity/no_aug
-  processed_path: /cmnfs/proj/prosit_astral/bmpc_dlomix_group/datasets/processed/noptm_baseline_full_bs1024_naivemods
+  processed_path: /cmnfs/proj/bmpc_dlomix/datasets/processed/noptm_baseline_full_bs1024_naivemods
   seq_length: 30
   batch_size: 1024
   alphabet: ALPHABET_NAIVE_MODS
@@ -19,4 +19,4 @@ training:
     min_delta: 0.0001
     patience: 4
 model:
-  save_dir: /cmnfs/proj/prosit_astral/bmpc_dlomix_group/models/baseline_models
+  save_dir: /cmnfs/proj/bmpc_dlomix/models/baseline_models

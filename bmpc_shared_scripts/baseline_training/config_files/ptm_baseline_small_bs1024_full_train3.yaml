@@ -1,15 +1,15 @@
 dataset:
-  name: noptm_baseline_full_bs1024_unmod
+  name: ptm_baseline_small_cleaned_bs1024
   hf_home: /cmnfs/proj/bmpc_dlomix/datasets
   hf_cache: /cmnfs/proj/bmpc_dlomix/datasets/hf_cache
-  parquet_path: /cmnfs/data/proteomics/Prosit_unmod/intensity/no_aug
-  processed_path: /cmnfs/proj/bmpc_dlomix/datasets/processed/noptm_baseline_full_bs1024_unmod
+  parquet_path: /cmnfs/data/proteomics/Prosit_PTMs/Transformer_Train/clean
+  processed_path: /cmnfs/proj/bmpc_dlomix/datasets/processed/ptm_baseline_small_cleaned_bs1024
   seq_length: 30
   batch_size: 1024
-  alphabet: ALPHABET_UNMOD
+  alphabet: PTMS_ALPHABET
 training:
   learning_rate: 0.0001
-  num_epochs: 100
+  num_epochs: 500
   early_stopping:
     min_delta: 0.00001
     patience: 10
