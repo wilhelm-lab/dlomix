@@ -1,7 +1,7 @@
 import argparse
 import os
 import wandb
-from impl_model_training import load_config, model_training, combine_into
+from impl_model_training import load_config, RlTlTraining, combine_into
 
 # parse args
 parser = argparse.ArgumentParser(prog='Refinement/Transfer Learning - Training Script')
@@ -27,5 +27,5 @@ if args.cpu_threads is not None:
 
 # start agent
 combine_into(overwritten_params, config)
-train_func = model_training(config)
+train_func = RlTlTraining(config)
 wandb.agent(args.sweep_id, train_func, count=args.sweep_count)

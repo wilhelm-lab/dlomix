@@ -10,6 +10,9 @@ from tensorflow.keras.callbacks import EarlyStopping, ReduceLROnPlateau, Learnin
 
 import change_layers
 import freezing
+from recompile_callbacks import *
+
+from dlomix.losses import masked_spectral_distance, masked_pearson_correlation_distance
 
 
 def load_config(config_file):
@@ -17,17 +20,23 @@ def load_config(config_file):
         config = yaml.safe_load(yaml_file)
 
     return config
+  
+
+class RlTlTraining:
+    def __init__(self, config):
+        self.config = config
+
+        self.current_epoch_offset = 0
 
 
-def model_training(config):
-    def run():
-        config['run_id'] = uuid.uuid4()
+    def init_config(self):
+        self.config['run_id'] = uuid.uuid4()
 
         # initialize weights and biases
         wandb.init(
-            project=config["project"],
-            config=config,
-            tags=[config['dataset']['name']]
+            project=self.config["project"],
+            config=self.config,
+            tags=[self.config['dataset']['name']]
         )
 
         if 'cuda_device_nr' in wandb.config['processing']:
@@ -48,20 +57,20 @@ def model_training(config):
         os.environ['HF_HOME'] = wandb.config['dataset']['hf_home']
         os.environ['HF_DATASETS_CACHE'] = wandb.config['dataset']['hf_cache']
 
-        from dlomix.constants import PTMS_ALPHABET, ALPHABET_NAIVE_MODS, ALPHABET_UNMOD
+    def load_dataset(self):
+        # import here because HF_* environment flags need to be set beforehand
         from dlomix.data import load_processed_dataset
+        self.dataset = load_processed_dataset(wandb.config['dataset']['processed_path'])
+
+    def initialize_model(self):
+        # import here because HF_* environment flags need to be set beforehand
+        from dlomix.constants import PTMS_ALPHABET, ALPHABET_NAIVE_MODS, ALPHABET_UNMOD
         from dlomix.models import PrositIntensityPredictor
-        from dlomix.losses import masked_spectral_distance, masked_pearson_correlation_distance
-
-        # load dataset
-        dataset = load_processed_dataset(wandb.config['dataset']['processed_path'])
-
-
 
         # load or create model
         if 'load_path' in wandb.config['model']:
             print(f"loading model from file {wandb.config['model']['load_path']}")
-            model = tf.keras.models.load_model(wandb.config['model']['load_path'])
+            self.model = tf.keras.models.load_model(wandb.config['model']['load_path'])
         else:
             # initialize model
             input_mapping = {
@@ -86,7 +95,7 @@ def model_training(config):
             else:
                 raise ValueError('unknown alphabet selected')
 
-            model = PrositIntensityPredictor(
+            self.model = PrositIntensityPredictor(
                 seq_length=wandb.config['dataset']['seq_length'],
                 alphabet=alphabet,
                 use_prosit_ptm_features=False,
@@ -95,23 +104,23 @@ def model_training(config):
                 meta_data_keys=meta_data_keys
             )
 
-
+    def configure_training(self):
         # initialize relevant stuff for training
-        total_epochs = wandb.config['training']['num_epochs']
-        recompile_callbacks = [{
-            "epoch": total_epochs,
-            "callback": lambda *args: None
-        }]
+        self.total_epochs = wandb.config['training']['num_epochs']
+        self.recompile_callbacks = [RecompileCallback(
+            epoch=self.total_epochs,
+            callback=lambda *args: None
+        )]
 
         # refinement/transfer learning configuration
         rl_config = wandb.config['refinement_transfer_learning']
 
         # optionally: replacing of input/output layers
         if 'new_output_layer' in rl_config:
-            change_layers.change_output_layer(model, rl_config['new_output_layer']['num_ions'])
+            change_layers.change_output_layer(self.model, rl_config['new_output_layer']['num_ions'])
         if 'new_input_layer' in rl_config:
             change_layers.change_input_layer(
-                model,
+                self.model,
                 rl_config['new_input_layer']['new_alphabet'],
                 rl_config['new_input_layer']['freeze_old_weights']
             )
@@ -120,27 +129,31 @@ def model_training(config):
         if 'freeze_layers' in rl_config:
             if 'activate' not in rl_config['freeze_layers'] or rl_config['freeze_layers']['activate']:
                 freezing.freeze_model(
-                    model, 
+                    self.model, 
                     rl_config['freeze_layers']['is_first_layer_trainable'],
                     rl_config['freeze_layers']['is_last_layer_trainable']
                 )
                 wandb.log({'freeze_layers': 1})
 
                 def release_callback():
-                    freezing.release_model(model)
+                    freezing.release_model(self.model)
                     wandb.log({'freeze_layers': 0})
 
-                recompile_callbacks.append({
-                    'epoch': rl_config['freeze_layers']['release_after_epochs'],
-                    'callback': release_callback
-                })
+                self.recompile_callbacks.append(RecompileCallback(
+                    epoch=rl_config['freeze_layers']['release_after_epochs'],
+                    callback=release_callback
+                ))
 
 
         class LearningRateReporter(tf.keras.callbacks.Callback):
             def on_train_batch_end(self, batch, *args):
                 wandb.log({'learning_rate': self.model.optimizer._learning_rate.numpy()})
 
-        callbacks = [WandbCallback(save_model=False, log_batch_frequency=True, verbose=1), LearningRateReporter()]
+        class RealEpochReporter(tf.keras.callbacks.Callback):
+            def on_epoch_begin(self_inner, epoch, *args):
+                wandb.log({'epoch_total': epoch + self.current_epoch_offset})
+
+        self.callbacks = [WandbCallback(save_model=False, log_batch_frequency=True, verbose=1), LearningRateReporter(), RealEpochReporter()]
 
         if 'early_stopping' in wandb.config['training']:
             print("using early stopping")
@@ -150,7 +163,7 @@ def model_training(config):
                 patience=wandb.config['training']['early_stopping']['patience'],
                 restore_best_weights=True)
 
-            callbacks.append(early_stopping)
+            self.callbacks.append(early_stopping)
 
         if 'lr_scheduler_plateau' in wandb.config['training']:
             print("using lr scheduler plateau")
@@ -163,7 +176,7 @@ def model_training(config):
                 cooldown=wandb.config['training']['lr_scheduler_plateau']['cooldown']
             ) 
 
-            callbacks.append(reduce_lr)
+            self.callbacks.append(reduce_lr)
 
         if 'lr_warmup_linear' in wandb.config['training']:
             print("using lr warmup linear")
@@ -171,7 +184,7 @@ def model_training(config):
             start_lr = wandb.config['training']['lr_warmup_linear']['start_lr']
             end_lr = wandb.config['training']['lr_warmup_linear']['end_lr']
             def scheduler(epoch, lr):
-                if epoch < num_epochs:
+                if (epoch + self.current_epoch_offset) < num_epochs:
                     print("warmup step")
                     factor = epoch / num_epochs
                     return factor * end_lr + (1-factor) * start_lr
@@ -179,65 +192,61 @@ def model_training(config):
                     return lr
             
             lr_warmup_linear = LearningRateScheduler(scheduler)
-            callbacks.append(lr_warmup_linear)
+            self.callbacks.append(lr_warmup_linear)
 
-
-        # restructure recompile callbacks to form training parts
-        assert not any([x['epoch'] > total_epochs for x in recompile_callbacks])
-        rcb_dict = {}
-        for rcb in recompile_callbacks:
-            rcb_dict.setdefault(rcb['epoch'], [])
-            rcb_dict[rcb['epoch']].append(rcb['callback'])
-        rcb_keys = sorted([int(x) for x in rcb_dict])
-        current_epoch = 0
-        training_parts = []
-        for epoch_key in rcb_keys:
-            training_parts.append({
-                "num_epochs": epoch_key - current_epoch,
-                "callbacks": rcb_dict[epoch_key]
-            })
-            current_epoch = epoch_key
-
-
+    def perform_training(self):
         # perform all training runs
         current_learning_rate = wandb.config['training']['learning_rate']
-        for training_part in training_parts:
+        for training_part in get_training_parts(self.recompile_callbacks, self.total_epochs):
+            # (re-)compile model
             optimizer = tf.keras.optimizers.Adam(learning_rate=current_learning_rate)
-            model.compile(
+            self.model.compile(
                 optimizer=optimizer,
                 loss=masked_spectral_distance,
                 metrics=[masked_pearson_correlation_distance]
             )
 
-            if training_part['num_epochs'] > 0:
+            if training_part.num_epochs > 0:
                 # train model
-                model.fit(
-                    dataset.tensor_train_data,
-                    validation_data=dataset.tensor_val_data,
-                    epochs=training_part['num_epochs'],
-                    callbacks=callbacks
+                self.model.fit(
+                    self.dataset.tensor_train_data,
+                    validation_data=self.dataset.tensor_val_data,
+                    epochs=training_part.num_epochs,
+                    callbacks=self.callbacks
                 )
 
             # call callbacks
-            for cb in training_part['callbacks']:
-                cb()
+            training_part()
             
-            current_learning_rate = model.optimizer._learning_rate.numpy()
+            current_learning_rate = self.model.optimizer._learning_rate.numpy()
+            self.current_epoch_offset += training_part.num_epochs
 
-
+    def save_model(self):
         out_path = None
         if 'save_dir' in wandb.config['model']:
             out_path = f"{wandb.config['model']['save_dir']}/{wandb.config['dataset']['name']}/{wandb.config['run_id']}.keras"
         if 'save_path' in wandb.config['model']:
             out_path = wandb.config['model']['save_path']
         if out_path is not None:
-            model.save(out_path)
+            print(f'saving the model to {out_path}')
+            dir = os.path.dirname(out_path)
+            if not os.path.exists(dir):
+                os.makedirs(dir)
+            self.model.save(out_path)
 
+    def __call__(self):
+        # setting up training
+        self.init_config()
+        self.load_dataset()
+        self.initialize_model()
+        self.configure_training()
 
-        # finish up training process
+        # do training
+        self.perform_training()
+        
+        # finish up
+        self.save_model()
         wandb.finish()
-
-    return run
 
 
 

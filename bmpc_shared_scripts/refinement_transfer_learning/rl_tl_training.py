@@ -1,6 +1,6 @@
 import argparse
 import os
-from impl_model_training import load_config, model_training, combine_into
+from impl_model_training import load_config, RlTlTraining, combine_into
 
 # parse args
 parser = argparse.ArgumentParser(prog='Refinement/Transfer Learning - Training Script')
@@ -26,4 +26,4 @@ if args.cpu_threads is not None:
 
 # start run
 combine_into(overwritten_params, config)
-model_training(config)()
+RlTlTraining(config)()
