@@ -248,7 +248,7 @@ class SequenceEncodingProcessor(PeptideDatasetBaseProcessor):
         }
 
     def _encode(self, sequence):
-        encoded = [self.alphabet.get(amino_acid) for amino_acid in sequence]
+        encoded = [self.alphabet[amino_acid] for amino_acid in sequence]
 
         return encoded
 
