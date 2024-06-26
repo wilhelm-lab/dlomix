@@ -76,3 +76,15 @@ def change_input_layer(model: PrositIntensityPredictor, modifications: list = No
         embeddings_constraint=embeddings_constraint,
         name='embedding'
         )
+
+
+def release_old_embeddings(model: PrositIntensityPredictor):
+    """Function to release the pre-trained embeddings of a re-initialized embedding layer of the Prosit model
+    The freeze_weights parameter changes the constraint, so that the weights do not get overwritten by the old weights
+    In theory, the embeddings can be frozen again.
+
+    Args:
+        model (PrositIntensityPredictor): model with a changed embedding layer named 'embedding'
+    """
+    if model.get_layer('embedding').embeddings_constraint is not None:
+        model.get_layer('embedding').embeddings_constraint.freeze_weights = False
