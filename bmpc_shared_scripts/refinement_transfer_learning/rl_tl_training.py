@@ -1,16 +1,15 @@
 import argparse
 import os
-import wandb
 from impl_model_training import load_config, model_training, combine_into
 
 # parse args
 parser = argparse.ArgumentParser(prog='Refinement/Transfer Learning - Training Script')
 parser.add_argument('--config', type=str, required=True)
-parser.add_argument('--sweep-id', type=str, required=True)
-parser.add_argument('--sweep-count', type=int, required=False)
 parser.add_argument('--cuda-device-nr', type=str, required=False)
 parser.add_argument('--cpu-threads', type=int, required=False)
+
 args = parser.parse_args()
+
 
 # create config
 config = load_config(args.config)
@@ -25,7 +24,6 @@ if args.cuda_device_nr is not None:
 if args.cpu_threads is not None:
     overwritten_params['processing']['num_proc'] = args.cpu_threads
 
-# start agent
+# start run
 combine_into(overwritten_params, config)
-train_func = model_training(config)
-wandb.agent(args.sweep_id, train_func, count=args.sweep_count)
+model_training(config)()

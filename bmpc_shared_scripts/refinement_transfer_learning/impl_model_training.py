@@ -102,36 +102,38 @@ def model_training(config):
             "epoch": total_epochs,
             "callback": lambda *args: None
         }]
-        optimizer = tf.keras.optimizers.Adam(learning_rate=wandb.config['training']['learning_rate'])
 
         # refinement/transfer learning configuration
         rl_config = wandb.config['refinement_transfer_learning']
 
         # optionally: replacing of input/output layers
         if 'new_output_layer' in rl_config:
-            change_layers.change_output_layer(model, rl_config['replaced_output_layer']['num_ions'])
+            change_layers.change_output_layer(model, rl_config['new_output_layer']['num_ions'])
         if 'new_input_layer' in rl_config:
             change_layers.change_input_layer(
                 model,
                 rl_config['new_input_layer']['new_alphabet'],
-                rl_config['freeze_old_weights']
+                rl_config['new_input_layer']['freeze_old_weights']
             )
         
         # optionally: freeze layers during training
         if 'freeze_layers' in rl_config:
-            freezing.freeze_model(
-                model, 
-                rl_config['freeze_layers']['is_first_layer_trainable'],
-                rl_config['freeze_layers']['is_last_layer_trainable']
-            )
+            if 'activate' not in rl_config['freeze_layers'] or rl_config['freeze_layers']['activate']:
+                freezing.freeze_model(
+                    model, 
+                    rl_config['freeze_layers']['is_first_layer_trainable'],
+                    rl_config['freeze_layers']['is_last_layer_trainable']
+                )
+                wandb.log({'freeze_layers': 1})
 
-            def release_callback():
-                freezing.release_model(model)
+                def release_callback():
+                    freezing.release_model(model)
+                    wandb.log({'freeze_layers': 0})
 
-            recompile_callbacks.push({
-                'epoch': rl_config['freeze_layers']['release_after_epochs'],
-                'callback': release_callback
-            })
+                recompile_callbacks.append({
+                    'epoch': rl_config['freeze_layers']['release_after_epochs'],
+                    'callback': release_callback
+                })
 
 
         class LearningRateReporter(tf.keras.callbacks.Callback):
@@ -181,23 +183,26 @@ def model_training(config):
 
 
         # restructure recompile callbacks to form training parts
-        assert not any([x['epoch'] >= total_epochs for x in recompile_callbacks])
+        assert not any([x['epoch'] > total_epochs for x in recompile_callbacks])
         rcb_dict = {}
         for rcb in recompile_callbacks:
-            rcb_dict.get(rcb['epoch'], []).push(rcb['callback'])
+            rcb_dict.setdefault(rcb['epoch'], [])
+            rcb_dict[rcb['epoch']].append(rcb['callback'])
         rcb_keys = sorted([int(x) for x in rcb_dict])
         current_epoch = 0
         training_parts = []
         for epoch_key in rcb_keys:
-            training_parts.push({
+            training_parts.append({
                 "num_epochs": epoch_key - current_epoch,
-                "callbacks": [rcb_dict[epoch_key]]
+                "callbacks": rcb_dict[epoch_key]
             })
             current_epoch = epoch_key
-                
+
 
         # perform all training runs
+        current_learning_rate = wandb.config['training']['learning_rate']
         for training_part in training_parts:
+            optimizer = tf.keras.optimizers.Adam(learning_rate=current_learning_rate)
             model.compile(
                 optimizer=optimizer,
                 loss=masked_spectral_distance,
@@ -216,15 +221,15 @@ def model_training(config):
             # call callbacks
             for cb in training_part['callbacks']:
                 cb()
+            
+            current_learning_rate = model.optimizer._learning_rate.numpy()
+
 
         out_path = None
-
         if 'save_dir' in wandb.config['model']:
             out_path = f"{wandb.config['model']['save_dir']}/{wandb.config['dataset']['name']}/{wandb.config['run_id']}.keras"
-
         if 'save_path' in wandb.config['model']:
             out_path = wandb.config['model']['save_path']
-
         if out_path is not None:
             model.save(out_path)
 
