@@ -12,6 +12,9 @@ import change_layers
 import freezing
 from recompile_callbacks import *
 
+from dlomix.constants import PTMS_ALPHABET, ALPHABET_NAIVE_MODS, ALPHABET_UNMOD
+from dlomix.data import load_processed_dataset
+from dlomix.models import PrositIntensityPredictor
 from dlomix.losses import masked_spectral_distance, masked_pearson_correlation_distance
 
 
@@ -27,6 +30,21 @@ class RlTlTraining:
         self.config = config
 
         self.current_epoch_offset = 0
+
+    def get_alphabet(config_entry):
+        if isinstance(config_entry, dict):
+            # this is a custom alphabet
+            alphabet = config_entry
+        elif config_entry == 'PTMS_ALPHABET':
+            alphabet = PTMS_ALPHABET
+        elif config_entry == 'ALPHABET_UNMOD':
+            alphabet = ALPHABET_UNMOD
+        elif config_entry == 'ALPHABET_NAIVE_MODS':
+            alphabet = ALPHABET_NAIVE_MODS
+        else:
+            raise ValueError('unknown alphabet selected')
+
+        return alphabet
 
 
     def init_config(self):
@@ -57,16 +75,12 @@ class RlTlTraining:
         os.environ['HF_HOME'] = wandb.config['dataset']['hf_home']
         os.environ['HF_DATASETS_CACHE'] = wandb.config['dataset']['hf_cache']
 
+        print(tf.version.VERSION)
+
     def load_dataset(self):
-        # import here because HF_* environment flags need to be set beforehand
-        from dlomix.data import load_processed_dataset
         self.dataset = load_processed_dataset(wandb.config['dataset']['processed_path'])
 
     def initialize_model(self):
-        # import here because HF_* environment flags need to be set beforehand
-        from dlomix.constants import PTMS_ALPHABET, ALPHABET_NAIVE_MODS, ALPHABET_UNMOD
-        from dlomix.models import PrositIntensityPredictor
-
         # load or create model
         if 'load_path' in wandb.config['model']:
             print(f"loading model from file {wandb.config['model']['load_path']}")
@@ -83,17 +97,7 @@ class RlTlTraining:
             meta_data_keys=["collision_energy_aligned_normed", "precursor_charge_onehot", "method_nbr"]
 
             # select alphabet
-            if isinstance(wandb.config['dataset']['alphabet'], dict):
-                # this is a custom alphabet
-                alphabet = wandb.config['dataset']['alphabet']
-            elif wandb.config['dataset']['alphabet'] == 'PTMS_ALPHABET':
-                alphabet = PTMS_ALPHABET
-            elif wandb.config['dataset']['alphabet'] == 'ALPHABET_UNMOD':
-                alphabet = ALPHABET_UNMOD
-            elif wandb.config['dataset']['alphabet'] == 'ALPHABET_NAIVE_MODS':
-                alphabet = ALPHABET_NAIVE_MODS
-            else:
-                raise ValueError('unknown alphabet selected')
+            alphabet = self.get_alphabet(wandb.config['dataset']['alphabet'])
 
             self.model = PrositIntensityPredictor(
                 seq_length=wandb.config['dataset']['seq_length'],
@@ -123,7 +127,7 @@ class RlTlTraining:
         if 'new_input_layer' in rl_config:
             change_layers.change_input_layer(
                 self.model,
-                rl_config['new_input_layer']['new_alphabet'],
+                self.get_alphabet(rl_config['new_input_layer']['new_alphabet']),
                 rl_config['new_input_layer']['freeze_old_weights']
             )
 
@@ -225,12 +229,16 @@ class RlTlTraining:
 
             if training_part.num_epochs > 0:
                 # train model
-                self.model.fit(
+                history = self.model.fit(
                     self.dataset.tensor_train_data,
                     validation_data=self.dataset.tensor_val_data,
                     epochs=training_part.num_epochs,
                     callbacks=self.callbacks
                 )
+
+                if len(history.history['loss']) < training_part.num_epochs:
+                    # early stopping
+                    break
 
             # call callbacks
             training_part()
@@ -239,9 +247,6 @@ class RlTlTraining:
             self.current_epoch_offset += training_part.num_epochs
 
     def save_model(self):
-        from dlomix.constants import PTMS_ALPHABET, ALPHABET_NAIVE_MODS, ALPHABET_UNMOD
-        from dlomix.data import load_processed_dataset
-        from dlomix.models import PrositIntensityPredictor
 
         out_path = None
         if 'save_dir' in wandb.config['model']:
@@ -256,6 +261,7 @@ class RlTlTraining:
             
             print(f'saving the model to {out_path}')
             self.model.save(out_path)
+            # self.model.save('test.keras')
 
     def __call__(self):
         # setting up training

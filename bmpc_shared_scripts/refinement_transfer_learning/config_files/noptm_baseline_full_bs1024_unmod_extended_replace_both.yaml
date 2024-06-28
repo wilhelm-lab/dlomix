@@ -1,9 +1,9 @@
 dataset:
-  name: noptm_baseline_small_bs1024_unmod_extended_replace_input_layer
+  name: noptm_baseline_full_bs1024_unmod_extended
   hf_home: /cmnfs/proj/bmpc_dlomix/datasets
   hf_cache: /cmnfs/proj/bmpc_dlomix/datasets/hf_cache
-  parquet_path: /cmnfs/proj/bmpc_dlomix/datasets/parquet/noptm_baseline_small
-  processed_path: /cmnfs/proj/bmpc_dlomix/datasets/processed/noptm_baseline_small_bs1024_unmod_extended
+  parquet_path: /cmnfs/data/proteomics/Prosit_unmod/intensity/no_aug
+  processed_path: /cmnfs/proj/bmpc_dlomix/datasets/processed/noptm_baseline_full_bs1024_unmod_extended
   seq_length: 30
   batch_size: 1024
   alphabet: 
@@ -82,6 +82,8 @@ refinement_transfer_learning:
       'C[UNIMOD:4]': 25
       '[UNIMOD:1]-': 26
     freeze_old_weights: true 
+  new_output_layer:
+    num_ions: 2
 model:
-  load_path: /cmnfs/proj/bmpc_dlomix/models/baseline_models/noptm_baseline_small_bs1024_unmod_extended/873ee240-8a06-4fd3-ac6f-50b714788eb6.keras
+  load_path: /cmnfs/proj/bmpc_dlomix/models/baseline_models/noptm_baseline_full_bs1024_unmod_extended/873ee240-8a06-4fd3-ac6f-50b714788eb6.keras
   # save_dir: /cmnfs/proj/bmpc_dlomix/models/refinement_transfer_learning
