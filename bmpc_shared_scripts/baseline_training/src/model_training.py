@@ -5,10 +5,7 @@ import uuid
 import wandb
 from wandb.integration.keras import WandbCallback
 
-from dlomix.constants import PTMS_ALPHABET, ALPHABET_NAIVE_MODS, ALPHABET_UNMOD
-from dlomix.data import load_processed_dataset
-from dlomix.models import PrositIntensityPredictor
-from dlomix.losses import masked_spectral_distance, masked_pearson_correlation_distance
+
 
 import tensorflow as tf
 from tensorflow.keras.callbacks import EarlyStopping, ReduceLROnPlateau, LearningRateScheduler
@@ -50,9 +47,27 @@ def model_training(config):
         os.environ['HF_HOME'] = wandb.config['dataset']['hf_home']
         os.environ['HF_DATASETS_CACHE'] = wandb.config['dataset']['hf_cache']
 
+        from dlomix.constants import PTMS_ALPHABET, ALPHABET_NAIVE_MODS, ALPHABET_UNMOD
+        from dlomix.data import load_processed_dataset
+        from dlomix.models import PrositIntensityPredictor
+        from dlomix.losses import masked_spectral_distance, masked_pearson_correlation_distance
+
         # load dataset
         dataset = load_processed_dataset(wandb.config['dataset']['processed_path'])
 
+        # # debugging
+        # import numpy as np
+        # import tqdm
+        # max_val = -np.Infinity
+        # min_val = np.Infinity
+        # for batch, y_true in tqdm.tqdm(dataset.tensor_train_data):
+        #     batch_max_val = batch['modified_sequence'].numpy().max()
+        #     batch_min_val = batch['modified_sequence'].numpy().min()
+
+        #     min_val = np.min([batch_min_val, min_val])
+        #     max_val = np.max([batch_max_val, max_val])
+
+        # print(f'bounds: min={min_val}, max={max_val}')
 
         # initialize relevant stuff for training
         optimizer = tf.keras.optimizers.Adam(learning_rate=wandb.config['training']['learning_rate'])
@@ -163,6 +178,9 @@ def model_training(config):
             out_path = wandb.config['model']['save_path']
 
         if out_path is not None:
+            dir = os.path.dirname(out_path)
+            if not os.path.exists(dir):
+                os.makedirs(dir)
             model.save(out_path)
 
 
