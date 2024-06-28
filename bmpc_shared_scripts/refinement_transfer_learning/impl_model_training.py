@@ -114,6 +114,8 @@ class RlTlTraining:
 
         # refinement/transfer learning configuration
         rl_config = wandb.config['refinement_transfer_learning']
+        if rl_config is None:
+            rl_config = {}
 
         # optionally: replacing of input/output layers
         if 'new_output_layer' in rl_config:
@@ -124,10 +126,24 @@ class RlTlTraining:
                 rl_config['new_input_layer']['new_alphabet'],
                 rl_config['new_input_layer']['freeze_old_weights']
             )
+
+            if rl_config['new_input_layer']['freeze_old_weights']:
+                wandb.log({'freeze_old_embedding_weights': 1})
+
+                def release_callback():
+                    change_layers.release_old_embeddings(self.model)
+                    wandb.log({'freeze_old_embedding_weights': 0})
+
+                self.recompile_callbacks.append(RecompileCallback(
+                    epoch=rl_config['new_input_layer']['release_after_epochs'],
+                    callback=release_callback
+                ))
+
         
         # optionally: freeze layers during training
         if 'freeze_layers' in rl_config:
             if 'activate' not in rl_config['freeze_layers'] or rl_config['freeze_layers']['activate']:
+                print('freezing active')
                 freezing.freeze_model(
                     self.model, 
                     rl_config['freeze_layers']['is_first_layer_trainable'],
@@ -184,9 +200,10 @@ class RlTlTraining:
             start_lr = wandb.config['training']['lr_warmup_linear']['start_lr']
             end_lr = wandb.config['training']['lr_warmup_linear']['end_lr']
             def scheduler(epoch, lr):
-                if (epoch + self.current_epoch_offset) < num_epochs:
+                global_epoch = epoch + self.current_epoch_offset
+                if global_epoch < num_epochs:
                     print("warmup step")
-                    factor = epoch / num_epochs
+                    factor = global_epoch / num_epochs
                     return factor * end_lr + (1-factor) * start_lr
                 else:
                     return lr
@@ -222,16 +239,22 @@ class RlTlTraining:
             self.current_epoch_offset += training_part.num_epochs
 
     def save_model(self):
+        from dlomix.constants import PTMS_ALPHABET, ALPHABET_NAIVE_MODS, ALPHABET_UNMOD
+        from dlomix.data import load_processed_dataset
+        from dlomix.models import PrositIntensityPredictor
+
         out_path = None
         if 'save_dir' in wandb.config['model']:
             out_path = f"{wandb.config['model']['save_dir']}/{wandb.config['dataset']['name']}/{wandb.config['run_id']}.keras"
         if 'save_path' in wandb.config['model']:
             out_path = wandb.config['model']['save_path']
+
         if out_path is not None:
-            print(f'saving the model to {out_path}')
             dir = os.path.dirname(out_path)
             if not os.path.exists(dir):
                 os.makedirs(dir)
+            
+            print(f'saving the model to {out_path}')
             self.model.save(out_path)
 
     def __call__(self):
