@@ -1,4 +1,5 @@
 from wandb.integration.keras import WandbCallback
+import tensorflow
 from tensorflow.keras.callbacks import (
     EarlyStopping, ModelCheckpoint, LearningRateScheduler, ReduceLROnPlateau,
     LambdaCallback, TerminateOnNaN, CSVLogger
