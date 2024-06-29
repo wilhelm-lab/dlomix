@@ -31,7 +31,7 @@ class RlTlTraining:
 
         self.current_epoch_offset = 0
 
-    def get_alphabet(config_entry):
+    def get_alphabet(self, config_entry):
         if isinstance(config_entry, dict):
             # this is a custom alphabet
             alphabet = config_entry
@@ -125,9 +125,10 @@ class RlTlTraining:
         if 'new_output_layer' in rl_config:
             change_layers.change_output_layer(self.model, rl_config['new_output_layer']['num_ions'])
         if 'new_input_layer' in rl_config:
+            new_alphabet = self.get_alphabet(rl_config['new_input_layer']['new_alphabet'])
             change_layers.change_input_layer(
                 self.model,
-                self.get_alphabet(rl_config['new_input_layer']['new_alphabet']),
+                new_alphabet,
                 rl_config['new_input_layer']['freeze_old_weights']
             )
 
