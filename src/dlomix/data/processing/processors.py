@@ -100,7 +100,12 @@ class SequenceParsingProcessor(PeptideDatasetBaseProcessor):
         splitted = sequence_string.split("-")
 
         if len(splitted) == 1:
-            n_term, seq, c_term = "[]-", splitted[0], "-[]"
+            if splitted[0].startswith('[UNIMOD:'):
+                n_term = splitted[0][:splitted[0].find(']') + 1] + '-'
+                seq = splitted[0][splitted[0].find(']') + 1:]
+                c_term = '-[]'
+            else:
+                n_term, seq, c_term = '[]-', splitted[0], '-[]'
         elif len(splitted) == 2:
             if splitted[0].startswith("[UNIMOD:"):
                 n_term, seq, c_term = splitted[0] + "-", splitted[1], "-[]"
@@ -110,8 +115,9 @@ class SequenceParsingProcessor(PeptideDatasetBaseProcessor):
             n_term, seq, c_term = splitted
             n_term += "-"
             c_term = "-" + c_term
-
-        seq = re.findall(r"[A-Za-z](?:\[UNIMOD:\d+\])*|[^\[\]]", seq)
+        # last option of the regex is to find unimod modifications at the beginning of the sequence when sequence does not start with []-
+        # e.g. seq = "[UNIMOD:1]ADEFGLMN"
+        seq = re.findall(r"[A-Za-z](?:\[UNIMOD:\d+\])*|[^\[\]]|\[UNIMOD:\d+\]", seq)
         return n_term, seq, c_term
 
     def batch_process(self, input_data, **kwargs):
