@@ -1,0 +1,13 @@
+dataset:
+  hf_home: /cmnfs/proj/bmpc_dlomix/datasets
+  hf_cache: /cmnfs/proj/bmpc_dlomix/datasets/hf_cache
+  parquet_path: /cmnfs/data/proteomics/Prosit_PTMs/TUM_mod_pyroGlu.parquet
+  processed_path: /cmnfs/proj/bmpc_dlomix/datasets/processed/tum_mod_pyroglu
+  seq_length: 30
+  batch_size: 1024
+  alphabet: "ALPHABET_NAIVE_MODS"
+  new_mods: ["E[UNIMOD:27]", "Q[UNIMOD:28]"]
+  val_ratio: 0.2
+  test_ratio: 0.1
+processing:
+  num_proc: 30

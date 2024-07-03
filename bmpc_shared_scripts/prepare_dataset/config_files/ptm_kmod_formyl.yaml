@@ -1,11 +1,13 @@
 dataset:
-  hf_home: /cmnfs/proj/prosit_astral/bmpc_dlomix_group/datasets
-  hf_cache: /cmnfs/proj/prosit_astral/bmpc_dlomix_group/datasets/hf_cache
+  hf_home: /cmnfs/proj/bmpc_dlomix/datasets
+  hf_cache: /cmnfs/proj/bmpc_dlomix/datasets/hf_cache
   parquet_path: /cmnfs/data/proteomics/Prosit_PTMs/21PTMs/Kmod_Formyl.parquet
-  processed_path: /cmnfs/proj/prosit_astral/bmpc_dlomix_group/datasets/processed/kmod_formyl
+  processed_path: /cmnfs/proj/bmpc_dlomix/datasets/processed/kmod_formyl
   seq_length: 30
   batch_size: 1024
-  alphabet: {'C[UNIMOD:4]': 24, 'M[UNIMOD:35]': 25, 'A': 1, 'C': 2, 'D': 3, 'E': 4, 'F': 5, 'G': 6, 'H': 7, 'I': 8, 'K': 9, 'L': 10, 'M': 11, 'N': 12, 'P': 13, 'Q': 14, 'R': 15, 'S': 16, 'T': 17, 'V': 18, 'W': 19, 'Y': 20, '[]-': 21, '-[]': 22, '[UNIMOD:737]-': 21, 'K[UNIMOD:122]': 26}
+  alphabet: 'ALPHABET_NAIVE_MODS'
+  new_mods: ['K[UNIMOD:122]']
   val_ratio: 0.2
+  test_ratio: 0.1
 processing:
   num_proc: 4

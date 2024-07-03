@@ -1,0 +1,13 @@
+dataset:
+  hf_home: /cmnfs/proj/bmpc_dlomix/datasets
+  hf_cache: /cmnfs/proj/bmpc_dlomix/datasets/hf_cache
+  parquet_path: /cmnfs/data/proteomics/Prosit_PTMs/TUM_mod_acetylated.parquet
+  processed_path: /cmnfs/proj/bmpc_dlomix/datasets/processed/tum_mod_acetylated
+  seq_length: 30
+  batch_size: 1024
+  alphabet: "ALPHABET_NAIVE_MODS"
+  new_mods: ["K[UNIMOD:1]"]
+  val_ratio: 0.2
+  test_ratio: 0.1
+processing:
+  num_proc: 20
