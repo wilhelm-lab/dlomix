@@ -19,6 +19,7 @@ class DatasetConfig:
     sequence_column: str
     label_column: str
     val_ratio: float
+    test_ratio: float
     max_seq_len: int
     dataset_type: str
     batch_size: int

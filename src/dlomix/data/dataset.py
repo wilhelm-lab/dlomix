@@ -50,6 +50,8 @@ class PeptideDataset:
         Name of the column in the data source file that contains the labels.
     val_ratio : float
         Ratio of the validation data to the training data. The value should be between 0 and 1.
+    test_ratio : float
+        Ratio of the test data to the validation data. The value should be between 0 and 1. (Splits the validation data again, not the train data.)
     max_seq_len : int
         Maximum sequence length to pad the sequences to. If set to 0, the sequences will not be padded.
     dataset_type : str
@@ -112,6 +114,7 @@ class PeptideDataset:
         sequence_column: str,
         label_column: str,
         val_ratio: float,
+        test_ratio: float,
         max_seq_len: int,
         dataset_type: str,
         batch_size: int,
@@ -140,6 +143,7 @@ class PeptideDataset:
         self.label_column = label_column
 
         self.val_ratio = val_ratio
+        self.test_ratio = test_ratio
         self.max_seq_len = max_seq_len
         self.dataset_type = dataset_type
         self.batch_size = batch_size
@@ -170,6 +174,7 @@ class PeptideDataset:
             self.hf_dataset: Optional[Union[Dataset, DatasetDict]] = None
             self._empty_dataset_mode = False
             self._is_predefined_split = False
+            self._is_predefine_test_split = False
             self._test_set_only = False
             self._num_proc = num_proc
             self._set_num_proc()
@@ -220,6 +225,7 @@ class PeptideDataset:
             sequence_column=self.sequence_column,
             label_column=self.label_column,
             val_ratio=self.val_ratio,
+            test_ratio=self.test_ratio,
             max_seq_len=self.max_seq_len,
             dataset_type=self.dataset_type,
             batch_size=self.batch_size,
@@ -277,6 +283,8 @@ class PeptideDataset:
         if count_loaded_data_sources >= 2:
             if self.val_data_source is not None:
                 self._is_predefined_split = True
+            if self.test_data_source is not None:
+                self._is_predefine_test_split = True
 
         if self._is_predefined_split:
             warnings.warn(
@@ -304,7 +312,6 @@ class PeptideDataset:
             return
 
         # only a train dataset or a train and a test but no val -> split train into train/val
-
         splitted_dataset = self.hf_dataset[
             PeptideDataset.DEFAULT_SPLIT_NAMES[0]
         ].train_test_split(test_size=self.val_ratio)
@@ -312,9 +319,22 @@ class PeptideDataset:
         self.hf_dataset["train"] = splitted_dataset["train"]
         self.hf_dataset["val"] = splitted_dataset["test"]
 
+        # if test set is not specified -> split train set into test set and remaining train set
+        if self._is_predefine_test_split:
+            del splitted_dataset["train"]
+            del splitted_dataset["test"]
+            del splitted_dataset
+            return
+        
+        self.test_ratio = self.test_ratio / (1 - self.val_ratio)
+        splitted_dataset = self.hf_dataset["train"].train_test_split(test_size=self.test_ratio)
+        self.hf_dataset["train"] = splitted_dataset["train"]
+        self.hf_dataset["test"] = splitted_dataset["test"]
+        
         del splitted_dataset["train"]
         del splitted_dataset["test"]
         del splitted_dataset
+        
 
     def _parse_sequences(self):
         # parse sequence in all encoding schemes
@@ -541,6 +561,7 @@ If you prefer to encode the (amino-acids)+PTM combinations as tokens in the voca
             sequence_column=config.sequence_column,
             label_column=config.label_column,
             val_ratio=config.val_ratio,
+            test_ratio=config.test_ratio,
             max_seq_len=config.max_seq_len,
             dataset_type=config.dataset_type,
             batch_size=config.batch_size,
