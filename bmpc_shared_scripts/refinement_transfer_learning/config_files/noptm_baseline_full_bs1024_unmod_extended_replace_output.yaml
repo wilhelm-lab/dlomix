@@ -1,4 +1,5 @@
 dataset:
+  name: noptm_baseline_full_bs1024_unmod_extended
   hf_home: /cmnfs/proj/bmpc_dlomix/datasets
   hf_cache: /cmnfs/proj/bmpc_dlomix/datasets/hf_cache
   parquet_path: /cmnfs/data/proteomics/Prosit_unmod/intensity/no_aug
@@ -33,3 +34,26 @@ dataset:
     'K[UNIMOD:737]': 24
     'C[UNIMOD:4]': 25
     '[UNIMOD:1]-': 26
+training:
+  learning_rate: 0.0001
+  num_epochs: 20
+  early_stopping:
+    min_delta: 0.00001
+    patience: 5
+  lr_scheduler_plateau:
+    cooldown: 1
+    factor: 0.5
+    min_delta: 0.0001
+    patience: 2
+  lr_warmup_linear:
+    start_lr: 0.000001
+    end_lr: 0.0001
+refinement_transfer_learning:
+  freeze_layers:
+    is_first_layer_trainable: false
+    is_last_layer_trainable: true
+  new_output_layer:
+    num_ions: 2 
+model:
+  load_path: /cmnfs/proj/bmpc_dlomix/models/baseline_models/noptm_baseline_full_bs1024_unmod_extended/7ef3360f-2349-46c0-a905-01187d4899e2.keras
+  # save_dir: /cmnfs/proj/bmpc_dlomix/models/refinement_transfer_learning

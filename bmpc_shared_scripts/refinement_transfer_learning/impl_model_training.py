@@ -12,6 +12,9 @@ import change_layers
 import freezing
 from recompile_callbacks import *
 
+from dlomix.constants import PTMS_ALPHABET, ALPHABET_NAIVE_MODS, ALPHABET_UNMOD
+from dlomix.data import load_processed_dataset
+from dlomix.models import PrositIntensityPredictor
 from dlomix.losses import masked_spectral_distance, masked_pearson_correlation_distance
 
 
@@ -27,6 +30,21 @@ class RlTlTraining:
         self.config = config
 
         self.current_epoch_offset = 0
+
+    def get_alphabet(self, config_entry):
+        if isinstance(config_entry, dict):
+            # this is a custom alphabet
+            alphabet = config_entry
+        elif config_entry == 'PTMS_ALPHABET':
+            alphabet = PTMS_ALPHABET
+        elif config_entry == 'ALPHABET_UNMOD':
+            alphabet = ALPHABET_UNMOD
+        elif config_entry == 'ALPHABET_NAIVE_MODS':
+            alphabet = ALPHABET_NAIVE_MODS
+        else:
+            raise ValueError('unknown alphabet selected')
+
+        return alphabet
 
 
     def init_config(self):
@@ -57,16 +75,12 @@ class RlTlTraining:
         os.environ['HF_HOME'] = wandb.config['dataset']['hf_home']
         os.environ['HF_DATASETS_CACHE'] = wandb.config['dataset']['hf_cache']
 
+        print(tf.version.VERSION)
+
     def load_dataset(self):
-        # import here because HF_* environment flags need to be set beforehand
-        from dlomix.data import load_processed_dataset
         self.dataset = load_processed_dataset(wandb.config['dataset']['processed_path'])
 
     def initialize_model(self):
-        # import here because HF_* environment flags need to be set beforehand
-        from dlomix.constants import PTMS_ALPHABET, ALPHABET_NAIVE_MODS, ALPHABET_UNMOD
-        from dlomix.models import PrositIntensityPredictor
-
         # load or create model
         if 'load_path' in wandb.config['model']:
             print(f"loading model from file {wandb.config['model']['load_path']}")
@@ -83,17 +97,7 @@ class RlTlTraining:
             meta_data_keys=["collision_energy_aligned_normed", "precursor_charge_onehot", "method_nbr"]
 
             # select alphabet
-            if isinstance(wandb.config['dataset']['alphabet'], dict):
-                # this is a custom alphabet
-                alphabet = wandb.config['dataset']['alphabet']
-            elif wandb.config['dataset']['alphabet'] == 'PTMS_ALPHABET':
-                alphabet = PTMS_ALPHABET
-            elif wandb.config['dataset']['alphabet'] == 'ALPHABET_UNMOD':
-                alphabet = ALPHABET_UNMOD
-            elif wandb.config['dataset']['alphabet'] == 'ALPHABET_NAIVE_MODS':
-                alphabet = ALPHABET_NAIVE_MODS
-            else:
-                raise ValueError('unknown alphabet selected')
+            alphabet = self.get_alphabet(wandb.config['dataset']['alphabet'])
 
             self.model = PrositIntensityPredictor(
                 seq_length=wandb.config['dataset']['seq_length'],
@@ -114,20 +118,37 @@ class RlTlTraining:
 
         # refinement/transfer learning configuration
         rl_config = wandb.config['refinement_transfer_learning']
+        if rl_config is None:
+            rl_config = {}
 
         # optionally: replacing of input/output layers
         if 'new_output_layer' in rl_config:
             change_layers.change_output_layer(self.model, rl_config['new_output_layer']['num_ions'])
         if 'new_input_layer' in rl_config:
+            new_alphabet = self.get_alphabet(rl_config['new_input_layer']['new_alphabet'])
             change_layers.change_input_layer(
                 self.model,
-                rl_config['new_input_layer']['new_alphabet'],
+                new_alphabet,
                 rl_config['new_input_layer']['freeze_old_weights']
             )
+
+            if rl_config['new_input_layer']['freeze_old_weights']:
+                wandb.log({'freeze_old_embedding_weights': 1})
+
+                def release_callback():
+                    change_layers.release_old_embeddings(self.model)
+                    wandb.log({'freeze_old_embedding_weights': 0})
+
+                self.recompile_callbacks.append(RecompileCallback(
+                    epoch=rl_config['new_input_layer']['release_after_epochs'],
+                    callback=release_callback
+                ))
+
         
         # optionally: freeze layers during training
         if 'freeze_layers' in rl_config:
             if 'activate' not in rl_config['freeze_layers'] or rl_config['freeze_layers']['activate']:
+                print('freezing active')
                 freezing.freeze_model(
                     self.model, 
                     rl_config['freeze_layers']['is_first_layer_trainable'],
@@ -184,9 +205,10 @@ class RlTlTraining:
             start_lr = wandb.config['training']['lr_warmup_linear']['start_lr']
             end_lr = wandb.config['training']['lr_warmup_linear']['end_lr']
             def scheduler(epoch, lr):
-                if (epoch + self.current_epoch_offset) < num_epochs:
+                global_epoch = epoch + self.current_epoch_offset
+                if global_epoch < num_epochs:
                     print("warmup step")
-                    factor = epoch / num_epochs
+                    factor = global_epoch / num_epochs
                     return factor * end_lr + (1-factor) * start_lr
                 else:
                     return lr
@@ -208,12 +230,16 @@ class RlTlTraining:
 
             if training_part.num_epochs > 0:
                 # train model
-                self.model.fit(
+                history = self.model.fit(
                     self.dataset.tensor_train_data,
                     validation_data=self.dataset.tensor_val_data,
                     epochs=training_part.num_epochs,
                     callbacks=self.callbacks
                 )
+
+                if len(history.history['loss']) < training_part.num_epochs:
+                    # early stopping
+                    break
 
             # call callbacks
             training_part()
@@ -222,17 +248,21 @@ class RlTlTraining:
             self.current_epoch_offset += training_part.num_epochs
 
     def save_model(self):
+
         out_path = None
         if 'save_dir' in wandb.config['model']:
             out_path = f"{wandb.config['model']['save_dir']}/{wandb.config['dataset']['name']}/{wandb.config['run_id']}.keras"
         if 'save_path' in wandb.config['model']:
             out_path = wandb.config['model']['save_path']
+
         if out_path is not None:
-            print(f'saving the model to {out_path}')
             dir = os.path.dirname(out_path)
             if not os.path.exists(dir):
                 os.makedirs(dir)
+            
+            print(f'saving the model to {out_path}')
             self.model.save(out_path)
+            # self.model.save('test.keras')
 
     def __call__(self):
         # setting up training
