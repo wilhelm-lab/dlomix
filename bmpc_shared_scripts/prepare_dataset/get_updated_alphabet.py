@@ -31,7 +31,7 @@ def create_parser():
 
 
 def get_modification(seq):
-    mod_pattern = r"[A-Za-z]?(?:\[UNIMOD:\d+\])*|[^\[\]]"
+    mod_pattern = r"[A-Za-z](?:\[UNIMOD:\d+\])*|[^\[\]]|\[UNIMOD:\d+\]"
     splitted = seq.split('-')
 
     match len(splitted):
