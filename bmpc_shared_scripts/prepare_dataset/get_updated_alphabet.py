@@ -36,7 +36,12 @@ def get_modification(seq):
 
     match len(splitted):
         case 1:
-            n_term, seq, c_term = '[]-', splitted[0], '-[]'
+            if splitted[0].startswith('[UNIMOD:'):
+                n_term = splitted[0][:splitted[0].find(']') + 1] + '-'
+                seq = splitted[0][splitted[0].find(']') + 1:]
+                c_term = '-[]'
+            else:
+                n_term, seq, c_term = '[]-', splitted[0], '-[]'
         case 2:
             if splitted[0].startswith('[UNIMOD:'):
                 n_term, seq, c_term = splitted[0] + '-', splitted[1], '-[]'
@@ -48,7 +53,6 @@ def get_modification(seq):
     seq = re.findall(mod_pattern, seq)
     seq.extend([n_term, c_term])
     return seq
-
 
 
 def main():

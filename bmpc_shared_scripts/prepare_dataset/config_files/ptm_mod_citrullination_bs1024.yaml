@@ -6,7 +6,7 @@ dataset:
   seq_length: 30
   batch_size: 1024
   alphabet: "ALPHABET_NAIVE_MODS"
-  new_mods: ["[UNIMOD:1]", "R[UNIMOD:7]", "Q[UNIMOD:28]"]
+  new_mods: ["[UNIMOD:1]-", "R[UNIMOD:7]", "Q[UNIMOD:28]"]
   val_ratio: 0.2
   test_ratio: 0.1
 processing:
