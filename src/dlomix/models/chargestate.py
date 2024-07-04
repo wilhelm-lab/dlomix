@@ -158,7 +158,7 @@ class ObservedChargeStatePredictor(tf.keras.Model):
         return x
 
 
-class ChargeStateProportionPredictor(tf.keras.Model):
+class ChargeStateDistributionPredictor(tf.keras.Model):
     """
     Task 3
     Predict the proportion of all observed charge states
@@ -173,9 +173,9 @@ class ChargeStateProportionPredictor(tf.keras.Model):
         latent_dropout_rate=0.1,
         recurrent_layers_sizes=(256, 512),
         regressor_layer_size=512,
-        num_classes=6,
+        num_classes=6,  # TODO number of charge states etc
     ):
-        super(ChargeStateProportionPredictor, self).__init__()
+        super(ChargeStateDistributionPredictor, self).__init__()
 
         # tie the count of embeddings to the size of the vocabulary (count of amino acids)
         self.embeddings_count = len(vocab_dict) + 2
