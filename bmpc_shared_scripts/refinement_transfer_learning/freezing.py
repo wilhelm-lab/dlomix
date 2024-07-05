@@ -36,7 +36,10 @@ def freeze_model(model:PrositIntensityPredictor, trainable_first_layer:bool = Fa
         first_layer.trainable = True
 
     if (trainable_last_layer):
-        last_layer = model.get_layer(name = "sequential_4").get_layer(name = "time_dense")
+        try:
+            last_layer = model.get_layer(name = "sequential_4").get_layer(name = "time_dense")
+        except (ValueError):
+            last_layer = model.get_layer(name = "regressor").get_layer(name = "time_dense")
         last_layer.trainable = True
 
 
