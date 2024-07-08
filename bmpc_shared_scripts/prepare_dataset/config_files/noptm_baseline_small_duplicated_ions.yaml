@@ -1,0 +1,37 @@
+dataset:
+  hf_home: /cmnfs/proj/bmpc_dlomix/datasets/
+  hf_cache: /cmnfs/proj/bmpc_dlomix/datasets/hf_cache
+  parquet_path: /cmnfs/proj/bmpc_dlomix/datasets/parquet/transfer_learning_toy_dataset/noptm_baseline_small_bs1024_duplicated_ions
+  processed_path: /cmnfs/proj/bmpc_dlomix/datasets/processed/noptm_baseline_small_duplicated_ions
+  seq_length: 30
+  batch_size: 1024
+  alphabet: 
+    'A': 1
+    'C': 2
+    'D': 3
+    'E': 4
+    'F': 5
+    'G': 6
+    'H': 7
+    'I': 8
+    'K': 9
+    'L': 10
+    'M': 11
+    'N': 12
+    'P': 13
+    'Q': 14
+    'R': 15
+    'S': 16
+    'T': 17
+    'V': 18
+    'W': 19
+    'Y': 20
+    '[]-': 21
+    '-[]': 22
+    '[UNIMOD:737]-': 21
+    'M[UNIMOD:35]': 23
+    'K[UNIMOD:737]': 24
+    'C[UNIMOD:4]': 25
+    '[UNIMOD:1]-': 26
+processing:
+  num_proc: 40
