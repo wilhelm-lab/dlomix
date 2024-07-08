@@ -37,18 +37,23 @@ else:
 
 
 
-# load dataset
+# load dataset -> if the dataset base path is already a parquet file, use just this file
 datset_base_path = config['dataset']['parquet_path']
-dataset_train_path = f"{datset_base_path}_train.parquet"
-dataset_val_path = f"{datset_base_path}_val.parquet"
-dataset_test_path = f"{datset_base_path}_test.parquet"
+
+if datset_base_path.endswith('.parquet'):
+    dataset_train_path = datset_base_path
+    dataset_val_path, dataset_test_path = None, None
+else:
+    dataset_train_path = f"{datset_base_path}_train.parquet"
+    dataset_val_path = f"{datset_base_path}_val.parquet"
+    dataset_test_path = f"{datset_base_path}_test.parquet"
 
 dataset = FragmentIonIntensityDataset(
     data_source=dataset_train_path,
     val_data_source=dataset_val_path,
     test_data_source=dataset_test_path,
     data_format="parquet", 
-    # val_ratio=config['dataloader']['val_ratio'], # why do we need this if we already have splits?
+    val_ratio=config['dataset'].get('val_ratio', 0.2), # why do we need this if we already have splits?
     batch_size=config['dataset']['batch_size'],
     max_seq_len=config['dataset']['seq_length'],
     encoding_scheme="naive-mods",
