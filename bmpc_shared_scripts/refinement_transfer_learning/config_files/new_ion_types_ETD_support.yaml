@@ -2,8 +2,8 @@ dataset:
   name: noptm_baseline_full_bs1024_unmod_extended
   hf_home: /cmnfs/proj/bmpc_dlomix/datasets
   hf_cache: /cmnfs/proj/bmpc_dlomix/datasets/hf_cache
-  parquet_path: /cmnfs/proj/oktoberfest/ETD_Support/02445d_BA1-TUM_HLA_1_01_01-ETD-1h-R4.parquet
-  processed_path: /cmnfs/proj/bmpc_dlomix/datasets/processed/new_ion_types_ETD_support
+  parquet_path: /cmnfs/proj/bmpc_dlomix/datasets/parquet/new_ion_types_ETD_support_edited.parquet
+  processed_path: /cmnfs/proj/bmpc_dlomix/datasets/processed/new_ion_types_ETD_support_edited
   seq_length: 30
   batch_size: 1024
   alphabet: 
@@ -48,6 +48,7 @@ training:
   lr_warmup_linear:
     start_lr: 0.00001
     end_lr: 0.0001
+    num_epochs: 20
 processing:
   cuda_device_nr: "2"
 refinement_transfer_learning:
