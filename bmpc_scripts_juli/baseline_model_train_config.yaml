@@ -1,6 +1,0 @@
-dataloader:
-  seq_length: 30
-  batch_size: 64
-training:
-  learning_rate: 1.0e-4
-  num_epochs: 1

@@ -8,7 +8,7 @@ dataset:
   batch_size: 1024
   alphabet: PTMS_ALPHABET
 training:
-    learning_rate: 0.0001
+  learning_rate: 0.0001
   num_epochs: 20
   early_stopping:
     min_delta: 0.00001
