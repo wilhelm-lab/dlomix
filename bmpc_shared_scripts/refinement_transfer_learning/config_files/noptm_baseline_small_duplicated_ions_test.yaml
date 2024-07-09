@@ -1,0 +1,63 @@
+dataset:
+  name: noptm_baseline_full_bs1024_unmod_extended
+  hf_home: /cmnfs/proj/bmpc_dlomix/datasets
+  hf_cache: /cmnfs/proj/bmpc_dlomix/datasets/hf_cache
+  parquet_path: /cmnfs/proj/bmpc_dlomix/datasets/parquet/noptm_baseline_small_duplicated_ions
+  processed_path: /cmnfs/proj/bmpc_dlomix/datasets/processed/noptm_baseline_small_duplicated_ions
+  seq_length: 30
+  batch_size: 1024
+  alphabet: 
+    'A': 1
+    'C': 2
+    'D': 3
+    'E': 4
+    'F': 5
+    'G': 6
+    'H': 7
+    'I': 8
+    'K': 9
+    'L': 10
+    'M': 11
+    'N': 12
+    'P': 13
+    'Q': 14
+    'R': 15
+    'S': 16
+    'T': 17
+    'V': 18
+    'W': 19
+    'Y': 20
+    '[]-': 21
+    '-[]': 22
+    '[UNIMOD:737]-': 21
+    'M[UNIMOD:35]': 23
+    'K[UNIMOD:737]': 24
+    'C[UNIMOD:4]': 25
+    '[UNIMOD:1]-': 26
+training:
+  learning_rate: 0.0001
+  num_epochs: 200
+  early_stopping:
+    min_delta: 0.00001
+    patience: 5
+  lr_scheduler_plateau:
+    cooldown: 1
+    factor: 0.5
+    min_delta: 0.0001
+    patience: 2
+  lr_warmup_linear:
+    start_lr: 0.00001
+    end_lr: 0.0001
+    num_epochs: 20
+processing:
+  cuda_device_nr: "3"
+refinement_transfer_learning:
+  freeze_layers:
+    release_after_epochs : 20
+    is_first_layer_trainable: false
+    is_last_layer_trainable: false
+  new_output_layer:
+    num_ions: 4 
+model:
+  load_path: /cmnfs/proj/bmpc_dlomix/models/baseline_models/noptm_baseline_full_bs1024_naivemods/d961f940-d142-4102-9775-c1f8b4373c91.keras
+  # save_dir: /cmnfs/proj/bmpc_dlomix/models/refinement_transfer_learning
