@@ -35,12 +35,13 @@ def change_output_layer(model: PrositIntensityPredictor, number_of_ions: int = 2
 
 @keras.saving.register_keras_serializable()
 class FixWeights(Constraint):
-    def __init__(self, old_weights):
+    def __init__(self, old_weights, max_old_embedding):
         self.old_weights = old_weights
         self.freeze_weights = True
+        self.max_embedding_value = max_old_embedding
     def __call__(self, w):
         if self.freeze_weights:
-            return K.concatenate([self.old_weights[:self.old_weights.shape[0] - 1], w[self.old_weights.shape[0] - 1:]], axis=0)
+            return K.concatenate([self.old_weights[:self.max_embedding_value + 1], w[self.max_embedding_value + 1:]], axis=0)
         return w
     
 
@@ -60,6 +61,7 @@ def change_input_layer(model: PrositIntensityPredictor, modifications: list = No
         modifications (list, optional): List of modifications the model should support. Defaults to None.
         freeze_old_embeds (bool): If set to True, the old embeddings of the loaded model are not changed during training. Defaults to False.
     """
+    old_embedding_max = max(model.alphabet.values())
     if modifications:
         model.alphabet.update({k: i for i, k in enumerate(modifications, start=len(model.alphabet) + 1)})
         
@@ -67,7 +69,7 @@ def change_input_layer(model: PrositIntensityPredictor, modifications: list = No
     if freeze_old_embeds:
         # if added names to the model, replace get_layer index with name 
         trained_embeds_weights = model.layers[0].get_weights()[0]
-        embeddings_constraint = FixWeights(trained_embeds_weights)
+        embeddings_constraint = FixWeights(trained_embeds_weights, max_old_embedding=old_embedding_max)
 
     model.embedding = tf.keras.layers.Embedding(
         input_dim=len(model.alphabet) + 2,
@@ -76,7 +78,6 @@ def change_input_layer(model: PrositIntensityPredictor, modifications: list = No
         embeddings_constraint=embeddings_constraint,
         name='embedding'
         )
-
 
 def release_old_embeddings(model: PrositIntensityPredictor):
     """Function to release the pre-trained embeddings of a re-initialized embedding layer of the Prosit model
