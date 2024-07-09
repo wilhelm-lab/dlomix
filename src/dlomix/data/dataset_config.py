@@ -19,7 +19,6 @@ class DatasetConfig:
     sequence_column: str
     label_column: str
     val_ratio: float
-    test_ratio: float
     max_seq_len: int
     dataset_type: str
     batch_size: int
@@ -32,6 +31,7 @@ class DatasetConfig:
     encoding_scheme: Union[str, EncodingScheme]
     processed: bool
     _additional_data: dict = field(default_factory=dict)
+    test_ratio: Optional[float] = 0
 
     def save_config_json(self, path: str):
         """
