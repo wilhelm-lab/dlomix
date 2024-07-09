@@ -125,10 +125,11 @@ class RlTlTraining:
         if 'new_output_layer' in rl_config:
             change_layers.change_output_layer(self.model, rl_config['new_output_layer']['num_ions'])
         if 'new_input_layer' in rl_config:
-            new_alphabet = self.get_alphabet(rl_config['new_input_layer']['new_alphabet'])
+            # new_alphabet = self.get_alphabet(rl_config['new_input_layer']['new_alphabet'])
+            new_mods = rl_config['new_input_layer']['new_mods']
             change_layers.change_input_layer(
                 self.model,
-                new_alphabet,
+                new_mods,
                 rl_config['new_input_layer']['freeze_old_weights']
             )
 

@@ -31,4 +31,12 @@ def train():
     train_func = RlTlTraining(config)
     train_func()
 
-wandb.agent(args.sweep_id, train, count=args.sweep_count)
+
+def main():
+    config = load_config(args.config)
+    project = config.get('project', 'refinement transfer learning')
+    wandb.agent(args.sweep_id, train, count=args.sweep_count, project=project)
+
+
+if __name__ == "__main__":
+    main()
