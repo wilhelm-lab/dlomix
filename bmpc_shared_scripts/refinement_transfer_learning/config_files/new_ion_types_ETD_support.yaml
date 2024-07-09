@@ -1,5 +1,5 @@
 dataset:
-  name: noptm_baseline_full_bs1024_unmod_extended
+  name: new_io_types_ETD_support
   hf_home: /cmnfs/proj/bmpc_dlomix/datasets
   hf_cache: /cmnfs/proj/bmpc_dlomix/datasets/hf_cache
   parquet_path: /cmnfs/proj/bmpc_dlomix/datasets/parquet/new_ion_types_ETD_support_edited.parquet

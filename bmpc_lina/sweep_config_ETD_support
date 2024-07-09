@@ -1,0 +1,124 @@
+method: bayes
+metric:
+  goal: minimize
+  name: val_loss
+parameters:
+  dataset:
+    parameters:
+      batch_size:
+        distribution: categorical
+        values:
+          - 1024
+      hf_cache:
+        distribution: categorical
+        values:
+          - /cmnfs/proj/bmpc_dlomix/datasets/hf_cache
+      hf_home:
+        distribution: categorical
+        values:
+          - /cmnfs/proj/bmpc_dlomix/datasets
+      name:
+        distribution: categorical
+        values:
+          - new_ion_types_ETD_support
+      parquet_path:
+        distribution: categorical
+        values:
+          - /cmnfs/proj/bmpc_dlomix/datasets/parquet/new_ion_types_ETD_support_edited.parquet
+      processed_path:
+        distribution: categorical
+        values:
+          - /cmnfs/proj/bmpc_dlomix/datasets/processed/new_ion_types_ETD_support_edited
+      seq_length:
+        distribution: categorical
+        values:
+          - 30
+  model:
+    parameters:
+      load_path:
+        distribution: categorical
+        values:
+          - /cmnfs/proj/bmpc_dlomix/models/baseline_models/noptm_baseline_full_bs1024_naivemods/d961f940-d142-4102-9775-c1f8b4373c91.keras
+  processing:
+    parameters:
+      cuda_device_nr:
+        distribution: categorical
+        values:
+          - "2"
+  project:
+    distribution: categorical
+    values:
+      - new_ion_types_ETD_support
+  refinement_transfer_learning:
+    parameters:
+      freeze_layers:
+        parameters:
+          is_first_layer_trainable:
+            distribution: categorical
+            values:
+              - false
+          is_last_layer_trainable:
+            distribution: categorical
+            values:
+              - true
+          release_after_epochs:
+            distribution: int_uniform
+            max: 256
+            min: 50
+  training:
+    parameters:
+      early_stopping:
+        parameters:
+          min_delta:
+            distribution: uniform
+            max: 2e-05
+            min: 5e-06
+          patience:
+            distribution: int_uniform
+            max: 20
+            min: 5
+      learning_rate:
+        distribution: uniform
+        max: 0.0002
+        min: 5e-05
+      lr_scheduler_plateau:
+        parameters:
+          cooldown:
+            distribution: int_uniform
+            max: 2
+            min: 1
+          factor:
+            distribution: uniform
+            max: 1
+            min: 0.25
+          min_delta:
+            distribution: uniform
+            max: 0.0002
+            min: 5e-05
+          patience:
+            distribution: int_uniform
+            max: 8
+            min: 2
+      lr_warmup_linear:
+        parameters:
+          end_lr:
+            distribution: uniform
+            max: 0.0002
+            min: 5e-05
+          num_epochs:
+            distribution: int_uniform
+            max: 50
+            min: 1
+          start_lr:
+            distribution: uniform
+            max: 2e-06
+            min: 5e-07
+      num_epochs:
+        distribution: int_uniform
+        max: 500
+        min: 250
+program: train.py
+
+
+
+python rl_tl_training_agent.py --config config_files/new_ion_types_ETD_support.yaml --sweep-id "mapra_dlomix/new_ion_types_ETD_support/3tj5j2te" --sweep-count 3 --cuda-device-nr 2

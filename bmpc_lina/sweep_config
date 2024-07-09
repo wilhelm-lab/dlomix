@@ -123,4 +123,4 @@ parameters:
 
 
 
-python rl_tl_training_agent.py --config config_files/noptm_baseline_small_duplicated_ions.yaml --sweep-id "mapra_dlomix/duplicated ions tl/pnv0gx3f" --sweep-count 20 --cuda-device-nr 1
+python rl_tl_training_agent.py --config config_files/new_ion_types_ETD_support.yaml --sweep-id "mapra_dlomix/new_ion_types_ETD_support/3tj5j2te" --sweep-count 3 --cuda-device-nr 2
