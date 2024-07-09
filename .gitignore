@@ -134,12 +134,14 @@ dmypy.json
 # Pyre type checker
 .pyre/
 .vscode/settings.json
+.vscode/
 
 # test notebooks are stored in /notebooks/ and named with a leading underscore
 notebooks/_*
 
 # wand outputs
 notebooks/wandb
+wandb/
 
 # output folders
 /notebooks/output*/
