@@ -20,10 +20,8 @@ source /nfs/home/students/j.poschenrieder/MaPra_Wilhelm/start_miniconda.sh
 conda activate dlomix
 
 python rl_tl_training_agent.py \
-    --config config_files/noptm_baseline_full_bs1024_unmod_extended_transfer_to_ptm.yaml \
-    --sweep-id "mapra_dlomix/refinement transfer learning/any8sciw" \
-    --sweep-count 1 \
+    --config config_files/noptm_baseline_full_bs1024_unmod_extended_replace_output.yaml \
+    --sweep-id "mapra_dlomix/refinement transfer learning/qmbac20j" \
+    --sweep-count 2 \
     --cuda-device-nr 0 \
     --cpu-threads 16
-
-

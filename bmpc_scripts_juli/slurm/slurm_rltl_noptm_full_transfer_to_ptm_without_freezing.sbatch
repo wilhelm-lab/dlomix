@@ -19,10 +19,8 @@ cd /nfs/home/students/j.poschenrieder/MaPra_Wilhelm/dlomix2/bmpc_shared_scripts/
 source /nfs/home/students/j.poschenrieder/MaPra_Wilhelm/start_miniconda.sh
 conda activate dlomix
 
-python rl_tl_training_agent.py \
-    --config config_files/noptm_baseline_full_bs1024_unmod_extended_transfer_to_ptm.yaml \
-    --sweep-id "mapra_dlomix/refinement transfer learning/any8sciw" \
-    --sweep-count 1 \
+python rl_tl_training.py \
+    --config config_files/noptm_baseline_full_bs1024_unmod_extended_transfer_to_ptm_without_freezing.yaml \
     --cuda-device-nr 0 \
     --cpu-threads 16
 
