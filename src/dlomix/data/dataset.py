@@ -104,7 +104,7 @@ class PeptideDataset:
         Create a PeptideDataset object from a DatasetConfig object.
     """
 
-    DEFAULT_SPLIT_NAMES = ["train", "val", "test"]
+    DEFAULT_SPLIT_NAMES = ["train", "val", "test", "inference"]
     CONFIG_JSON_NAME = "dlomix_peptide_dataset_config.json"
 
     def __init__(
@@ -134,6 +134,7 @@ class PeptideDataset:
         auto_cleanup_cache: bool = True,
         num_proc: Optional[int] = None,
         batch_processing_size: Optional[int] = 1000,
+        inference_only: Optional[bool] = False
     ):
         super(PeptideDataset, self).__init__()
         self.data_source = data_source
@@ -151,6 +152,9 @@ class PeptideDataset:
         self.dataset_type = dataset_type
         self.batch_size = batch_size
         self.model_features = model_features
+        self.inference_only = inference_only
+        if inference_only:
+            self.label_column = None
 
         # to be kept in the hf dataset, but not returned in the tensor dataset
         if dataset_columns_to_keep is None:
@@ -241,6 +245,7 @@ class PeptideDataset:
             alphabet=self.alphabet,
             encoding_scheme=self.encoding_scheme,
             processed=self.processed,
+            inference_only=self.inference_only
         )
 
         self._config._additional_data.update(
@@ -354,7 +359,17 @@ class PeptideDataset:
             )
 
     def _remove_unnecessary_columns(self):
-        self._relevant_columns = [self.sequence_column, self.label_column]
+        # if inference only dataset, no sequence column necessary
+        if self.inference_only:
+            warnings.warn(
+                """
+                This is a inference only dataset! You can only make predictions with this dataset! Attempting to
+                train a model with this dataset will result in an error!
+                """
+            )
+            self._relevant_columns = [self.sequence_column]
+        else:
+            self._relevant_columns = [self.sequence_column, self.label_column]
 
         if self.model_features is not None:
             self._relevant_columns.extend(self.model_features)
@@ -368,6 +383,12 @@ class PeptideDataset:
 
     def _split_dataset(self):
         if self._is_predefined_split or self._test_set_only:
+            return
+        
+        if self.inference_only:
+            # if inference only dataset -> only keep the inference dataset and remove the train set
+            self.hf_dataset["inference"] = self.hf_dataset[PeptideDataset.DEFAULT_SPLIT_NAMES[0]]
+            self.hf_dataset.pop(PeptideDataset.DEFAULT_SPLIT_NAMES[0])
             return
 
         # only a train dataset or a train and a test but no val -> split train into train/val
@@ -633,6 +654,7 @@ If you prefer to encode the (amino-acids)+PTM combinations as tokens in the voca
             alphabet=config.alphabet,
             encoding_scheme=config.encoding_scheme,
             processed=config.processed,
+            inference_only=config.inference_only,
         )
 
         for k, v in config._additional_data.items():
@@ -667,7 +689,10 @@ If you prefer to encode the (amino-acids)+PTM combinations as tokens in the voca
         input_tensor_columns = self._relevant_columns.copy()
 
         # remove the label column from the input tensor columns since the to_tf_dataset method has a separate label_cols argument
-        input_tensor_columns.remove(self.label_column)
+        try:
+            input_tensor_columns.remove(self.label_column)
+        except ValueError as e:
+            pass
 
         # remove the columns that are not needed in the tensor dataset
         input_tensor_columns = list(
@@ -707,6 +732,16 @@ If you prefer to encode the (amino-acids)+PTM combinations as tokens in the voca
         if self.enable_tf_dataset_cache:
             tf_dataset = tf_dataset.cache()
 
+        return tf_dataset
+    
+    @property
+    def tensor_inference_data(self):
+        """TensorFlow Dataset object for the inference data"""
+        tf_dataset = self._get_split_tf_dataset(PeptideDataset.DEFAULT_SPLIT_NAMES[3])
+
+        if self.enable_tf_dataset_cache:
+            tf_dataset = tf_dataset.cache()
+        
         return tf_dataset
 
     def _get_split_tf_dataset(self, split_name: str):

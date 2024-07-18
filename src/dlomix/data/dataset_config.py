@@ -32,6 +32,7 @@ class DatasetConfig:
     processed: bool
     _additional_data: dict = field(default_factory=dict)
     test_ratio: Optional[float] = 0
+    inference_only: Optional[bool] = False
 
     def save_config_json(self, path: str):
         """
