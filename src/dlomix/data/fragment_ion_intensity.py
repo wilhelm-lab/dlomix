@@ -44,7 +44,7 @@ class FragmentIonIntensityDataset(PeptideDataset):
         sequence_column: str = "modified_sequence",
         label_column: str = "intensities_raw",
         val_ratio: float = 0.2,
-        test_ratio: float = 0.1,
+        test_ratio: float = 0.0,
         max_seq_len: Union[int, str] = 30,
         dataset_type: str = "tf",
         batch_size: int = 64,

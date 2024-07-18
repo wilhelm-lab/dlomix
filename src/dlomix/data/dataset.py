@@ -182,7 +182,7 @@ class PeptideDataset:
             self.hf_dataset: Optional[Union[Dataset, DatasetDict]] = None
             self._empty_dataset_mode = False
             self._is_predefined_split = False
-            self._is_predefine_test_split = False
+            self._is_predefined_test_split = False
             self._test_set_only = False
             self._num_proc = num_proc
             self._set_num_proc()
@@ -342,13 +342,15 @@ class PeptideDataset:
                 self._test_set_only = True
             if self.val_data_source is not None:
                 self._is_predefined_split = True
+            if self.test_ratio == 0.0 or self.test_ratio is None:
+                self._is_predefined_test_split = True
 
         # two or more data sources provided -> no splitting in all cases
         if count_loaded_data_sources >= 2:
             if self.val_data_source is not None:
                 self._is_predefined_split = True
             if self.test_data_source is not None:
-                self._is_predefine_test_split = True
+                self._is_predefined_test_split = True
 
         if self._is_predefined_split:
             warnings.warn(
@@ -360,7 +362,7 @@ class PeptideDataset:
 
     def _remove_unnecessary_columns(self):
         # if inference only dataset, no sequence column necessary
-        if self.inference_only:
+        if self.ƒly:
             warnings.warn(
                 """
                 This is a inference only dataset! You can only make predictions with this dataset! Attempting to
@@ -400,7 +402,7 @@ class PeptideDataset:
         self.hf_dataset["val"] = splitted_dataset["test"]
 
         # if test set is not specified -> split train set into test set and remaining train set
-        if self._is_predefine_test_split:
+        if self._is_predefined_test_split:
             del splitted_dataset["train"]
             del splitted_dataset["test"]
             del splitted_dataset
