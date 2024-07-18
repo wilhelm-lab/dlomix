@@ -4,9 +4,8 @@ import zipfile
 from os import makedirs
 from os.path import exists, join
 
-import numpy as np
-import pandas as pd
 import pytest
+from datasets import load_dataset
 
 from dlomix.data import FragmentIonIntensityDataset, RetentionTimeDataset
 
@@ -14,9 +13,9 @@ logger = logging.getLogger(__name__)
 
 RT_PARQUET_EXAMPLE_URL = "https://zenodo.org/record/6602020/files/TUM_missing_first_meta_data.parquet?download=1"
 RT_CSV_EXAMPLE_URL = "https://raw.githubusercontent.com/wilhelm-lab/dlomix/develop/example_dataset/proteomTools_train_val.csv"
-# INTENSITY_PARQUET_EXAMPLE_URL = "https://raw.githubusercontent.com/wilhelm-lab/dlomix/develop/example_dataset/intensity/intensity_data.parquet"
-INTENSITY_PARQUET_EXAMPLE_URL = "https://raw.githubusercontent.com/wilhelm-lab/dlomix/feature/migrate-to-huggingface-datasets/example_dataset/intensity/intensity_data.parquet"
+INTENSITY_PARQUET_EXAMPLE_URL = "https://raw.githubusercontent.com/wilhelm-lab/dlomix/develop/example_dataset/intensity/intensity_data.parquet"
 INTENSITY_CSV_EXAMPLE_URL = "https://raw.githubusercontent.com/wilhelm-lab/dlomix/develop/example_dataset/intensity/intensity_data.csv"
+RT_HUB_DATASET_NAME = "Wilhelmlab/prospect-ptms-irt"
 
 TEST_ASSETS_TO_DOWNLOAD = [
     RT_PARQUET_EXAMPLE_URL,
@@ -84,6 +83,49 @@ def test_parquet_rtdataset():
     )
     assert rtdataset[RetentionTimeDataset.DEFAULT_SPLIT_NAMES[0]].num_rows > 0
     assert rtdataset[RetentionTimeDataset.DEFAULT_SPLIT_NAMES[1]].num_rows > 0
+
+
+def test_rtdataset_inmemory():
+    hf_dataset = load_dataset(
+        "parquet", data_files=join(DOWNLOAD_PATH_FOR_ASSETS, "file_1.parquet")
+    )
+
+    rtdataset = RetentionTimeDataset(
+        data_source=hf_dataset,
+        data_format="hf",
+        sequence_column="modified_sequence",
+        label_column="indexed_retention_time",
+    )
+    assert rtdataset.hf_dataset is not None
+    assert rtdataset._empty_dataset_mode is False
+    assert RetentionTimeDataset.DEFAULT_SPLIT_NAMES[0] in list(
+        rtdataset.hf_dataset.keys()
+    )
+
+    assert rtdataset[RetentionTimeDataset.DEFAULT_SPLIT_NAMES[0]].num_rows > 0
+
+
+def test_rtdataset_hub():
+    rtdataset = RetentionTimeDataset(
+        data_source=RT_HUB_DATASET_NAME,
+        data_format="hub",
+        sequence_column="modified_sequence",
+        label_column="indexed_retention_time",
+    )
+    assert rtdataset.hf_dataset is not None
+    assert rtdataset._empty_dataset_mode is False
+    assert RetentionTimeDataset.DEFAULT_SPLIT_NAMES[0] in list(
+        rtdataset.hf_dataset.keys()
+    )
+    assert RetentionTimeDataset.DEFAULT_SPLIT_NAMES[1] in list(
+        rtdataset.hf_dataset.keys()
+    )
+    assert RetentionTimeDataset.DEFAULT_SPLIT_NAMES[2] in list(
+        rtdataset.hf_dataset.keys()
+    )
+    assert rtdataset[RetentionTimeDataset.DEFAULT_SPLIT_NAMES[0]].num_rows > 0
+    assert rtdataset[RetentionTimeDataset.DEFAULT_SPLIT_NAMES[1]].num_rows > 0
+    assert rtdataset[RetentionTimeDataset.DEFAULT_SPLIT_NAMES[2]].num_rows > 0
 
 
 def test_csv_rtdataset():

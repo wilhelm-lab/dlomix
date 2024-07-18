@@ -26,6 +26,7 @@ class RetentionTimeDataset(PeptideDataset):
         pad (bool): Whether to pad sequences to the maximum length. Defaults to True.
         padding_value (int): The value to use for padding sequences. Defaults to 0.
         alphabet (Dict): The alphabet used for encoding sequences. Defaults to ALPHABET_UNMOD.
+        with_termini (bool): Whether to add the N- and C-termini in the sequence column, even if they do not exist. Defaults to True.
         encoding_scheme (Union[str, EncodingScheme]): The encoding scheme to use for sequences. Defaults to EncodingScheme.UNMOD.
         processed (bool): Whether the dataset has been preprocessed. Defaults to False.
         enable_tf_dataset_cache (bool): Flag to indicate whether to enable TensorFlow Dataset caching (call `.cahce()` on the generate TF Datasets).
@@ -50,6 +51,7 @@ class RetentionTimeDataset(PeptideDataset):
         pad: bool = True,
         padding_value: int = 0,
         alphabet: Dict = ALPHABET_UNMOD,
+        with_termini: bool = True,
         encoding_scheme: Union[str, EncodingScheme] = EncodingScheme.UNMOD,
         processed: bool = False,
         enable_tf_dataset_cache: bool = False,
@@ -75,6 +77,7 @@ class RetentionTimeDataset(PeptideDataset):
             pad,
             padding_value,
             alphabet,
+            with_termini,
             encoding_scheme,
             processed,
             enable_tf_dataset_cache,

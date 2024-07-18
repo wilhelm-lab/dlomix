@@ -43,7 +43,7 @@ class PeptideDataset:
     test_data_source : Union[str, List]
         Path to the test data source file or list of paths to the test data source files.
     data_format : str
-        Format of the data source file(s). Example formats are 'csv', 'json', 'parquet', etc.
+        Format of the data source file(s). Example formats are 'csv', 'json', 'parquet', etc. Use 'hub' for datasets from the Hugging Face Hub and 'hf' for in-memory HF Dataset/DatasetDict objects.
     sequence_column : str
         Name of the column in the data source file that contains the peptide sequences.
     label_column : str
@@ -68,6 +68,8 @@ class PeptideDataset:
         Value to use for padding the sequences.
     alphabet : Dict
         Alphabet to use for encoding the amino acids in the sequences.
+    with_termini : bool
+        Flag to indicate whether to include the N- and C-termini []- and -[] in the sequences.
     encoding_scheme : Union[str, EncodingScheme]
         Encoding scheme to use for encoding the sequences. Possible values are "unmod" and "naive-mods" for unmodified sequences and sequences with PTMs respectively.
     processed : bool
@@ -121,6 +123,7 @@ class PeptideDataset:
         pad: bool = True,
         padding_value: int = 0,
         alphabet: Dict = ALPHABET_UNMOD,
+        with_termini: bool = True,
         encoding_scheme: Union[str, EncodingScheme] = EncodingScheme.UNMOD,
         processed: bool = False,
         enable_tf_dataset_cache: bool = False,
@@ -155,6 +158,7 @@ class PeptideDataset:
         self.pad = pad
         self.padding_value = padding_value
         self.alphabet = alphabet
+        self.with_termini = with_termini
         self.encoding_scheme = EncodingScheme(encoding_scheme)
         self.processed = processed
         self.enable_tf_dataset_cache = enable_tf_dataset_cache
@@ -244,6 +248,14 @@ class PeptideDataset:
         self._config._additional_data.update({"cls": self.__class__.__name__})
 
     def _load_dataset(self):
+        if self.data_format == "hub":
+            self._load_from_hub()
+            return
+
+        if self.data_format == "hf":
+            self._load_from_inmemory_hf_dataset()
+            return
+
         data_sources = [self.data_source, self.val_data_source, self.test_data_source]
 
         for split_name, source in zip(PeptideDataset.DEFAULT_SPLIT_NAMES, data_sources):
@@ -255,12 +267,59 @@ class PeptideDataset:
             warnings.warn(
                 "No data files provided, please provide at least one data source if you plan to use this dataset directly. Otherwise, you can later load data into this empty dataset"
             )
-
         else:
             self._empty_dataset_mode = False
 
             self.hf_dataset = load_dataset(
                 self.data_format, data_files=self._data_files_available_splits
+            )
+
+    def _load_from_hub(self):
+        self.hf_dataset = load_dataset(self.data_source)
+        self._empty_dataset_mode = False
+        warnings.warn(
+            'The provided data is assumed to be hosted on the Hugging Face Hub since data_format is set to "hub". Validation and test data sources will be ignored.'
+        )
+        if isinstance(self.hf_dataset, DatasetDict):
+            for split in self.hf_dataset.keys():
+                if split not in PeptideDataset.DEFAULT_SPLIT_NAMES:
+                    raise ValueError(
+                        f"The split name {split} is not a valid split name. Please use one of the default split names: {PeptideDataset.DEFAULT_SPLIT_NAMES}."
+                    )
+            self._data_files_available_splits = {
+                split: f"HF hub dataset - {self.data_source} - {split}"
+                for split in self.hf_dataset
+            }
+
+        else:
+            self._data_files_available_splits = {
+                PeptideDataset.DEFAULT_SPLIT_NAMES[
+                    0
+                ]: f"HF hub dataset - {self.data_source}"
+            }
+
+    def _load_from_inmemory_hf_dataset(self):
+        self._empty_dataset_mode = False
+        warnings.warn(
+            f'The provided data is assumed to be an in-memory Hugging Face Dataset or DatasetDict object since data_format is set to "hf". Validation and test data sources will be ignored and the split names of the DatasetDict has to follow the default namings {PeptideDataset.DEFAULT_SPLIT_NAMES}.'
+        )
+
+        if isinstance(self.data_source, DatasetDict):
+            self.hf_dataset = self.data_source
+            self._data_files_available_splits = dict.fromkeys(self.hf_dataset)
+            self._data_files_available_splits = {
+                split: f"in-memory Dataset object - {split}"
+                for split in self.hf_dataset
+            }
+        elif isinstance(self.data_source, Dataset):
+            self.hf_dataset = DatasetDict()
+            self.hf_dataset[PeptideDataset.DEFAULT_SPLIT_NAMES[0]] = self.data_source
+            self._data_files_available_splits = {
+                PeptideDataset.DEFAULT_SPLIT_NAMES[0]: "in-memory Dataset object"
+            }
+        else:
+            raise ValueError(
+                "The provided data source is not a valid Hugging Face Dataset/DatasetDict object. The data_format value should be set to 'hf' if you plan to use an in-memory Hugging Face Dataset/DatasetDict object."
             )
 
     def _decide_on_splitting(self):
@@ -321,6 +380,7 @@ class PeptideDataset:
         sequence_parsing_processor = SequenceParsingProcessor(
             self.sequence_column,
             batched=True,
+            with_termini=self.with_termini,
         )
 
         self.dataset_columns_to_keep.extend(
