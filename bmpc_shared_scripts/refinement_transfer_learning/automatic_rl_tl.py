@@ -187,7 +187,7 @@ class AutomaticRlTlTraining:
 
         # check whether number of ions matches
         model_ions = self.model.len_fion
-        dataset_ions = self.dataset
+        dataset_ions = self.dataset.???
 
         # TODO: check if number of ions matches
 
