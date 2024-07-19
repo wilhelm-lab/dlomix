@@ -127,7 +127,8 @@ def process_dataset(
         test_ratio=test_ratio,
         alphabet=new_alphabet,
         encoding_scheme='naive-mods',
-        model_features=['precursor_charge_onehot', 'collision_energy_aligned_normed', 'method_nbr']
+        model_features=['precursor_charge_onehot', 'collision_energy_aligned_normed', 'method_nbr'],
+        ion_types=ion_types,
     )
 
     print(f'The available data splits are: {", ".join(list(dataset.hf_dataset.keys()))}')
