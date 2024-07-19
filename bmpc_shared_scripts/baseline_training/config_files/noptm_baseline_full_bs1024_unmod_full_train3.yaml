@@ -1,0 +1,22 @@
+dataset:
+  name: noptm_baseline_full_bs1024_unmod
+  hf_home: /cmnfs/proj/bmpc_dlomix/datasets
+  hf_cache: /cmnfs/proj/bmpc_dlomix/datasets/hf_cache
+  parquet_path: /cmnfs/data/proteomics/Prosit_unmod/intensity/no_aug
+  processed_path: /cmnfs/proj/bmpc_dlomix/datasets/processed/noptm_baseline_full_bs1024_unmod
+  seq_length: 30
+  batch_size: 1024
+  alphabet: ALPHABET_UNMOD
+training:
+  learning_rate: 0.0001
+  num_epochs: 100
+  early_stopping:
+    min_delta: 0.00001
+    patience: 10
+  lr_scheduler_plateau:
+    cooldown: 1
+    factor: 0.5
+    min_delta: 0.0001
+    patience: 4
+model:
+  save_dir: /cmnfs/proj/bmpc_dlomix/models/baseline_models

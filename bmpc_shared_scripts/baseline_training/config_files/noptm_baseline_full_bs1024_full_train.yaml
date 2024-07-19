@@ -8,7 +8,19 @@ dataset:
   batch_size: 1024
   alphabet: PTMS_ALPHABET
 training:
-  learning_rate: 1.0e-4
-  num_epochs: 10
+  learning_rate: 0.001
+  num_epochs: 60
+  early_stopping:
+    min_delta: 0.0001
+    patience: 8
+  lr_scheduler_plateau:
+    cooldown: 1
+    factor: 0.5
+    min_delta: 0.0001
+    patience: 2
+  lr_warmup_linear:
+    num_epochs: 10
+    start_lr: 0.00001
+    end_lr: 0.001
 model:
   save_dir: /cmnfs/proj/bmpc_dlomix/models/baseline_models

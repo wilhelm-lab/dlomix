@@ -37,7 +37,7 @@ else:
 
 
 
-# load dataset -> if the dataset base path is already a parquet file, use just this file
+# load dataset
 datset_base_path = config['dataset']['parquet_path']
 
 if datset_base_path.endswith('.parquet'):
