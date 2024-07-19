@@ -1,0 +1,137 @@
+method: bayes
+metric:
+  goal: minimize
+  name: val_loss
+parameters:
+  dataset:
+    parameters:
+      batch_size:
+        distribution: categorical
+        values:
+          - 1024
+      hf_cache:
+        distribution: categorical
+        values:
+          - /cmnfs/proj/bmpc_dlomix/datasets/hf_cache
+      hf_home:
+        distribution: categorical
+        values:
+          - /cmnfs/proj/bmpc_dlomix/datasets
+      name:
+        distribution: categorical
+        values:
+          - noptm_baseline_small_duplicated_ions
+      parquet_path:
+        distribution: categorical
+        values:
+          - /cmnfs/proj/bmpc_dlomix/datasets/parquet/noptm_baseline_small_duplicated_ions
+      processed_path:
+        distribution: categorical
+        values:
+          - /cmnfs/proj/bmpc_dlomix/datasets/processed/noptm_baseline_small_duplicated_ions
+      seq_length:
+        distribution: categorical
+        values:
+          - 30
+  model:
+    parameters:
+      load_path:
+        distribution: categorical
+        values:
+          - /cmnfs/proj/bmpc_dlomix/models/baseline_models/noptm_baseline_full_bs1024_naivemods/d961f940-d142-4102-9775-c1f8b4373c91.keras
+  processing:
+    parameters:
+      cuda_device_nr:
+        distribution: categorical
+        values:
+          - "2"
+  project:
+    distribution: categorical
+    values:
+      - duplicated ions tl
+  refinement_transfer_learning:
+    parameters:
+      freeze_layers:
+        parameters:
+          is_first_layer_trainable:
+            distribution: categorical
+            values:
+              - false
+          is_last_layer_trainable:
+            distribution: categorical
+            values:
+              - true
+          release_after_epochs:
+            distribution: int_uniform
+            max: 50
+            min: 0
+      new_output_layer:
+        parameters:
+          num_ions:
+            distribution: categorical
+            values:
+              - 4
+          freeze_old_weights: 
+            distribution: categorical
+            values:
+              - true
+          release_after_epochs: 
+            distribution: int_uniform
+            max: 50
+            min: 0
+  training:
+    parameters:
+      early_stopping:
+        parameters:
+          min_delta:
+            distribution: uniform
+            max: 2e-05
+            min: 5e-06
+          patience:
+            distribution: int_uniform
+            max: 20
+            min: 5
+      learning_rate:
+        distribution: uniform
+        max: 0.0002
+        min: 5e-05
+      lr_scheduler_plateau:
+        parameters:
+          cooldown:
+            distribution: int_uniform
+            max: 2
+            min: 1
+          factor:
+            distribution: uniform
+            max: 1
+            min: 0.25
+          min_delta:
+            distribution: uniform
+            max: 0.0002
+            min: 5e-05
+          patience:
+            distribution: int_uniform
+            max: 8
+            min: 2
+      lr_warmup_linear:
+        parameters:
+          end_lr:
+            distribution: uniform
+            max: 0.0002
+            min: 5e-05
+          num_epochs:
+            distribution: int_uniform
+            max: 50
+            min: 0
+          start_lr:
+            distribution: uniform
+            max: 2e-06
+            min: 5e-07
+      num_epochs:
+        distribution: int_uniform
+        max: 201
+        min: 200
+program: train.py
+
+
+python rl_tl_training_agent.py --config config_files/noptm_baseline_small_duplicated_ions_randomized.yaml --sweep-id "mapra_dlomix/duplicated ions tl/khf1m1pb" --sweep-count 30 --cuda-device-nr 2
