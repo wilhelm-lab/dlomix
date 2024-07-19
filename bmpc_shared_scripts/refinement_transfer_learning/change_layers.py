@@ -82,9 +82,9 @@ def release_old_regressor(model: PrositIntensityPredictor):
     Args:
         model (PrositIntensityPredictor): the model where to release the regressor
     """
-    if model.regressor.get_layer('time_dense').kernel_constraint is not None:
-        model.regressor.get_layer('time_dense').kernel_constraint.freeze_weights = False
-        model.regressor.get_layer('time_dense').bias_constraint.freeze_weights = False
+    if model.regressor.get_layer('time_dense').layer.kernel_constraint is not None:
+        model.regressor.get_layer('time_dense').layer.kernel_constraint.freeze_weights = False
+        model.regressor.get_layer('time_dense').layer.bias_constraint.freeze_weights = False
 
 
 @keras.saving.register_keras_serializable()
