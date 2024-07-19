@@ -69,7 +69,13 @@ class TrainingInstanceConfig:
     learning_rate : float
     num_epochs : int
     
-    early_stopping
+    freeze_inner_layers : bool
+    freeze_whole_embedding_layer : bool
+    freeze_whole_regressor_layer : bool
+    freeze_old_embedding_weights : bool
+    freeze_old_regressor_weights : bool
+
+    # TODO early_stopping
 
 class AutomaticRlTlTraining:
     config : AutomaticRlTlTrainingConfig
@@ -198,6 +204,7 @@ class AutomaticRlTlTraining:
                 dataset_alphabet,
                 freeze_old_embeds=self.can_reuse_old_embedding_weights
             )
+            self.model.alphabet = dataset_alphabet
 
     def _update_model_outputs(self):
         # check that sequence length matches
@@ -232,6 +239,7 @@ class AutomaticRlTlTraining:
                 len(dataset_ions),
                 freeze_old_output=self.can_reuse_old_regressor_weights
             )
+            self.model.ion_types = dataset_ions
 
     def run(self):
 
@@ -257,49 +265,40 @@ class AutomaticRlTlTrainingInstance:
 
     instance_config : TrainingInstanceConfig
     current_epoch_offset : int
+    wandb_logging : bool
 
 
-    def __init__(self, instance_config : TrainingInstanceConfig, current_epoch_offset : int):
+    def __init__(self, instance_config : TrainingInstanceConfig, current_epoch_offset : int, wandb_logging : bool):
         self.instance_config = instance_config
         self.current_epoch_offset = current_epoch_offset
+        self.wandb_logging = wandb_logging
 
     def configure_training(self):
-        # initialize relevant stuff for training
-        self.total_epochs = wandb.config['training']['num_epochs']
-        self.recompile_callbacks = [RecompileCallback(
-            epoch=self.total_epochs,
-            callback=lambda *args: None
-        )]
 
-        # refinement/transfer learning configuration
-        rl_config = wandb.config['refinement_transfer_learning']
-        if rl_config is None:
-            rl_config = {}
-
-        # optionally: replacing of input/output layers
-        if 'new_output_layer' in rl_config:
-            change_layers.change_output_layer(self.model, rl_config['new_output_layer']['num_ions'])
-        if 'new_input_layer' in rl_config:
-            new_alphabet = self.get_alphabet(rl_config['new_input_layer']['new_alphabet'])
-            change_layers.change_input_layer(
-                self.model,
-                new_alphabet,
-                rl_config['new_input_layer']['freeze_old_weights']
-            )
-
-            if rl_config['new_input_layer']['freeze_old_weights']:
+        # freezing of old embedding weights
+        if self.instance_config.freeze_old_embedding_weights:
+            if self.wandb_logging:
                 wandb.log({'freeze_old_embedding_weights': 1})
-
-                def release_callback():
-                    change_layers.release_old_embeddings(self.model)
-                    wandb.log({'freeze_old_embedding_weights': 0})
-
-                self.recompile_callbacks.append(RecompileCallback(
-                    epoch=rl_config['new_input_layer']['release_after_epochs'],
-                    callback=release_callback
-                ))
-
+            change_layers.freeze_old_embeddings(self.model)
+        else:
+            if self.wandb_logging:
+                wandb.log({'freeze_old_embedding_weights': 0})
+            change_layers.release_old_embeddings(self.model)
         
+        # freezing of old regressor weights
+        if self.instance_config.freeze_old_regressor_weights:
+            if self.wandb_logging:
+                wandb.log({'freeze_old_regressor_weights': 1})
+            change_layers.freeze_old_regressor(self.model)
+        else:
+            if self.wandb_logging:
+                wandb.log({'freeze_old_regressor_weights': 0})
+            change_layers.release_old_regressor(self.model)
+
+
+        # freezing of inner layers
+        # TODO 
+
         # optionally: freeze layers during training
         if 'freeze_layers' in rl_config:
             if 'activate' not in rl_config['freeze_layers'] or rl_config['freeze_layers']['activate']:
