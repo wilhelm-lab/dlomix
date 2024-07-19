@@ -41,7 +41,8 @@ class Dataset:
 class AutomaticRlTlTrainingConfig:
     # dataset/model parameters
     dataset : Dataset
-    model_path : Optional[str] = None
+    input_model_path : Optional[str] = None
+    output_model_path : str
 
     # wandb parameters
     use_wandb : bool = False
@@ -63,6 +64,12 @@ class AutomaticRlTlTrainingConfig:
         """
         return asdict(self)
 
+@dataclass
+class TrainingInstanceConfig:
+    learning_rate : float
+    num_epochs : int
+    
+    early_stopping
 
 class AutomaticRlTlTraining:
     config : AutomaticRlTlTrainingConfig
@@ -199,12 +206,12 @@ class AutomaticRlTlTraining:
 
         # check whether number of ions matches
         model_ions = ['y', 'b']
-        if hasattr(self.model, 'ion_list'):
-            model_ions = self.model.ion_list 
+        if hasattr(self.model, 'ion_types') and self.model.ion_types is not None:
+            model_ions = self.model.ion_types 
 
         dataset_ions = ['y', 'b']
-        if hasattr(self.dataset, 'ion_list'):
-            dataset_ions = self.dataset.ion_list 
+        if hasattr(self.dataset, 'ion_types') and self.dataset.ion_types is not None:
+            dataset_ions = self.dataset.ion_types 
 
         if model_ions == dataset_ions:
             print('[regressor layer]  matching ion types')
@@ -223,20 +230,37 @@ class AutomaticRlTlTraining:
             change_layers.change_output_layer(
                 self.model,
                 len(dataset_ions),
-                freeze_old_embeds=self.can_reuse_old_embedding_weights
+                freeze_old_output=self.can_reuse_old_regressor_weights
             )
 
-    def _configure_training(self):
+    def run(self):
+
+        training_hierachy = [
+
+        ]
+
+        for instance_config in training_hierachy:
+            training = AutomaticRlTlTrainingInstance(instance_config, self.current_epoch_offset)
+            training.run()
+
+            self.current_epoch_offset = training.current_epoch_offset
+
+        self._save_model()
+
+    def _save_model(self):
+        print(f'saving the model to {self.config.output_model_path}')
+        self.model.save(self.config.output_model_path)
+
 
 
 class AutomaticRlTlTrainingInstance:
 
-    config : AutomaticRlTlTrainingConfig
+    instance_config : TrainingInstanceConfig
     current_epoch_offset : int
 
 
-    def __init__(self, config : AutomaticRlTlTrainingConfig, current_epoch_offset : int):
-        self.config = config
+    def __init__(self, instance_config : TrainingInstanceConfig, current_epoch_offset : int):
+        self.instance_config = instance_config
         self.current_epoch_offset = current_epoch_offset
 
     def configure_training(self):
@@ -378,22 +402,7 @@ class AutomaticRlTlTrainingInstance:
             current_learning_rate = self.model.optimizer._learning_rate.numpy()
             self.current_epoch_offset += training_part.num_epochs
 
-    def save_model(self):
 
-        out_path = None
-        if 'save_dir' in wandb.config['model']:
-            out_path = f"{wandb.config['model']['save_dir']}/{wandb.config['dataset']['name']}/{wandb.config['run_id']}.keras"
-        if 'save_path' in wandb.config['model']:
-            out_path = wandb.config['model']['save_path']
-
-        if out_path is not None:
-            dir = os.path.dirname(out_path)
-            if not os.path.exists(dir):
-                os.makedirs(dir)
-            
-            print(f'saving the model to {out_path}')
-            self.model.save(out_path)
-            # self.model.save('test.keras')
 
     def __call__(self):
         # setting up training
@@ -409,4 +418,3 @@ class AutomaticRlTlTrainingInstance:
         self.save_model()
         wandb.finish()
 
-    """
