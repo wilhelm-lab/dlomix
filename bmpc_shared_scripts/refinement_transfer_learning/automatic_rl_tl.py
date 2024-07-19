@@ -71,9 +71,11 @@ class AutomaticRlTlTraining:
     model : PrositIntensityPredictor
     is_new_model : bool = False
 
-    requires_new_embedding_layer : bool = False
-    can_reuse_old_embedding_weights : bool = True
-
+    requires_new_embedding_layer : bool
+    can_reuse_old_embedding_weights : bool
+    requires_new_regressor_layer : bool
+    can_reuse_old_regressor_weights : bool
+    
     current_epoch_offset : int = 0
 
     def __init__(self, config : AutomaticRlTlTrainingConfig):
@@ -83,6 +85,8 @@ class AutomaticRlTlTraining:
         self._init_tensorflow()
         self._load_dataset()
         self._init_model()
+        self._update_model_inputs()
+        self._update_model_outputs()
     
     def _init_wandb(self):
         """ Initializes Weights & Biases Logging if the user requested that in the config.
@@ -169,6 +173,7 @@ class AutomaticRlTlTraining:
 
         if model_alphabet == dataset_alphabet:
             print('[embedding layer]  model and dataset modifications match')
+            self.requires_new_embedding_layer = False
         else:
             print('[embedding layer]  model and dataset modifications do not match')
             self.requires_new_embedding_layer = True
@@ -176,9 +181,16 @@ class AutomaticRlTlTraining:
             including_entries = [model_val == dataset_alphabet[key] for key, model_val in model_alphabet.items()]
             if all(including_entries):
                 print('[embedding layer]  can reuse old embedding weights')
+                self.can_reuse_old_embedding_weights = True
             else:
                 print('[embedding layer]  old embedding weights cannot be reused (mismatch in the mapping)')
                 self.can_reuse_old_embedding_weights = False
+
+            change_layers.change_input_layer(
+                self.model,
+                dataset_alphabet,
+                freeze_old_embeds=self.can_reuse_old_embedding_weights
+            )
 
     def _update_model_outputs(self):
         # check that sequence length matches
@@ -186,10 +198,35 @@ class AutomaticRlTlTraining:
             raise RuntimeError(f"Max. sequence length does not match between dataset and model (dataset: {self.dataset.max_seq_len}, model: {self.model.seq_len})")
 
         # check whether number of ions matches
-        model_ions = self.model.len_fion
-        dataset_ions = self.dataset.???
+        model_ions = ['y', 'b']
+        if hasattr(self.model, 'ion_list'):
+            model_ions = self.model.ion_list 
 
-        # TODO: check if number of ions matches
+        dataset_ions = ['y', 'b']
+        if hasattr(self.dataset, 'ion_list'):
+            dataset_ions = self.dataset.ion_list 
+
+        if model_ions == dataset_ions:
+            print('[regressor layer]  matching ion types')
+            self.requires_new_regressor_layer = True
+        else:
+            print('[regressor layer]  ion types not matching')
+            self.requires_new_regressor_layer = False
+
+            if len(model_ions) <= len(dataset_ions) and all([m == d for m, d in zip(model_ions, dataset_ions)]):
+                print('[regressor layer]  can reuse existing regressor weights')
+                self.can_reuse_old_regressor_weights = True
+            else:
+                print('[regressor layer]  old regressor weights cannot be reused (mismatch in the ion ordering / num. ions)')
+                self.can_reuse_old_regressor_weights = False
+            
+            change_layers.change_output_layer(
+                self.model,
+                len(dataset_ions),
+                freeze_old_embeds=self.can_reuse_old_embedding_weights
+            )
+
+    def _configure_training(self):
 
 
 class AutomaticRlTlTrainingInstance:
@@ -202,7 +239,6 @@ class AutomaticRlTlTrainingInstance:
         self.config = config
         self.current_epoch_offset = current_epoch_offset
 
-    """
     def configure_training(self):
         # initialize relevant stuff for training
         self.total_epochs = wandb.config['training']['num_epochs']
