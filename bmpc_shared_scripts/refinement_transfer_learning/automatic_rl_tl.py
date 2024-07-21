@@ -75,7 +75,25 @@ class TrainingInstanceConfig:
     freeze_old_embedding_weights : bool
     freeze_old_regressor_weights : bool
 
-    # TODO early_stopping
+    plateau_early_stopping : bool
+    plateau_early_stopping_patience : int
+    plateau_early_stopping_min_delta : float
+
+    inflection_early_stopping : bool
+    # TODO 
+    inflection_early_stopping_
+
+    lr_scheduler_plateau : bool
+    lr_scheduler_plateau_factor : float
+    lr_scheduler_plateau_min_delta : float
+    lr_scheduler_plateau_patience : int
+    lr_scheduler_plateau_cooldown : int
+
+    lr_warmup : bool
+    # lr_warmup_type : str = 'linear'
+    lr_warmup_num_epochs : int
+    lr_warmup_start_lr : float
+
 
 class AutomaticRlTlTraining:
     config : AutomaticRlTlTrainingConfig
@@ -90,6 +108,7 @@ class AutomaticRlTlTraining:
     can_reuse_old_regressor_weights : bool
     
     current_epoch_offset : int = 0
+    callbacks : list = []
 
     def __init__(self, config : AutomaticRlTlTrainingConfig):
         self.config = config
@@ -100,6 +119,7 @@ class AutomaticRlTlTraining:
         self._init_model()
         self._update_model_inputs()
         self._update_model_outputs()
+        self._init_training()
     
     def _init_wandb(self):
         """ Initializes Weights & Biases Logging if the user requested that in the config.
@@ -241,6 +261,20 @@ class AutomaticRlTlTraining:
             )
             self.model.ion_types = dataset_ions
 
+   
+    def _init_training(self):
+        if self.config.use_wandb:
+            class LearningRateReporter(tf.keras.callbacks.Callback):
+                def on_train_batch_end(self, batch, *args):
+                    wandb.log({'learning_rate': self.model.optimizer._learning_rate.numpy()})
+
+            class RealEpochReporter(tf.keras.callbacks.Callback):
+                def on_epoch_begin(self_inner, epoch, *args):
+                    wandb.log({'epoch_total': epoch + self.current_epoch_offset})
+
+            self.callbacks = [WandbCallback(save_model=False, log_batch_frequency=True, verbose=1), LearningRateReporter(), RealEpochReporter()]
+
+
     def run(self):
 
         training_hierachy = [
@@ -248,12 +282,16 @@ class AutomaticRlTlTraining:
         ]
 
         for instance_config in training_hierachy:
-            training = AutomaticRlTlTrainingInstance(instance_config, self.current_epoch_offset)
+            training = AutomaticRlTlTrainingInstance(instance_config, self.current_epoch_offset, self.config.use_wandb, self.callbacks)
             training.run()
 
             self.current_epoch_offset = training.current_epoch_offset
 
         self._save_model()
+
+        if self.config.use_wandb:
+            wandb.finish()
+
 
     def _save_model(self):
         print(f'saving the model to {self.config.output_model_path}')
@@ -266,14 +304,22 @@ class AutomaticRlTlTrainingInstance:
     instance_config : TrainingInstanceConfig
     current_epoch_offset : int
     wandb_logging : bool
+    callbacks : list
+
+    stopped_early : bool
+    final_learning_rate : float
 
 
-    def __init__(self, instance_config : TrainingInstanceConfig, current_epoch_offset : int, wandb_logging : bool):
+    def __init__(self, instance_config : TrainingInstanceConfig, current_epoch_offset : int, wandb_logging : bool, callbacks : list):
         self.instance_config = instance_config
         self.current_epoch_offset = current_epoch_offset
         self.wandb_logging = wandb_logging
+        self.callbacks = callbacks.copy()
 
-    def configure_training(self):
+        self._configure_training()
+
+
+    def _configure_training(self):
 
         # freezing of old embedding weights
         if self.instance_config.freeze_old_embedding_weights:
@@ -297,71 +343,76 @@ class AutomaticRlTlTrainingInstance:
 
 
         # freezing of inner layers
-        # TODO 
+        if self.instance_config.freeze_inner_layers:
+            freezing.freeze_model(
+                self.model, 
+                self.instance_config.freeze_whole_embedding_layer,
+                self.instance_config.freeze_whole_regressor_layer
+            )
 
-        # optionally: freeze layers during training
-        if 'freeze_layers' in rl_config:
-            if 'activate' not in rl_config['freeze_layers'] or rl_config['freeze_layers']['activate']:
-                print('freezing active')
-                freezing.freeze_model(
-                    self.model, 
-                    rl_config['freeze_layers']['is_first_layer_trainable'],
-                    rl_config['freeze_layers']['is_last_layer_trainable']
-                )
-                wandb.log({'freeze_layers': 1})
+            if self.wandb_logging:
+                wandb.log({
+                    'freeze_layers': 1,
+                    'freeze_embedding_layer': 1 if self.instance_config.freeze_whole_embedding_layer else 0,
+                    'freeze_regressor_layer': 1 if self.instance_config.freeze_whole_regressor_layer else 0
+                })
+        else:
+            if self.instance_config.freeze_whole_embedding_layer:
+                raise RuntimeError('Cannot freeze whole embedding layer without freezing inner part of the model.')
+            if self.instance_config.freeze_whole_regressor_layer:
+                raise RuntimeError('Cannot freeze whole regressor layer without freezing inner part of the model.')
+            
+            freezing.release_model(self.model)
 
-                def release_callback():
-                    freezing.release_model(self.model)
-                    wandb.log({'freeze_layers': 0})
-
-                self.recompile_callbacks.append(RecompileCallback(
-                    epoch=rl_config['freeze_layers']['release_after_epochs'],
-                    callback=release_callback
-                ))
+            if self.wandb_logging:
+                wandb.log({
+                    'freeze_layers': 0,
+                    'freeze_embedding_layer': 0,
+                    'freeze_regressor_layer': 0    
+                })
 
 
-        class LearningRateReporter(tf.keras.callbacks.Callback):
-            def on_train_batch_end(self, batch, *args):
-                wandb.log({'learning_rate': self.model.optimizer._learning_rate.numpy()})
-
-        class RealEpochReporter(tf.keras.callbacks.Callback):
-            def on_epoch_begin(self_inner, epoch, *args):
-                wandb.log({'epoch_total': epoch + self.current_epoch_offset})
-
-        self.callbacks = [WandbCallback(save_model=False, log_batch_frequency=True, verbose=1), LearningRateReporter(), RealEpochReporter()]
-
-        if 'early_stopping' in wandb.config['training']:
-            print("using early stopping")
+        if self.instance_config.plateau_early_stopping:
             early_stopping = EarlyStopping(
                 monitor="val_loss",
-                min_delta=wandb.config['training']['early_stopping']['min_delta'],
-                patience=wandb.config['training']['early_stopping']['patience'],
+                min_delta=self.instance_config.plateau_early_stopping_min_delta,
+                patience=self.instance_config.plateau_early_stopping_patience,
                 restore_best_weights=True)
 
             self.callbacks.append(early_stopping)
 
-        if 'lr_scheduler_plateau' in wandb.config['training']:
-            print("using lr scheduler plateau")
-            # Reduce LR on Plateau Callback
+
+        if self.instance_config.inflection_early_stopping:
+            class InflectionPointEarlyStopping(tf.keras.callbacks.Callback):
+                min_delta : float
+
+                def __init__(self, min_delta : float, *args, **kwargs):
+                    super().__init__(*args, **kwargs)
+                    self.min_delta = min_delta
+
+
+                def on_train_batch_end(self, batch, *args):
+                    # TODO: implement                    
+
+
+        if self.instance_config.lr_scheduler_plateau:
             reduce_lr = ReduceLROnPlateau(
                 monitor="val_loss",
-                factor=wandb.config['training']['lr_scheduler_plateau']['factor'],
-                patience=wandb.config['training']['lr_scheduler_plateau']['patience'],
-                min_delta=wandb.config['training']['lr_scheduler_plateau']['min_delta'],
-                cooldown=wandb.config['training']['lr_scheduler_plateau']['cooldown']
+                factor=self.instance_config.lr_scheduler_plateau_factor,
+                patience=self.instance_config.lr_scheduler_plateau_patience,
+                min_delta=self.instance_config.lr_scheduler_plateau_min_delta,
+                cooldown=self.instance_config.lr_scheduler_plateau_cooldown
             ) 
 
             self.callbacks.append(reduce_lr)
 
-        if 'lr_warmup_linear' in wandb.config['training']:
-            print("using lr warmup linear")
-            num_epochs = wandb.config['training']['lr_warmup_linear']['num_epochs']
-            start_lr = wandb.config['training']['lr_warmup_linear']['start_lr']
-            end_lr = wandb.config['training']['lr_warmup_linear']['end_lr']
+        if self.instance_config.lr_warmup:
+            num_epochs = self.instance_config.lr_warmup_num_epochs
+            start_lr = self.instance_config.lr_warmup_start_lr
+            end_lr = self.instance_config.learning_rate
             def scheduler(epoch, lr):
                 global_epoch = epoch + self.current_epoch_offset
                 if global_epoch < num_epochs:
-                    print("warmup step")
                     factor = global_epoch / num_epochs
                     return factor * end_lr + (1-factor) * start_lr
                 else:
@@ -370,50 +421,29 @@ class AutomaticRlTlTrainingInstance:
             lr_warmup_linear = LearningRateScheduler(scheduler)
             self.callbacks.append(lr_warmup_linear)
 
-    def perform_training(self):
+
+    def run(self):
         # perform all training runs
-        current_learning_rate = wandb.config['training']['learning_rate']
-        for training_part in get_training_parts(self.recompile_callbacks, self.total_epochs):
-            # (re-)compile model
-            optimizer = tf.keras.optimizers.Adam(learning_rate=current_learning_rate)
-            self.model.compile(
-                optimizer=optimizer,
-                loss=masked_spectral_distance,
-                metrics=[masked_pearson_correlation_distance]
-            )
+        optimizer = tf.keras.optimizers.Adam(learning_rate=self.instance_config.learning_rate)
+        self.model.compile(
+            optimizer=optimizer,
+            loss=masked_spectral_distance,
+            metrics=[masked_pearson_correlation_distance]
+        )
 
-            if training_part.num_epochs > 0:
-                # train model
-                history = self.model.fit(
-                    self.dataset.tensor_train_data,
-                    validation_data=self.dataset.tensor_val_data,
-                    epochs=training_part.num_epochs,
-                    callbacks=self.callbacks
-                )
+        # train model
+        history = self.model.fit(
+            self.dataset.tensor_train_data,
+            validation_data=self.dataset.tensor_val_data,
+            epochs=self.instance_config.num_epochs,
+            callbacks=self.callbacks
+        )
 
-                if len(history.history['loss']) < training_part.num_epochs:
-                    # early stopping
-                    break
+        if len(history.history['loss']) < self.instance_config.num_epochs:
+            self.stopped_early = True
+        else:
+            self.stopped_early = False
 
-            # call callbacks
-            training_part()
-            
-            current_learning_rate = self.model.optimizer._learning_rate.numpy()
-            self.current_epoch_offset += training_part.num_epochs
-
-
-
-    def __call__(self):
-        # setting up training
-        self.init_config()
-        self.load_dataset()
-        self.initialize_model()
-        self.configure_training()
-
-        # do training
-        self.perform_training()
-        
-        # finish up
-        self.save_model()
-        wandb.finish()
+        self.final_learning_rate = self.model.optimizer._learning_rate.numpy()
+        self.current_epoch_offset += len(history.history['loss'])
 
