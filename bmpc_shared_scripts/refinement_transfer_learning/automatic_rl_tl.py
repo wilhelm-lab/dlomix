@@ -10,7 +10,8 @@ from tensorflow.keras.callbacks import EarlyStopping, ReduceLROnPlateau, Learnin
 
 import change_layers
 import freezing
-from recompile_callbacks import *
+# from recompile_callbacks import *
+from custom_callbacks import InflectionPointEarlyStopping, LearningRateWarmupPerStep
 
 from dlomix.constants import PTMS_ALPHABET, ALPHABET_NAIVE_MODS, ALPHABET_UNMOD
 from dlomix.data import load_processed_dataset, FragmentIonIntensityDataset
@@ -19,6 +20,8 @@ from dlomix.losses import masked_spectral_distance, masked_pearson_correlation_d
 
 from dataclasses import dataclass, asdict
 from typing import Optional
+import math
+
 
 class Dataset:
     is_preprocessed : bool
@@ -64,35 +67,35 @@ class AutomaticRlTlTrainingConfig:
         """
         return asdict(self)
 
+
 @dataclass
 class TrainingInstanceConfig:
     learning_rate : float
     num_epochs : int
     
-    freeze_inner_layers : bool
-    freeze_whole_embedding_layer : bool
-    freeze_whole_regressor_layer : bool
-    freeze_old_embedding_weights : bool
-    freeze_old_regressor_weights : bool
+    freeze_inner_layers : bool = False
+    freeze_whole_embedding_layer : bool = False
+    freeze_whole_regressor_layer : bool = False
+    freeze_old_embedding_weights : bool = False
+    freeze_old_regressor_weights : bool = False
 
-    plateau_early_stopping : bool
-    plateau_early_stopping_patience : int
-    plateau_early_stopping_min_delta : float
+    plateau_early_stopping : bool = False
+    plateau_early_stopping_patience : int = 0
+    plateau_early_stopping_min_delta : float = 0
 
-    inflection_early_stopping : bool
-    # TODO 
-    inflection_early_stopping_
+    inflection_early_stopping : bool = False
+    inflection_early_stopping_min_improvement : float = 0
+    inflection_early_stopping_patience : int = 0
 
-    lr_scheduler_plateau : bool
-    lr_scheduler_plateau_factor : float
-    lr_scheduler_plateau_min_delta : float
-    lr_scheduler_plateau_patience : int
-    lr_scheduler_plateau_cooldown : int
+    lr_scheduler_plateau : bool = False
+    lr_scheduler_plateau_factor : float = 0
+    lr_scheduler_plateau_min_delta : float = 0
+    lr_scheduler_plateau_patience : int = 0
+    lr_scheduler_plateau_cooldown : int = 0
 
-    lr_warmup : bool
-    # lr_warmup_type : str = 'linear'
-    lr_warmup_num_epochs : int
-    lr_warmup_start_lr : float
+    lr_warmup : bool = False
+    lr_warmup_num_steps : int = 0
+    lr_warmup_start_lr : float = 0
 
 
 class AutomaticRlTlTraining:
@@ -109,6 +112,7 @@ class AutomaticRlTlTraining:
     
     current_epoch_offset : int = 0
     callbacks : list = []
+    training_schedule : list = []
 
     def __init__(self, config : AutomaticRlTlTrainingConfig):
         self.config = config
@@ -120,6 +124,7 @@ class AutomaticRlTlTraining:
         self._update_model_inputs()
         self._update_model_outputs()
         self._init_training()
+        self._construct_training_schedule()
     
     def _init_wandb(self):
         """ Initializes Weights & Biases Logging if the user requested that in the config.
@@ -261,7 +266,6 @@ class AutomaticRlTlTraining:
             )
             self.model.ion_types = dataset_ions
 
-   
     def _init_training(self):
         if self.config.use_wandb:
             class LearningRateReporter(tf.keras.callbacks.Callback):
@@ -274,15 +278,43 @@ class AutomaticRlTlTraining:
 
             self.callbacks = [WandbCallback(save_model=False, log_batch_frequency=True, verbose=1), LearningRateReporter(), RealEpochReporter()]
 
+    def _construct_training_schedule(self):
+        self.training_schedule = []
+
+        num_train_batches = self.dataset.tensor_train_data.cardinality().numpy()
+        batch_size = self.dataset.batch_size 
+        num_train_sequences = batch_size * num_train_batches 
+
+        is_transfer_learning = self.requires_new_embedding_layer or self.requires_new_regressor_layer
+
+        # warmup
+        #    transfer learning: freeze everything but the new parameters (input and/or output layer)
+        #    refinement learning: train all weights during warmup
+        warmup_sequences = 10000
+        warmup_epochs = math.ceil(warmup_sequences / num_train_sequences)
+        self.training_schedule.append(TrainingInstanceConfig(
+            num_epochs=warmup_epochs,
+            learning_rate=1e-4,
+            lr_warmup=True,
+            lr_warmup_num_steps=math.ceil(warmup_sequences / batch_size),
+            lr_warmup_start_lr=1e-7,
+            # inflection_early_stopping=True,
+            # inflection_easly_stopping_min_improvement=1e-7,
+            # inflection_easly_stopping_patience=100,
+            freeze_inner_layers=is_transfer_learning,
+            freeze_whole_embedding_layer=is_transfer_learning and not self.requires_new_embedding_layer,
+            freeze_whole_regressor_layer=is_transfer_learning and not self.requires_new_regressor_layer,
+            freeze_old_embedding_weights=self.requires_new_embedding_layer and self.can_reuse_old_embedding_weights, 
+            freeze_old_regressor_weights=self.requires_new_regressor_layer and self.can_reuse_old_regressor_weights 
+        ))
+
+
+        # 
+
 
     def run(self):
-
-        training_hierachy = [
-
-        ]
-
-        for instance_config in training_hierachy:
-            training = AutomaticRlTlTrainingInstance(instance_config, self.current_epoch_offset, self.config.use_wandb, self.callbacks)
+        for instance_config in self.training_schedule:
+            training = AutomaticRlTlTrainingInstance(instance_config, self.model, self.current_epoch_offset, self.config.use_wandb, self.callbacks)
             training.run()
 
             self.current_epoch_offset = training.current_epoch_offset
@@ -297,10 +329,9 @@ class AutomaticRlTlTraining:
         print(f'saving the model to {self.config.output_model_path}')
         self.model.save(self.config.output_model_path)
 
-
-
 class AutomaticRlTlTrainingInstance:
 
+    model : PrositIntensityPredictor
     instance_config : TrainingInstanceConfig
     current_epoch_offset : int
     wandb_logging : bool
@@ -308,10 +339,12 @@ class AutomaticRlTlTrainingInstance:
 
     stopped_early : bool
     final_learning_rate : float
+    inflection_early_stopping : Optional[InflectionPointEarlyStopping] = None
 
 
-    def __init__(self, instance_config : TrainingInstanceConfig, current_epoch_offset : int, wandb_logging : bool, callbacks : list):
+    def __init__(self, instance_config : TrainingInstanceConfig, model : PrositIntensityPredictor, current_epoch_offset : int, wandb_logging : bool, callbacks : list):
         self.instance_config = instance_config
+        self.model = model
         self.current_epoch_offset = current_epoch_offset
         self.wandb_logging = wandb_logging
         self.callbacks = callbacks.copy()
@@ -383,16 +416,12 @@ class AutomaticRlTlTrainingInstance:
 
 
         if self.instance_config.inflection_early_stopping:
-            class InflectionPointEarlyStopping(tf.keras.callbacks.Callback):
-                min_delta : float
-
-                def __init__(self, min_delta : float, *args, **kwargs):
-                    super().__init__(*args, **kwargs)
-                    self.min_delta = min_delta
-
-
-                def on_train_batch_end(self, batch, *args):
-                    # TODO: implement                    
+            self.inflection_early_stopping = InflectionPointEarlyStopping(
+                min_improvement=self.instance_config.inflection_early_stopping_min_improvement,
+                patience=self.instance_config.inflection_early_stopping_patience
+            )
+            
+            self.callbacks.append(self.inflection_early_stopping)
 
 
         if self.instance_config.lr_scheduler_plateau:
@@ -407,18 +436,11 @@ class AutomaticRlTlTrainingInstance:
             self.callbacks.append(reduce_lr)
 
         if self.instance_config.lr_warmup:
-            num_epochs = self.instance_config.lr_warmup_num_epochs
-            start_lr = self.instance_config.lr_warmup_start_lr
-            end_lr = self.instance_config.learning_rate
-            def scheduler(epoch, lr):
-                global_epoch = epoch + self.current_epoch_offset
-                if global_epoch < num_epochs:
-                    factor = global_epoch / num_epochs
-                    return factor * end_lr + (1-factor) * start_lr
-                else:
-                    return lr
-            
-            lr_warmup_linear = LearningRateScheduler(scheduler)
+            lr_warmup_linear = LearningRateWarmupPerStep(
+                num_steps=self.instance_config.lr_warmup_num_steps,
+                start_lr=self.instance_config.lr_warmup_start_lr,
+                end_lr=self.instance_config.learning_rate
+            )
             self.callbacks.append(lr_warmup_linear)
 
 
@@ -439,7 +461,8 @@ class AutomaticRlTlTrainingInstance:
             callbacks=self.callbacks
         )
 
-        if len(history.history['loss']) < self.instance_config.num_epochs:
+        inflection_ES_stopped = self.inflection_early_stopping is not None and self.inflection_early_stopping.stopped_early
+        if len(history.history['loss']) < self.instance_config.num_epochs or inflection_ES_stopped:
             self.stopped_early = True
         else:
             self.stopped_early = False
