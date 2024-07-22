@@ -1,16 +1,50 @@
 import warnings
+import os
+import requests
+import importlib.resources as pkg_resources
 from copy import deepcopy
 import tensorflow as tf
 import pyarrow.parquet as pq
 from pathlib import Path
+
+import dlomix
 from dlomix.losses import masked_spectral_distance
 from dlomix.data.fragment_ion_intensity import FragmentIonIntensityDataset
 from dlomix.models.prosit import PrositIntensityPredictor
 
+MODEL_FILENAME = 'prosit_baseline_model.keras'
+MODEL_DIR = Path.home() / '.dlomix' / 'models'
+
+
+def get_model_url():
+    with pkg_resources.open_text(dlomix, 'prosit_baseline_model.txt') as url_file:
+        return url_file.read().strip()
+    
+
+def download_model_from_github():
+    MODEL_DIR.mkdir(parents=True, exist_ok=True)
+    model_path = MODEL_DIR / MODEL_FILENAME
+
+    if model_path.exists():
+        print('Using cached model.')
+        return model_path
+    
+    print('Start downloading model from GitHub...')
+    model_url = get_model_url()
+    response = requests.get(model_url)
+    response.raise_for_status()
+
+    with open(model_path, 'wb') as f:
+        f.write(response.content)
+    
+    print('Model downloaded successfully.')
+    return model_path
+
+
 
 def process_dataset(
         parquet_file_path: str,
-        model_file_path: str = 'unmod_ext',
+        model_file_path: str = 'baseline',
         modifications: list = None,
         ion_types: list = None,
         label_column: str = 'intensities_raw',
@@ -29,7 +63,7 @@ def process_dataset(
         parquet_file_path (str): Path to the .parquet file which has the necessary data stored. 
             Necessary columns are: ['modified_sequence', 'precursor_charge_onehot', 'collision_energy_aligned_normed', 'method_nbr']
             Optional columns are: ['intensities_raw']
-        model_file_path (str, optional): Either a predefined baseline model identifier. Options are ['unmod_ext', 'naive', 'ptm']
+        model_file_path (str, optional): Either download the pre defined baseline model from github, or specify own local model path
             or a path to a PrositIntensityPredictor model saved with the .keras file format. Defaults to 'unmod_ext'.
         modifications (list, optional): A list of all modifications which are present in the dataset. Defaults to None.
         ion_types (list, optional): A list of the ion types which are present in the dataset. Defaults to ['y', 'b'].
@@ -53,22 +87,10 @@ def process_dataset(
     modifications = [] if modifications is None else modifications
     ion_types = ['y', 'b'] if ion_types is None else ion_types
 
-    # give the option to load different baseline models
-    model_base_path = '/cmnfs/proj/bmpc_dlomix/models/baseline_models/'
-    match model_file_path:
-        case 'unmod_ext':
-            model_file_path = model_base_path + 'noptm_baseline_full_bs1024_unmod_extended/7ef3360f-2349-46c0-a905-01187d4899e2.keras'
-        case 'naive':
-            model_file_path = model_base_path + 'noptm_baseline_full_bs1024_naivemods/d961f940-d142-4102-9775-c1f8b4373c91.keras'
-        case 'ptm':
-            model_file_path = model_base_path + 'noptm_baseline_full_bs1024/4bc7bc69-bbf4-4366-90fc-474b1946c588.keras'
-        case _:
-            if not model_file_path.endswith('.keras'):
-                raise ValueError('Given model needs to be saved in the .keras format in order to be loaded correctly.')
-            if not Path(model_file_path).exists():
-                raise FileNotFoundError('The model was not found. Please specify a valid model.')
+    # download the model file from github if the baseline model should be used, otherwise a model path can be specified
+    if model_file_path == 'baseline':
+        model_file_path = download_model_from_github()
     
-    # load the model
     model = tf.keras.models.load_model(model_file_path)
 
     if not parquet_file_path.endswith('.parquet'):
