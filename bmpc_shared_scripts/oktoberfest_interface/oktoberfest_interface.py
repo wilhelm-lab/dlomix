@@ -26,7 +26,7 @@ def download_model_from_github():
     model_path = MODEL_DIR / MODEL_FILENAME
 
     if model_path.exists():
-        print('Using cached model.')
+        print(f'Using cached model: {str(model_path)}')
         return model_path
     
     print('Start downloading model from GitHub...')
@@ -37,7 +37,7 @@ def download_model_from_github():
     with open(model_path, 'wb') as f:
         f.write(response.content)
     
-    print('Model downloaded successfully.')
+    print(f'Model downloaded successfully under {str(model_path)}')
     return model_path
 
 
@@ -90,7 +90,6 @@ def process_dataset(
     # download the model file from github if the baseline model should be used, otherwise a model path can be specified
     if model_file_path == 'baseline':
         model_file_path = download_model_from_github()
-    
     model = tf.keras.models.load_model(model_file_path)
 
     if not parquet_file_path.endswith('.parquet'):

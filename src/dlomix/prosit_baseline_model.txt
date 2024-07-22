@@ -1,1 +1,1 @@
-https://github.com/wilhelm-lab/dlomix/blob/feature/bmpc-make-model-available/baseline_model/Prosit_baseline_model.keras
+https://github.com/wilhelm-lab/dlomix/raw/feature/bmpc/baseline_model/Prosit_baseline_model.keras
