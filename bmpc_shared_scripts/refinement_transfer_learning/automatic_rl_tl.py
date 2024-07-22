@@ -11,7 +11,7 @@ from tensorflow.keras.callbacks import EarlyStopping, ReduceLROnPlateau, Learnin
 import change_layers
 import freezing
 # from recompile_callbacks import *
-from custom_callbacks import InflectionPointEarlyStopping, LearningRateWarmupPerStep
+from custom_callbacks import InflectionPointEarlyStopping, LearningRateWarmupPerStep, InflectionPointLRReducer
 
 from dlomix.constants import PTMS_ALPHABET, ALPHABET_NAIVE_MODS, ALPHABET_UNMOD
 from dlomix.data import load_processed_dataset, FragmentIonIntensityDataset
@@ -46,6 +46,11 @@ class AutomaticRlTlTrainingConfig:
     dataset : Dataset
     input_model_path : Optional[str] = None
     output_model_path : str
+
+    # training parameters
+    min_warmup_sequences_new_weights : int = 10000
+    min_warmup_sequences_whole_model : int = 10000
+    improve_further : bool = True
 
     # wandb parameters
     use_wandb : bool = False
@@ -86,12 +91,12 @@ class TrainingInstanceConfig:
     inflection_early_stopping : bool = False
     inflection_early_stopping_min_improvement : float = 0
     inflection_early_stopping_patience : int = 0
+    inflection_early_stopping_ignore_first_n : int = 0
 
-    lr_scheduler_plateau : bool = False
-    lr_scheduler_plateau_factor : float = 0
-    lr_scheduler_plateau_min_delta : float = 0
-    lr_scheduler_plateau_patience : int = 0
-    lr_scheduler_plateau_cooldown : int = 0
+    inflection_lr_reducer : bool = False
+    inflection_lr_reducer_factor : float = 0
+    inflection_lr_reducer_min_improvement : float = 0
+    inflection_lr_reducer_patience : int = 0
 
     lr_warmup : bool = False
     lr_warmup_num_steps : int = 0
@@ -287,29 +292,63 @@ class AutomaticRlTlTraining:
 
         is_transfer_learning = self.requires_new_embedding_layer or self.requires_new_regressor_layer
 
-        # warmup
-        #    transfer learning: freeze everything but the new parameters (input and/or output layer)
-        #    refinement learning: train all weights during warmup
-        warmup_sequences = 10000
+        # step 1:
+        #   warm up new weights in embedding/regressor layer
+        if is_transfer_learning:
+            warmup_sequences = self.config.min_warmup_sequences_new_weights
+            warmup_epochs = math.ceil(warmup_sequences / num_train_sequences)
+            warmup_batches = math.ceil(warmup_sequences / batch_size)
+            self.training_schedule.append(TrainingInstanceConfig(
+                num_epochs=warmup_epochs,
+                learning_rate=1e-4,
+                lr_warmup=True,
+                lr_warmup_num_steps=math.ceil(warmup_sequences / batch_size),
+                lr_warmup_start_lr=1e-7,
+                inflection_early_stopping=True,
+                inflection_easly_stopping_min_improvement=1e-7,
+                inflection_easly_stopping_ignore_first_n=warmup_batches,
+                inflection_early_stopping_patience=30,
+                freeze_inner_layers=True,
+                freeze_whole_embedding_layer=not self.requires_new_embedding_layer,
+                freeze_whole_regressor_layer=not self.requires_new_regressor_layer,
+                freeze_old_embedding_weights=self.requires_new_embedding_layer and self.can_reuse_old_embedding_weights, 
+                freeze_old_regressor_weights=self.requires_new_regressor_layer and self.can_reuse_old_regressor_weights 
+            ))
+
+        # step 2:
+        #   warmup whole model and do main fitting process
+        warmup_sequences = self.config.min_warmup_sequences_whole_model
         warmup_epochs = math.ceil(warmup_sequences / num_train_sequences)
+        warmup_batches = math.ceil(warmup_sequences / batch_size)
+        training_epochs = 100
         self.training_schedule.append(TrainingInstanceConfig(
-            num_epochs=warmup_epochs,
+            num_epochs=warmup_epochs + training_epochs,
             learning_rate=1e-4,
             lr_warmup=True,
             lr_warmup_num_steps=math.ceil(warmup_sequences / batch_size),
             lr_warmup_start_lr=1e-7,
-            # inflection_early_stopping=True,
-            # inflection_easly_stopping_min_improvement=1e-7,
-            # inflection_easly_stopping_patience=100,
-            freeze_inner_layers=is_transfer_learning,
-            freeze_whole_embedding_layer=is_transfer_learning and not self.requires_new_embedding_layer,
-            freeze_whole_regressor_layer=is_transfer_learning and not self.requires_new_regressor_layer,
-            freeze_old_embedding_weights=self.requires_new_embedding_layer and self.can_reuse_old_embedding_weights, 
-            freeze_old_regressor_weights=self.requires_new_regressor_layer and self.can_reuse_old_regressor_weights 
+            inflection_early_stopping=True,
+            inflection_easly_stopping_min_improvement=1e-7,
+            inflection_easly_stopping_ignore_first_n=warmup_batches,
+            inflection_early_stopping_patience=50
         ))
 
-
-        # 
+        # step 3:
+        #   optional: refine the model further to get a really good model
+        if self.config.improve_further:
+            training_epochs = 100
+            self.training_schedule.append(TrainingInstanceConfig(
+                num_epochs=training_epochs,
+                learning_rate=1e-4,
+                inflection_early_stopping=True,
+                inflection_easly_stopping_min_improvement=1e-9,
+                inflection_early_stopping_ignore_first_n=0,
+                inflection_early_stopping_patience=max(2 * num_train_batches, 10000),
+                inflection_lr_reducer=True,
+                inflection_lr_reducer_factor=0.5,
+                inflection_lr_reducer_min_improvement=1e-7,
+                inflection_lr_reducer_patience=50
+            ))
 
 
     def run(self):
@@ -418,19 +457,18 @@ class AutomaticRlTlTrainingInstance:
         if self.instance_config.inflection_early_stopping:
             self.inflection_early_stopping = InflectionPointEarlyStopping(
                 min_improvement=self.instance_config.inflection_early_stopping_min_improvement,
-                patience=self.instance_config.inflection_early_stopping_patience
+                patience=self.instance_config.inflection_early_stopping_patience,
+                ignore_first_n=self.instance_config.inflection_early_stopping_ignore_first_n
             )
             
             self.callbacks.append(self.inflection_early_stopping)
 
 
-        if self.instance_config.lr_scheduler_plateau:
-            reduce_lr = ReduceLROnPlateau(
-                monitor="val_loss",
-                factor=self.instance_config.lr_scheduler_plateau_factor,
-                patience=self.instance_config.lr_scheduler_plateau_patience,
-                min_delta=self.instance_config.lr_scheduler_plateau_min_delta,
-                cooldown=self.instance_config.lr_scheduler_plateau_cooldown
+        if self.instance_config.inflection_lr_reducer:
+            reduce_lr = InflectionPointLRReducer(
+                factor=self.instance_config.inflection_lr_reducer_factor,
+                patience=self.instance_config.inflection_lr_reducer_patience,
+                min_improvement=self.instance_config.inflection_lr_reducer_min_improvement
             ) 
 
             self.callbacks.append(reduce_lr)
