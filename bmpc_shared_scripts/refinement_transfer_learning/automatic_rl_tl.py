@@ -18,59 +18,39 @@ from dlomix.data import load_processed_dataset, FragmentIonIntensityDataset
 from dlomix.models import PrositIntensityPredictor
 from dlomix.losses import masked_spectral_distance, masked_pearson_correlation_distance
 
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass, asdict, field
 from typing import Optional
 import math
-
-
-class Dataset:
-    is_preprocessed : bool
-    parquet_path : Optional[str]
-    preprocessed_path : Optional[str]
-
-    def __init__(self, *, preprocessed_path : Optional[str] = None, parquet_path : Optional[str] = None):
-        if preprocessed_path is not None and parquet_path is not None:
-            raise ValueError("Either specify parquet_path or preprocessed_path")
-
-        if preprocessed_path is not None:
-            self.is_preprocessed = True
-            self.preprocessed_path = preprocessed_path
-        else:
-            self.is_preprocessed = False
-            self.parquet_path = parquet_path
 
 
 @dataclass
 class AutomaticRlTlTrainingConfig:
     # dataset/model parameters
-    dataset : Dataset
-    input_model_path : Optional[str] = None
-    output_model_path : str
+    dataset : FragmentIonIntensityDataset 
+    baseline_model : Optional[PrositIntensityPredictor] = None
 
     # training parameters
-    min_warmup_sequences_new_weights : int = 10000
-    min_warmup_sequences_whole_model : int = 10000
+    min_warmup_sequences_new_weights : int = 100000
+    min_warmup_sequences_whole_model : int = 100000
     improve_further : bool = True
 
     # wandb parameters
     use_wandb : bool = False
     wandb_project : str = 'DLOmix_auto_RL_TL'
-    wandb_tags : list[str] = []
+    wandb_tags : list[str] = field(default_factory=list)
 
-    # tensorflow parameters
-    tf_cuda_devices : Optional[list[int]] = None
-    tf_num_procs : Optional[int] = None
-    hf_home_directory : Optional[str] = None
-    hf_cache_directory : Optional[str] = None
-
-
+    
     def to_dict(self):
         """Converts configuration to a python dict object.
 
         Returns:
             dict: Configuration options as dictionary
         """
-        return asdict(self)
+        return {
+            'min_warmup_sequences_new_weights': self.min_warmup_sequences_new_weights,
+            'min_warmup_sequences_whole_model': self.min_warmup_sequences_whole_model,
+            'improve_further': self.improve_further
+        }
 
 
 @dataclass
@@ -106,9 +86,8 @@ class TrainingInstanceConfig:
 class AutomaticRlTlTraining:
     config : AutomaticRlTlTrainingConfig
 
-    dataset : FragmentIonIntensityDataset
     model : PrositIntensityPredictor
-    is_new_model : bool = False
+    is_new_model : bool
 
     requires_new_embedding_layer : bool
     can_reuse_old_embedding_weights : bool
@@ -123,8 +102,6 @@ class AutomaticRlTlTraining:
         self.config = config
 
         self._init_wandb()
-        self._init_tensorflow()
-        self._load_dataset()
         self._init_model()
         self._update_model_inputs()
         self._update_model_outputs()
@@ -141,51 +118,11 @@ class AutomaticRlTlTraining:
                 tags=self.config.wandb_tags
             )
 
-    def _init_tensorflow(self):
-        """Initializes Tensorflow based on the parameters in the config.
-        """
-        if self.config.tf_cuda_devices is not None:
-            cuda_device_str = '-1'
-            if len(self.config.tf_cuda_devices) > 0:
-                cuda_device_str = ','.join([str(x) for x in self.config.tf_cuda_devices])
-
-            os.environ["CUDA_VISIBLE_DEVICES"] = cuda_device_str
-
-        if self.config.tf_num_procs is not None:
-            num_proc = self.config.tf_num_procs
-            os.environ["OMP_NUM_THREADS"] = f"{num_proc}"
-            os.environ["TF_NUM_INTRAOP_THREADS"] = f"{num_proc}"
-            os.environ["TF_NUM_INTEROP_THREADS"] = f"{num_proc}"
-            tf.config.threading.set_inter_op_parallelism_threads(
-                num_proc
-            )
-            tf.config.threading.set_intra_op_parallelism_threads(
-                num_proc
-            )
-
-        if self.config.hf_home_directory is not None:
-            os.environ['HF_HOME'] = self.config.hf_home_directory
-
-        if self.config.hf_cache_directory is not None:
-            os.environ['HF_DATASETS_CACHE'] = self.config.hf_cache_directory
         
-    def _load_dataset(self):
-        """Loads the specified dataset.
-
-        Raises:
-            NotImplementedError: Raised if an unprocessed dataset is provided
-        """
-        # TODO: should we support loading a dataset which is not preprocessed yet here
-        if not self.config.dataset.is_preprocessed:
-            raise NotImplementedError("Only preprocessed datasets are currently supported by the automatic RL/TL training.")
-
-        self.dataset = load_processed_dataset(self.config.dataset.preprocessed_path)
-
     def _init_model(self):
-        if self.config.model_path is not None:
-            print(f"loading model from file {self.config.model_path}")
-            self.model = tf.keras.models.load_model(self.config.model_path)
-
+        if self.config.baseline_model is not None:
+            self.model = self.config.baseline_model
+            self.is_new_model = False
         else:
             # initialize new model
             input_mapping = {
@@ -198,25 +135,29 @@ class AutomaticRlTlTraining:
             meta_data_keys=["collision_energy_aligned_normed", "precursor_charge_onehot", "method_nbr"]
 
             self.model = PrositIntensityPredictor(
-                seq_length=self.dataset.max_seq_len,
-                alphabet=self.dataset.alphabet,
+                seq_length=self.config.dataset.max_seq_len,
+                alphabet=self.config.dataset.alphabet,
                 use_prosit_ptm_features=False,
                 with_termini=False,
                 input_keys=input_mapping,
                 meta_data_keys=meta_data_keys
             )
+            self.is_new_model = True
 
     def _update_model_inputs(self):
         model_alphabet = self.model.alphabet
-        dataset_alphabet = self.dataset.alphabet
+        dataset_alphabet = self.config.dataset.alphabet
 
         if self.is_new_model:
             print('[embedding layer]  created new model with fresh embedding layer')
+            self.requires_new_embedding_layer = False
+            self.can_reuse_old_embedding_weights = False
             return
 
         if model_alphabet == dataset_alphabet:
             print('[embedding layer]  model and dataset modifications match')
             self.requires_new_embedding_layer = False
+            self.can_reuse_old_embedding_weights = False
         else:
             print('[embedding layer]  model and dataset modifications do not match')
             self.requires_new_embedding_layer = True
@@ -238,8 +179,14 @@ class AutomaticRlTlTraining:
 
     def _update_model_outputs(self):
         # check that sequence length matches
-        if self.model.seq_len != self.dataset.max_seq_len:
-            raise RuntimeError(f"Max. sequence length does not match between dataset and model (dataset: {self.dataset.max_seq_len}, model: {self.model.seq_len})")
+        if self.model.seq_length != self.config.dataset.max_seq_len:
+            raise RuntimeError(f"Max. sequence length does not match between dataset and model (dataset: {self.config.dataset.max_seq_len}, model: {self.model.seq_length})")
+
+        if self.is_new_model:
+            print('[regressor layer]  created new model with fresh regressor layer')
+            self.requires_new_regressor_layer = False
+            self.can_reuse_old_regressor_weights = False
+            return
 
         # check whether number of ions matches
         model_ions = ['y', 'b']
@@ -247,15 +194,16 @@ class AutomaticRlTlTraining:
             model_ions = self.model.ion_types 
 
         dataset_ions = ['y', 'b']
-        if hasattr(self.dataset, 'ion_types') and self.dataset.ion_types is not None:
-            dataset_ions = self.dataset.ion_types 
+        if hasattr(self.config.dataset, 'ion_types') and self.config.dataset.ion_types is not None:
+            dataset_ions = self.config.dataset.ion_types 
 
         if model_ions == dataset_ions:
             print('[regressor layer]  matching ion types')
-            self.requires_new_regressor_layer = True
+            self.requires_new_regressor_layer = False
+            self.can_reuse_old_regressor_weights = False
         else:
             print('[regressor layer]  ion types not matching')
-            self.requires_new_regressor_layer = False
+            self.requires_new_regressor_layer = True
 
             if len(model_ions) <= len(dataset_ions) and all([m == d for m, d in zip(model_ions, dataset_ions)]):
                 print('[regressor layer]  can reuse existing regressor weights')
@@ -275,7 +223,7 @@ class AutomaticRlTlTraining:
         if self.config.use_wandb:
             class LearningRateReporter(tf.keras.callbacks.Callback):
                 def on_train_batch_end(self, batch, *args):
-                    wandb.log({'learning_rate': self.model.optimizer._learning_rate.numpy()})
+                    wandb.log({'learning_rate': self.model.optimizer.lr.read_value()})
 
             class RealEpochReporter(tf.keras.callbacks.Callback):
                 def on_epoch_begin(self_inner, epoch, *args):
@@ -286,8 +234,8 @@ class AutomaticRlTlTraining:
     def _construct_training_schedule(self):
         self.training_schedule = []
 
-        num_train_batches = self.dataset.tensor_train_data.cardinality().numpy()
-        batch_size = self.dataset.batch_size 
+        num_train_batches = self.config.dataset.tensor_train_data.cardinality().numpy()
+        batch_size = self.config.dataset.batch_size 
         num_train_sequences = batch_size * num_train_batches 
 
         is_transfer_learning = self.requires_new_embedding_layer or self.requires_new_regressor_layer
@@ -305,9 +253,9 @@ class AutomaticRlTlTraining:
                 lr_warmup_num_steps=math.ceil(warmup_sequences / batch_size),
                 lr_warmup_start_lr=1e-7,
                 inflection_early_stopping=True,
-                inflection_easly_stopping_min_improvement=1e-7,
-                inflection_easly_stopping_ignore_first_n=warmup_batches,
-                inflection_early_stopping_patience=30,
+                inflection_early_stopping_min_improvement=1e-4,
+                inflection_early_stopping_ignore_first_n=warmup_batches,
+                inflection_early_stopping_patience=10,
                 freeze_inner_layers=True,
                 freeze_whole_embedding_layer=not self.requires_new_embedding_layer,
                 freeze_whole_regressor_layer=not self.requires_new_regressor_layer,
@@ -328,9 +276,9 @@ class AutomaticRlTlTraining:
             lr_warmup_num_steps=math.ceil(warmup_sequences / batch_size),
             lr_warmup_start_lr=1e-7,
             inflection_early_stopping=True,
-            inflection_easly_stopping_min_improvement=1e-7,
-            inflection_easly_stopping_ignore_first_n=warmup_batches,
-            inflection_early_stopping_patience=50
+            inflection_early_stopping_min_improvement=1e-4,
+            inflection_early_stopping_ignore_first_n=warmup_batches,
+            inflection_early_stopping_patience=20
         ))
 
         # step 3:
@@ -341,36 +289,41 @@ class AutomaticRlTlTraining:
                 num_epochs=training_epochs,
                 learning_rate=1e-4,
                 inflection_early_stopping=True,
-                inflection_easly_stopping_min_improvement=1e-9,
+                inflection_early_stopping_min_improvement=1e-6,
                 inflection_early_stopping_ignore_first_n=0,
-                inflection_early_stopping_patience=max(2 * num_train_batches, 10000),
+                inflection_early_stopping_patience=100,
                 inflection_lr_reducer=True,
                 inflection_lr_reducer_factor=0.5,
-                inflection_lr_reducer_min_improvement=1e-7,
-                inflection_lr_reducer_patience=50
+                inflection_lr_reducer_min_improvement=1e-4,
+                inflection_lr_reducer_patience=20
             ))
 
 
-    def run(self):
+    def train(self):
         for instance_config in self.training_schedule:
-            training = AutomaticRlTlTrainingInstance(instance_config, self.model, self.current_epoch_offset, self.config.use_wandb, self.callbacks)
+            training = AutomaticRlTlTrainingInstance(
+                instance_config=instance_config,
+                model=self.model,
+                dataset=self.config.dataset,
+                current_epoch_offset=self.current_epoch_offset,
+                wandb_logging=self.config.use_wandb,
+                callbacks=self.callbacks
+            )
             training.run()
 
             self.current_epoch_offset = training.current_epoch_offset
 
-        self._save_model()
-
         if self.config.use_wandb:
             wandb.finish()
 
+        return self.model
 
-    def _save_model(self):
-        print(f'saving the model to {self.config.output_model_path}')
-        self.model.save(self.config.output_model_path)
+
 
 class AutomaticRlTlTrainingInstance:
 
     model : PrositIntensityPredictor
+    dataset : FragmentIonIntensityDataset
     instance_config : TrainingInstanceConfig
     current_epoch_offset : int
     wandb_logging : bool
@@ -381,9 +334,10 @@ class AutomaticRlTlTrainingInstance:
     inflection_early_stopping : Optional[InflectionPointEarlyStopping] = None
 
 
-    def __init__(self, instance_config : TrainingInstanceConfig, model : PrositIntensityPredictor, current_epoch_offset : int, wandb_logging : bool, callbacks : list):
+    def __init__(self, instance_config : TrainingInstanceConfig, model : PrositIntensityPredictor, current_epoch_offset : int, dataset : FragmentIonIntensityDataset, wandb_logging : bool, callbacks : list):
         self.instance_config = instance_config
         self.model = model
+        self.dataset = dataset
         self.current_epoch_offset = current_epoch_offset
         self.wandb_logging = wandb_logging
         self.callbacks = callbacks.copy()
@@ -424,7 +378,7 @@ class AutomaticRlTlTrainingInstance:
 
             if self.wandb_logging:
                 wandb.log({
-                    'freeze_layers': 1,
+                    'freeze_inner_layers': 1,
                     'freeze_embedding_layer': 1 if self.instance_config.freeze_whole_embedding_layer else 0,
                     'freeze_regressor_layer': 1 if self.instance_config.freeze_whole_regressor_layer else 0
                 })
@@ -438,7 +392,7 @@ class AutomaticRlTlTrainingInstance:
 
             if self.wandb_logging:
                 wandb.log({
-                    'freeze_layers': 0,
+                    'freeze_inner_layers': 0,
                     'freeze_embedding_layer': 0,
                     'freeze_regressor_layer': 0    
                 })
