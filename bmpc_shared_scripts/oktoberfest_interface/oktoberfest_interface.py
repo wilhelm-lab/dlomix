@@ -4,6 +4,7 @@ import requests
 import importlib.resources as pkg_resources
 from copy import deepcopy
 import tensorflow as tf
+from tensorflow.keras.models import load_model
 import pyarrow.parquet as pq
 from pathlib import Path
 
@@ -41,10 +42,36 @@ def download_model_from_github():
     return model_path
 
 
+def load_keras_model(model_file_path: str = 'baseline') -> PrositIntensityPredictor:
+    """Load a PrositIntensityPredictor model given a model file path. 
+
+    Args:
+        model_file_path (str): Path to a saved PrositIntensityPredictor model (.keras format). 
+            If no path is given, automatically downloads the baseline model. Defaults to 'baseline'
+
+    Raises:
+        ValueError: If the model_file_path does not end with the .keras extension
+        FileNotFoundError: If the given model_file_path does not exist
+
+    Returns:
+        PrositIntensityPredictor: A loaded PrositIntensityPredictor model, that can be used for predictions, refinement or transfer learning purposes.
+    """
+
+    # download the model file from github if the baseline model should be used, otherwise a model path can be specified
+    if model_file_path == 'baseline':
+        model_file_path = download_model_from_github()
+        return load_model(model_file_path)
+
+    if not model_file_path.endswith('.keras'):
+        raise ValueError('The given model file is not saved with the .keras format! Please specify a path with the .keras extension.')
+    if not Path(model_file_path).exists():
+        raise FileNotFoundError('Given model file was not found. Please specify an existing saved model file.')
+    return load_model(model_file_path)
+
 
 def process_dataset(
         parquet_file_path: str,
-        model_file_path: str = 'baseline',
+        model: PrositIntensityPredictor = None,
         modifications: list = None,
         ion_types: list = None,
         label_column: str = 'intensities_raw',
@@ -63,8 +90,8 @@ def process_dataset(
         parquet_file_path (str): Path to the .parquet file which has the necessary data stored. 
             Necessary columns are: ['modified_sequence', 'precursor_charge_onehot', 'collision_energy_aligned_normed', 'method_nbr']
             Optional columns are: ['intensities_raw']
-        model_file_path (str, optional): Either download the pre defined baseline model from github, or specify own local model path
-            or a path to a PrositIntensityPredictor model saved with the .keras file format. Defaults to 'unmod_ext'.
+        model (PrositIntensityPredictor, optional): Specify a loaded model of the PrositIntensityPredictor class. If None is given,
+            the baseline model will be automatically downloaded from GitHub and loaded. Defaults to 'None'
         modifications (list, optional): A list of all modifications which are present in the dataset. Defaults to None.
         ion_types (list, optional): A list of the ion types which are present in the dataset. Defaults to ['y', 'b'].
         label_column (str, optional): The column identifier for where the intensity labels are, if there are any. Defaults to 'intensities_raw'.
@@ -72,8 +99,6 @@ def process_dataset(
         test_ratio (float, optional): A test split ratio. Defaults to 0.0.
 
     Raises:
-        ValueError: If the model_file_path does not have the .keras extension
-        FileNotFoundError: if the model_file_path does not exist
         ValueError: If the parquet_file_path does not have the .parquet extension
         FileNotFoundError: If the parquet_file_path does not exist
 
@@ -87,10 +112,9 @@ def process_dataset(
     modifications = [] if modifications is None else modifications
     ion_types = ['y', 'b'] if ion_types is None else ion_types
 
-    # download the model file from github if the baseline model should be used, otherwise a model path can be specified
-    if model_file_path == 'baseline':
-        model_file_path = download_model_from_github()
-    model = tf.keras.models.load_model(model_file_path)
+    # load the baseline model if None is given
+    if model is None:
+        model = load_keras_model('baseline')
 
     if not parquet_file_path.endswith('.parquet'):
         raise ValueError('The specified file is not a parquet file! Please specify a path with the .parquet extension.')
