@@ -17,6 +17,7 @@ class FragmentIonIntensityDataset(PeptideDataset):
         sequence_column (str): The name of the column containing the peptide sequences.
         label_column (str): The name of the column containing the intensity labels.
         val_ratio (float): The ratio of validation data to split from the training data.
+        test_ratio (float): The ratio of the test data to split from the training data.
         max_seq_len (Union[int, str]): The maximum length of the peptide sequences.
         dataset_type (str): The type of dataset to use (e.g., "tf" for TensorFlow dataset).
         batch_size (int): The batch size for training and evaluation.
@@ -26,6 +27,7 @@ class FragmentIonIntensityDataset(PeptideDataset):
         pad (bool): Whether to pad the sequences to the maximum length.
         padding_value (int): The value to use for padding.
         alphabet (Dict): The mapping of characters to integers for encoding the sequences.
+        with_termini (bool): Whether to add the N- and C-termini in the sequence column, even if they do not exist. Defaults to True.
         encoding_scheme (Union[str, EncodingScheme]): The encoding scheme to use for encoding the sequences.
         processed (bool): Whether the data has been preprocessed before or not.
         enable_tf_dataset_cache (bool): Flag to indicate whether to enable TensorFlow Dataset caching (call `.cahce()` on the generate TF Datasets).
@@ -42,6 +44,7 @@ class FragmentIonIntensityDataset(PeptideDataset):
         sequence_column: str = "modified_sequence",
         label_column: str = "intensities_raw",
         val_ratio: float = 0.2,
+        test_ratio: float = 0.0,
         max_seq_len: Union[int, str] = 30,
         dataset_type: str = "tf",
         batch_size: int = 64,
@@ -51,6 +54,7 @@ class FragmentIonIntensityDataset(PeptideDataset):
         pad: bool = True,
         padding_value: int = 0,
         alphabet: Dict = ALPHABET_UNMOD,
+        with_termini: bool = True,
         encoding_scheme: Union[str, EncodingScheme] = EncodingScheme.UNMOD,
         processed: bool = False,
         enable_tf_dataset_cache: bool = False,
@@ -58,6 +62,7 @@ class FragmentIonIntensityDataset(PeptideDataset):
         auto_cleanup_cache: bool = True,
         num_proc: Optional[int] = None,
         batch_processing_size: int = 1000,
+        inference_only: Optional[bool] = False
     ):
         super().__init__(
             data_source,
@@ -67,6 +72,7 @@ class FragmentIonIntensityDataset(PeptideDataset):
             sequence_column,
             label_column,
             val_ratio,
+            test_ratio,
             max_seq_len,
             dataset_type,
             batch_size,
@@ -76,6 +82,7 @@ class FragmentIonIntensityDataset(PeptideDataset):
             pad,
             padding_value,
             alphabet,
+            with_termini,
             encoding_scheme,
             processed,
             enable_tf_dataset_cache,
@@ -83,4 +90,5 @@ class FragmentIonIntensityDataset(PeptideDataset):
             auto_cleanup_cache,
             num_proc,
             batch_processing_size,
+            inference_only
         )

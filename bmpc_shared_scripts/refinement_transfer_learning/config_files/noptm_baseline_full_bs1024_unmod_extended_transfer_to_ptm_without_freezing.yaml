@@ -21,13 +21,16 @@ training:
   lr_warmup_linear:
     start_lr: 0.000001
     end_lr: 0.0001
+    num_epochs: 0
 refinement_transfer_learning:
   freeze_layers:
     is_first_layer_trainable: true
     is_last_layer_trainable: false
+    release_after_epochs: 0
   new_input_layer:
     new_alphabet: PTMS_ALPHABET
     freeze_old_weights: true
+    release_after_epochs: 0
 model:
   load_path: /cmnfs/proj/bmpc_dlomix/models/baseline_models/noptm_baseline_full_bs1024_unmod_extended/7ef3360f-2349-46c0-a905-01187d4899e2.keras
   # save_dir: /cmnfs/proj/bmpc_dlomix/models/refinement_transfer_learning
