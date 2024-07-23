@@ -30,8 +30,8 @@ class AutomaticRlTlTrainingConfig:
     baseline_model : Optional[PrositIntensityPredictor] = None
 
     # training parameters
-    min_warmup_sequences_new_weights : int = 100000
-    min_warmup_sequences_whole_model : int = 100000
+    min_warmup_sequences_new_weights : int = 4000000
+    min_warmup_sequences_whole_model : int = 4000000
     improve_further : bool = True
 
     # wandb parameters
@@ -231,6 +231,16 @@ class AutomaticRlTlTraining:
 
             self.callbacks = [WandbCallback(save_model=False, log_batch_frequency=True, verbose=1), LearningRateReporter(), RealEpochReporter()]
 
+    def _evaluate_model(self):
+        loss, metric = self.model.evaluate(
+            self.config.dataset.tensor_val_data,
+            steps=1000
+        )
+
+        print(f'validation loss: {loss}, pearson distance: {metric}')
+        if self.config.use_wandb:
+            wandb.log({'val_loss': loss, 'val_masked_pearson_correlation_distance': metric})
+
     def _construct_training_schedule(self):
         self.training_schedule = []
 
@@ -246,16 +256,17 @@ class AutomaticRlTlTraining:
             warmup_sequences = self.config.min_warmup_sequences_new_weights
             warmup_epochs = math.ceil(warmup_sequences / num_train_sequences)
             warmup_batches = math.ceil(warmup_sequences / batch_size)
+            training_epochs = 10000
             self.training_schedule.append(TrainingInstanceConfig(
-                num_epochs=warmup_epochs,
-                learning_rate=1e-4,
+                num_epochs=warmup_epochs + training_epochs,
+                learning_rate=1e-3,
                 lr_warmup=True,
-                lr_warmup_num_steps=math.ceil(warmup_sequences / batch_size),
-                lr_warmup_start_lr=1e-7,
+                lr_warmup_num_steps=warmup_batches,
+                lr_warmup_start_lr=1e-8,
                 inflection_early_stopping=True,
                 inflection_early_stopping_min_improvement=1e-4,
                 inflection_early_stopping_ignore_first_n=warmup_batches,
-                inflection_early_stopping_patience=10,
+                inflection_early_stopping_patience=1000,
                 freeze_inner_layers=True,
                 freeze_whole_embedding_layer=not self.requires_new_embedding_layer,
                 freeze_whole_regressor_layer=not self.requires_new_regressor_layer,
@@ -268,38 +279,40 @@ class AutomaticRlTlTraining:
         warmup_sequences = self.config.min_warmup_sequences_whole_model
         warmup_epochs = math.ceil(warmup_sequences / num_train_sequences)
         warmup_batches = math.ceil(warmup_sequences / batch_size)
-        training_epochs = 100
+        training_epochs = 10000
         self.training_schedule.append(TrainingInstanceConfig(
             num_epochs=warmup_epochs + training_epochs,
-            learning_rate=1e-4,
+            learning_rate=1e-3,
             lr_warmup=True,
-            lr_warmup_num_steps=math.ceil(warmup_sequences / batch_size),
-            lr_warmup_start_lr=1e-7,
+            lr_warmup_num_steps=warmup_batches,
+            lr_warmup_start_lr=1e-8,
             inflection_early_stopping=True,
-            inflection_early_stopping_min_improvement=1e-4,
+            inflection_early_stopping_min_improvement=1e-5,
             inflection_early_stopping_ignore_first_n=warmup_batches,
-            inflection_early_stopping_patience=20
+            inflection_early_stopping_patience=2000
         ))
 
         # step 3:
         #   optional: refine the model further to get a really good model
         if self.config.improve_further:
-            training_epochs = 100
+            training_epochs = 10000
             self.training_schedule.append(TrainingInstanceConfig(
                 num_epochs=training_epochs,
                 learning_rate=1e-4,
                 inflection_early_stopping=True,
                 inflection_early_stopping_min_improvement=1e-6,
                 inflection_early_stopping_ignore_first_n=0,
-                inflection_early_stopping_patience=100,
+                inflection_early_stopping_patience=10000,
                 inflection_lr_reducer=True,
                 inflection_lr_reducer_factor=0.5,
-                inflection_lr_reducer_min_improvement=1e-4,
-                inflection_lr_reducer_patience=20
+                inflection_lr_reducer_min_improvement=1e-5,
+                inflection_lr_reducer_patience=7000
             ))
 
 
     def train(self):
+        self._evaluate_model()
+
         for instance_config in self.training_schedule:
             training = AutomaticRlTlTrainingInstance(
                 instance_config=instance_config,
@@ -312,6 +325,7 @@ class AutomaticRlTlTraining:
             training.run()
 
             self.current_epoch_offset = training.current_epoch_offset
+            self._evaluate_model()
 
         if self.config.use_wandb:
             wandb.finish()
@@ -449,6 +463,7 @@ class AutomaticRlTlTrainingInstance:
         history = self.model.fit(
             self.dataset.tensor_train_data,
             validation_data=self.dataset.tensor_val_data,
+            validation_steps=1000,
             epochs=self.instance_config.num_epochs,
             callbacks=self.callbacks
         )

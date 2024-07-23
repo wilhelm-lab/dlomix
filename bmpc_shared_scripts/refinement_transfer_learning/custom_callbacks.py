@@ -38,9 +38,6 @@ class InflectionPointDetector:
                 self.current_changes.pop(0)
             change = sum(self.current_changes) / len(self.current_changes)
 
-            if self.num_steps < self.ignore_first_n:
-                return
-
             avg_change = self.change_sum / self.num_steps 
 
             wandb.log({
@@ -48,10 +45,13 @@ class InflectionPointDetector:
                 'es_curr_change': change,
                 'patience_counter': self.patience_counter
             })
+            
+            if self.num_steps < self.ignore_first_n:
+                return
 
             if self.num_steps > self.patience:
                 # enough datapoints to do estimation
-                if avg_change > -self.min_improvement and change > avg_change:
+                if change > -self.min_improvement and change > avg_change:
                     # we are likely after the inflection point and have a low avg change
                     self.patience_counter += 1
 
@@ -114,7 +114,8 @@ class LearningRateWarmupPerStep(tf.keras.callbacks.Callback):
         lr = self.model.optimizer.lr.read_value()
         if self.steps_counter < self.num_steps:
             factor = self.steps_counter / self.num_steps
-            lr = factor * self.end_lr + (1-factor) * self.start_lr
+            # lr = factor * self.end_lr + (1-factor) * self.start_lr
+            lr = self.end_lr ** factor * self.start_lr ** (1-factor)
             self.model.optimizer.lr.assign(lr)
         
         self.steps_counter += 1
