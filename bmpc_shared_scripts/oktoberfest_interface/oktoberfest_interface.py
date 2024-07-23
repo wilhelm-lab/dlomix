@@ -77,7 +77,7 @@ def process_dataset(
         label_column: str = 'intensities_raw',
         val_ratio: float = 0.2,
         test_ratio: float = 0.0
-        ) -> tuple[FragmentIonIntensityDataset, PrositIntensityPredictor]:
+        ) -> FragmentIonIntensityDataset:
     """Interface function for Oktoberfest package to correcly process a dataset and load a baseline model
 
     Processes the parquet file to a FragmentIonIntensityDataset, which is ready to be used for prediction and/or refinement/transfer learning
@@ -103,9 +103,8 @@ def process_dataset(
         FileNotFoundError: If the parquet_file_path does not exist
 
     Returns:
-        (FragmentIonIntensityDataset, PrositIntensityPredictor): 
+        FragmentIonIntensityDataset: 
             FragmentIonIntensityDataset: The fully processed dataset, which is ready to be used for prediction or transfer/refinement learning
-            PrositIntensityPredictor: The loaded baseline model. Can only be used for prediction, if the data is compatible -> see warnings
     """
     
     
@@ -178,4 +177,4 @@ def process_dataset(
 
     print(f'The available data splits are: {", ".join(list(dataset.hf_dataset.keys()))}')
 
-    return dataset, model
+    return dataset
