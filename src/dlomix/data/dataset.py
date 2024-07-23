@@ -135,7 +135,7 @@ class PeptideDataset:
         num_proc: Optional[int] = None,
         batch_processing_size: Optional[int] = 1000,
         inference_only: Optional[bool] = False,
-        ion_types: Optional[List[str]] = None,
+        ion_types: Optional[List[str]] = None
     ):
         super(PeptideDataset, self).__init__()
         self.data_source = data_source

@@ -51,7 +51,7 @@ training:
 refinement_transfer_learning:
   freeze_layers:
     is_first_layer_trainable: true
-    is_last_layer_trainable: false
+    is_last_layer_trainable: true
   new_input_layer:
     new_alphabet: 
       'A': 1

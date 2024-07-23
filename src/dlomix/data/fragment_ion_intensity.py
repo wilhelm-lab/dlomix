@@ -63,7 +63,7 @@ class FragmentIonIntensityDataset(PeptideDataset):
         num_proc: Optional[int] = None,
         batch_processing_size: int = 1000,
         inference_only: Optional[bool] = False,
-        ion_types: Optional[List[str]] = None,
+        ion_types: Optional[List[str]] = None
     ):
         super().__init__(
             data_source,
@@ -92,5 +92,5 @@ class FragmentIonIntensityDataset(PeptideDataset):
             num_proc,
             batch_processing_size,
             inference_only,
-            ion_types,
+            ion_types
         )
