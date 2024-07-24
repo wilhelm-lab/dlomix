@@ -123,7 +123,24 @@ class RlTlTraining:
 
         # optionally: replacing of input/output layers
         if 'new_output_layer' in rl_config:
-            change_layers.change_output_layer(self.model, rl_config['new_output_layer']['num_ions'])
+            change_layers.change_output_layer(
+                self.model,
+                rl_config['new_output_layer']['num_ions'],
+                rl_config['new_output_layer']['freeze_old_weights']
+            )
+
+            if rl_config['new_output_layer']['freeze_old_weights']:
+                wandb.log({'freeze_old_regressor_weights': 1})
+
+                def release_callback():
+                    change_layers.release_old_regressor(self.model)
+                    wandb.log({'freeze_old_regressor_weights': 0})
+
+                self.recompile_callbacks.append(RecompileCallback(
+                    epoch=rl_config['new_output_layer']['release_after_epochs'],
+                    callback=release_callback
+                ))
+
         if 'new_input_layer' in rl_config:
             # new_alphabet = self.get_alphabet(rl_config['new_input_layer']['new_alphabet'])
             new_mods = rl_config['new_input_layer']['new_mods']

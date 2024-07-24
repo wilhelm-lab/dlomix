@@ -11,7 +11,7 @@ training:
   learning_rate: 0.0001
   num_epochs: 20
   early_stopping:
-    min_delta: 0.00001
+    min_delta: 0.0001
     patience: 5
   lr_scheduler_plateau:
     cooldown: 1
@@ -23,8 +23,8 @@ training:
     end_lr: 0.0001
 refinement_transfer_learning:
   freeze_layers:
-    is_first_layer_trainable: false
-    is_last_layer_trainable: true
+    is_first_layer_trainable: true
+    is_last_layer_trainable: false
   new_input_layer:
     new_alphabet: PTMS_ALPHABET
     freeze_old_weights: true

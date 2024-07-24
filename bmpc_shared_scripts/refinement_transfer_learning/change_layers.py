@@ -82,9 +82,21 @@ def release_old_regressor(model: PrositIntensityPredictor):
     Args:
         model (PrositIntensityPredictor): the model where to release the regressor
     """
-    if model.regressor.get_layer('time_dense').kernel_constraint is not None:
-        model.regressor.get_layer('time_dense').kernel_constraint.freeze_weights = False
-        model.regressor.get_layer('time_dense').bias_constraint.freeze_weights = False
+    if model.regressor.get_layer('time_dense').layer.kernel_constraint is not None:
+        model.regressor.get_layer('time_dense').layer.kernel_constraint.freeze_weights = False
+        model.regressor.get_layer('time_dense').layer.bias_constraint.freeze_weights = False
+
+
+def freeze_old_regressor(model: PrositIntensityPredictor):
+    """Function to freeze the pre-trained regressor of a re-initialized regressor layer of the Prosit model
+    The freeze_weights parameter changes the constraint, so that the weights do not get overwritten by the old weights.
+
+    Args:
+        model (PrositIntensityPredictor): the model where to freeze the regressor
+    """
+    if model.regressor.get_layer('time_dense').layer.kernel_constraint is not None:
+        model.regressor.get_layer('time_dense').layer.kernel_constraint.freeze_weights = False
+        model.regressor.get_layer('time_dense').layer.bias_constraint.freeze_weights = False
 
 
 @keras.saving.register_keras_serializable()
@@ -143,3 +155,13 @@ def release_old_embeddings(model: PrositIntensityPredictor):
     """
     if model.get_layer('embedding').embeddings_constraint is not None:
         model.get_layer('embedding').embeddings_constraint.freeze_weights = False
+    
+def freeze_old_embeddings(model: PrositIntensityPredictor):
+    """Function to freeze the pre-trained embeddings of a re-initialized embedding layer of the Prosit model
+    The freeze_weights parameter changes the constraint, so that the weights do not get overwritten by the old weights.
+
+    Args:
+        model (PrositIntensityPredictor): model with a changed embedding layer named 'embedding'
+    """
+    if model.get_layer('embedding').embeddings_constraint is not None:
+        model.get_layer('embedding').embeddings_constraint.freeze_weights = True
