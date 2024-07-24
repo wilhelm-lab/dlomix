@@ -134,8 +134,8 @@ class PeptideDataset:
         auto_cleanup_cache: bool = True,
         num_proc: Optional[int] = None,
         batch_processing_size: Optional[int] = 1000,
-        inference_only: Optional[bool] = False,
-        ion_types: Optional[List[str]] = None
+        inference_only: bool = False,
+        ion_types: Optional[List[str]] = None,
     ):
         super(PeptideDataset, self).__init__()
         self.data_source = data_source
@@ -154,7 +154,7 @@ class PeptideDataset:
         self.batch_size = batch_size
         self.model_features = model_features
         self.inference_only = inference_only
-        if inference_only:
+        if isinstance(inference_only, bool) and inference_only:
             self.label_column = None
         # y and b ions are the standard ions which are used for Prosit
         self.ion_types = ['y', 'b'] if ion_types is None else ion_types
