@@ -97,6 +97,7 @@ class AutomaticRlTlTraining:
     current_epoch_offset : int = 0
     callbacks : list = []
     training_schedule : list = []
+    validation_steps : Optional[int]
 
     def __init__(self, config : AutomaticRlTlTrainingConfig):
         self.config = config
@@ -230,11 +231,15 @@ class AutomaticRlTlTraining:
                     wandb.log({'epoch_total': epoch + self.current_epoch_offset})
 
             self.callbacks = [WandbCallback(save_model=False, log_batch_frequency=True, verbose=1), LearningRateReporter(), RealEpochReporter()]
+        
+
+        num_val_batches = self.config.dataset.tensor_val_data.cardinality().numpy()
+        self.validation_steps = 1000 if num_val_batches > 1000 else None
 
     def _evaluate_model(self):
         loss, metric = self.model.evaluate(
             self.config.dataset.tensor_val_data,
-            steps=1000
+            steps=self.validation_steps
         )
 
         print(f'validation loss: {loss}, pearson distance: {metric}')
@@ -320,7 +325,8 @@ class AutomaticRlTlTraining:
                 dataset=self.config.dataset,
                 current_epoch_offset=self.current_epoch_offset,
                 wandb_logging=self.config.use_wandb,
-                callbacks=self.callbacks
+                callbacks=self.callbacks,
+                validation_steps=self.validation_steps
             )
             training.run()
 
@@ -342,19 +348,30 @@ class AutomaticRlTlTrainingInstance:
     current_epoch_offset : int
     wandb_logging : bool
     callbacks : list
+    validation_steps : Optional[int]
 
     stopped_early : bool
     final_learning_rate : float
     inflection_early_stopping : Optional[InflectionPointEarlyStopping] = None
 
 
-    def __init__(self, instance_config : TrainingInstanceConfig, model : PrositIntensityPredictor, current_epoch_offset : int, dataset : FragmentIonIntensityDataset, wandb_logging : bool, callbacks : list):
+    def __init__(
+            self,
+            instance_config : TrainingInstanceConfig,
+            model : PrositIntensityPredictor,
+            current_epoch_offset : int,
+            dataset : FragmentIonIntensityDataset,
+            wandb_logging : bool,
+            callbacks : list,
+            validation_steps : Optional[int]
+        ):
         self.instance_config = instance_config
         self.model = model
         self.dataset = dataset
         self.current_epoch_offset = current_epoch_offset
         self.wandb_logging = wandb_logging
         self.callbacks = callbacks.copy()
+        self.validation_steps = validation_steps
 
         self._configure_training()
 
@@ -463,7 +480,7 @@ class AutomaticRlTlTrainingInstance:
         history = self.model.fit(
             self.dataset.tensor_train_data,
             validation_data=self.dataset.tensor_val_data,
-            validation_steps=1000,
+            validation_steps=self.validation_steps,
             epochs=self.instance_config.num_epochs,
             callbacks=self.callbacks
         )
