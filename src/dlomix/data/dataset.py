@@ -43,13 +43,15 @@ class PeptideDataset:
     test_data_source : Union[str, List]
         Path to the test data source file or list of paths to the test data source files.
     data_format : str
-        Format of the data source file(s). Example formats are 'csv', 'json', 'parquet', etc.
+        Format of the data source file(s). Example formats are 'csv', 'json', 'parquet', etc. Use 'hub' for datasets from the Hugging Face Hub and 'hf' for in-memory HF Dataset/DatasetDict objects.
     sequence_column : str
         Name of the column in the data source file that contains the peptide sequences.
     label_column : str
         Name of the column in the data source file that contains the labels.
     val_ratio : float
         Ratio of the validation data to the training data. The value should be between 0 and 1.
+    test_ratio : float
+        Ratio of the test data to the validation data. The value should be between 0 and 1. (Splits the validation data again, not the train data.)
     max_seq_len : int
         Maximum sequence length to pad the sequences to. If set to 0, the sequences will not be padded.
     dataset_type : str
@@ -68,6 +70,8 @@ class PeptideDataset:
         Value to use for padding the sequences.
     alphabet : Dict
         Alphabet to use for encoding the amino acids in the sequences.
+    with_termini : bool
+        Flag to indicate whether to include the N- and C-termini []- and -[] in the sequences.
     encoding_scheme : Union[str, EncodingScheme]
         Encoding scheme to use for encoding the sequences. Possible values are "unmod" and "naive-mods" for unmodified sequences and sequences with PTMs respectively.
     processed : bool
@@ -100,7 +104,7 @@ class PeptideDataset:
         Create a PeptideDataset object from a DatasetConfig object.
     """
 
-    DEFAULT_SPLIT_NAMES = ["train", "val", "test"]
+    DEFAULT_SPLIT_NAMES = ["train", "val", "test", "inference"]
     CONFIG_JSON_NAME = "dlomix_peptide_dataset_config.json"
 
     def __init__(
@@ -112,6 +116,7 @@ class PeptideDataset:
         sequence_column: str,
         label_column: str,
         val_ratio: float,
+        test_ratio: float,
         max_seq_len: int,
         dataset_type: str,
         batch_size: int,
@@ -121,6 +126,7 @@ class PeptideDataset:
         pad: bool = True,
         padding_value: int = 0,
         alphabet: Dict = ALPHABET_UNMOD,
+        with_termini: bool = True,
         encoding_scheme: Union[str, EncodingScheme] = EncodingScheme.UNMOD,
         processed: bool = False,
         enable_tf_dataset_cache: bool = False,
@@ -128,6 +134,8 @@ class PeptideDataset:
         auto_cleanup_cache: bool = True,
         num_proc: Optional[int] = None,
         batch_processing_size: Optional[int] = 1000,
+        inference_only: bool = False,
+        ion_types: Optional[List[str]] = None,
     ):
         super(PeptideDataset, self).__init__()
         self.data_source = data_source
@@ -140,10 +148,16 @@ class PeptideDataset:
         self.label_column = label_column
 
         self.val_ratio = val_ratio
+        self.test_ratio = test_ratio
         self.max_seq_len = max_seq_len
         self.dataset_type = dataset_type
         self.batch_size = batch_size
         self.model_features = model_features
+        self.inference_only = inference_only
+        if isinstance(inference_only, bool) and inference_only:
+            self.label_column = None
+        # y and b ions are the standard ions which are used for Prosit
+        self.ion_types = ['y', 'b'] if ion_types is None else ion_types
 
         # to be kept in the hf dataset, but not returned in the tensor dataset
         if dataset_columns_to_keep is None:
@@ -155,6 +169,7 @@ class PeptideDataset:
         self.pad = pad
         self.padding_value = padding_value
         self.alphabet = alphabet
+        self.with_termini = with_termini
         self.encoding_scheme = EncodingScheme(encoding_scheme)
         self.processed = processed
         self.enable_tf_dataset_cache = enable_tf_dataset_cache
@@ -170,6 +185,7 @@ class PeptideDataset:
             self.hf_dataset: Optional[Union[Dataset, DatasetDict]] = None
             self._empty_dataset_mode = False
             self._is_predefined_split = False
+            self._is_predefined_test_split = False
             self._test_set_only = False
             self._num_proc = num_proc
             self._set_num_proc()
@@ -220,6 +236,7 @@ class PeptideDataset:
             sequence_column=self.sequence_column,
             label_column=self.label_column,
             val_ratio=self.val_ratio,
+            test_ratio=self.test_ratio,
             max_seq_len=self.max_seq_len,
             dataset_type=self.dataset_type,
             batch_size=self.batch_size,
@@ -231,6 +248,7 @@ class PeptideDataset:
             alphabet=self.alphabet,
             encoding_scheme=self.encoding_scheme,
             processed=self.processed,
+            inference_only=self.inference_only
         )
 
         self._config._additional_data.update(
@@ -244,6 +262,14 @@ class PeptideDataset:
         self._config._additional_data.update({"cls": self.__class__.__name__})
 
     def _load_dataset(self):
+        if self.data_format == "hub":
+            self._load_from_hub()
+            return
+
+        if self.data_format == "hf":
+            self._load_from_inmemory_hf_dataset()
+            return
+
         data_sources = [self.data_source, self.val_data_source, self.test_data_source]
 
         for split_name, source in zip(PeptideDataset.DEFAULT_SPLIT_NAMES, data_sources):
@@ -255,12 +281,59 @@ class PeptideDataset:
             warnings.warn(
                 "No data files provided, please provide at least one data source if you plan to use this dataset directly. Otherwise, you can later load data into this empty dataset"
             )
-
         else:
             self._empty_dataset_mode = False
 
             self.hf_dataset = load_dataset(
                 self.data_format, data_files=self._data_files_available_splits
+            )
+
+    def _load_from_hub(self):
+        self.hf_dataset = load_dataset(self.data_source)
+        self._empty_dataset_mode = False
+        warnings.warn(
+            'The provided data is assumed to be hosted on the Hugging Face Hub since data_format is set to "hub". Validation and test data sources will be ignored.'
+        )
+        if isinstance(self.hf_dataset, DatasetDict):
+            for split in self.hf_dataset.keys():
+                if split not in PeptideDataset.DEFAULT_SPLIT_NAMES:
+                    raise ValueError(
+                        f"The split name {split} is not a valid split name. Please use one of the default split names: {PeptideDataset.DEFAULT_SPLIT_NAMES}."
+                    )
+            self._data_files_available_splits = {
+                split: f"HF hub dataset - {self.data_source} - {split}"
+                for split in self.hf_dataset
+            }
+
+        else:
+            self._data_files_available_splits = {
+                PeptideDataset.DEFAULT_SPLIT_NAMES[
+                    0
+                ]: f"HF hub dataset - {self.data_source}"
+            }
+
+    def _load_from_inmemory_hf_dataset(self):
+        self._empty_dataset_mode = False
+        warnings.warn(
+            f'The provided data is assumed to be an in-memory Hugging Face Dataset or DatasetDict object since data_format is set to "hf". Validation and test data sources will be ignored and the split names of the DatasetDict has to follow the default namings {PeptideDataset.DEFAULT_SPLIT_NAMES}.'
+        )
+
+        if isinstance(self.data_source, DatasetDict):
+            self.hf_dataset = self.data_source
+            self._data_files_available_splits = dict.fromkeys(self.hf_dataset)
+            self._data_files_available_splits = {
+                split: f"in-memory Dataset object - {split}"
+                for split in self.hf_dataset
+            }
+        elif isinstance(self.data_source, Dataset):
+            self.hf_dataset = DatasetDict()
+            self.hf_dataset[PeptideDataset.DEFAULT_SPLIT_NAMES[0]] = self.data_source
+            self._data_files_available_splits = {
+                PeptideDataset.DEFAULT_SPLIT_NAMES[0]: "in-memory Dataset object"
+            }
+        else:
+            raise ValueError(
+                "The provided data source is not a valid Hugging Face Dataset/DatasetDict object. The data_format value should be set to 'hf' if you plan to use an in-memory Hugging Face Dataset/DatasetDict object."
             )
 
     def _decide_on_splitting(self):
@@ -272,11 +345,15 @@ class PeptideDataset:
                 self._test_set_only = True
             if self.val_data_source is not None:
                 self._is_predefined_split = True
+            if self.test_ratio == 0.0 or self.test_ratio is None:
+                self._is_predefined_test_split = True
 
         # two or more data sources provided -> no splitting in all cases
         if count_loaded_data_sources >= 2:
             if self.val_data_source is not None:
                 self._is_predefined_split = True
+            if self.test_data_source is not None:
+                self._is_predefined_test_split = True
 
         if self._is_predefined_split:
             warnings.warn(
@@ -287,7 +364,17 @@ class PeptideDataset:
             )
 
     def _remove_unnecessary_columns(self):
-        self._relevant_columns = [self.sequence_column, self.label_column]
+        # if inference only dataset, no sequence column necessary
+        if self.inference_only:
+            warnings.warn(
+                """
+                This is a inference only dataset! You can only make predictions with this dataset! Attempting to
+                train a model with this dataset will result in an error!
+                """
+            )
+            self._relevant_columns = [self.sequence_column]
+        else:
+            self._relevant_columns = [self.sequence_column, self.label_column]
 
         if self.model_features is not None:
             self._relevant_columns.extend(self.model_features)
@@ -302,9 +389,14 @@ class PeptideDataset:
     def _split_dataset(self):
         if self._is_predefined_split or self._test_set_only:
             return
+        
+        if self.inference_only:
+            # if inference only dataset -> only keep the inference dataset and remove the train set
+            self.hf_dataset["inference"] = self.hf_dataset[PeptideDataset.DEFAULT_SPLIT_NAMES[0]]
+            self.hf_dataset.pop(PeptideDataset.DEFAULT_SPLIT_NAMES[0])
+            return
 
         # only a train dataset or a train and a test but no val -> split train into train/val
-
         splitted_dataset = self.hf_dataset[
             PeptideDataset.DEFAULT_SPLIT_NAMES[0]
         ].train_test_split(test_size=self.val_ratio)
@@ -312,15 +404,29 @@ class PeptideDataset:
         self.hf_dataset["train"] = splitted_dataset["train"]
         self.hf_dataset["val"] = splitted_dataset["test"]
 
+        # if test set is not specified -> split train set into test set and remaining train set
+        if self._is_predefined_test_split:
+            del splitted_dataset["train"]
+            del splitted_dataset["test"]
+            del splitted_dataset
+            return
+        
+        self.test_ratio = self.test_ratio / (1 - self.val_ratio)
+        splitted_dataset = self.hf_dataset["train"].train_test_split(test_size=self.test_ratio)
+        self.hf_dataset["train"] = splitted_dataset["train"]
+        self.hf_dataset["test"] = splitted_dataset["test"]
+        
         del splitted_dataset["train"]
         del splitted_dataset["test"]
         del splitted_dataset
+        
 
     def _parse_sequences(self):
         # parse sequence in all encoding schemes
         sequence_parsing_processor = SequenceParsingProcessor(
             self.sequence_column,
             batched=True,
+            with_termini=self.with_termini,
         )
 
         self.dataset_columns_to_keep.extend(
@@ -541,6 +647,7 @@ If you prefer to encode the (amino-acids)+PTM combinations as tokens in the voca
             sequence_column=config.sequence_column,
             label_column=config.label_column,
             val_ratio=config.val_ratio,
+            test_ratio=config.test_ratio,
             max_seq_len=config.max_seq_len,
             dataset_type=config.dataset_type,
             batch_size=config.batch_size,
@@ -552,6 +659,8 @@ If you prefer to encode the (amino-acids)+PTM combinations as tokens in the voca
             alphabet=config.alphabet,
             encoding_scheme=config.encoding_scheme,
             processed=config.processed,
+            inference_only=config.inference_only,
+            ion_types=config.ion_types,
         )
 
         for k, v in config._additional_data.items():
@@ -586,7 +695,10 @@ If you prefer to encode the (amino-acids)+PTM combinations as tokens in the voca
         input_tensor_columns = self._relevant_columns.copy()
 
         # remove the label column from the input tensor columns since the to_tf_dataset method has a separate label_cols argument
-        input_tensor_columns.remove(self.label_column)
+        try:
+            input_tensor_columns.remove(self.label_column)
+        except ValueError as e:
+            pass
 
         # remove the columns that are not needed in the tensor dataset
         input_tensor_columns = list(
@@ -626,6 +738,16 @@ If you prefer to encode the (amino-acids)+PTM combinations as tokens in the voca
         if self.enable_tf_dataset_cache:
             tf_dataset = tf_dataset.cache()
 
+        return tf_dataset
+    
+    @property
+    def tensor_inference_data(self):
+        """TensorFlow Dataset object for the inference data"""
+        tf_dataset = self._get_split_tf_dataset(PeptideDataset.DEFAULT_SPLIT_NAMES[3])
+
+        if self.enable_tf_dataset_cache:
+            tf_dataset = tf_dataset.cache()
+        
         return tf_dataset
 
     def _get_split_tf_dataset(self, split_name: str):

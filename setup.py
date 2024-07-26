@@ -19,7 +19,7 @@ setuptools.setup(
     packages=setuptools.find_packages(where="src"),
     package_dir={"": "src"},
     include_package_data=True,
-    package_data={"": ["data/processing/pickled_feature_dicts/*"]},
+    package_data={"": ["data/processing/pickled_feature_dicts/*", "prosit_baseline_model.txt"]},
     install_requires=[
         "datasets",
         "fpdf",
