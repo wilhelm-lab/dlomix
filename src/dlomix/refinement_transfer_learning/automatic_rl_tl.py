@@ -2,16 +2,13 @@ import yaml
 import os
 import uuid
 
-import wandb
-from wandb.integration.keras import WandbCallback
-
 import tensorflow as tf
 from tensorflow.keras.callbacks import EarlyStopping, ReduceLROnPlateau, LearningRateScheduler
 
 import change_layers
 import freezing
 # from recompile_callbacks import *
-from custom_callbacks import InflectionPointEarlyStopping, LearningRateWarmupPerStep, InflectionPointLRReducer
+from .custom_callbacks import InflectionPointEarlyStopping, LearningRateWarmupPerStep, InflectionPointLRReducer
 
 from dlomix.constants import PTMS_ALPHABET, ALPHABET_NAIVE_MODS, ALPHABET_UNMOD
 from dlomix.data import load_processed_dataset, FragmentIonIntensityDataset
@@ -113,6 +110,11 @@ class AutomaticRlTlTraining:
         """ Initializes Weights & Biases Logging if the user requested that in the config.
         """
         if self.config.use_wandb:
+            global wandb
+            global WandbCallback
+            import wandb
+            from wandb.integration.keras import WandbCallback
+
             wandb.init(
                 project=self.config.wandb_project,
                 config=self.config.to_dict(),
@@ -443,7 +445,8 @@ class AutomaticRlTlTrainingInstance:
             self.inflection_early_stopping = InflectionPointEarlyStopping(
                 min_improvement=self.instance_config.inflection_early_stopping_min_improvement,
                 patience=self.instance_config.inflection_early_stopping_patience,
-                ignore_first_n=self.instance_config.inflection_early_stopping_ignore_first_n
+                ignore_first_n=self.instance_config.inflection_early_stopping_ignore_first_n,
+                wandb_log=self.wandb_logging
             )
             
             self.callbacks.append(self.inflection_early_stopping)
@@ -453,7 +456,8 @@ class AutomaticRlTlTrainingInstance:
             reduce_lr = InflectionPointLRReducer(
                 factor=self.instance_config.inflection_lr_reducer_factor,
                 patience=self.instance_config.inflection_lr_reducer_patience,
-                min_improvement=self.instance_config.inflection_lr_reducer_min_improvement
+                min_improvement=self.instance_config.inflection_lr_reducer_min_improvement,
+                wandb_log=self.wandb_logging
             ) 
 
             self.callbacks.append(reduce_lr)
