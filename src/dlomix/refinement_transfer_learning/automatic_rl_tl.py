@@ -22,9 +22,22 @@ import math
 
 @dataclass
 class AutomaticRlTlTrainingConfig:
+    """Configuration for an automatic refinement/transfer learning run.
+
+    Attributes:
+        dataset (FragmentIonIntensityDataset): Dataset that should be used for training. The datasets needs a train and validation split and must not be an inference-only dataset.
+        baseline_model (Optional[PrositIntensityPredictor]): If a model is provided, this model is used as baseline for training. If no model is specified, a new model is trained from scratch.
+        min_warmup_sequences_new_weights (int): Determines, the length the learning rate warmup phase in phase 1 of the automatic training pipeline (training of newly added weights). Default: 4000000
+        min_warmup_sequences_whole_model (int): Determines, the length the learning rate warmup phase in phase 2 of the automatic training pipeline (training of all weights in the model). Default: 4000000
+        improve_further (bool): Determines whether a third training phase is performed which has more restrictive early stopping criterions and learning rate scheduling. Default: True
+        use_wandb (bool): Determines whether to use wandb to log the training run. Wandb needs to be installed as dependency if this is set to True. Default: False
+        wandb_project (str): Selects the wandb project that the run should correspond to. This is ignored if use_wandb is set to False. Default: "DLOmix_auto_RL_TL"
+        wandb_tags (list[str]): List of wandb tags to add to the run. This is ignored if use_wandb is set to False. Default: [] 
+    """
+
     # dataset/model parameters
     dataset : FragmentIonIntensityDataset 
-    baseline_model : Optional[PrositIntensityPredictor] = None
+    baseline_model : Optional[PrositIntensityPredictor]
 
     # training parameters
     min_warmup_sequences_new_weights : int = 4000000
@@ -38,7 +51,7 @@ class AutomaticRlTlTrainingConfig:
 
     
     def to_dict(self):
-        """Converts configuration to a python dict object.
+        """Converts configuration to a python dict object. Only attributes are included which can be easily represented as text.
 
         Returns:
             dict: Configuration options as dictionary
@@ -97,6 +110,20 @@ class AutomaticRlTlTraining:
     validation_steps : Optional[int]
 
     def __init__(self, config : AutomaticRlTlTrainingConfig):
+        """Automatic refinement/transfer learning given a dataset and optionally an existing model. The training process consists of the following phases:
+        
+        Phase 1:
+            This phase is only performed, if new weights were added to the model in the embedding or regressor layer (extended embedding or additional ions). Only the new weights are trained while all other weights are frozen. The training process starts with a learning rate warmup. The phase automatically stops as soon as no major improvements are detected anymore.
+
+        Phase 2:
+            This phase resembles the main training process. All weights are trained and no freezing is applied. The phase starts with a learning rate warmup and automatically stops as soon as no major improvements are detected anymore.
+        
+        Phase 3:
+            Optional finetuning phase that is only performed if config.improve_further is set to True. This phase starts with a slightly lower learning rate than the one used in phase 2 and reduces the learning rate when as no significant improvement can be detected anymore. The phase stops automatically as soon as no improvements are detected over a longer period.
+
+        Args:
+            config (AutomaticRlTlTrainingConfig): Contains all relevant configuration parameters for performing the automatic refinement/transfer learning process. Please refer to the documentation of AutomaticRlTlTrainingConfig for further documentation.
+        """
         self.config = config
 
         self._init_wandb()
@@ -123,6 +150,8 @@ class AutomaticRlTlTraining:
 
         
     def _init_model(self):
+        """Configures the given baseline model or creates a new model if no baseline model is provided in the config.
+        """
         if self.config.baseline_model is not None:
             self.model = self.config.baseline_model
             self.is_new_model = False
@@ -148,6 +177,8 @@ class AutomaticRlTlTraining:
             self.is_new_model = True
 
     def _update_model_inputs(self):
+        """Modifies the model's embedding layer to fit the provided dataset. All decisions here are made automatically based on the provided model and dataset.
+        """
         model_alphabet = self.model.alphabet
         dataset_alphabet = self.config.dataset.alphabet
 
@@ -181,6 +212,11 @@ class AutomaticRlTlTraining:
             self.model.alphabet = dataset_alphabet
 
     def _update_model_outputs(self):
+        """Modifies the model's regressor layer to fit the provided dataset. All decisions here are made automatically based on the provided model and dataset.
+
+        Raises:
+            RuntimeError: Error is raised if the model and the dataset have a different sequence length. A mismatch in the sequence length is not supported.
+        """
         # check that sequence length matches
         if self.model.seq_length != self.config.dataset.max_seq_len:
             raise RuntimeError(f"Max. sequence length does not match between dataset and model (dataset: {self.config.dataset.max_seq_len}, model: {self.model.seq_length})")
@@ -223,6 +259,8 @@ class AutomaticRlTlTraining:
             self.model.ion_types = dataset_ions
 
     def _init_training(self):
+        """Configures relevant training settings that are used across all phases of the training.
+        """
         if self.config.use_wandb:
             class LearningRateReporter(tf.keras.callbacks.Callback):
                 def on_train_batch_end(self, batch, *args):
@@ -239,6 +277,8 @@ class AutomaticRlTlTraining:
         self.validation_steps = 1000 if num_val_batches > 1000 else None
 
     def _evaluate_model(self):
+        """Runs an evaluation over max. 1000 batches of the validation set and logs the validation performance.
+        """
         loss, metric = self.model.evaluate(
             self.config.dataset.tensor_val_data,
             steps=self.validation_steps
@@ -249,6 +289,8 @@ class AutomaticRlTlTraining:
             wandb.log({'val_loss': loss, 'val_masked_pearson_correlation_distance': metric})
 
     def _construct_training_schedule(self):
+        """Configures the phases of the training process based on the given config and the provided dataset and model.
+        """
         self.training_schedule = []
 
         num_train_batches = self.config.dataset.tensor_train_data.cardinality().numpy()
@@ -318,6 +360,11 @@ class AutomaticRlTlTraining:
 
 
     def train(self):
+        """Performs the training process and returns the final model.
+
+        Returns:
+            PrositIntensityPredictor: The refined model that results from the training process. This model can be used for predictions or further training steps.
+        """
         self._evaluate_model()
 
         for instance_config in self.training_schedule:
