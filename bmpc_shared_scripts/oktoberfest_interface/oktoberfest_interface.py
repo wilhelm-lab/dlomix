@@ -79,6 +79,7 @@ def process_dataset(
         modifications: list = None,
         ion_types: list = None,
         label_column: str = 'intensities_raw',
+        batch_size: int = 1024,
         val_ratio: float = 0.2,
         test_ratio: float = 0.0
         ) -> FragmentIonIntensityDataset:
@@ -172,6 +173,7 @@ def process_dataset(
         label_column=label_column,
         inference_only=inference_only,
         val_ratio=val_ratio,
+        batch_size=batch_size,
         test_ratio=test_ratio,
         alphabet=new_alphabet,
         encoding_scheme='naive-mods',
