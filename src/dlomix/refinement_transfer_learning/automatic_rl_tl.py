@@ -5,8 +5,8 @@ import uuid
 import tensorflow as tf
 from tensorflow.keras.callbacks import EarlyStopping, ReduceLROnPlateau, LearningRateScheduler
 
-import change_layers
-import freezing
+import dlomix.refinement_transfer_learning.change_layers as change_layers
+import dlomix.refinement_transfer_learning.freezing as freezing
 # from recompile_callbacks import *
 from .custom_callbacks import InflectionPointEarlyStopping, LearningRateWarmupPerStep, InflectionPointLRReducer
 
