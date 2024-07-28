@@ -1,6 +1,7 @@
 import warnings
 import os
 import requests
+import logging
 import importlib.resources as pkg_resources
 from copy import deepcopy
 import tensorflow as tf
@@ -12,6 +13,9 @@ import dlomix
 from dlomix.losses import masked_spectral_distance
 from dlomix.data.fragment_ion_intensity import FragmentIonIntensityDataset
 from dlomix.models.prosit import PrositIntensityPredictor
+
+logger = logging.getLogger(__name__)
+logger.propagate = False
 
 MODEL_FILENAME = 'prosit_baseline_model.keras'
 MODEL_DIR = Path.home() / '.dlomix' / 'models'
@@ -27,10 +31,10 @@ def download_model_from_github():
     model_path = MODEL_DIR / MODEL_FILENAME
 
     if model_path.exists():
-        print(f'Using cached model: {str(model_path)}')
+        logger.info(f'Using cached model: {str(model_path)}')
         return model_path
     
-    print('Start downloading model from GitHub...')
+    logger.info('Start downloading model from GitHub...')
     model_url = get_model_url()
     response = requests.get(model_url)
     response.raise_for_status()
@@ -75,6 +79,7 @@ def process_dataset(
         modifications: list = None,
         ion_types: list = None,
         label_column: str = 'intensities_raw',
+        batch_size: int = 1024,
         val_ratio: float = 0.2,
         test_ratio: float = 0.0
         ) -> FragmentIonIntensityDataset:
@@ -131,7 +136,7 @@ def process_dataset(
     if not difference:
         new_alphabet = model.alphabet
     else:
-        warnings.warn(
+        logger.warning(
             """
             There are new tokens in the dataset, which are not supported by the loaded model.
             Either load a different model or transfer learning needs to be done.
@@ -142,32 +147,33 @@ def process_dataset(
     # check for new ion types
     if any([ion_type in ['c', 'z', 'a', 'x'] for ion_type in ion_types]):
         if len(ion_types) == 2:
-            warnings.warn(
+            logger.warning(
                 """
                 Number of ions is the same as the loaded model supports, but the ion types are different.
                 The model probably needs to be refined to achieve a better performance on these new ion types.
                 """)
         if len(ion_types) > 2:
             if 'y' in ion_types and 'b' in ion_types:
-                warnings.warn(
+                logger.warning(
                     """
                     New Ion types in addition to y and b ions detected.
                     A new output layer is necessary, but it can keep trained weights for y and b ions.
                     """)
             else:
-                warnings.warn(
+                logger.warning(
                     """
                     Only new ion types are detected. A totally new output layer is necessary.
                     """
                 )
 
-    print('Start processing the dataset...')
+    logger.info('Start processing the dataset...')
     dataset = FragmentIonIntensityDataset(
         data_source=parquet_file_path,
         data_format='parquet',
         label_column=label_column,
         inference_only=inference_only,
         val_ratio=val_ratio,
+        batch_size=batch_size,
         test_ratio=test_ratio,
         alphabet=new_alphabet,
         encoding_scheme='naive-mods',
@@ -175,6 +181,6 @@ def process_dataset(
         ion_types=ion_types,
     )
 
-    print(f'The available data splits are: {", ".join(list(dataset.hf_dataset.keys()))}')
+    logger.info(f'The available data splits are: {", ".join(list(dataset.hf_dataset.keys()))}')
 
     return dataset
