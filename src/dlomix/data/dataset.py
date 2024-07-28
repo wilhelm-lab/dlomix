@@ -134,7 +134,8 @@ class PeptideDataset:
         auto_cleanup_cache: bool = True,
         num_proc: Optional[int] = None,
         batch_processing_size: Optional[int] = 1000,
-        inference_only: Optional[bool] = False
+        inference_only: bool = False,
+        ion_types: Optional[List[str]] = None,
     ):
         super(PeptideDataset, self).__init__()
         self.data_source = data_source
@@ -153,8 +154,10 @@ class PeptideDataset:
         self.batch_size = batch_size
         self.model_features = model_features
         self.inference_only = inference_only
-        if inference_only:
+        if isinstance(inference_only, bool) and inference_only:
             self.label_column = None
+        # y and b ions are the standard ions which are used for Prosit
+        self.ion_types = ['y', 'b'] if ion_types is None else ion_types
 
         # to be kept in the hf dataset, but not returned in the tensor dataset
         if dataset_columns_to_keep is None:
@@ -362,7 +365,7 @@ class PeptideDataset:
 
     def _remove_unnecessary_columns(self):
         # if inference only dataset, no sequence column necessary
-        if self.ƒly:
+        if self.inference_only:
             warnings.warn(
                 """
                 This is a inference only dataset! You can only make predictions with this dataset! Attempting to
@@ -657,6 +660,7 @@ If you prefer to encode the (amino-acids)+PTM combinations as tokens in the voca
             encoding_scheme=config.encoding_scheme,
             processed=config.processed,
             inference_only=config.inference_only,
+            ion_types=config.ion_types,
         )
 
         for k, v in config._additional_data.items():
