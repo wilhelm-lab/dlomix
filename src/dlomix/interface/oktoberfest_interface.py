@@ -120,8 +120,26 @@ def process_dataset(
     if model is None:
         model = load_keras_model('baseline')
 
+    val_data_source, test_data_source = None, None
     if not parquet_file_path.endswith('.parquet'):
-        raise ValueError('The specified file is not a parquet file! Please specify a path with the .parquet extension.')
+        # check if dataset is already split
+        train_path = parquet_file_path + '_train.parquet'
+        val_data_path = parquet_file_path + '_val.parquet'
+        test_data_path = parquet_file_path + '_test.parquet'
+
+        # check if the train split exists, if not -> raise ValueError (val and test split are not necessary)
+        if not Path(train_path).exists():
+            raise ValueError('The specified file is not a parquet file! Please specify a path with the .parquet extension.')
+        else:
+            parquet_file_path = train_path
+
+        # check if validation split exists
+        if Path(val_data_path).exists():
+            val_data_source = val_data_path 
+        # check if test split exists
+        if Path(test_data_path).exists():
+            test_data_source = test_data_path
+
     if not Path(parquet_file_path).exists():
         raise FileNotFoundError('Specified parquet file was not found. Please specify a valid parquet file.')
     
@@ -169,6 +187,8 @@ def process_dataset(
     logger.info('Start processing the dataset...')
     dataset = FragmentIonIntensityDataset(
         data_source=parquet_file_path,
+        val_data_source=val_data_source,
+        test_data_source=test_data_source,
         data_format='parquet',
         label_column=label_column,
         inference_only=inference_only,
