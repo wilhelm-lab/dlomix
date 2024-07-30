@@ -175,6 +175,13 @@ class AutomaticRlTlTraining:
                 meta_data_keys=meta_data_keys
             )
             self.is_new_model = True
+        
+        optimizer = tf.keras.optimizers.Adam(learning_rate=1e-4)
+        self.model.compile(
+            optimizer=optimizer,
+            loss=masked_spectral_distance,
+            metrics=[masked_pearson_correlation_distance]
+        )
 
     def _update_model_inputs(self):
         """Modifies the model's embedding layer to fit the provided dataset. All decisions here are made automatically based on the provided model and dataset.
