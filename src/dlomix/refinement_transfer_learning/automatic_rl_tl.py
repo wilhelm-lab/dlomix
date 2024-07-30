@@ -5,11 +5,9 @@ import uuid
 import tensorflow as tf
 from tensorflow.keras.callbacks import EarlyStopping, ReduceLROnPlateau, LearningRateScheduler
 
-import dlomix.refinement_transfer_learning.change_layers as change_layers
-import dlomix.refinement_transfer_learning.freezing as freezing
-# from recompile_callbacks import *
 from .custom_callbacks import InflectionPointEarlyStopping, LearningRateWarmupPerStep, InflectionPointLRReducer
 
+from dlomix.refinement_transfer_learning import change_layers, freezing
 from dlomix.constants import PTMS_ALPHABET, ALPHABET_NAIVE_MODS, ALPHABET_UNMOD
 from dlomix.data import load_processed_dataset, FragmentIonIntensityDataset
 from dlomix.models import PrositIntensityPredictor
