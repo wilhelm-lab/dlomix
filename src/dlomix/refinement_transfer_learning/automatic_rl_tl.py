@@ -5,15 +5,13 @@ import uuid
 import tensorflow as tf
 from tensorflow.keras.callbacks import EarlyStopping, ReduceLROnPlateau, LearningRateScheduler
 
-import change_layers
-import freezing
-# from recompile_callbacks import *
 from .custom_callbacks import InflectionPointEarlyStopping, LearningRateWarmupPerStep, InflectionPointLRReducer
 
 from dlomix.constants import PTMS_ALPHABET, ALPHABET_NAIVE_MODS, ALPHABET_UNMOD
 from dlomix.data import load_processed_dataset, FragmentIonIntensityDataset
 from dlomix.models import PrositIntensityPredictor
 from dlomix.losses import masked_spectral_distance, masked_pearson_correlation_distance
+from dlomix.refinement_transfer_learning import change_layers, freezing
 
 from dataclasses import dataclass, asdict, field
 from typing import Optional
@@ -175,6 +173,13 @@ class AutomaticRlTlTraining:
                 meta_data_keys=meta_data_keys
             )
             self.is_new_model = True
+        
+        optimizer = tf.keras.optimizers.Adam(learning_rate=1e-4)
+        self.model.compile(
+            optimizer=optimizer,
+            loss=masked_spectral_distance,
+            metrics=[masked_pearson_correlation_distance]
+        )
 
     def _update_model_inputs(self):
         """Modifies the model's embedding layer to fit the provided dataset. All decisions here are made automatically based on the provided model and dataset.
