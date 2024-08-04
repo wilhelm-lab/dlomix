@@ -3,9 +3,9 @@ import os
 import uuid
 
 import tensorflow as tf
-from tensorflow.keras.callbacks import EarlyStopping, ReduceLROnPlateau, LearningRateScheduler
+from tensorflow.keras.callbacks import EarlyStopping, ReduceLROnPlateau, LearningRateScheduler, CSVLogger
 
-from .custom_callbacks import InflectionPointEarlyStopping, LearningRateWarmupPerStep, InflectionPointLRReducer
+from .custom_callbacks import CustomCSVLogger, InflectionPointEarlyStopping, LearningRateWarmupPerStep, InflectionPointLRReducer
 
 from dlomix.constants import PTMS_ALPHABET, ALPHABET_NAIVE_MODS, ALPHABET_UNMOD
 from dlomix.data import load_processed_dataset, FragmentIonIntensityDataset
@@ -125,6 +125,7 @@ class AutomaticRlTlTraining:
         self.config = config
 
         self._init_wandb()
+        self._init_logging()
         self._init_model()
         self._update_model_inputs()
         self._update_model_outputs()
@@ -145,6 +146,15 @@ class AutomaticRlTlTraining:
                 config=self.config.to_dict(),
                 tags=self.config.wandb_tags
             )
+
+    def _init_logging(self):
+        """ Initializes Weights & Biases Logging and CSV Logging if the user requested that in the config.
+        """       
+        
+        if not os.path.exists('results_log'):
+            os.makedirs('results_log')
+
+        self.csv_logger = CustomCSVLogger('results_log/training_log.csv', append=True)
 
         
     def _init_model(self):
@@ -275,8 +285,11 @@ class AutomaticRlTlTraining:
                 def on_epoch_begin(self_inner, epoch, *args):
                     wandb.log({'epoch_total': epoch + self.current_epoch_offset})
 
-            self.callbacks = [WandbCallback(save_model=False, log_batch_frequency=True, verbose=1), LearningRateReporter(), RealEpochReporter()]
-        
+            self.callbacks = [WandbCallback(save_model=False, log_batch_frequency=True, verbose=1), LearningRateReporter(), RealEpochReporter(), self.csv_logger]
+        else:         
+            self.callbacks = [             
+                self.csv_logger
+            ]        
 
         num_val_batches = self.config.dataset.tensor_val_data.cardinality().numpy()
         self.validation_steps = 1000 if num_val_batches > 1000 else None
@@ -436,20 +449,28 @@ class AutomaticRlTlTrainingInstance:
         if self.instance_config.freeze_old_embedding_weights:
             if self.wandb_logging:
                 wandb.log({'freeze_old_embedding_weights': 1})
+            with open('results_log/freeze_log.csv', 'a') as f:
+                f.write('freeze_old_embedding_weights,1\n')
             change_layers.freeze_old_embeddings(self.model)
         else:
             if self.wandb_logging:
                 wandb.log({'freeze_old_embedding_weights': 0})
+            with open('results_log/freeze_log.csv', 'a') as f:
+                f.write('freeze_old_embedding_weights,0\n')
             change_layers.release_old_embeddings(self.model)
         
         # freezing of old regressor weights
         if self.instance_config.freeze_old_regressor_weights:
             if self.wandb_logging:
                 wandb.log({'freeze_old_regressor_weights': 1})
+            with open('results_log/freeze_log.csv', 'a') as f:
+                f.write('freeze_old_regressor_weights,1\n')
             change_layers.freeze_old_regressor(self.model)
         else:
             if self.wandb_logging:
                 wandb.log({'freeze_old_regressor_weights': 0})
+            with open('results_log/freeze_log.csv', 'a') as f:
+                f.write('freeze_old_regressor_weights,0\n')
             change_layers.release_old_regressor(self.model)
 
 
@@ -467,6 +488,8 @@ class AutomaticRlTlTrainingInstance:
                     'freeze_embedding_layer': 1 if self.instance_config.freeze_whole_embedding_layer else 0,
                     'freeze_regressor_layer': 1 if self.instance_config.freeze_whole_regressor_layer else 0
                 })
+            with open('results_log/freeze_log.csv', 'a') as f:
+                f.write(f'freeze_inner_layers,1\nfreeze_embedding_layer,{1 if self.instance_config.freeze_whole_embedding_layer else 0}\nfreeze_regressor_layer,{1 if self.instance_config.freeze_whole_regressor_layer else 0}\n\n')
         else:
             if self.instance_config.freeze_whole_embedding_layer:
                 raise RuntimeError('Cannot freeze whole embedding layer without freezing inner part of the model.')
@@ -481,6 +504,8 @@ class AutomaticRlTlTrainingInstance:
                     'freeze_embedding_layer': 0,
                     'freeze_regressor_layer': 0    
                 })
+            with open('results_log/freeze_log.csv', 'a') as f:
+                f.write(f'freeze_inner_layers,0\nfreeze_embedding_layer,0\nfreeze_regressor_layer,0\n\n')
 
 
         if self.instance_config.plateau_early_stopping:

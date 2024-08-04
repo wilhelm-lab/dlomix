@@ -1,5 +1,13 @@
 import tensorflow as tf
+from tensorflow.keras.callbacks import CSVLogger
 
+
+class CustomCSVLogger(CSVLogger):
+    def on_epoch_end(self, epoch, logs=None):
+        logs = logs or {}
+        # Adding learning rate to logs
+        logs['learning_rate'] = float(tf.keras.backend.get_value(self.model.optimizer.lr))
+        super().on_epoch_end(epoch, logs)
 
 class InflectionPointDetector:
     min_improvement : float
