@@ -289,10 +289,10 @@ class AutomaticRlTlTraining:
             def on_train_batch_end(self_inner, batch, logs):
                 loss = logs['loss']
 
-                if self.min_loss is None:
-                    self.min_loss = loss
+                if self_inner.min_loss is None:
+                    self_inner.min_loss = loss
 
-                loss = min(self.min_loss, loss)
+                loss = min(self_inner.min_loss, loss)
 
                 if self_inner.counter % 1000 == 0:
                     approx_progress = min(0.9999, max(0, (self.initial_loss - loss) / (self.initial_loss - 0.1)))
@@ -386,7 +386,7 @@ class AutomaticRlTlTraining:
                 inflection_early_stopping_ignore_first_n=0,
                 inflection_early_stopping_patience=100000,
                 inflection_lr_reducer=True,
-                inflection_lr_reducer_factor=0.8,
+                inflection_lr_reducer_factor=0.5,
                 inflection_lr_reducer_min_improvement=1e-5,
                 inflection_lr_reducer_patience=5000
             ))
