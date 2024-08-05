@@ -3,9 +3,9 @@ import os
 import uuid
 
 import tensorflow as tf
-from tensorflow.keras.callbacks import EarlyStopping, ReduceLROnPlateau, LearningRateScheduler
+from tensorflow.keras.callbacks import EarlyStopping, ReduceLROnPlateau, LearningRateScheduler, CSVLogger
 
-from .custom_callbacks import InflectionPointEarlyStopping, LearningRateWarmupPerStep, InflectionPointLRReducer
+from .custom_callbacks import CustomCSVLogger, BatchEvaluationCallback, InflectionPointEarlyStopping, LearningRateWarmupPerStep, InflectionPointLRReducer
 
 from dlomix.constants import PTMS_ALPHABET, ALPHABET_NAIVE_MODS, ALPHABET_UNMOD
 from dlomix.data import load_processed_dataset, FragmentIonIntensityDataset
@@ -16,6 +16,10 @@ from dlomix.refinement_transfer_learning import change_layers, freezing
 from dataclasses import dataclass, asdict, field
 from typing import Optional
 import math
+import json
+import numpy as np
+import matplotlib.pyplot as plt
+from collections import defaultdict
 
 
 @dataclass
@@ -46,6 +50,9 @@ class AutomaticRlTlTrainingConfig:
     use_wandb : bool = False
     wandb_project : str = 'DLOmix_auto_RL_TL'
     wandb_tags : list[str] = field(default_factory=list)
+
+    # csv logger parameters
+    results_log : str = 'results_log'
 
     
     def to_dict(self):
@@ -127,11 +134,14 @@ class AutomaticRlTlTraining:
         self.config = config
 
         self._init_wandb()
+        self._init_logging()
         self._init_model()
+        self._calculate_spectral_angles('before')
         self._update_model_inputs()
         self._update_model_outputs()
         self._init_training()
         self._construct_training_schedule()
+        self._explore_data()
     
     def _init_wandb(self):
         """ Initializes Weights & Biases Logging if the user requested that in the config.
@@ -148,7 +158,15 @@ class AutomaticRlTlTraining:
                 tags=self.config.wandb_tags
             )
 
+    def _init_logging(self):
+        """ Initializes Weights & Biases Logging and CSV Logging if the user requested that in the config.
+        """       
         
+        if not os.path.exists(self.config.results_log):
+            os.makedirs(self.config.results_log)
+
+        self.csv_logger = CustomCSVLogger(f'{self.config.results_log}/training_log.csv', separator=',', append=True)
+
     def _init_model(self):
         """Configures the given baseline model or creates a new model if no baseline model is provided in the config.
         """
@@ -182,6 +200,76 @@ class AutomaticRlTlTraining:
             loss=masked_spectral_distance,
             metrics=[masked_pearson_correlation_distance]
         )
+    
+
+    def _calculate_spectral_angles(self, stage):
+        """Calculates and saves the spectral angle distributions before and after training."""
+
+        def calculate_spectral_distance(dataset, model):
+            spectral_dists = []
+            for batch, y_true in dataset:        
+                y_pred = model.predict(batch)
+                spectral_dists.extend(masked_spectral_distance(y_true=y_true, y_pred=y_pred).numpy())
+            return spectral_dists
+
+        def calculate_and_save_spectral_angle_distribution(data, model, results_log, stage, datasets=['train', 'val', 'test']):
+            """
+            Predict the intensities, calculate spectral distances, and save the spectral angle distribution for the specified datasets.
+
+            Args:
+                data: A dataset containing tensor_train_data, tensor_val_data, and tensor_test_data.
+                model: A trained model used for making predictions.
+                results_log: Directory to save the JSON files.
+                stage: A string indicating the stage ('before' or 'after').
+                datasets: A list of strings indicating which datasets to use ('train', 'val', 'test').
+
+            Returns:
+                None (saves JSON files)
+            """
+            def save_json(data, filename):
+                with open(os.path.join(results_log, filename), 'w') as f:
+                    json.dump(data, f)
+
+            for dataset in datasets:
+                if dataset == 'train':
+                    dataset_data = data.tensor_train_data
+                elif dataset == 'val':
+                    dataset_data = data.tensor_val_data
+                elif dataset == 'test':
+                    dataset_data = data.tensor_test_data
+                else:
+                    raise ValueError("Invalid dataset type. Choose 'train', 'val', or 'test'.")
+
+                spectral_dists = calculate_spectral_distance(dataset_data, model)
+                sa_data = [1 - sd for sd in spectral_dists]
+                avg_sa = np.mean(sa_data)
+
+                data_to_save = {
+                    'spectral_angles': sa_data,
+                    'average_spectral_angle': avg_sa
+                }
+
+                # Load existing data if present
+                filename = f'spectral_angle_distribution_{dataset}.json'
+                file_path = os.path.join(results_log, filename)
+                if os.path.exists(file_path):
+                    with open(file_path, 'r') as f:
+                        existing_data = json.load(f)
+                else:
+                    existing_data = {}
+
+                existing_data[stage] = data_to_save
+
+                save_json(existing_data, filename)
+
+        calculate_and_save_spectral_angle_distribution(
+            data=self.config.dataset,
+            model=self.model,
+            results_log=self.config.results_log,
+            stage=stage,
+            datasets=['train', 'val', 'test']
+        )
+
 
     def _update_model_inputs(self):
         """Modifies the model's embedding layer to fit the provided dataset. All decisions here are made automatically based on the provided model and dataset.
@@ -280,7 +368,11 @@ class AutomaticRlTlTraining:
                 def on_epoch_begin(self_inner, epoch, *args):
                     wandb.log({'epoch_total': epoch + self.current_epoch_offset})
 
-            self.callbacks.extend([WandbCallback(save_model=False, log_batch_frequency=True, verbose=1), LearningRateReporter(), RealEpochReporter()])
+            self.callbacks = [WandbCallback(save_model=False, log_batch_frequency=True, verbose=1), LearningRateReporter(), RealEpochReporter(), self.csv_logger]
+        else:         
+            self.callbacks = [             
+                self.csv_logger
+            ]        
 
         
         class LossProgressReporter(tf.keras.callbacks.Callback):
@@ -320,6 +412,10 @@ class AutomaticRlTlTraining:
         print(f'validation loss: {loss}, pearson distance: {metric}')
         if self.config.use_wandb:
             wandb.log({'val_loss': loss, 'val_masked_pearson_correlation_distance': metric})
+        
+        self.csv_logger.set_validation_metrics(val_loss=loss, val_masked_pearson_correlation_distance=metric)
+        return {'val_loss': loss, 'val_masked_pearson_correlation_distance': metric}    
+
 
     def _construct_training_schedule(self):
         """Configures the phases of the training process based on the given config and the provided dataset and model.
@@ -390,6 +486,71 @@ class AutomaticRlTlTraining:
                 inflection_lr_reducer_min_improvement=1e-5,
                 inflection_lr_reducer_patience=5000
             ))
+    
+
+    def _explore_data(self):
+        """Generates and saves exploratory data plots in the results_log folder."""
+        def save_json(data, filename):
+            with open(os.path.join(self.config.results_log, filename), 'w') as f:
+                json.dump(data, f)
+
+        def plot_amino_acid_distribution(dataset, alphabet, dataset_name):
+            """Plots the frequency of each amino acid in the sequences for a given dataset split."""
+            def count_amino_acids(sequences):
+                aa_counts = {aa: 0 for aa in alphabet}
+                for seq in sequences:
+                    for aa in seq:
+                        if aa in aa_counts:
+                            aa_counts[aa] += 1
+                return list(aa_counts.values())
+
+            sequences = dataset[self.config.dataset.sequence_column]
+            aa_counts = count_amino_acids(sequences)
+            alphabet_keys = list(alphabet.keys())
+
+            data = {
+                'alphabet': alphabet_keys,
+                'counts': aa_counts
+            }
+            save_json(data, f'amino_acid_distribution_{dataset_name}.json')
+
+        def plot_distribution(dataset, feature, dataset_name, transform_func=None, bins=None, xlabel='', ylabel='Frequency', is_sequence=False):
+            """General function to plot distributions for different features."""
+            feature_data = dataset[feature]
+            if transform_func:
+                feature_data = transform_func(feature_data)
+            if is_sequence:
+                feature_data = [len(seq) for seq in feature_data]
+
+            actual_bins = bins(feature_data) if callable(bins) else bins if bins is not None else 30
+            hist, bin_edges = np.histogram(feature_data, bins=actual_bins)
+
+            data = {
+                'hist': hist.tolist(),
+                'bin_edges': bin_edges.tolist(),
+                'xlabel': xlabel,
+                'ylabel': ylabel
+            }
+            save_json(data, f'{feature}_distribution_{dataset_name}.json')
+
+        eval_datasets = {
+            'train': self.config.dataset.hf_dataset['train'],
+            'val': self.config.dataset.hf_dataset['val'],
+            'test': self.config.dataset.hf_dataset['test'] if 'test' in self.config.dataset.hf_dataset else None
+        }
+
+        # Plot amino acid distribution
+        for dataset_name, dataset in eval_datasets.items():
+            if dataset:
+                plot_amino_acid_distribution(dataset, self.config.dataset.alphabet, dataset_name)
+
+        # Plot distributions
+        for dataset_name, dataset in eval_datasets.items():
+            if dataset:
+                plot_distribution(dataset, 'collision_energy_aligned_normed', dataset_name, xlabel='Collision Energy')
+                plot_distribution(dataset, 'intensities_raw', dataset_name, lambda x: [i for sub in x for i in sub], xlabel='Intensity')
+                plot_distribution(dataset, self.config.dataset.sequence_column, dataset_name, is_sequence=True, bins=None, xlabel='Sequence Length')
+                plot_distribution(dataset, 'precursor_charge_onehot', dataset_name, lambda x: np.argmax(x, axis=1), bins=np.arange(6) - 0.5, xlabel='Precursor Charge')
 
 
     def train(self):
@@ -400,13 +561,21 @@ class AutomaticRlTlTraining:
         """
         self._evaluate_model()
 
+        # Add the batch evaluation callback to the callbacks list
+        batch_eval_callback = BatchEvaluationCallback(self._evaluate_model, 1000)
+        self.callbacks.append(batch_eval_callback)
+
         for instance_config in self.training_schedule:
+
+            self.csv_logger.reset_phase()
+
             training = AutomaticRlTlTrainingInstance(
                 instance_config=instance_config,
                 model=self.model,
                 dataset=self.config.dataset,
                 current_epoch_offset=self.current_epoch_offset,
                 wandb_logging=self.config.use_wandb,
+                results_log=self.config.results_log,
                 callbacks=self.callbacks,
                 validation_steps=self.validation_steps
             )
@@ -417,6 +586,8 @@ class AutomaticRlTlTraining:
 
         if self.config.use_wandb:
             wandb.finish()
+        
+        self._calculate_spectral_angles('after')
 
         return self.model
 
@@ -429,6 +600,7 @@ class AutomaticRlTlTrainingInstance:
     instance_config : TrainingInstanceConfig
     current_epoch_offset : int
     wandb_logging : bool
+    results_log: str 
     callbacks : list
     validation_steps : Optional[int]
 
@@ -444,6 +616,7 @@ class AutomaticRlTlTrainingInstance:
             current_epoch_offset : int,
             dataset : FragmentIonIntensityDataset,
             wandb_logging : bool,
+            results_log: str,
             callbacks : list,
             validation_steps : Optional[int]
         ):
@@ -452,6 +625,7 @@ class AutomaticRlTlTrainingInstance:
         self.dataset = dataset
         self.current_epoch_offset = current_epoch_offset
         self.wandb_logging = wandb_logging
+        self.results_log = results_log
         self.callbacks = callbacks.copy()
         self.validation_steps = validation_steps
 
@@ -464,20 +638,28 @@ class AutomaticRlTlTrainingInstance:
         if self.instance_config.freeze_old_embedding_weights:
             if self.wandb_logging:
                 wandb.log({'freeze_old_embedding_weights': 1})
+            with open(f'{self.results_log}/freeze_log.csv', 'a') as f:
+                f.write('freeze_old_embedding_weights,1\n')
             change_layers.freeze_old_embeddings(self.model)
         else:
             if self.wandb_logging:
                 wandb.log({'freeze_old_embedding_weights': 0})
+            with open(f'{self.results_log}/freeze_log.csv', 'a') as f:
+                f.write('freeze_old_embedding_weights,0\n')
             change_layers.release_old_embeddings(self.model)
         
         # freezing of old regressor weights
         if self.instance_config.freeze_old_regressor_weights:
             if self.wandb_logging:
                 wandb.log({'freeze_old_regressor_weights': 1})
+            with open(f'{self.results_log}/freeze_log.csv', 'a') as f:
+                f.write('freeze_old_regressor_weights,1\n')
             change_layers.freeze_old_regressor(self.model)
         else:
             if self.wandb_logging:
                 wandb.log({'freeze_old_regressor_weights': 0})
+            with open(f'{self.results_log}/freeze_log.csv', 'a') as f:
+                f.write('freeze_old_regressor_weights,0\n')
             change_layers.release_old_regressor(self.model)
 
 
@@ -495,6 +677,8 @@ class AutomaticRlTlTrainingInstance:
                     'freeze_embedding_layer': 1 if self.instance_config.freeze_whole_embedding_layer else 0,
                     'freeze_regressor_layer': 1 if self.instance_config.freeze_whole_regressor_layer else 0
                 })
+            with open(f'{self.results_log}/freeze_log.csv', 'a') as f:
+                f.write(f'freeze_inner_layers,1\nfreeze_embedding_layer,{1 if self.instance_config.freeze_whole_embedding_layer else 0}\nfreeze_regressor_layer,{1 if self.instance_config.freeze_whole_regressor_layer else 0}\n\n')
         else:
             if self.instance_config.freeze_whole_embedding_layer:
                 raise RuntimeError('Cannot freeze whole embedding layer without freezing inner part of the model.')
@@ -509,6 +693,8 @@ class AutomaticRlTlTrainingInstance:
                     'freeze_embedding_layer': 0,
                     'freeze_regressor_layer': 0    
                 })
+            with open(f'{self.results_log}/freeze_log.csv', 'a') as f:
+                f.write(f'freeze_inner_layers,0\nfreeze_embedding_layer,0\nfreeze_regressor_layer,0\n\n')
 
 
         if self.instance_config.plateau_early_stopping:
@@ -552,6 +738,7 @@ class AutomaticRlTlTrainingInstance:
 
 
     def run(self):
+        
         # perform all training runs
         optimizer = tf.keras.optimizers.Adam(learning_rate=self.instance_config.learning_rate)
         self.model.compile(

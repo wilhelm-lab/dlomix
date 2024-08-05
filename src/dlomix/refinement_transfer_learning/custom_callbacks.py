@@ -1,4 +1,77 @@
 import tensorflow as tf
+from tensorflow.keras.callbacks import Callback
+
+class CustomCSVLogger(tf.keras.callbacks.Callback):
+    def __init__(self, filename, separator=',', append=True):
+        super().__init__()
+        self.filename = filename
+        self.separator = separator
+        self.append = append
+        self.file_writer = None
+        self.keys = None
+        self.epoch = 0
+        self.batch_counter = 0
+        self.val_loss = None
+        self.val_masked_pearson_correlation_distance = None
+        self.phase = 0
+
+    def on_train_begin(self, logs=None):
+        mode = 'a' if self.append else 'w'
+        self.file_writer = open(self.filename, mode)
+        # Set up headers if file is empty
+        if not self.append or self.file_writer.tell() == 0:
+            self.keys = ['phase', 'epoch', 'batch', 'learning_rate', 'loss', 'masked_pearson_correlation_distance', 'val_loss', 'val_masked_pearson_correlation_distance']
+            header = self.separator.join(self.keys)
+            self.file_writer.write(header + '\n')
+
+    def on_batch_end(self, batch, logs=None):
+        logs = logs or {}
+        self.batch_counter += 1
+        logs['phase'] = self.phase
+        logs['epoch'] = self.epoch
+        logs['batch'] = self.batch_counter
+        logs['learning_rate'] = float(tf.keras.backend.get_value(self.model.optimizer.lr))
+
+        # Ensure all keys are present, even if some values are missing
+        data_to_log = {key: logs.get(key, '') for key in self.keys}
+        data_to_log['val_loss'] = self.val_loss
+        data_to_log['val_masked_pearson_correlation_distance'] = self.val_masked_pearson_correlation_distance
+
+        # Write the log data for the current batch
+        row = [str(data_to_log.get(key, '')) for key in self.keys]
+        row_line = self.separator.join(row)
+        self.file_writer.write(row_line + '\n')
+        self.file_writer.flush()
+
+    def on_epoch_end(self, epoch, logs=None):
+        self.epoch += 1
+
+    def on_train_end(self, logs=None):
+        if self.file_writer:
+            self.file_writer.close()
+
+    def reset_phase(self):
+        """Resets the epoch counter and increments the phase."""
+        self.phase += 1
+
+    def set_validation_metrics(self, val_loss, val_masked_pearson_correlation_distance):
+        self.val_loss = val_loss
+        self.val_masked_pearson_correlation_distance = val_masked_pearson_correlation_distance
+
+
+
+class BatchEvaluationCallback(tf.keras.callbacks.Callback):
+    def __init__(self, evaluate_model_func, batch_interval):
+        super().__init__()
+        self.evaluate_model_func = evaluate_model_func
+        self.batch_interval = batch_interval
+        self.batch_counter = 0
+
+    def on_batch_end(self, batch, logs=None):
+        self.batch_counter += 1
+        if self.batch_counter % self.batch_interval == 0:
+            self.evaluate_model_func()
+
 
 
 class InflectionPointDetector:
