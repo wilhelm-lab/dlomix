@@ -459,7 +459,7 @@ class AutomaticRlTlTraining:
             warmup_sequences = self.config.min_warmup_sequences_new_weights
             warmup_epochs = math.ceil(warmup_sequences / num_train_sequences)
             warmup_batches = math.ceil(warmup_sequences / batch_size)
-            training_epochs = 100
+            training_epochs = 10000
             self.training_schedule.append(TrainingInstanceConfig(
                 num_epochs=warmup_epochs + training_epochs,
                 learning_rate=1e-3,
@@ -482,7 +482,7 @@ class AutomaticRlTlTraining:
         warmup_sequences = self.config.min_warmup_sequences_whole_model
         warmup_epochs = math.ceil(warmup_sequences / num_train_sequences)
         warmup_batches = math.ceil(warmup_sequences / batch_size)
-        training_epochs = 100
+        training_epochs = 10000
         self.training_schedule.append(TrainingInstanceConfig(
             num_epochs=warmup_epochs + training_epochs,
             learning_rate=1e-3,
@@ -498,7 +498,7 @@ class AutomaticRlTlTraining:
         # step 3:
         #   optional: refine the model further to get a really good model
         if self.config.improve_further:
-            training_epochs = 100
+            training_epochs = 10000
             self.training_schedule.append(TrainingInstanceConfig(
                 num_epochs=training_epochs,
                 learning_rate=1e-4,
