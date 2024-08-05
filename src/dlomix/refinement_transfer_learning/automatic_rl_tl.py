@@ -12,6 +12,7 @@ from dlomix.constants import PTMS_ALPHABET, ALPHABET_NAIVE_MODS, ALPHABET_UNMOD
 from dlomix.data import load_processed_dataset, FragmentIonIntensityDataset
 from dlomix.models import PrositIntensityPredictor
 from dlomix.losses import masked_spectral_distance, masked_pearson_correlation_distance
+from dlomix.refinement_transfer_learning import change_layers, freezing
 
 from dataclasses import dataclass, asdict, field
 from typing import Optional
@@ -107,6 +108,8 @@ class AutomaticRlTlTraining:
     training_schedule : list = []
     validation_steps : Optional[int]
 
+    initial_loss : float = None
+
     def __init__(self, config : AutomaticRlTlTrainingConfig):
         """Automatic refinement/transfer learning given a dataset and optionally an existing model. The training process consists of the following phases:
         
@@ -173,6 +176,13 @@ class AutomaticRlTlTraining:
                 meta_data_keys=meta_data_keys
             )
             self.is_new_model = True
+        
+        optimizer = tf.keras.optimizers.Adam(learning_rate=1e-4)
+        self.model.compile(
+            optimizer=optimizer,
+            loss=masked_spectral_distance,
+            metrics=[masked_pearson_correlation_distance]
+        )
 
     def _update_model_inputs(self):
         """Modifies the model's embedding layer to fit the provided dataset. All decisions here are made automatically based on the provided model and dataset.
@@ -187,6 +197,8 @@ class AutomaticRlTlTraining:
             return
 
         if model_alphabet == dataset_alphabet:
+            print(model_alphabet)
+            print(dataset_alphabet)
             print('[embedding layer]  model and dataset modifications match')
             self.requires_new_embedding_layer = False
             self.can_reuse_old_embedding_weights = False
@@ -259,6 +271,7 @@ class AutomaticRlTlTraining:
     def _init_training(self):
         """Configures relevant training settings that are used across all phases of the training.
         """
+        self.callbacks = []
         if self.config.use_wandb:
             class LearningRateReporter(tf.keras.callbacks.Callback):
                 def on_train_batch_end(self, batch, *args):
@@ -268,9 +281,28 @@ class AutomaticRlTlTraining:
                 def on_epoch_begin(self_inner, epoch, *args):
                     wandb.log({'epoch_total': epoch + self.current_epoch_offset})
 
-            self.callbacks = [WandbCallback(save_model=False, log_batch_frequency=True, verbose=1), LearningRateReporter(), RealEpochReporter()]
-        
+            self.callbacks.extend([WandbCallback(save_model=False, log_batch_frequency=True, verbose=1), LearningRateReporter(), RealEpochReporter()])
 
+        
+        class LossProgressReporter(tf.keras.callbacks.Callback):
+            counter : int = 0
+            min_loss : float = None
+            def on_train_batch_end(self_inner, batch, logs):
+                loss = logs['loss']
+
+                if self_inner.min_loss is None:
+                    self_inner.min_loss = loss
+
+                loss = min(self_inner.min_loss, loss)
+
+                if self_inner.counter % 1000 == 0:
+                    approx_progress = min(0.9999, max(0, (self.initial_loss - loss) / (self.initial_loss - 0.1)))
+                    print(f'[training]  masked spectral distance: {loss}, approx. progress: {approx_progress * 100:.2f}%')
+
+                self_inner.counter += 1
+
+        self.callbacks.append(LossProgressReporter())
+                
         num_val_batches = self.config.dataset.tensor_val_data.cardinality().numpy()
         self.validation_steps = 1000 if num_val_batches > 1000 else None
 
@@ -279,8 +311,12 @@ class AutomaticRlTlTraining:
         """
         loss, metric = self.model.evaluate(
             self.config.dataset.tensor_val_data,
-            steps=self.validation_steps
+            steps=self.validation_steps,
+            verbose=0
         )
+
+        if self.initial_loss is None:
+            self.initial_loss = loss
 
         print(f'validation loss: {loss}, pearson distance: {metric}')
         if self.config.use_wandb:
@@ -345,15 +381,15 @@ class AutomaticRlTlTraining:
             training_epochs = 10000
             self.training_schedule.append(TrainingInstanceConfig(
                 num_epochs=training_epochs,
-                learning_rate=1e-4,
+                learning_rate=1e-3,
                 inflection_early_stopping=True,
-                inflection_early_stopping_min_improvement=1e-6,
+                inflection_early_stopping_min_improvement=1e-7,
                 inflection_early_stopping_ignore_first_n=0,
-                inflection_early_stopping_patience=10000,
+                inflection_early_stopping_patience=100000,
                 inflection_lr_reducer=True,
                 inflection_lr_reducer_factor=0.5,
                 inflection_lr_reducer_min_improvement=1e-5,
-                inflection_lr_reducer_patience=7000
+                inflection_lr_reducer_patience=5000
             ))
 
 
@@ -531,7 +567,8 @@ class AutomaticRlTlTrainingInstance:
             validation_data=self.dataset.tensor_val_data,
             validation_steps=self.validation_steps,
             epochs=self.instance_config.num_epochs,
-            callbacks=self.callbacks
+            callbacks=self.callbacks,
+            verbose=0
         )
 
         inflection_ES_stopped = self.inflection_early_stopping is not None and self.inflection_early_stopping.stopped_early

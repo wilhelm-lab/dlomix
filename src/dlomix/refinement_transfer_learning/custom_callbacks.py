@@ -11,7 +11,9 @@ class InflectionPointDetector:
 
     change_sum : float = 0
     num_steps : int = 0
-    previous_loss : float = None
+    previous_loss : float = 0
+    global_min : float = float('inf')
+    initial_loss : float = None
     patience_counter : int = 0
     current_changes : list[float] = []
 
@@ -27,45 +29,52 @@ class InflectionPointDetector:
             import wandb
     
     def reset_detector(self):
-        self.change_sum = 0
-        self.num_steps = 0 
+        # self.change_sum = 0
+        # self.num_steps = 0 
         self.patience_counter = 0
-        self.current_changes = []
+        # self.current_changes = []
 
     
     def inflection_reached(self, loss : float):
-        if self.previous_loss is not None:
-            change = loss - self.previous_loss
-            self.change_sum += change
-            self.num_steps += 1
+        if loss < self.global_min:
+            self.global_min = loss
 
-            self.current_changes.append(change)
-            if len(self.current_changes) > self.smoothing_window:
-                self.current_changes.pop(0)
-            change = sum(self.current_changes) / len(self.current_changes)
+        if self.initial_loss is None:
+            self.initial_loss = loss
 
-            avg_change = self.change_sum / self.num_steps 
+        loss = self.initial_loss - self.global_min
 
-            if self.wandb_log:
-                wandb.log({
-                    f'{self.wandb_log_name}_avg_change': avg_change,
-                    f'{self.wandb_log_name}_current_change': change,
-                    f'{self.wandb_log_name}_current_patience': self.patience_counter / self.patience
-                })
-            
-            if self.num_steps < self.ignore_first_n:
-                return
+        change = loss - self.previous_loss
+        self.change_sum += change
+        self.num_steps += 1
 
-            if self.num_steps > self.patience:
-                # enough datapoints to do estimation
-                if change > -self.min_improvement and change > avg_change:
-                    # we are likely after the inflection point and have a low avg change
-                    self.patience_counter += 1
+        self.current_changes.append(change)
+        if len(self.current_changes) > self.smoothing_window:
+            self.current_changes.pop(0)
+        change = sum(self.current_changes) / len(self.current_changes)
 
-                    if self.patience_counter >= self.patience:
-                        return True
-                else:
-                    self.patience_counter = 0
+        avg_change = self.change_sum / self.num_steps 
+
+        if self.wandb_log:
+            wandb.log({
+                f'{self.wandb_log_name}_avg_change': avg_change,
+                f'{self.wandb_log_name}_current_change': change,
+                f'{self.wandb_log_name}_current_patience': self.patience_counter / self.patience
+            })
+        
+        if self.num_steps < self.ignore_first_n:
+            return
+
+        if self.num_steps > self.patience:
+            # enough datapoints to do estimation
+            if change < self.min_improvement and change < avg_change:
+                # we are likely after the inflection point and have a low avg change
+                self.patience_counter += 1
+
+                if self.patience_counter >= self.patience:
+                    return True
+            else:
+                self.patience_counter = 0
 
         self.previous_loss = loss
         return False
