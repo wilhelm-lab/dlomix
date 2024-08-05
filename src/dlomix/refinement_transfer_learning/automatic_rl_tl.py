@@ -341,7 +341,7 @@ class AutomaticRlTlTraining:
             training_epochs = 10000
             self.training_schedule.append(TrainingInstanceConfig(
                 num_epochs=warmup_epochs + training_epochs,
-                learning_rate=1e-3,
+                learning_rate=1e-4,
                 lr_warmup=True,
                 lr_warmup_num_steps=warmup_batches,
                 lr_warmup_start_lr=1e-8,
@@ -364,7 +364,7 @@ class AutomaticRlTlTraining:
         training_epochs = 10000
         self.training_schedule.append(TrainingInstanceConfig(
             num_epochs=warmup_epochs + training_epochs,
-            learning_rate=1e-3,
+            learning_rate=1e-4,
             lr_warmup=True,
             lr_warmup_num_steps=warmup_batches,
             lr_warmup_start_lr=1e-8,
@@ -380,13 +380,13 @@ class AutomaticRlTlTraining:
             training_epochs = 10000
             self.training_schedule.append(TrainingInstanceConfig(
                 num_epochs=training_epochs,
-                learning_rate=1e-3,
+                learning_rate=1e-4,
                 inflection_early_stopping=True,
                 inflection_early_stopping_min_improvement=1e-7,
                 inflection_early_stopping_ignore_first_n=0,
                 inflection_early_stopping_patience=100000,
                 inflection_lr_reducer=True,
-                inflection_lr_reducer_factor=0.5,
+                inflection_lr_reducer_factor=0.7,
                 inflection_lr_reducer_min_improvement=1e-5,
                 inflection_lr_reducer_patience=5000
             ))
