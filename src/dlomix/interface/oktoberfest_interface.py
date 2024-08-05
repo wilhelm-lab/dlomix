@@ -24,7 +24,7 @@ def get_model_url():
         return url_file.read().strip()
     
 
-def download_model_from_github() -> Path:
+def download_model_from_github() -> str:
     MODEL_DIR.mkdir(parents=True, exist_ok=True)
     model_path = MODEL_DIR / MODEL_FILENAME
 
@@ -41,10 +41,10 @@ def download_model_from_github() -> Path:
         f.write(response.content)
     
     print(f'Model downloaded successfully under {str(model_path)}')
-    return Path(model_path)
+    return str(model_path)
 
 
-def load_keras_model(model_file_path: Path = Path('baseline')) -> PrositIntensityPredictor:
+def load_keras_model(model_file_path: str = 'baseline') -> PrositIntensityPredictor:
     """Load a PrositIntensityPredictor model given a model file path. 
 
     Args:
