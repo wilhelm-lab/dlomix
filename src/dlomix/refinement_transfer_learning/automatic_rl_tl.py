@@ -136,7 +136,6 @@ class AutomaticRlTlTraining:
         self._init_wandb()
         self._init_logging()
         self._init_model()
-        self._calculate_spectral_angles('before')
         self._update_model_inputs()
         self._update_model_outputs()
         self._init_training()
@@ -205,9 +204,11 @@ class AutomaticRlTlTraining:
     def _calculate_spectral_angles(self, stage):
         """Calculates and saves the spectral angle distributions before and after training."""
 
-        def calculate_spectral_distance(dataset, model):
+        def calculate_spectral_distance(dataset, model, max_batches=1000):
             spectral_dists = []
-            for batch, y_true in dataset:        
+            for i, (batch, y_true) in enumerate(dataset):
+                if i >= max_batches:
+                    break
                 y_pred = model.predict(batch)
                 spectral_dists.extend(masked_spectral_distance(y_true=y_true, y_pred=y_pred).numpy())
             return spectral_dists
@@ -256,7 +257,7 @@ class AutomaticRlTlTraining:
                     with open(file_path, 'r') as f:
                         existing_data = json.load(f)
                 else:
-                    existing_data = {}
+                        existing_data = {}
 
                 existing_data[stage] = data_to_save
 
@@ -269,6 +270,7 @@ class AutomaticRlTlTraining:
             stage=stage,
             datasets=['train', 'val', 'test']
         )
+
 
 
     def _update_model_inputs(self):
@@ -492,7 +494,7 @@ class AutomaticRlTlTraining:
         """Generates and saves exploratory data plots in the results_log folder."""
         def save_json(data, filename):
             with open(os.path.join(self.config.results_log, filename), 'w') as f:
-                json.dump(data, f)
+                json.dump(data, f)       
 
         def plot_amino_acid_distribution(dataset, alphabet, dataset_name):
             """Plots the frequency of each amino acid in the sequences for a given dataset split."""
@@ -503,8 +505,8 @@ class AutomaticRlTlTraining:
                         if aa in aa_counts:
                             aa_counts[aa] += 1
                 return list(aa_counts.values())
-
-            sequences = dataset[self.config.dataset.sequence_column]
+            
+            sequences = dataset[self.config.dataset.dataset_columns_to_keep[0]]
             aa_counts = count_amino_acids(sequences)
             alphabet_keys = list(alphabet.keys())
 
@@ -522,7 +524,12 @@ class AutomaticRlTlTraining:
             if is_sequence:
                 feature_data = [len(seq) for seq in feature_data]
 
-            actual_bins = bins(feature_data) if callable(bins) else bins if bins is not None else 30
+            if is_sequence:
+                # Define bins to cover the integer range of sequence lengths
+                actual_bins = np.arange(min(feature_data) - 0.5, max(feature_data) + 1.5, 1)
+            else:
+                actual_bins = bins(feature_data) if callable(bins) else bins if bins is not None else 30
+        
             hist, bin_edges = np.histogram(feature_data, bins=actual_bins)
 
             data = {
@@ -531,6 +538,10 @@ class AutomaticRlTlTraining:
                 'xlabel': xlabel,
                 'ylabel': ylabel
             }
+
+            if is_sequence: 
+                feature = 'sequence'
+
             save_json(data, f'{feature}_distribution_{dataset_name}.json')
 
         eval_datasets = {
@@ -538,18 +549,16 @@ class AutomaticRlTlTraining:
             'val': self.config.dataset.hf_dataset['val'],
             'test': self.config.dataset.hf_dataset['test'] if 'test' in self.config.dataset.hf_dataset else None
         }
+                
 
-        # Plot amino acid distribution
-        for dataset_name, dataset in eval_datasets.items():
+        for dataset_name, dataset in eval_datasets.items():            
             if dataset:
-                plot_amino_acid_distribution(dataset, self.config.dataset.alphabet, dataset_name)
+                if self.config.dataset.dataset_columns_to_keep[0] is not None:
+                    plot_amino_acid_distribution(dataset, self.config.dataset.alphabet, dataset_name)
+                    plot_distribution(dataset, self.config.dataset.dataset_columns_to_keep[0], dataset_name, is_sequence=True, bins=None, xlabel='Sequence Length')
 
-        # Plot distributions
-        for dataset_name, dataset in eval_datasets.items():
-            if dataset:
                 plot_distribution(dataset, 'collision_energy_aligned_normed', dataset_name, xlabel='Collision Energy')
-                plot_distribution(dataset, 'intensities_raw', dataset_name, lambda x: [i for sub in x for i in sub], xlabel='Intensity')
-                plot_distribution(dataset, self.config.dataset.sequence_column, dataset_name, is_sequence=True, bins=None, xlabel='Sequence Length')
+                plot_distribution(dataset, 'intensities_raw', dataset_name, lambda x: [i for sub in x for i in sub], xlabel='Intensity')                
                 plot_distribution(dataset, 'precursor_charge_onehot', dataset_name, lambda x: np.argmax(x, axis=1), bins=np.arange(6) - 0.5, xlabel='Precursor Charge')
 
 
@@ -559,6 +568,7 @@ class AutomaticRlTlTraining:
         Returns:
             PrositIntensityPredictor: The refined model that results from the training process. This model can be used for predictions or further training steps.
         """
+        self._calculate_spectral_angles('before')
         self._evaluate_model()
 
         # Add the batch evaluation callback to the callbacks list
@@ -765,4 +775,3 @@ class AutomaticRlTlTrainingInstance:
 
         self.final_learning_rate = self.model.optimizer._learning_rate.numpy()
         self.current_epoch_offset += len(history.history['loss'])
-
