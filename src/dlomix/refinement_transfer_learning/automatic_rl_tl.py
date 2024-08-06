@@ -245,14 +245,19 @@ class AutomaticRlTlTraining:
                     json.dump(data, f)
 
             for dataset in datasets:
-                if dataset == 'train':
-                    dataset_data = data.tensor_train_data
-                elif dataset == 'val':
-                    dataset_data = data.tensor_val_data
-                elif dataset == 'test':
-                    dataset_data = data.tensor_test_data
-                else:
+                if dataset not in ['train', 'val', 'test']:
                     raise ValueError("Invalid dataset type. Choose 'train', 'val', or 'test'.")
+
+                try:
+                    if dataset == 'train':
+                        dataset_data = data.tensor_train_data
+                    elif dataset == 'val':
+                        dataset_data = data.tensor_val_data
+                    elif dataset == 'test':
+                        dataset_data = data.tensor_test_data
+                except ValueError:
+                    continue
+                
 
                 spectral_dists = calculate_spectral_distance(dataset_data, model)
                 sa_data = [1 - sd for sd in spectral_dists]
@@ -297,8 +302,6 @@ class AutomaticRlTlTraining:
             return
 
         if model_alphabet == dataset_alphabet:
-            print(model_alphabet)
-            print(dataset_alphabet)
             print('[embedding layer]  model and dataset modifications match')
             self.requires_new_embedding_layer = False
             self.can_reuse_old_embedding_weights = False
