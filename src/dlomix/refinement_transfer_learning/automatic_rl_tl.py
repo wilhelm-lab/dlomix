@@ -1,6 +1,5 @@
-import yaml
 import os
-import uuid
+import sys
 
 import tensorflow as tf
 from tensorflow.keras.callbacks import EarlyStopping, ReduceLROnPlateau, LearningRateScheduler, CSVLogger
@@ -18,8 +17,13 @@ from typing import Optional
 import math
 import json
 import numpy as np
-import matplotlib.pyplot as plt
-from collections import defaultdict
+from pathlib import Path
+import importlib.resources as importlib_resources
+import shutil
+
+from nbconvert import HTMLExporter
+import nbformat
+from nbconvert.preprocessors import ExecutePreprocessor
 
 
 @dataclass
@@ -100,6 +104,8 @@ class TrainingInstanceConfig:
 
 class AutomaticRlTlTraining:
     config : AutomaticRlTlTrainingConfig
+    results_data_path : Path
+    results_notebook_path : Path 
 
     model : PrositIntensityPredictor
     is_new_model : bool
@@ -136,7 +142,6 @@ class AutomaticRlTlTraining:
         self._init_wandb()
         self._init_logging()
         self._init_model()
-        self._calculate_spectral_angles('before')
         self._update_model_inputs()
         self._update_model_outputs()
         self._init_training()
@@ -162,10 +167,17 @@ class AutomaticRlTlTraining:
         """ Initializes Weights & Biases Logging and CSV Logging if the user requested that in the config.
         """       
         
-        if not os.path.exists(self.config.results_log):
-            os.makedirs(self.config.results_log)
+        self.results_data_path = Path(self.config.results_log) / 'log_data/'
 
-        self.csv_logger = CustomCSVLogger(f'{self.config.results_log}/training_log.csv', separator=',', append=True)
+        if not os.path.exists(self.results_data_path):
+            os.makedirs(self.results_data_path)
+
+        notebook_ref = importlib_resources.files('dlomix') / 'refinement_transfer_learning' / 'user_report.ipynb'
+        self.results_notebook_path = Path(self.config.results_log) / 'report.ipynb'
+        with importlib_resources.as_file(notebook_ref) as path: 
+            shutil.copyfile(path, self.results_notebook_path)
+
+        self.csv_logger = CustomCSVLogger(f'{self.results_data_path}/training_log.csv', separator=',', append=True)
 
     def _init_model(self):
         """Configures the given baseline model or creates a new model if no baseline model is provided in the config.
@@ -233,14 +245,19 @@ class AutomaticRlTlTraining:
                     json.dump(data, f)
 
             for dataset in datasets:
-                if dataset == 'train':
-                    dataset_data = data.tensor_train_data
-                elif dataset == 'val':
-                    dataset_data = data.tensor_val_data
-                elif dataset == 'test':
-                    dataset_data = data.tensor_test_data
-                else:
+                if dataset not in ['train', 'val', 'test']:
                     raise ValueError("Invalid dataset type. Choose 'train', 'val', or 'test'.")
+
+                try:
+                    if dataset == 'train':
+                        dataset_data = data.tensor_train_data
+                    elif dataset == 'val':
+                        dataset_data = data.tensor_val_data
+                    elif dataset == 'test':
+                        dataset_data = data.tensor_test_data
+                except ValueError:
+                    continue
+                
 
                 spectral_dists = calculate_spectral_distance(dataset_data, model)
                 sa_data = [1 - sd for sd in spectral_dists]
@@ -267,12 +284,10 @@ class AutomaticRlTlTraining:
         calculate_and_save_spectral_angle_distribution(
             data=self.config.dataset,
             model=self.model,
-            results_log=self.config.results_log,
+            results_log=self.results_data_path,
             stage=stage,
             datasets=['train', 'val', 'test']
         )
-
-
 
     def _update_model_inputs(self):
         """Modifies the model's embedding layer to fit the provided dataset. All decisions here are made automatically based on the provided model and dataset.
@@ -287,8 +302,6 @@ class AutomaticRlTlTraining:
             return
 
         if model_alphabet == dataset_alphabet:
-            print(model_alphabet)
-            print(dataset_alphabet)
             print('[embedding layer]  model and dataset modifications match')
             self.requires_new_embedding_layer = False
             self.can_reuse_old_embedding_weights = False
@@ -391,7 +404,7 @@ class AutomaticRlTlTraining:
 
                 if self_inner.counter % 1000 == 0:
                     approx_progress = min(0.9999, max(0, (self.initial_loss - loss) / (self.initial_loss - 0.1)))
-                    print(f'[training]  masked spectral distance: {loss}, approx. progress: {approx_progress * 100:.2f}%')
+                    print(f'[training]  masked spectral distance: {loss}, approx. progress: {approx_progress * 100:.2f}%', file=sys.stderr)
 
                 self_inner.counter += 1
 
@@ -418,7 +431,6 @@ class AutomaticRlTlTraining:
         
         self.csv_logger.set_validation_metrics(val_loss=loss, val_masked_pearson_correlation_distance=metric)
         return {'val_loss': loss, 'val_masked_pearson_correlation_distance': metric}    
-
 
     def _construct_training_schedule(self):
         """Configures the phases of the training process based on the given config and the provided dataset and model.
@@ -489,12 +501,10 @@ class AutomaticRlTlTraining:
                 inflection_lr_reducer_min_improvement=1e-5,
                 inflection_lr_reducer_patience=5000
             ))
-    
-
     def _explore_data(self):
         """Generates and saves exploratory data plots in the results_log folder."""
         def save_json(data, filename):
-            with open(os.path.join(self.config.results_log, filename), 'w') as f:
+            with open(os.path.join(self.results_data_path, filename), 'w') as f:
                 json.dump(data, f)       
 
         def plot_amino_acid_distribution(dataset, alphabet, dataset_name):
@@ -562,6 +572,26 @@ class AutomaticRlTlTraining:
                 plot_distribution(dataset, 'intensities_raw', dataset_name, lambda x: [i for sub in x for i in sub], xlabel='Intensity')                
                 plot_distribution(dataset, 'precursor_charge_onehot', dataset_name, lambda x: np.argmax(x, axis=1), bins=np.arange(6) - 0.5, xlabel='Precursor Charge')
 
+    def _compile_report(self):
+        """Creates a visual PDF report from the jupyter notebook in the results folder
+        """
+        with open(self.results_notebook_path, 'r') as notebook_file:
+            notebook = nbformat.read(notebook_file, as_version=4)
+
+        current_cwd = os.getcwd()
+        os.chdir(self.config.results_log)
+        executor = ExecutePreprocessor()
+        executor.preprocess(notebook)
+        os.chdir(current_cwd)
+
+        exporter = HTMLExporter()
+        exporter.exclude_input = True
+        result, resources = exporter.from_notebook_node(notebook)
+
+        result_path = Path(self.config.results_log) / 'report.html'
+        with open(result_path, "w") as f:
+            f.write(result)
+
 
     def train(self):
         """Performs the training process and returns the final model.
@@ -569,6 +599,7 @@ class AutomaticRlTlTraining:
         Returns:
             PrositIntensityPredictor: The refined model that results from the training process. This model can be used for predictions or further training steps.
         """
+        self._calculate_spectral_angles('before')
         self._evaluate_model()
 
         # Add the batch evaluation callback to the callbacks list
@@ -585,7 +616,7 @@ class AutomaticRlTlTraining:
                 dataset=self.config.dataset,
                 current_epoch_offset=self.current_epoch_offset,
                 wandb_logging=self.config.use_wandb,
-                results_log=self.config.results_log,
+                results_log=self.results_data_path,
                 callbacks=self.callbacks,
                 validation_steps=self.validation_steps
             )
@@ -598,6 +629,7 @@ class AutomaticRlTlTraining:
             wandb.finish()
         
         self._calculate_spectral_angles('after')
+        self._compile_report()
 
         return self.model
 
