@@ -40,12 +40,18 @@ if args.model_path is not None:
     model = tf.keras.models.load_model(args.model_path)
 
 
+import datetime
+now = datetime.datetime.now().isoformat()
+results_dir = f'results/{now}/'
+
 
 from dlomix.refinement_transfer_learning.automatic_rl_tl import AutomaticRlTlTraining, AutomaticRlTlTrainingConfig
 config = AutomaticRlTlTrainingConfig(
     dataset=dataset,
     baseline_model=model,
-    use_wandb=True
+    # use_wandb=True,
+    improve_further=False,
+    results_log=results_dir
 )
 trainer = AutomaticRlTlTraining(config)
 
