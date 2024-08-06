@@ -114,6 +114,8 @@ class AutomaticRlTlTraining:
     training_schedule : list = []
     validation_steps : Optional[int]
 
+    initial_loss : float = None
+
     def __init__(self, config : AutomaticRlTlTrainingConfig):
         """Automatic refinement/transfer learning given a dataset and optionally an existing model. The training process consists of the following phases:
         
@@ -199,60 +201,6 @@ class AutomaticRlTlTraining:
             metrics=[masked_pearson_correlation_distance]
         )
     
-    # def _calculate_spectral_angles(self):
-    #     """Calculates and saves the spectral angle distributions before and after training."""
-
-    #     def calculate_spectral_distance(dataset, model):
-    #         spectral_dists = []
-    #         for batch, y_true in dataset:        
-    #             y_pred = model.predict(batch)
-    #             spectral_dists.extend(masked_spectral_distance(y_true=y_true, y_pred=y_pred).numpy())
-    #         return spectral_dists
-
-    #     def calculate_and_save_spectral_angle_distribution(data, model, results_log, datasets=['train', 'val', 'test']):
-    #         """
-    #         Predict the intensities, calculate spectral distances, and save the spectral angle distribution for the specified datasets.
-
-    #         Args:
-    #             data: A dataset containing tensor_train_data, tensor_val_data, and tensor_test_data.
-    #             model: A trained model used for making predictions.
-    #             results_log: Directory to save the JSON files.
-    #             datasets: A list of strings indicating which datasets to use ('train', 'val', 'test').
-
-    #         Returns:
-    #             None (saves JSON files)
-    #         """
-    #         def save_json(data, filename):
-    #             with open(os.path.join(results_log, filename), 'w') as f:
-    #                 json.dump(data, f)
-
-    #         for dataset in datasets:
-    #             if dataset == 'train':
-    #                 dataset_data = data.tensor_train_data
-    #             elif dataset == 'val':
-    #                 dataset_data = data.tensor_val_data
-    #             elif dataset == 'test':
-    #                 dataset_data = data.tensor_test_data
-    #             else:
-    #                 raise ValueError("Invalid dataset type. Choose 'train', 'val', or 'test'.")
-
-    #             spectral_dists = calculate_spectral_distance(dataset_data, model)
-    #             sa_data = [1 - sd for sd in spectral_dists]
-    #             avg_sa = np.mean(sa_data)
-
-    #             data_to_save = {
-    #                 'spectral_angles': sa_data,
-    #                 'average_spectral_angle': avg_sa
-    #             }
-
-    #             save_json(data_to_save, f'spectral_angle_distribution_{dataset}.json')
-
-    #     calculate_and_save_spectral_angle_distribution(
-    #         data=self.config.dataset,
-    #         model=self.model,
-    #         results_log=self.config.results_log,
-    #         datasets=['train', 'val', 'test']
-    #     )
 
     def _calculate_spectral_angles(self, stage):
         """Calculates and saves the spectral angle distributions before and after training."""
@@ -336,6 +284,8 @@ class AutomaticRlTlTraining:
             return
 
         if model_alphabet == dataset_alphabet:
+            print(model_alphabet)
+            print(dataset_alphabet)
             print('[embedding layer]  model and dataset modifications match')
             self.requires_new_embedding_layer = False
             self.can_reuse_old_embedding_weights = False
@@ -408,6 +358,7 @@ class AutomaticRlTlTraining:
     def _init_training(self):
         """Configures relevant training settings that are used across all phases of the training.
         """
+        self.callbacks = []
         if self.config.use_wandb:
             class LearningRateReporter(tf.keras.callbacks.Callback):
                 def on_train_batch_end(self, batch, *args):
@@ -423,6 +374,26 @@ class AutomaticRlTlTraining:
                 self.csv_logger
             ]        
 
+        
+        class LossProgressReporter(tf.keras.callbacks.Callback):
+            counter : int = 0
+            min_loss : float = None
+            def on_train_batch_end(self_inner, batch, logs):
+                loss = logs['loss']
+
+                if self_inner.min_loss is None:
+                    self_inner.min_loss = loss
+
+                loss = min(self_inner.min_loss, loss)
+
+                if self_inner.counter % 1000 == 0:
+                    approx_progress = min(0.9999, max(0, (self.initial_loss - loss) / (self.initial_loss - 0.1)))
+                    print(f'[training]  masked spectral distance: {loss}, approx. progress: {approx_progress * 100:.2f}%')
+
+                self_inner.counter += 1
+
+        self.callbacks.append(LossProgressReporter())
+                
         num_val_batches = self.config.dataset.tensor_val_data.cardinality().numpy()
         self.validation_steps = 1000 if num_val_batches > 1000 else None
 
@@ -431,8 +402,12 @@ class AutomaticRlTlTraining:
         """
         loss, metric = self.model.evaluate(
             self.config.dataset.tensor_val_data,
-            steps=self.validation_steps
+            steps=self.validation_steps,
+            verbose=0
         )
+
+        if self.initial_loss is None:
+            self.initial_loss = loss
 
         print(f'validation loss: {loss}, pearson distance: {metric}')
         if self.config.use_wandb:
@@ -462,7 +437,7 @@ class AutomaticRlTlTraining:
             training_epochs = 10000
             self.training_schedule.append(TrainingInstanceConfig(
                 num_epochs=warmup_epochs + training_epochs,
-                learning_rate=1e-3,
+                learning_rate=1e-4,
                 lr_warmup=True,
                 lr_warmup_num_steps=warmup_batches,
                 lr_warmup_start_lr=1e-8,
@@ -485,7 +460,7 @@ class AutomaticRlTlTraining:
         training_epochs = 10000
         self.training_schedule.append(TrainingInstanceConfig(
             num_epochs=warmup_epochs + training_epochs,
-            learning_rate=1e-3,
+            learning_rate=1e-4,
             lr_warmup=True,
             lr_warmup_num_steps=warmup_batches,
             lr_warmup_start_lr=1e-8,
@@ -503,13 +478,13 @@ class AutomaticRlTlTraining:
                 num_epochs=training_epochs,
                 learning_rate=1e-4,
                 inflection_early_stopping=True,
-                inflection_early_stopping_min_improvement=1e-6,
+                inflection_early_stopping_min_improvement=1e-7,
                 inflection_early_stopping_ignore_first_n=0,
-                inflection_early_stopping_patience=10000,
+                inflection_early_stopping_patience=100000,
                 inflection_lr_reducer=True,
-                inflection_lr_reducer_factor=0.5,
+                inflection_lr_reducer_factor=0.7,
                 inflection_lr_reducer_min_improvement=1e-5,
-                inflection_lr_reducer_patience=7000
+                inflection_lr_reducer_patience=5000
             ))
     
 
@@ -778,7 +753,8 @@ class AutomaticRlTlTrainingInstance:
             validation_data=self.dataset.tensor_val_data,
             validation_steps=self.validation_steps,
             epochs=self.instance_config.num_epochs,
-            callbacks=self.callbacks
+            callbacks=self.callbacks,
+            verbose=0
         )
 
         inflection_ES_stopped = self.inflection_early_stopping is not None and self.inflection_early_stopping.stopped_early
@@ -789,4 +765,3 @@ class AutomaticRlTlTrainingInstance:
 
         self.final_learning_rate = self.model.optimizer._learning_rate.numpy()
         self.current_epoch_offset += len(history.history['loss'])
-

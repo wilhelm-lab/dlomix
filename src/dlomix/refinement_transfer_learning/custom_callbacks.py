@@ -102,10 +102,10 @@ class InflectionPointDetector:
             import wandb
     
     def reset_detector(self):
-        self.change_sum = 0
-        self.num_steps = 0 
+        # self.change_sum = 0
+        # self.num_steps = 0 
         self.patience_counter = 0
-        self.current_changes = []
+        # self.current_changes = []
 
     
     def inflection_reached(self, loss : float):

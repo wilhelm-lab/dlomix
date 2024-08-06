@@ -24,7 +24,7 @@ def get_model_url():
         return url_file.read().strip()
     
 
-def download_model_from_github() -> Path:
+def download_model_from_github() -> str:
     MODEL_DIR.mkdir(parents=True, exist_ok=True)
     model_path = MODEL_DIR / MODEL_FILENAME
 
@@ -41,10 +41,10 @@ def download_model_from_github() -> Path:
         f.write(response.content)
     
     print(f'Model downloaded successfully under {str(model_path)}')
-    return Path(model_path)
+    return str(model_path)
 
 
-def load_keras_model(model_file_path: Path = Path('baseline')) -> PrositIntensityPredictor:
+def load_keras_model(model_file_path: str = 'baseline') -> PrositIntensityPredictor:
     """Load a PrositIntensityPredictor model given a model file path. 
 
     Args:
@@ -98,7 +98,8 @@ def process_dataset(
         label_column: str = 'intensities_raw',
         batch_size: int = 1024,
         val_ratio: float = 0.2,
-        test_ratio: float = 0.0
+        test_ratio: float = 0.0,
+        additional_columns: list[str] = None
         ) -> FragmentIonIntensityDataset:
     """Interface function for Oktoberfest package to correcly process a dataset and load a baseline model
 
@@ -119,6 +120,7 @@ def process_dataset(
         label_column (str, optional): The column identifier for where the intensity labels are, if there are any. Defaults to 'intensities_raw'.
         val_ratio (float, optional): A validation split ratio. Defaults to 0.2.
         test_ratio (float, optional): A test split ratio. Defaults to 0.0.
+        additional_columns (list[str], optional): List of additional columns to keep in dataset for downstream analysis (will not be returned as tensors).
 
     Raises:
         ValueError: If the parquet_file_path does not have the .parquet extension
@@ -216,6 +218,7 @@ def process_dataset(
         encoding_scheme='naive-mods',
         model_features=['precursor_charge_onehot', 'collision_energy_aligned_normed', 'method_nbr'],
         ion_types=ion_types,
+        dataset_columns_to_keep=additional_columns
     )
 
     logger.info(f'The available data splits are: {", ".join(list(dataset.hf_dataset.keys()))}')
