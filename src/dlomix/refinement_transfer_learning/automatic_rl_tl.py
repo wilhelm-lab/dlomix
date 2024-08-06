@@ -136,7 +136,6 @@ class AutomaticRlTlTraining:
         self._init_wandb()
         self._init_logging()
         self._init_model()
-        self._calculate_spectral_angles('before')
         self._update_model_inputs()
         self._update_model_outputs()
         self._init_training()
@@ -559,6 +558,7 @@ class AutomaticRlTlTraining:
         Returns:
             PrositIntensityPredictor: The refined model that results from the training process. This model can be used for predictions or further training steps.
         """
+        self._calculate_spectral_angles('before')
         self._evaluate_model()
 
         # Add the batch evaluation callback to the callbacks list
