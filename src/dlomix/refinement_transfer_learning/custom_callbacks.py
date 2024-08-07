@@ -1,5 +1,7 @@
 import tensorflow as tf
 from tensorflow.keras.callbacks import Callback
+from typing import Optional
+import math
 
 class CustomCSVLogger(tf.keras.callbacks.Callback):
     def __init__(self, filename, separator=',', append=True):
@@ -8,7 +10,7 @@ class CustomCSVLogger(tf.keras.callbacks.Callback):
         self.separator = separator
         self.append = append
         self.file_writer = None
-        self.keys = None
+        self.keys = ['phase', 'epoch', 'batch', 'learning_rate', 'loss', 'masked_pearson_correlation_distance', 'val_loss', 'val_masked_pearson_correlation_distance']
         self.epoch = 0
         self.batch_counter = 0
         self.val_loss = None
@@ -20,7 +22,6 @@ class CustomCSVLogger(tf.keras.callbacks.Callback):
         self.file_writer = open(self.filename, mode)
         # Set up headers if file is empty
         if not self.append or self.file_writer.tell() == 0:
-            self.keys = ['phase', 'epoch', 'batch', 'learning_rate', 'loss', 'masked_pearson_correlation_distance', 'val_loss', 'val_masked_pearson_correlation_distance']
             header = self.separator.join(self.keys)
             self.file_writer.write(header + '\n')
 
@@ -71,6 +72,24 @@ class BatchEvaluationCallback(tf.keras.callbacks.Callback):
         self.batch_counter += 1
         if self.batch_counter % self.batch_interval == 0:
             self.evaluate_model_func()
+
+
+class OverfittingEarlyStopping(tf.keras.callbacks.Callback):
+    max_validation_train_difference : float
+
+    def __init__(self, max_validation_train_difference):
+        super().__init__()
+        self.max_validation_train_difference = max_validation_train_difference
+
+    def on_epoch_end(self, epoch, logs=None):
+        train_loss = logs['loss']
+        val_loss = logs['val_loss']
+
+        if math.isfinite(train_loss) and math.isfinite(val_loss):
+            if val_loss - train_loss < self.max_validation_train_difference:
+                return
+        
+        self.model.stop_training = True
 
 
 
