@@ -4,7 +4,7 @@ import sys
 import tensorflow as tf
 from tensorflow.keras.callbacks import EarlyStopping, ReduceLROnPlateau, LearningRateScheduler, CSVLogger
 
-from .custom_callbacks import CustomCSVLogger, BatchEvaluationCallback, InflectionPointEarlyStopping, LearningRateWarmupPerStep, InflectionPointLRReducer
+from .custom_callbacks import CustomCSVLogger, BatchEvaluationCallback, InflectionPointEarlyStopping, LearningRateWarmupPerStep, InflectionPointLRReducer, OverfittingEarlyStopping
 
 from dlomix.constants import PTMS_ALPHABET, ALPHABET_NAIVE_MODS, ALPHABET_UNMOD
 from dlomix.data import load_processed_dataset, FragmentIonIntensityDataset
@@ -390,17 +390,16 @@ class AutomaticRlTlTraining:
                 self.csv_logger
             ]        
 
-        
+        self.progress_reporter_min_loss = None
         class LossProgressReporter(tf.keras.callbacks.Callback):
             counter : int = 0
-            min_loss : float = None
             def on_train_batch_end(self_inner, batch, logs):
                 loss = logs['loss']
 
-                if self_inner.min_loss is None:
-                    self_inner.min_loss = loss
+                if self.progress_reporter_min_loss is None:
+                    self.progress_reporter_min_loss = loss
 
-                loss = min(self_inner.min_loss, loss)
+                loss = min(self.progress_reporter_min_loss, loss)
 
                 if self_inner.counter % 1000 == 0:
                     approx_progress = min(0.9999, max(0, (self.initial_loss - loss) / (self.initial_loss - 0.1)))
@@ -409,9 +408,13 @@ class AutomaticRlTlTraining:
                 self_inner.counter += 1
 
         self.callbacks.append(LossProgressReporter())
+
+        self.callbacks.append(OverfittingEarlyStopping(0.1))
                 
         num_val_batches = self.config.dataset.tensor_val_data.cardinality().numpy()
         self.validation_steps = 1000 if num_val_batches > 1000 else None
+
+
 
     def _evaluate_model(self):
         """Runs an evaluation over max. 1000 batches of the validation set and logs the validation performance.
