@@ -1,8 +1,0 @@
-dataset:
-  hf_home: /cmnfs/proj/bmpc_dlomix/datasets
-  hf_cache: /cmnfs/proj/bmpc_dlomix/datasets/hf_cache
-  parquet_path: /cmnfs/proj/bmpc_dlomix/datasets/parquet/noptm_baseline_small
-  processed_path: /cmnfs/proj/bmpc_dlomix/datasets/processed/noptm_baseline_small_bs1024_unmod
-  seq_length: 30
-  batch_size: 1024
-  alphabet: ALPHABET_UNMOD
