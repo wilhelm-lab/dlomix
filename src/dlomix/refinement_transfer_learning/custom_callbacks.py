@@ -154,8 +154,10 @@ class InflectionPointDetector:
                 f'{self.wandb_log_name}_current_patience': self.patience_counter / self.patience
             })
         
+        self.previous_loss = loss
+        
         if self.num_steps < self.ignore_first_n:
-            return
+            return False
 
         if self.num_steps > self.patience:
             # enough datapoints to do estimation
@@ -168,7 +170,6 @@ class InflectionPointDetector:
             else:
                 self.patience_counter = 0
 
-        self.previous_loss = loss
         return False
 
 
