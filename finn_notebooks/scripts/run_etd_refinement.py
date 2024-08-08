@@ -3,34 +3,33 @@ import tensorflow as tf
 import argparse
 import sys
 from pyarrow.parquet import ParquetFile
-sys.path.append('../../bmpc_shared_scripts/refinement_transfer_learning')
-sys.path.append('../../bmpc_shared_scripts/oktoberfest_interface')
 sys.path.append('../../bmpc_shared_scripts/prepare_dataset')
 from get_updated_alphabet import get_modification
-from oktoberfest_interface import load_keras_model, process_dataset
-from automatic_rl_tl import AutomaticRlTlTraining, AutomaticRlTlTrainingConfig
+from dlomix.interface.oktoberfest_interface import load_keras_model, process_dataset, save_keras_model
+from dlomix.refinement_transfer_learning.automatic_rl_tl import AutomaticRlTlTraining, AutomaticRlTlTrainingConfig
 from dlomix.data.dataset import load_processed_dataset
 
 
 def main():
     parser = argparse.ArgumentParser(prog='Test single small PTMs')
     parser.add_argument('--parquet', type=str, required=True)
+    parser.add_argument('--model_path', type=str, required=True)
 
     args = parser.parse_args()
 
-    file = ParquetFile(args.parquet)
+    file = ParquetFile(args.parquet + '_train.parquet')
     modifications = set()
     for batch in file.iter_batches():
         for cur_seq in batch['modified_sequence']:
             cur_mods = get_modification(str(cur_seq))
             modifications |= set(cur_mods)
     
-    model = load_keras_model('/cmnfs/proj/bmpc_dlomix/models/cid_hcd_only_models/noptm_baseline_full_bs1024_unmod_extended_cid/8a1af0c5-e446-4113-a570-5a4066af7f62.keras')
+    model = load_keras_model('baseline')
     dataset = process_dataset(
         parquet_file_path=args.parquet,
         model=model,
         modifications=list(modifications),
-        ion_types=['y', 'b']
+        ion_types=['c', 'z']
     )
 
     config = AutomaticRlTlTrainingConfig(
@@ -42,6 +41,10 @@ def main():
     trainer = AutomaticRlTlTraining(config)
 
     new_model = trainer.train()
+
+    model_path = args.model_path
+    save_keras_model(new_model, model_path)
+
 
 
 if __name__ == '__main__':
