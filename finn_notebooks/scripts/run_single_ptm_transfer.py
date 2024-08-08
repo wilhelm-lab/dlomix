@@ -14,6 +14,7 @@ def main():
     parser = argparse.ArgumentParser(prog='Test single small PTMs')
     parser.add_argument('--parquet', type=str, required=True)
     parser.add_argument('--model_path', type=str, required=True)
+    parser.add_argument('--improve', type=bool, required=True)
 
     args = parser.parse_args()
 
@@ -35,8 +36,8 @@ def main():
         dataset=dataset,
         baseline_model=model,
         use_wandb=True,
-        results_log=os.path.basename(args.parquet) + '_dont_improve_logs',
-        improve_further=False
+        results_log=os.path.basename(args.parquet) + f'_improve_{str(args.improve)}_log',
+        improve_further=args.improve
     )
 
     trainer = AutomaticRlTlTraining(config)
