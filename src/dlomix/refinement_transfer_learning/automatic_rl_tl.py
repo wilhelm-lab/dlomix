@@ -502,7 +502,7 @@ class AutomaticRlTlTraining:
                 inflection_early_stopping_patience=100000,
                 inflection_lr_reducer=True,
                 inflection_lr_reducer_factor=0.7,
-                inflection_lr_reducer_min_improvement=1e-5,
+                inflection_lr_reducer_min_improvement=1e-6,
                 inflection_lr_reducer_patience=5000
             ))
     def _explore_data(self):
@@ -573,7 +573,7 @@ class AutomaticRlTlTraining:
                     plot_distribution(dataset, self.config.dataset.dataset_columns_to_keep[0], dataset_name, is_sequence=True, bins=None, xlabel='Sequence Length')
 
                 plot_distribution(dataset, 'collision_energy_aligned_normed', dataset_name, xlabel='Collision Energy')
-                plot_distribution(dataset, 'intensities_raw', dataset_name, lambda x: [i for sub in x for i in sub], xlabel='Intensity')                
+                # plot_distribution(dataset, 'intensities_raw', dataset_name, lambda x: [i for sub in x for i in sub], xlabel='Intensity')                
                 plot_distribution(dataset, 'precursor_charge_onehot', dataset_name, lambda x: np.argmax(x, axis=1), bins=np.arange(6) - 0.5, xlabel='Precursor Charge')
 
     def _compile_report(self):
