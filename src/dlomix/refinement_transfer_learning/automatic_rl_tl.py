@@ -409,7 +409,14 @@ class AutomaticRlTlTraining:
 
         self.callbacks.append(LossProgressReporter())
 
-        self.callbacks.append(OverfittingEarlyStopping(0.1))
+        num_train_batches = self.config.dataset.tensor_train_data.cardinality().numpy()
+        batch_size = self.config.dataset.batch_size 
+        num_train_sequences = batch_size * num_train_batches 
+        self.callbacks.append(OverfittingEarlyStopping(
+            max_validation_train_difference=0.1,
+            patience=max(2, math.ceil(2000000 / num_train_sequences)),
+            wandb_log=self.config.use_wandb
+        ))
                 
         num_val_batches = self.config.dataset.tensor_val_data.cardinality().numpy()
         self.validation_steps = 1000 if num_val_batches > 1000 else None

@@ -76,20 +76,44 @@ class BatchEvaluationCallback(tf.keras.callbacks.Callback):
 
 class OverfittingEarlyStopping(tf.keras.callbacks.Callback):
     max_validation_train_difference : float
+    patience : int
+    wandb_log : bool
 
-    def __init__(self, max_validation_train_difference):
+    patience_counter : int = 0
+
+    def __init__(self, max_validation_train_difference, patience, wandb_log):
         super().__init__()
         self.max_validation_train_difference = max_validation_train_difference
+        self.patience = patience
+        self.wandb_log = wandb_log
+
+        if self.wandb_log:
+            global wandb
+            import wandb
 
     def on_epoch_end(self, epoch, logs=None):
         train_loss = logs['loss']
         val_loss = logs['val_loss']
 
-        if math.isfinite(train_loss) and math.isfinite(val_loss):
-            if val_loss - train_loss < self.max_validation_train_difference:
-                return
+        if not math.isfinite(train_loss) or not math.isfinite(val_loss):
+            self.model.stop_training = True
+            return
+
+        if self.wandb_log:
+            wandb.log({
+                'overfitting_early_stopping_loss_diff': val_loss - train_loss,
+                'overfitting_early_stopping_current_patience': self.patience_counter / self.patience
+            })
         
-        self.model.stop_training = True
+        if val_loss - train_loss < self.max_validation_train_difference:
+            # difference is within allowed margin
+            self.patience_counter = max(0, self.patience_counter - max(2, math.ceil(0.1 * self.patience)))
+            return
+        
+        # difference is too high
+        self.patience_counter += 1
+        if self.patience_counter > self.patience:
+            self.model.stop_training = True
 
 
 
