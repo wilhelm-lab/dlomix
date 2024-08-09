@@ -123,6 +123,8 @@ class PrositIntensityPredictor(tf.keras.Model):
         List of string values corresponding to fixed keys in the inputs dict that are considered meta data. Defaults to None, which corresponds then to the default meta data keys `META_DATA_KEYS`.
     with_termini : boolean, optional
         Whether to consider the termini in the sequence. Defaults to True.
+    ion_types : list[str], optional
+        Save the ion types with the model to later check compatibility with a given dataset.
 
     Attributes
     ----------
@@ -167,6 +169,7 @@ class PrositIntensityPredictor(tf.keras.Model):
         input_keys=None,
         meta_data_keys=None,
         with_termini=True,
+        ion_types=None
     ):
         super(PrositIntensityPredictor, self).__init__()
 
@@ -180,6 +183,7 @@ class PrositIntensityPredictor(tf.keras.Model):
         self.use_prosit_ptm_features = use_prosit_ptm_features
         self.input_keys = input_keys
         self.meta_data_keys = meta_data_keys
+        self.ion_types = ion_types
 
         # maximum number of fragment ions
         self.max_ion = self.seq_length - 1
