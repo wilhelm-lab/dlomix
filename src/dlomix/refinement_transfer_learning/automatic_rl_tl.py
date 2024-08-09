@@ -501,7 +501,7 @@ class AutomaticRlTlTraining:
                 inflection_early_stopping_patience=100000,
                 inflection_lr_reducer=True,
                 inflection_lr_reducer_factor=0.7,
-                inflection_lr_reducer_min_improvement=1e-6,
+                inflection_lr_reducer_min_improvement=1e-7,
                 inflection_lr_reducer_patience=5000
             ))
     def _explore_data(self):
