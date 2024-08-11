@@ -1,0 +1,23 @@
+{
+    "type": "Rescoring", 
+    "tag": "", 
+    "inputs": {
+        "search_results": "/cmnfs/data/proteomics/ProteomeTools/ETD/MQ/TUM_HLA2_30_01_01/ETD-1h-R1-unspecific/ETD-1h-R1-unspecific/combined/txt", 
+        "search_results_type": "Maxquant", 
+        "spectra": "/cmnfs/data/proteomics/ProteomeTools/ETD/raw", 
+        "spectra_type": "raw"
+    }, 
+    "output": "../rescoring_out", 
+    "models": {
+        "intensity": "/cmnfs/proj/bmpc_dlomix/oktoberfest_output/out2/data/dlomix/refined.keras", 
+        "irt": "Prosit_2019_irt"
+    }, 
+    "thermoExe": "/cmnfs/home/students/j.schlensok/compomics/ThermoRawFileParser.exe",
+    "numThreads": 1, 
+    "fdr_estimation_method": "percolator", 
+    "regressionMethod": "spline", 
+    "allFeatures": false,
+    "massTolerance": 20, 
+    "unitMassTolerance": "ppm",
+    "fragmentation_method" : "ETD"
+}

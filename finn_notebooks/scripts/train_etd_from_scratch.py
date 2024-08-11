@@ -28,12 +28,13 @@ def main():
     dataset = process_dataset(
         parquet_file_path=args.parquet,
         model=model,
-        modifications=list(modifications)
+        modifications=list(modifications),
+        ion_types=['c', 'z']
     )
 
     config = AutomaticRlTlTrainingConfig(
         dataset=dataset,
-        baseline_model=model,
+        baseline_model=None,
         use_wandb=True,
         results_log=os.path.basename(args.parquet) + f'_improve_{str(args.improve)}_log',
         improve_further=args.improve

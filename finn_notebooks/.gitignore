@@ -3,3 +3,4 @@ out*/
 *_logs/
 *_log/
 *.out
+*_out/

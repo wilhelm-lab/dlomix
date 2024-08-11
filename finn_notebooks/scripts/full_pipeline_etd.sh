@@ -2,7 +2,7 @@
 
 #SBATCH --job-name=oktoberfest_w_dlomix
 #SBATCH --out=R-%x.%j.out
-#SBATCH --partition=shared-gpu
+#SBATCH --partition=compms-gpu-a40
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --gres=gpu:1

@@ -153,8 +153,8 @@ def release_old_embeddings(model: PrositIntensityPredictor):
     Args:
         model (PrositIntensityPredictor): model with a changed embedding layer named 'embedding'
     """
-    if model.get_layer('embedding').embeddings_constraint is not None:
-        model.get_layer('embedding').embeddings_constraint.freeze_weights = False
+    if model.embedding.embeddings_constraint is not None:
+        model.embedding.embeddings_constraint.freeze_weights = False
     
 def freeze_old_embeddings(model: PrositIntensityPredictor):
     """Function to freeze the pre-trained embeddings of a re-initialized embedding layer of the Prosit model
@@ -163,5 +163,5 @@ def freeze_old_embeddings(model: PrositIntensityPredictor):
     Args:
         model (PrositIntensityPredictor): model with a changed embedding layer named 'embedding'
     """
-    if model.get_layer('embedding').embeddings_constraint is not None:
-        model.get_layer('embedding').embeddings_constraint.freeze_weights = True
+    if model.embedding.embeddings_constraint is not None:
+        model.embedding.embeddings_constraint.freeze_weights = True
