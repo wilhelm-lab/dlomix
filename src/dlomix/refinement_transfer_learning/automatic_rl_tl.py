@@ -435,7 +435,7 @@ class AutomaticRlTlTraining:
         if self.initial_loss is None:
             self.initial_loss = loss
 
-        print(f'validation loss: {loss}, pearson distance: {metric}')
+        print(f'[validation]  loss: {loss}, pearson distance: {metric}', file=sys.stderr)
         if self.config.use_wandb:
             wandb.log({'val_loss': loss, 'val_masked_pearson_correlation_distance': metric})
         
