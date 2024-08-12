@@ -7,6 +7,7 @@ from wandb.integration.keras import WandbCallback
 
 import tensorflow as tf
 from tensorflow.keras.callbacks import EarlyStopping, ReduceLROnPlateau, LearningRateScheduler
+import numpy as np
 
 import change_layers
 import freezing
@@ -107,6 +108,28 @@ class RlTlTraining:
                 input_keys=input_mapping,
                 meta_data_keys=meta_data_keys
             )
+        
+        if wandb.config['model']['duplicate_regressor']:
+            len_fion = 3 * 4
+            # save weights
+            dense_weights = self.model.regressor.get_layer("time_dense").get_weights()[0]
+            dense_bias = self.model.regressor.get_layer("time_dense").get_weights()[1]
+            # new regressor
+            self.model.regressor = tf.keras.Sequential(
+                    [
+                        tf.keras.layers.TimeDistributed(
+                            tf.keras.layers.Dense(len_fion), name='time_dense'
+                            ), 
+                        tf.keras.layers.LeakyReLU(name='activation'), 
+                        tf.keras.layers.Flatten(name='out')], 
+                    name='regressor'
+                    )
+            
+            self.model.compile(tf.keras.optimizers.Adam(learning_rate=0.0001), loss=masked_spectral_distance)
+            self.model.regressor.get_layer("time_dense").build(input_shape=(None, 29, 512))
+            self.model.regressor.get_layer("time_dense").layer.set_weights([tf.keras.backend.concatenate([dense_weights, dense_weights], axis=1), tf.keras.backend.concatenate([dense_bias, dense_bias], axis=0)])
+            np.allclose(tf.keras.backend.concatenate([dense_weights, dense_weights], axis=1), self.model.regressor.get_layer("time_dense").get_weights()[0])
+
 
     def configure_training(self):
         # initialize relevant stuff for training
