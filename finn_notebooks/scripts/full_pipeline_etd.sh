@@ -20,4 +20,4 @@ NUM_THREADS=$SLURM_CPUS_PER_TASK
 
 # =========== Run oktoberfest =========== #
  
-python -m oktoberfest --config_path=../configs/refinement_etd_config_2.json
+python -m oktoberfest --config_path=../configs/large_etd_rescoring.json

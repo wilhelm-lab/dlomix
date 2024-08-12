@@ -2,22 +2,16 @@
     "type": "Rescoring", 
     "tag": "", 
     "inputs": {
-        "search_results": "/cmnfs/data/proteomics/ProteomeTools/ETD/multiple_msms/only_ETD/msms.txt", 
+        "search_results": "/cmnfs/data/proteomics/ProteomeTools/ETD/multiple_msms/TUM_HLA_26_to_40/msms.txt", 
         "search_results_type": "Maxquant", 
         "spectra": "/cmnfs/data/proteomics/ProteomeTools/ETD/raw", 
         "spectra_type": "raw"
     }, 
-    "output": "../rescoring_out_2", 
+    "output": "../rescoring_out_large", 
     "models": {
-        "intensity": "baseline", 
+        "intensity": "/cmnfs/proj/bmpc_dlomix/oktoberfest_output/refinement_etd_out/data/dlomix/refined.keras", 
         "irt": "Prosit_2019_irt"
     },
-    "refinementLearningOptions": {
-        "includeOriginalSequences": true,
-        "wandbOptions": {
-            "project": "ETD_refinement_final"
-        }
-    }, 
     "thermoExe": "/cmnfs/home/students/j.schlensok/compomics/ThermoRawFileParser.exe",
     "numThreads": 1, 
     "fdr_estimation_method": "percolator", 

@@ -15,11 +15,13 @@ conda activate dlomix
 files=(
     #"Kmod_Acetyl.parquet"
     #"Kmod_Formyl.parquet"
-    "TUM_mod_acetylated.parquet"
+    #"Rmod_Citrullin.parquet"
     #"Ymod_Nitrotyr.parquet"
     #"Pmod_Hydroxypro.parquet"
+    #"TUM_mod_acetylated.parquet"
+    "TUM_mod_citrullination_2.parquet"
 )
 
 for file in "${files[@]}"; do
-    python run_single_ptm_transfer.py --parquet /cmnfs/data/proteomics/Prosit_PTMs/"$file" --model_path /cmnfs/proj/bmpc_dlomix/models/refinement_transfer_learning/single_ptm_models/refined_to_"${file%.*}".keras
+    python run_single_ptm_transfer.py --parquet /cmnfs/data/proteomics/Prosit_PTMs/"$file" --model_path /cmnfs/proj/bmpc_dlomix/models/refinement_transfer_learning/single_ptm_models/refined_to_"${file%.*}".keras --improve
 done
