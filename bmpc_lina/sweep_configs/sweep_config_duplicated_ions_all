@@ -1,0 +1,46 @@
+method: grid
+metric:
+  goal: minimize
+  name: val_loss
+parameters:
+  model:
+    parameters:
+      duplicate_regressor:
+        distribution: categorical
+        values:
+          - true
+          - false
+      load_path:
+        distribution: categorical
+        values:
+          - /cmnfs/proj/bmpc_dlomix/models/baseline_models/noptm_baseline_full_bs1024_naivemods/d961f940-d142-4102-9775-c1f8b4373c91.keras
+          - /cmnfs/proj/bmpc_dlomix/models/refinement_transfer_learning/random_model.keras
+  refinement_transfer_learning:
+    parameters:
+    freeze_layers:
+        parameters:
+          is_first_layer_trainable:
+            distribution: categorical
+            values:
+              - false
+          is_last_layer_trainable:
+            distribution: categorical
+            values:
+              - true
+          release_after_epochs:
+            distribution: categorical
+            values: [30, 60]
+      new_output_layer:
+        parameters: 
+          freeze_old_weights:
+            distribution: categorical
+            values:
+              - true
+              - false
+          release_after_epochs:
+            distribution: categorical
+            values: [10, 20]
+program: train.py
+
+
+python rl_tl_training_agent.py --config config_files/noptm_baseline_small_duplicated_ions_all.yaml --sweep-id "mapra_dlomix/duplicated ions tl/qilt4j3e" 

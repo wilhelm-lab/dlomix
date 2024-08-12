@@ -38,13 +38,7 @@ parameters:
       load_path:
         distribution: categorical
         values:
-          - /cmnfs/proj/bmpc_dlomix/models/refinement_transfer_learning/double_regressor1.keras
-  processing:
-    parameters:
-      cuda_device_nr:
-        distribution: categorical
-        values:
-          - "3"
+          - /cmnfs/proj/bmpc_dlomix/models/baseline_models/noptm_baseline_full_bs1024_naivemods/d961f940-d142-4102-9775-c1f8b4373c91.keras
   project:
     distribution: categorical
     values:
@@ -65,6 +59,12 @@ parameters:
             distribution: int_uniform
             max: 90
             min: 0
+      new_output_layer:
+        parameters:
+          num_ions:
+            distribution: categorical
+            values:
+              - 4
   training:
     parameters:
       early_stopping:
@@ -118,6 +118,3 @@ parameters:
         max: 201
         min: 200
 program: train.py
-
-
-python rl_tl_training_agent.py --config config_files/noptm_baseline_small_duplicated_ions_double_regressor.yaml --sweep-id "mapra_dlomix/duplicated ions tl/umhofzo6" --sweep-count 3 --cuda-device-nr 1

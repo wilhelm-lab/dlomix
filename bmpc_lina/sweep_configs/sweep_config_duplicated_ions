@@ -126,4 +126,4 @@ parameters:
 program: train.py
 
 
-python rl_tl_training_agent.py --config config_files/noptm_baseline_small_duplicated_ions_randomized.yaml --sweep-id "mapra_dlomix/duplicated ions tl/vm6lpyji" --sweep-count 20 --cuda-device-nr 2
+python rl_tl_training_agent.py --config config_files/noptm_baseline_small_duplicated_ions_randomized.yaml --sweep-id "mapra_dlomix/duplicated ions tl/m20twxe6" --sweep-count 3 --cuda-device-nr 1
