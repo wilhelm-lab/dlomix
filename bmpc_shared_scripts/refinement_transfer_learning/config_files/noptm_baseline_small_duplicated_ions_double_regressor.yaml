@@ -2,8 +2,8 @@ dataset:
   name: noptm_baseline_full_bs1024_unmod_extended
   hf_home: /cmnfs/proj/bmpc_dlomix/datasets
   hf_cache: /cmnfs/proj/bmpc_dlomix/datasets/hf_cache
-  parquet_path: /cmnfs/proj/bmpc_dlomix/datasets/parquet/noptm_baseline_small_duplicated_ions
-  processed_path: /cmnfs/proj/bmpc_dlomix/datasets/processed/noptm_baseline_small_duplicated_ions
+  parquet_path: /cmnfs/proj/bmpc_dlomix/datasets/parquet/noptm_baseline_small_duplicated_ions2
+  processed_path: /cmnfs/proj/bmpc_dlomix/datasets/processed/noptm_baseline_small_duplicated_ions2
   seq_length: 30
   batch_size: 1024
   alphabet: 
@@ -56,6 +56,10 @@ refinement_transfer_learning:
     release_after_epochs : 20
     is_first_layer_trainable: false
     is_last_layer_trainable: true
+  new_output_layer:
+    num_ions: 4 
+    freeze_old_weights: false
 model:
-  load_path: "/cmnfs/proj/bmpc_dlomix/models/refinement_transfer_learning/double_regressor1.keras"
+  duplicate_regressor: true
+  load_path: "/cmnfs/proj/bmpc_dlomix/models/baseline_models/noptm_baseline_full_bs1024_naivemods/d961f940-d142-4102-9775-c1f8b4373c91.keras"
   # save_dir: /cmnfs/proj/bmpc_dlomix/models/refinement_transfer_learning

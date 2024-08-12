@@ -60,5 +60,6 @@ refinement_transfer_learning:
     num_ions: 4 
     freeze_old_weights: false
 model:
-  load_path: /cmnfs/proj/bmpc_dlomix/models/baseline_models/noptm_baseline_full_bs1024_naivemods/d961f940-d142-4102-9775-c1f8b4373c91.keras
+  load_path: /cmnfs/proj/bmpc_dlomix/models/refinement_transfer_learning/random_model.keras
+  duplicate_regressor: false
   # save_dir: /cmnfs/proj/bmpc_dlomix/models/refinement_transfer_learning
