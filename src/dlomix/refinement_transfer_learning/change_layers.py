@@ -129,7 +129,8 @@ def change_input_layer(model: PrositIntensityPredictor, modifications: list = No
     """
     old_embedding_max = max(model.alphabet.values())
     if modifications:
-        model.alphabet.update({k: i for i, k in enumerate(modifications, start=len(model.alphabet) + 1)})
+        new_modifications = set(modifications) - set(model.alphabet.keys())
+        model.alphabet.update({k: i for i, k in enumerate(new_modifications, start=len(model.alphabet) + 1)})
         
     embeddings_constraint = None
     if freeze_old_embeds:

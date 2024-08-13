@@ -34,7 +34,7 @@ def main():
     config = AutomaticRlTlTrainingConfig(
         dataset=dataset,
         baseline_model=model,
-        use_wandb=True,
+        # use_wandb=True,
         results_log=os.path.basename(args.parquet) + f'_improve_{str(args.improve)}_log',
         improve_further=args.improve
     )
@@ -53,6 +53,7 @@ if __name__ == '__main__':
     os.environ['HF_DATASETS_CACHE'] = '/cmnfs/proj/bmpc_dlomix/datasets/hf_cache'
 
     num_proc = 16
+    os.environ["CUDA_VISIBLE_DEVICES"] = '-1'
     os.environ["OMP_NUM_THREADS"] = f"{num_proc}"
     os.environ["TF_NUM_INTRAOP_THREADS"] = f"{num_proc}"
     os.environ["TF_NUM_INTEROP_THREADS"] = f"{num_proc}"
