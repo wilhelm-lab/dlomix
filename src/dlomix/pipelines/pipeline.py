@@ -1,12 +1,12 @@
 import zipfile
 from os import makedirs
-from os.path import dirname, join, splitext
+from os.path import dirname, splitext
 
 import numpy as np
 import requests
 
 from ..constants import retention_time_pipeline_parameters
-from ..data import RetentionTimeDataset
+from ..data.RetentionTimeDataset import RetentionTimeDataset
 from ..models.base import RetentionTimePredictor
 from ..reports import RetentionTimeReport
 

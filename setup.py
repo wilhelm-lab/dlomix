@@ -1,3 +1,5 @@
+import platform
+
 import setuptools
 
 with open("README.md", "r") as fh:
@@ -6,6 +8,43 @@ with open("README.md", "r") as fh:
 from src.dlomix import META_DATA, __version__
 
 VERSION = __version__
+tensorflow_version = "2.10.0"
+tensorflow_version = "2.10.0"
+
+os_name = platform.system().lower()
+
+if os_name == "darwin":
+    # Apple silicon
+    tensorflow_requirement = "tensorflow-macos"
+else:
+    tensorflow_requirement = "tensorflow"
+
+tensorflow_requirement = tensorflow_requirement + " == " + tensorflow_version
+
+requirements = [
+    "fpdf",
+    "matplotlib",
+    "numpy",
+    "pandas",
+    "pyarrow",
+    # we install with the extra xml to ensure lxml is installed
+    # more details about extras for pyteomics are here: https://pyteomics.readthedocs.io/en/latest/installation.html
+    "pyteomics[XML]",
+    "scikit-learn",
+    "seaborn",
+    tensorflow_requirement,
+    "prospect-dataset @ git+https://github.com/wilhelm-lab/PROSPECT.git@develop",
+]
+
+dev_requirements = [
+    "black",
+    "pylint",
+    "pytest >= 3.7",
+    "pytest-cov",
+    "setuptools",
+    "twine",
+    "wheel",
+]
 
 setuptools.setup(
     name=META_DATA["package_name"].lower(),
@@ -16,32 +55,10 @@ setuptools.setup(
     long_description=long_description,
     long_description_content_type="text/markdown",
     url=META_DATA["github_url"],
-    packages=setuptools.find_packages(where="src"),
-    package_dir={"": "src"},
-    include_package_data=True,
-    package_data={"": ["data/processing/pickled_feature_dicts/*"]},
-    install_requires=[
-        "datasets",
-        "fpdf",
-        "pandas",
-        "numpy",
-        "matplotlib",
-        "scikit-learn",
-        "tensorflow>=2.13,<2.16",  # 2.16 introduces breaking changes and has Keras 3 as default
-        "tensorflow_probability>=0.21",
-        "pyarrow",
-        "seaborn",
-    ],
+    packages=setuptools.find_packages(),
+    install_requires=requirements,
     extras_require={
-        "dev": [
-            "pytest >= 3.7",
-            "pytest-cov",
-            "black",
-            "twine",
-            "setuptools",
-            "wheel",
-            "pylint",
-        ],
+        "dev": dev_requirements,
         "wandb": [
             "wandb >= 0.15",
         ],

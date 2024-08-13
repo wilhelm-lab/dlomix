@@ -14,16 +14,7 @@ def test_prosit_retention_time_model():
 
 
 def test_prosit_intensity_model():
-    model = PrositIntensityPredictor(
-        input_keys={
-            "SEQUENCE_KEY": "sequence",
-        },
-        meta_data_keys={
-            "COLLISION_ENERGY_KEY": "collision_energy",
-            "PRECURSOR_CHARGE_KEY": "precursor_charge",
-        },
-    )
-
+    model = PrositIntensityPredictor()
     seq_len = model.seq_length
     model.build(
         {
@@ -38,21 +29,21 @@ def test_prosit_intensity_model():
     model.summary(print_fn=logger.info)
     logger.info(model)
     assert model is not None
+    assert model.ptm_encoder is None
+    assert model.ptm_aa_fusion is None
+
+
+def test_prosit_intensity_model_ptm_on():
+    model = PrositIntensityPredictor(use_ptm_counts=True)
+    logger.info(model.input_keys)
+    logger.info(model)
+    assert model is not None
+    assert model.ptm_encoder is not None
+    assert model.ptm_aa_fusion is not None
 
 
 def test_prosit_intensity_model_ptm_on_input():
-    model = PrositIntensityPredictor(
-        input_keys={
-            "SEQUENCE_KEY": "sequence",
-        },
-        meta_data_keys={
-            "COLLISION_ENERGY_KEY": "collision_energy",
-            "PRECURSOR_CHARGE_KEY": "precursor_charge",
-            "FRAGMENTATION_TYPE_KEY": "fragmentation_type",
-        },
-        use_prosit_ptm_features=True,
-    )
-
+    model = PrositIntensityPredictor(use_ptm_counts=True)
     seq_len = model.seq_length
     model.build(
         {
@@ -87,7 +78,7 @@ def test_prosit_intensity_model_ptm_on_input():
 
 
 def test_prosit_intensity_model_ptm_on_missing():
-    model = PrositIntensityPredictor(use_prosit_ptm_features=True)
+    model = PrositIntensityPredictor(use_ptm_counts=True)
     seq_len = model.seq_length
     with pytest.raises(ValueError):
         model.build(
@@ -96,9 +87,9 @@ def test_prosit_intensity_model_ptm_on_missing():
                     None,
                     seq_len,
                 ),
-                "collision_energy": (None,),
+                "collision_energy": (None, 1),
                 "precursor_charge": (None, 6),
-                "fragmentation_type": (None,),
+                "fragmentation_type": (None, 1),
                 # no PTM features
             }
         )

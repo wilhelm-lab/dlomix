@@ -11,16 +11,13 @@ build:
   tools:
     python: "3.8"
   jobs:
-  # Build the rst files in case API has changed or modules has been added
+    # Build the rst files in case API has changed or modules has been added
     pre_build:
-    # M Modules first, E no headers, f force overwrite, l links, o output directory
-      - sphinx-apidoc -M -E -f -l -o docs/ src/dlomix/
-      - python docs/codify_package_titles.py
-
+      - sphinx-apidoc -f -o docs/ dlomix/
 
 # Build documentation in the docs/ directory with Sphinx
 sphinx:
-   configuration: docs/conf.py
+  configuration: docs/conf.py
 
 python:
   install:

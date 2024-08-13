@@ -10,7 +10,7 @@ def reshape_dims(array):
     n, dims = array.shape
     assert dims == 174
     nlosses = 1
-    return array.reshape([array.shape[0], 30 - 1, 2, nlosses, 3])
+    return array.reshape([n, 30 - 1, 2, nlosses, 3])
 
 
 def reshape_flat(array):

@@ -6,7 +6,7 @@ from matplotlib import pyplot as plt
 from matplotlib.colors import LogNorm
 from matplotlib.ticker import LogLocator
 
-from ..reports.Report import PDFFile, Report
+from .Report import PDFFile, Report
 
 
 class RetentionTimeReport(Report):
@@ -29,7 +29,7 @@ class RetentionTimeReport(Report):
     def generate_report(self, targets, predictions, **kwargs):
         self._init_report_resources()
 
-        r2 = self.calculate_r2(targets, predictions)
+        _ = self.calculate_r2(targets, predictions)
         self.plot_all_metrics()
         self.plot_residuals(targets, predictions)
         self.plot_density(targets, predictions)
@@ -71,7 +71,7 @@ class RetentionTimeReport(Report):
             predictions: Array with prediction values
             xrange (tuple, optional): X-axis range for plotting the histogram. Defaults to (-10, 10).
         """
-        error = np.ravel(targets) - np.ravel(predictions)
+        error = np.ravel(predictions) - np.ravel(targets)
 
         x_min, x_max = xrange
         if xrange == (0, 0):
@@ -127,7 +127,8 @@ class RetentionTimeReport(Report):
         H = np.flipud(H)
 
         # Mask zeros
-        Hmasked = np.ma.masked_where(H == 0, H)  # Mask pixels with a value of zero
+        # Mask pixels with a value of zero
+        Hmasked = np.ma.masked_where(H == 0, H)
 
         # Plot 2D histogram using pcolor
         cm = plt.cm.get_cmap(palette)

@@ -1,12 +1,10 @@
+uninstall:
+	pip uninstall dlomix -y
 install:
 	pip install --upgrade pip && pip install -e .
 
-uninstall:
-	pip uninstall dlomix -y
-
 install-nodeps:
 	pip install --upgrade pip && pip install -e . --no-deps
-
 
 install-dev:
 	pip install --upgrade pip && pip install -e .[dev]
@@ -15,22 +13,21 @@ install-dev:
 test:
 	make uninstall
 	make install
-	mkdir -p .test_results/cov/
+	mkdir -p cov/
 
-	python -m pytest tests/ --junitxml=.test_results/junit/test-results.xml --cov=dlomix --cov-report html:.test_results/cov/cov_html --cov-report xml:.test_results/cov/cov.xml --cov-report lcov:.test_results/cov/cov.info --cov-report annotate:.test_results/cov/cov_annotate
+	python -m pytest tests/ --junitxml=junit/test-results.xml --cov=dlomix --cov-report html:cov/cov_html --cov-report xml:cov/cov.xml --cov-report lcov:cov/cov.info --cov-report annotate:cov/cov_annotate
 
 test-local:
 	make uninstall
 	make install-nodeps
-	mkdir -p .test_results/cov/
+	mkdir -p cov/
 
-	python -m pytest tests/ --junitxml=.test_results/junit/test-results.xml --cov=dlomix --cov-report html:.test_results/cov/cov_html --cov-report xml:.test_results/cov/cov.xml --cov-report lcov:.test_results/cov/cov.info --cov-report annotate:.test_results/cov/cov_annotate
+	python -m pytest tests/ --junitxml=junit/test-results.xml --cov=dlomix --cov-report html:cov/cov_html --cov-report xml:cov/cov.xml --cov-report lcov:cov/cov.info --cov-report annotate:cov/cov_annotate
 
 
 format:
-	black ./src/dlomix/*
 	isort --profile black .
-	black ./src/dlomix/*.py
+	black ./dlomix/*.py
 	black ./run_scripts/*.py
 	black ./tests/*.py
 

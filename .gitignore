@@ -54,8 +54,8 @@ coverage.xml
 .hypothesis/
 .pytest_cache/
 
-# put all test results and coverage in one place
-.test_results/
+# put all coverage in one place
+cov/
 
 # Translations
 *.mo
@@ -157,7 +157,7 @@ todo.md
 
 .DS_Store
 
-# model checkpoints in the run scripts directory
+# model checkpoints, csvs, pkls in the run scripts directory
 run_scripts/checkpoint*
 run_scripts/*.index
 run_scripts/*.data-*
@@ -167,5 +167,3 @@ run_scripts/*.pkl
 
 # test assets (will be downloaded the first time tests are run and then ignore by git)
 assets/
-
-src/dlomix/reports/quarto/.local_quarto_plots

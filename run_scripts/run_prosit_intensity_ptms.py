@@ -3,38 +3,44 @@ import sys
 
 import tensorflow as tf
 
-from dlomix.data import FragmentIonIntensityDataset
+from dlomix.data import IntensityDataset
+from dlomix.data.feature_extractors import (
+    ModificationGainFeature,
+    ModificationLocationFeature,
+    ModificationLossFeature,
+)
 from dlomix.losses import masked_spectral_distance
 from dlomix.models import PrositIntensityPredictor
 
+sys.path.append(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
+
+
 # consider the use-case for starting from a saved model
 
-model = PrositIntensityPredictor(
-    seq_length=30,
-    use_prosit_ptm_features=True,
-    input_keys={
-        "SEQUENCE_KEY": "modified_sequence",
-    },
-    meta_data_keys={
-        "COLLISION_ENERGY_KEY": "collision_energy_aligned_normed",
-        "PRECURSOR_CHARGE_KEY": "precursor_charge_onehot",
-    },
-    with_termini=False,
-)
+model = PrositIntensityPredictor(seq_length=30, use_ptm_counts=True)
 
-optimizer = tf.keras.optimizers.Adam(learning_rate=0.0001)
+optimizer = tf.keras.optimizers.Adam(learning_rate=0.0001, decay=1e-7)
 
-TRAIN_DATAPATH = "../example_dataset/intensity/third_pool_processed_sample.parquet"
+# TRAIN_DATAPATH = "../example_dataset/intensity/intensity_data.csv"
+# TRAIN_DATAPATH = "../notebooks/data/third_pool_processed_sample.parquet"
+TRAIN_DATAPATH = "../notebooks/data/third_pool_processed.parquet"
+# TEST_DATAPATH = '../example_dataset/proteomTools_test.csv'
 
-d = FragmentIonIntensityDataset(
+d = IntensityDataset(
     data_source=TRAIN_DATAPATH,
-    max_seq_len=30,
-    batch_size=8,
-    val_ratio=0.2,
-    model_features=["collision_energy_aligned_normed", "precursor_charge_onehot"],
-    sequence_column="modified_sequence",
-    label_column="intensities_raw",
-    features_to_extract=["mod_loss", "delta_mass"],
+    seq_length=30,
+    batch_size=128,
+    val_ratio=0.3,
+    precursor_charge_col="precursor_charge_onehot",
+    sequence_col="modified_sequence",
+    collision_energy_col="collision_energy_aligned_normed",
+    intensities_col="intensities_raw",
+    features_to_extract=[
+        ModificationLocationFeature(),
+        ModificationLossFeature(),
+        ModificationGainFeature(),
+    ],
+    parser="proforma",
 )
 
 model.compile(optimizer=optimizer, loss=masked_spectral_distance, metrics=["mse"])
@@ -51,10 +57,7 @@ callbacks = [checkpoint, early_stop, decay]
 
 
 history = model.fit(
-    d.tensor_train_data,
-    epochs=20,
-    validation_data=d.tensor_val_data,
-    callbacks=callbacks,
+    d.train_data, epochs=2, validation_data=d.val_data, callbacks=callbacks
 )
 
 # # to add test data, a pool for example
