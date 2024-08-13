@@ -311,6 +311,7 @@ class PeptideDataset:
                 split: f"in-memory Dataset object - {split}"
                 for split in self.hf_dataset
             }
+
         elif isinstance(self.data_source, Dataset):
             self.hf_dataset = DatasetDict()
             self.hf_dataset[PeptideDataset.DEFAULT_SPLIT_NAMES[0]] = self.data_source
@@ -327,7 +328,12 @@ class PeptideDataset:
 
         # one non-train data source provided -> if test, then test only, if val, then do not split
         if count_loaded_data_sources == 1:
-            if self.test_data_source is not None:
+            if (
+                self.test_data_source is not None
+                or PeptideDataset.DEFAULT_SPLIT_NAMES[2]
+                in self._data_files_available_splits
+            ):
+                # test data source provided OR hugging face dataset with test split only
                 self._test_set_only = True
             if self.val_data_source is not None:
                 self._is_predefined_split = True
