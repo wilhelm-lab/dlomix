@@ -553,7 +553,7 @@ If you prefer to encode the (amino-acids)+PTM combinations as tokens in the voca
 
             if isinstance(processor, SequencePaddingProcessor):
                 for split in self.hf_dataset.keys():
-                    if split != "test":
+                    if split != "test" or split != 'inference:
                         logger.info(
                             f"Removing truncated sequences in the {split} split ..."
                         )
