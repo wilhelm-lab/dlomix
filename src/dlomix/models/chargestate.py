@@ -1,6 +1,6 @@
 import tensorflow as tf
 import tensorflow.keras.backend as K
-from tensorflow.keras import activations, constraints, initializers, regularizers
+from tensorflow.keras import constraints, initializers, regularizers
 
 from ..constants import ALPHABET_UNMOD
 
@@ -201,9 +201,7 @@ class ChargeStateDistributionPredictor(tf.keras.Model):
             ]
         )
 
-        self.output_layer = tf.keras.layers.Dense(
-            num_classes, activation="linear"
-        )  # alternatively: sigmoid ?
+        self.output_layer = tf.keras.layers.Dense(num_classes, activation="softmax")
 
     def _build_encoder(self):
         self.encoder = tf.keras.Sequential(
