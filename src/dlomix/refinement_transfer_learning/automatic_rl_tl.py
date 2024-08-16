@@ -222,7 +222,7 @@ class AutomaticRlTlTraining:
             for i, (batch, y_true) in enumerate(dataset):
                 if i >= max_batches:
                     break
-                y_pred = model.predict(batch)
+                y_pred = model.predict(batch, verbose=0)
                 spectral_dists.extend(masked_spectral_distance(y_true=y_true, y_pred=y_pred).numpy())
             return spectral_dists
 
