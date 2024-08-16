@@ -1,7 +1,5 @@
-import yaml
 import os
-import uuid
-import logging
+import sys
 
 import tensorflow as tf
 from tensorflow.keras.callbacks import EarlyStopping, ReduceLROnPlateau, LearningRateScheduler, CSVLogger
@@ -19,10 +17,13 @@ from typing import Optional
 import math
 import json
 import numpy as np
-import matplotlib.pyplot as plt
-from collections import defaultdict
+from pathlib import Path
+import importlib.resources as importlib_resources
+import shutil
 
-logger = logging.getLogger(__name__)
+from nbconvert import HTMLExporter
+import nbformat
+from nbconvert.preprocessors import ExecutePreprocessor
 
 
 @dataclass
@@ -103,6 +104,8 @@ class TrainingInstanceConfig:
 
 class AutomaticRlTlTraining:
     config : AutomaticRlTlTrainingConfig
+    results_data_path : Path
+    results_notebook_path : Path 
 
     model : PrositIntensityPredictor
     is_new_model : bool
@@ -139,17 +142,12 @@ class AutomaticRlTlTraining:
         self._init_wandb()
         self._init_logging()
         self._init_model()
-        self._calculate_spectral_angles('before')
         self._update_model_inputs()
         self._update_model_outputs()
         self._init_training()
         self._construct_training_schedule()
         self._explore_data()
     
-    def _save_json(self, data, filename):
-        with open(os.path.join(self.config.results_log, filename), 'w') as f:
-            json.dump(data, f)
-
     def _init_wandb(self):
         """ Initializes Weights & Biases Logging if the user requested that in the config.
         """
@@ -169,10 +167,17 @@ class AutomaticRlTlTraining:
         """ Initializes Weights & Biases Logging and CSV Logging if the user requested that in the config.
         """       
         
-        if not os.path.exists(self.config.results_log):
-            os.makedirs(self.config.results_log)
+        self.results_data_path = Path(self.config.results_log) / 'log_data/'
 
-        self.csv_logger = CustomCSVLogger(f'{self.config.results_log}/training_log.csv', separator=',', append=True)
+        if not os.path.exists(self.results_data_path):
+            os.makedirs(self.results_data_path)
+
+        notebook_ref = importlib_resources.files('dlomix') / 'refinement_transfer_learning' / 'user_report.ipynb'
+        self.results_notebook_path = Path(self.config.results_log) / 'report.ipynb'
+        with importlib_resources.as_file(notebook_ref) as path: 
+            shutil.copyfile(path, self.results_notebook_path)
+
+        self.csv_logger = CustomCSVLogger(f'{self.results_data_path}/training_log.csv', separator=',', append=True)
 
     def _init_model(self):
         """Configures the given baseline model or creates a new model if no baseline model is provided in the config.
@@ -209,61 +214,80 @@ class AutomaticRlTlTraining:
         )
     
 
-    def _calculate_spectral_angles(self, stage, datasets=['train', 'val', 'test']):
-        """
-        Predict the intensities, calculate spectral distances, and save the spectral angle distribution for the specified datasets.
+    def _calculate_spectral_angles(self, stage):
+        """Calculates and saves the spectral angle distributions before and after training."""
 
-        Args:
-            tage: A string indicating the stage ('before' or 'after').
-            datasets: A list of strings indicating which datasets to use ('train', 'val', 'test').
-
-        Returns:
-            None (saves JSON files)
-        """
-
-        def calculate_spectral_distance(dataset, model):
+        def calculate_spectral_distance(dataset, model, max_batches=1000):
             spectral_dists = []
-            for batch, y_true in dataset:        
+            for i, (batch, y_true) in enumerate(dataset):
+                if i >= max_batches:
+                    break
                 y_pred = model.predict(batch)
                 spectral_dists.extend(masked_spectral_distance(y_true=y_true, y_pred=y_pred).numpy())
             return spectral_dists
 
+        def calculate_and_save_spectral_angle_distribution(data, model, results_log, stage, datasets=['train', 'val', 'test']):
+            """
+            Predict the intensities, calculate spectral distances, and save the spectral angle distribution for the specified datasets.
 
-        for dataset in datasets:
-            if dataset not in ['train', 'val', 'test']:
-                raise ValueError("Invalid dataset type. Choose 'train', 'val', or 'test'.")
+            Args:
+                data: A dataset containing tensor_train_data, tensor_val_data, and tensor_test_data.
+                model: A trained model used for making predictions.
+                results_log: Directory to save the JSON files.
+                stage: A string indicating the stage ('before' or 'after').
+                datasets: A list of strings indicating which datasets to use ('train', 'val', 'test').
 
-            try:
-                if dataset == 'train':
-                    dataset_data = self.config.dataset.tensor_train_data
-                elif dataset == 'val':
-                    dataset_data = self.config.dataset.tensor_val_data
-                elif dataset == 'test':
-                    dataset_data = self.config.dataset.tensor_test_data
-            except ValueError:
-                continue
+            Returns:
+                None (saves JSON files)
+            """
+            def save_json(data, filename):
+                with open(os.path.join(results_log, filename), 'w') as f:
+                    json.dump(data, f)
 
-            spectral_dists = calculate_spectral_distance(dataset_data, self.model)
-            sa_data = [1 - sd for sd in spectral_dists]
-            avg_sa = np.mean(sa_data)
+            for dataset in datasets:
+                if dataset not in ['train', 'val', 'test']:
+                    raise ValueError("Invalid dataset type. Choose 'train', 'val', or 'test'.")
 
-            data_to_save = {
-                'spectral_angles': sa_data,
-                'average_spectral_angle': avg_sa
-            }
+                try:
+                    if dataset == 'train':
+                        dataset_data = data.tensor_train_data
+                    elif dataset == 'val':
+                        dataset_data = data.tensor_val_data
+                    elif dataset == 'test':
+                        dataset_data = data.tensor_test_data
+                except ValueError:
+                    continue
+                
 
-            # Load existing data if present
-            filename = f'spectral_angle_distribution_{dataset}.json'
-            file_path = os.path.join(self.config.results_log, filename)
-            if os.path.exists(file_path):
-                with open(file_path, 'r') as f:
-                    existing_data = json.load(f)
-            else:
-                existing_data = {}
+                spectral_dists = calculate_spectral_distance(dataset_data, model)
+                sa_data = [1 - sd for sd in spectral_dists]
+                avg_sa = np.mean(sa_data)
 
-            existing_data[stage] = data_to_save
+                data_to_save = {
+                    'spectral_angles': sa_data,
+                    'average_spectral_angle': avg_sa
+                }
 
-            self._save_json(existing_data, filename)
+                # Load existing data if present
+                filename = f'spectral_angle_distribution_{dataset}.json'
+                file_path = os.path.join(results_log, filename)
+                if os.path.exists(file_path):
+                    with open(file_path, 'r') as f:
+                        existing_data = json.load(f)
+                else:
+                        existing_data = {}
+
+                existing_data[stage] = data_to_save
+
+                save_json(existing_data, filename)
+
+        calculate_and_save_spectral_angle_distribution(
+            data=self.config.dataset,
+            model=self.model,
+            results_log=self.results_data_path,
+            stage=stage,
+            datasets=['train', 'val', 'test']
+        )
 
     def _update_model_inputs(self):
         """Modifies the model's embedding layer to fit the provided dataset. All decisions here are made automatically based on the provided model and dataset.
@@ -272,27 +296,25 @@ class AutomaticRlTlTraining:
         dataset_alphabet = self.config.dataset.alphabet
 
         if self.is_new_model:
-            logger.info('[embedding layer]  created new model with fresh embedding layer')
+            print('[embedding layer]  created new model with fresh embedding layer')
             self.requires_new_embedding_layer = False
             self.can_reuse_old_embedding_weights = False
             return
 
         if model_alphabet == dataset_alphabet:
-            logger.debug(f"model_alphabet={model_alphabet}")
-            logger.debug(f"dataset_alphabet={dataset_alphabet}")
-            logger.info('[embedding layer]  model and dataset modifications match')
+            print('[embedding layer]  model and dataset modifications match')
             self.requires_new_embedding_layer = False
             self.can_reuse_old_embedding_weights = False
         else:
-            logger.warning('[embedding layer]  model and dataset modifications do not match')
+            print('[embedding layer]  model and dataset modifications do not match')
             self.requires_new_embedding_layer = True
             # check if the existing embedding can be reused
             including_entries = [model_val == dataset_alphabet[key] for key, model_val in model_alphabet.items()]
             if all(including_entries):
-                logger.info('[embedding layer]  can reuse old embedding weights')
+                print('[embedding layer]  can reuse old embedding weights')
                 self.can_reuse_old_embedding_weights = True
             else:
-                logger.warning('[embedding layer]  old embedding weights cannot be reused (mismatch in the mapping)')
+                print('[embedding layer]  old embedding weights cannot be reused (mismatch in the mapping)')
                 self.can_reuse_old_embedding_weights = False
 
             change_layers.change_input_layer(
@@ -313,7 +335,7 @@ class AutomaticRlTlTraining:
             raise RuntimeError(f"Max. sequence length does not match between dataset and model (dataset: {self.config.dataset.max_seq_len}, model: {self.model.seq_length})")
 
         if self.is_new_model:
-            logger.info('[regressor layer]  created new model with fresh regressor layer')
+            print('[regressor layer]  created new model with fresh regressor layer')
             self.requires_new_regressor_layer = False
             self.can_reuse_old_regressor_weights = False
             return
@@ -328,18 +350,18 @@ class AutomaticRlTlTraining:
             dataset_ions = self.config.dataset.ion_types 
 
         if model_ions == dataset_ions:
-            logger.info('[regressor layer]  matching ion types')
+            print('[regressor layer]  matching ion types')
             self.requires_new_regressor_layer = False
             self.can_reuse_old_regressor_weights = False
         else:
-            logger.warning('[regressor layer]  ion types not matching')
+            print('[regressor layer]  ion types not matching')
             self.requires_new_regressor_layer = True
 
             if len(model_ions) <= len(dataset_ions) and all([m == d for m, d in zip(model_ions, dataset_ions)]):
-                logger.info('[regressor layer]  can reuse existing regressor weights')
+                print('[regressor layer]  can reuse existing regressor weights')
                 self.can_reuse_old_regressor_weights = True
             else:
-                logger.warning('[regressor layer]  old regressor weights cannot be reused (mismatch in the ion ordering / num. ions)')
+                print('[regressor layer]  old regressor weights cannot be reused (mismatch in the ion ordering / num. ions)')
                 self.can_reuse_old_regressor_weights = False
             
             change_layers.change_output_layer(
@@ -381,7 +403,7 @@ class AutomaticRlTlTraining:
 
                 if self_inner.counter % 1000 == 0:
                     approx_progress = min(0.9999, max(0, (self.initial_loss - loss) / (self.initial_loss - 0.1)))
-                    logger.info(f'[training]  masked spectral distance: {loss}, approx. progress: {approx_progress * 100:.2f}%')
+                    print(f'[training]  masked spectral distance: {loss}, approx. progress: {approx_progress * 100:.2f}%', file=sys.stderr)
 
                 self_inner.counter += 1
 
@@ -413,13 +435,12 @@ class AutomaticRlTlTraining:
         if self.initial_loss is None:
             self.initial_loss = loss
 
-        logger.info(f'[validation] loss: {loss}, pearson distance: {metric}')
+        print(f'[validation]  loss: {loss}, pearson distance: {metric}', file=sys.stderr)
         if self.config.use_wandb:
             wandb.log({'val_loss': loss, 'val_masked_pearson_correlation_distance': metric})
         
         self.csv_logger.set_validation_metrics(val_loss=loss, val_masked_pearson_correlation_distance=metric)
         return {'val_loss': loss, 'val_masked_pearson_correlation_distance': metric}    
-
 
     def _construct_training_schedule(self):
         """Configures the phases of the training process based on the given config and the provided dataset and model.
@@ -490,10 +511,12 @@ class AutomaticRlTlTraining:
                 inflection_lr_reducer_min_improvement=1e-7,
                 inflection_lr_reducer_patience=5000
             ))
-    
-
     def _explore_data(self):
         """Generates and saves exploratory data plots in the results_log folder."""
+        def save_json(data, filename):
+            with open(os.path.join(self.results_data_path, filename), 'w') as f:
+                json.dump(data, f)       
+
         def plot_amino_acid_distribution(dataset, alphabet, dataset_name):
             """Plots the frequency of each amino acid in the sequences for a given dataset split."""
             def count_amino_acids(sequences):
@@ -503,8 +526,8 @@ class AutomaticRlTlTraining:
                         if aa in aa_counts:
                             aa_counts[aa] += 1
                 return list(aa_counts.values())
-
-            sequences = dataset[self.config.dataset.sequence_column]
+            
+            sequences = dataset[self.config.dataset.dataset_columns_to_keep[0]]
             aa_counts = count_amino_acids(sequences)
             alphabet_keys = list(alphabet.keys())
 
@@ -512,7 +535,7 @@ class AutomaticRlTlTraining:
                 'alphabet': alphabet_keys,
                 'counts': aa_counts
             }
-            self._save_json(data, f'amino_acid_distribution_{dataset_name}.json')
+            save_json(data, f'amino_acid_distribution_{dataset_name}.json')
 
         def plot_distribution(dataset, feature, dataset_name, transform_func=None, bins=None, xlabel='', ylabel='Frequency', is_sequence=False):
             """General function to plot distributions for different features."""
@@ -522,7 +545,12 @@ class AutomaticRlTlTraining:
             if is_sequence:
                 feature_data = [len(seq) for seq in feature_data]
 
-            actual_bins = bins(feature_data) if callable(bins) else bins if bins is not None else 30
+            if is_sequence:
+                # Define bins to cover the integer range of sequence lengths
+                actual_bins = np.arange(min(feature_data) - 0.5, max(feature_data) + 1.5, 1)
+            else:
+                actual_bins = bins(feature_data) if callable(bins) else bins if bins is not None else 30
+        
             hist, bin_edges = np.histogram(feature_data, bins=actual_bins)
 
             data = {
@@ -531,25 +559,48 @@ class AutomaticRlTlTraining:
                 'xlabel': xlabel,
                 'ylabel': ylabel
             }
-            self._save_json(data, f'{feature}_distribution_{dataset_name}.json')
+
+            if is_sequence: 
+                feature = 'sequence'
+
+            save_json(data, f'{feature}_distribution_{dataset_name}.json')
 
         eval_datasets = {
             'train': self.config.dataset.hf_dataset['train'],
             'val': self.config.dataset.hf_dataset['val'],
             'test': self.config.dataset.hf_dataset['test'] if 'test' in self.config.dataset.hf_dataset else None
         }
+                
 
-        # Plot amino acid distribution
-        for dataset_name, dataset in eval_datasets.items():
+        for dataset_name, dataset in eval_datasets.items():            
             if dataset:
-                plot_amino_acid_distribution(dataset, self.config.dataset.alphabet, dataset_name)
+                if self.config.dataset.dataset_columns_to_keep[0] is not None:
+                    plot_amino_acid_distribution(dataset, self.config.dataset.alphabet, dataset_name)
+                    plot_distribution(dataset, self.config.dataset.dataset_columns_to_keep[0], dataset_name, is_sequence=True, bins=None, xlabel='Sequence Length')
 
-        # Plot distributions
-        for dataset_name, dataset in eval_datasets.items():
-            if dataset:
                 plot_distribution(dataset, 'collision_energy_aligned_normed', dataset_name, xlabel='Collision Energy')
                 # plot_distribution(dataset, 'intensities_raw', dataset_name, lambda x: [i for sub in x for i in sub], xlabel='Intensity')                
                 plot_distribution(dataset, 'precursor_charge_onehot', dataset_name, lambda x: np.argmax(x, axis=1), bins=np.arange(6) - 0.5, xlabel='Precursor Charge')
+
+    def _compile_report(self):
+        """Creates a visual PDF report from the jupyter notebook in the results folder
+        """
+        with open(self.results_notebook_path, 'r') as notebook_file:
+            notebook = nbformat.read(notebook_file, as_version=4)
+
+        current_cwd = os.getcwd()
+        os.chdir(self.config.results_log)
+        executor = ExecutePreprocessor()
+        executor.preprocess(notebook)
+        os.chdir(current_cwd)
+
+        exporter = HTMLExporter()
+        exporter.exclude_input = True
+        result, resources = exporter.from_notebook_node(notebook)
+
+        result_path = Path(self.config.results_log) / 'report.html'
+        with open(result_path, "w") as f:
+            f.write(result)
 
 
     def train(self):
@@ -558,6 +609,7 @@ class AutomaticRlTlTraining:
         Returns:
             PrositIntensityPredictor: The refined model that results from the training process. This model can be used for predictions or further training steps.
         """
+        self._calculate_spectral_angles('before')
         self._evaluate_model()
 
         # Add the batch evaluation callback to the callbacks list
@@ -574,7 +626,7 @@ class AutomaticRlTlTraining:
                 dataset=self.config.dataset,
                 current_epoch_offset=self.current_epoch_offset,
                 wandb_logging=self.config.use_wandb,
-                results_log=self.config.results_log,
+                results_log=self.results_data_path,
                 callbacks=self.callbacks,
                 validation_steps=self.validation_steps
             )
@@ -587,6 +639,7 @@ class AutomaticRlTlTraining:
             wandb.finish()
         
         self._calculate_spectral_angles('after')
+        self._compile_report()
 
         return self.model
 
@@ -764,4 +817,3 @@ class AutomaticRlTlTrainingInstance:
 
         self.final_learning_rate = self.model.optimizer._learning_rate.numpy()
         self.current_epoch_offset += len(history.history['loss'])
-
