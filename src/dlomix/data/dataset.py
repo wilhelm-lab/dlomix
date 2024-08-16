@@ -26,6 +26,7 @@ from .processing.processors import (
 )
 
 logger = logging.getLogger(__name__)
+logging.captureWarnings(True)
 
 
 class PeptideDataset:

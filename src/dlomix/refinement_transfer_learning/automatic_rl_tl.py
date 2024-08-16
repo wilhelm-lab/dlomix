@@ -25,6 +25,8 @@ from nbconvert import HTMLExporter
 import nbformat
 from nbconvert.preprocessors import ExecutePreprocessor
 
+logger = logging.getLogger(__name__)
+
 
 @dataclass
 class AutomaticRlTlTrainingConfig:
@@ -222,7 +224,7 @@ class AutomaticRlTlTraining:
             for i, (batch, y_true) in enumerate(dataset):
                 if i >= max_batches:
                     break
-                y_pred = model.predict(batch)
+                y_pred = model.predict(batch, verbose=0)
                 spectral_dists.extend(masked_spectral_distance(y_true=y_true, y_pred=y_pred).numpy())
             return spectral_dists
 
@@ -296,25 +298,25 @@ class AutomaticRlTlTraining:
         dataset_alphabet = self.config.dataset.alphabet
 
         if self.is_new_model:
-            print('[embedding layer]  created new model with fresh embedding layer')
+            logger.info('[embedding layer]  created new model with fresh embedding layer')
             self.requires_new_embedding_layer = False
             self.can_reuse_old_embedding_weights = False
             return
 
         if model_alphabet == dataset_alphabet:
-            print('[embedding layer]  model and dataset modifications match')
+            logger.info('[embedding layer]  model and dataset modifications match')
             self.requires_new_embedding_layer = False
             self.can_reuse_old_embedding_weights = False
         else:
-            print('[embedding layer]  model and dataset modifications do not match')
+            logger.info('[embedding layer]  model and dataset modifications do not match')
             self.requires_new_embedding_layer = True
             # check if the existing embedding can be reused
             including_entries = [model_val == dataset_alphabet[key] for key, model_val in model_alphabet.items()]
             if all(including_entries):
-                print('[embedding layer]  can reuse old embedding weights')
+                logger.info('[embedding layer]  can reuse old embedding weights')
                 self.can_reuse_old_embedding_weights = True
             else:
-                print('[embedding layer]  old embedding weights cannot be reused (mismatch in the mapping)')
+                logger.info('[embedding layer]  old embedding weights cannot be reused (mismatch in the mapping)')
                 self.can_reuse_old_embedding_weights = False
 
             change_layers.change_input_layer(
@@ -335,7 +337,7 @@ class AutomaticRlTlTraining:
             raise RuntimeError(f"Max. sequence length does not match between dataset and model (dataset: {self.config.dataset.max_seq_len}, model: {self.model.seq_length})")
 
         if self.is_new_model:
-            print('[regressor layer]  created new model with fresh regressor layer')
+            logger.info('[regressor layer]  created new model with fresh regressor layer')
             self.requires_new_regressor_layer = False
             self.can_reuse_old_regressor_weights = False
             return
@@ -350,18 +352,18 @@ class AutomaticRlTlTraining:
             dataset_ions = self.config.dataset.ion_types 
 
         if model_ions == dataset_ions:
-            print('[regressor layer]  matching ion types')
+            logger.info('[regressor layer]  matching ion types')
             self.requires_new_regressor_layer = False
             self.can_reuse_old_regressor_weights = False
         else:
-            print('[regressor layer]  ion types not matching')
+            logger.info('[regressor layer]  ion types not matching')
             self.requires_new_regressor_layer = True
 
             if len(model_ions) <= len(dataset_ions) and all([m == d for m, d in zip(model_ions, dataset_ions)]):
-                print('[regressor layer]  can reuse existing regressor weights')
+                logger.info('[regressor layer]  can reuse existing regressor weights')
                 self.can_reuse_old_regressor_weights = True
             else:
-                print('[regressor layer]  old regressor weights cannot be reused (mismatch in the ion ordering / num. ions)')
+                logger.info('[regressor layer]  old regressor weights cannot be reused (mismatch in the ion ordering / num. ions)')
                 self.can_reuse_old_regressor_weights = False
             
             change_layers.change_output_layer(
@@ -403,7 +405,7 @@ class AutomaticRlTlTraining:
 
                 if self_inner.counter % 1000 == 0:
                     approx_progress = min(0.9999, max(0, (self.initial_loss - loss) / (self.initial_loss - 0.1)))
-                    print(f'[training]  masked spectral distance: {loss}, approx. progress: {approx_progress * 100:.2f}%', file=sys.stderr)
+                    logger.info(f'[training]  masked spectral distance: {loss}, approx. progress: {approx_progress * 100:.2f}%')
 
                 self_inner.counter += 1
 
@@ -435,12 +437,13 @@ class AutomaticRlTlTraining:
         if self.initial_loss is None:
             self.initial_loss = loss
 
-        print(f'[validation]  loss: {loss}, pearson distance: {metric}', file=sys.stderr)
+        logger.info(f'[validation]  loss: {loss}, pearson distance: {metric}')
         if self.config.use_wandb:
             wandb.log({'val_loss': loss, 'val_masked_pearson_correlation_distance': metric})
         
         self.csv_logger.set_validation_metrics(val_loss=loss, val_masked_pearson_correlation_distance=metric)
         return {'val_loss': loss, 'val_masked_pearson_correlation_distance': metric}    
+
 
     def _construct_training_schedule(self):
         """Configures the phases of the training process based on the given config and the provided dataset and model.
@@ -511,6 +514,8 @@ class AutomaticRlTlTraining:
                 inflection_lr_reducer_min_improvement=1e-7,
                 inflection_lr_reducer_patience=5000
             ))
+    
+
     def _explore_data(self):
         """Generates and saves exploratory data plots in the results_log folder."""
         def save_json(data, filename):
@@ -817,3 +822,4 @@ class AutomaticRlTlTrainingInstance:
 
         self.final_learning_rate = self.model.optimizer._learning_rate.numpy()
         self.current_epoch_offset += len(history.history['loss'])
+

@@ -13,7 +13,6 @@ from dlomix.data.fragment_ion_intensity import FragmentIonIntensityDataset
 from dlomix.models.prosit import PrositIntensityPredictor
 
 logger = logging.getLogger(__name__)
-logger.propagate = False
 
 MODEL_FILENAME = 'prosit_baseline_model.keras'
 MODEL_DIR = Path.home() / '.dlomix' / 'models'
@@ -40,7 +39,7 @@ def download_model_from_github() -> str:
     with open(model_path, 'wb') as f:
         f.write(response.content)
     
-    print(f'Model downloaded successfully under {str(model_path)}')
+    logger.info(f'Model downloaded successfully under {str(model_path)}')
     return str(model_path)
 
 
