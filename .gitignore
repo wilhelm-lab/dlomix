@@ -169,3 +169,6 @@ run_scripts/*.pkl
 assets/
 
 src/dlomix/reports/quarto/.local_quarto_plots
+
+# slurm out files
+*.out
