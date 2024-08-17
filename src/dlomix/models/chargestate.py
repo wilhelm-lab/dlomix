@@ -1,6 +1,6 @@
 import tensorflow as tf
-import tf.keras.backend as K
-from tf.keras import constraints, initializers, regularizers
+import tensorflow.keras.backend as K
+from tensorflow.keras import constraints, initializers, regularizers
 
 from ..constants import ALPHABET_UNMOD
 
