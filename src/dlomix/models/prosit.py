@@ -1,3 +1,4 @@
+import logging
 import warnings
 
 import tensorflow as tf
@@ -5,6 +6,9 @@ import tensorflow as tf
 from ..constants import ALPHABET_UNMOD
 from ..data.processing.feature_extractors import FEATURE_EXTRACTORS_PARAMETERS
 from ..layers.attention import AttentionLayer, DecoderAttentionLayer
+
+logger = logging.getLogger(__name__)
+logging.captureWarnings(True)
 
 
 class PrositRetentionTimePredictor(tf.keras.Model):
@@ -323,7 +327,7 @@ class PrositIntensityPredictor(tf.keras.Model):
                 encoded_ptm = self.ptm_input_encoder(ptm_ac_features)
             elif self.use_prosit_ptm_features:
                 warnings.warn(
-                    f"PTM features enabled and following PTM features are expected in the model for Prosit Intesity: {PrositIntensityPredictor.PTM_INPUT_KEYS}. The actual input passed to the model contains the following keys: {list(inputs.keys())}. Falling back to no PTM features."
+                    f"PTM features enabled and following PTM features are expected in the model for Prosit Intensity: {PrositIntensityPredictor.PTM_INPUT_KEYS}. The actual input passed to the model contains the following keys: {list(inputs.keys())}. Falling back to no PTM features."
                 )
 
         x = self.embedding(peptides_in)

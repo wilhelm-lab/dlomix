@@ -1,5 +1,6 @@
 import abc
 import glob
+import logging
 import warnings
 from os import makedirs
 from os.path import join
@@ -7,6 +8,9 @@ from os.path import join
 import tensorflow as tf
 from fpdf import FPDF
 from matplotlib import pyplot as plt
+
+logger = logging.getLogger(__name__)
+logging.captureWarnings(True)
 
 
 class Report(abc.ABC):

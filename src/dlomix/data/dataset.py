@@ -26,6 +26,7 @@ from .processing.processors import (
 )
 
 logger = logging.getLogger(__name__)
+logging.captureWarnings(True)
 
 
 class PeptideDataset:
@@ -553,8 +554,7 @@ If you prefer to encode the (amino-acids)+PTM combinations as tokens in the voca
 
             if isinstance(processor, SequencePaddingProcessor):
                 for split in self.hf_dataset.keys():
-                    # TODO: don't filter out longer sequences if inference split, because it messes with the shape dimensions
-                    if split != "test":
+                    if split != "test" or split != "inference":
                         logger.info(
                             f"Removing truncated sequences in the {split} split ..."
                         )

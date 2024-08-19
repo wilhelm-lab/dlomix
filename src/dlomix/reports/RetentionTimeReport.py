@@ -1,5 +1,5 @@
+import logging
 from os.path import join
-from warnings import warn
 
 import numpy as np
 from matplotlib import pyplot as plt
@@ -7,6 +7,9 @@ from matplotlib.colors import LogNorm
 from matplotlib.ticker import LogLocator
 
 from ..reports.Report import PDFFile, Report
+
+logger = logging.getLogger(__name__)
+logging.captureWarnings(True)
 
 
 class RetentionTimeReport(Report):
