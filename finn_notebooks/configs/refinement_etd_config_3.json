@@ -7,7 +7,7 @@
         "spectra": "/cmnfs/data/proteomics/ProteomeTools/ETD/raw", 
         "spectra_type": "raw"
     }, 
-    "output": "../refinement_ETD_dont_improve_out", 
+    "output": "../refinement_ETD_dont_improve_out_2", 
     "models": {
         "intensity": "baseline", 
         "irt": "Prosit_2019_irt"

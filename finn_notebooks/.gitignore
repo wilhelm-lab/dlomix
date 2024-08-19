@@ -4,4 +4,5 @@ out*/
 *_log/
 *.out
 *_out/
+*_out_*/
 rescoring_*/
