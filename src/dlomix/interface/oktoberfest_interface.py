@@ -62,13 +62,13 @@ def load_keras_model(model_file_path: str = 'baseline') -> PrositIntensityPredic
     # download the model file from github if the baseline model should be used, otherwise a model path can be specified
     if model_file_path == 'baseline':
         model_file_path = download_model_from_github()
-        return load_model(model_file_path)
+        return load_model(model_file_path, compile=False)
 
     if not str(model_file_path).endswith('.keras'):
         raise ValueError('The given model file is not saved with the .keras format! Please specify a path with the .keras extension.')
     if not Path(model_file_path).exists():
         raise FileNotFoundError('Given model file was not found. Please specify an existing saved model file.')
-    return load_model(model_file_path)
+    return load_model(model_file_path, compile=False)
 
 
 def save_keras_model(model: PrositIntensityPredictor, path_to_model: str) -> None:
