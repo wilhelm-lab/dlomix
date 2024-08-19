@@ -203,6 +203,10 @@ def process_dataset(
                     """
                 )
 
+    # put additional columns in lower case TODO: remove if CAPS issue is fixed on Oktoberfest side
+    if additional_columns is not None:
+        additional_columns = [c.lower() for c in additional_columns]
+
     logger.info('Start processing the dataset...')
     dataset = FragmentIonIntensityDataset(
         data_source=parquet_file_path,
