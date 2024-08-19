@@ -321,7 +321,7 @@ class AutomaticRlTlTraining:
 
             change_layers.change_input_layer(
                 self.model,
-                dataset_alphabet,
+                list(dataset_alphabet.keys()),
                 freeze_old_embeds=self.can_reuse_old_embedding_weights
             )
             self.model.alphabet = dataset_alphabet
