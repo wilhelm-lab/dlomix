@@ -219,6 +219,7 @@ def process_dataset(
         label_column=label_column,
         inference_only=inference_only,
         val_ratio=val_ratio,
+        advanced_splitting=True,
         batch_size=batch_size,
         test_ratio=test_ratio,
         alphabet=new_alphabet,
