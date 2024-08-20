@@ -129,7 +129,8 @@ def change_input_layer(model: PrositIntensityPredictor, modifications: list = No
     """
     old_embedding_max = max(model.alphabet.values())
     if modifications:
-        model.alphabet.update({k: i for i, k in enumerate(modifications, start=len(model.alphabet) + 1)})
+        new_modifications = set(modifications) - set(model.alphabet.keys())
+        model.alphabet.update({k: i for i, k in enumerate(new_modifications, start=len(model.alphabet) + 1)})
         
     embeddings_constraint = None
     if freeze_old_embeds:
@@ -153,8 +154,8 @@ def release_old_embeddings(model: PrositIntensityPredictor):
     Args:
         model (PrositIntensityPredictor): model with a changed embedding layer named 'embedding'
     """
-    if model.get_layer('embedding').embeddings_constraint is not None:
-        model.get_layer('embedding').embeddings_constraint.freeze_weights = False
+    if model.embedding.embeddings_constraint is not None:
+        model.embedding.embeddings_constraint.freeze_weights = False
     
 def freeze_old_embeddings(model: PrositIntensityPredictor):
     """Function to freeze the pre-trained embeddings of a re-initialized embedding layer of the Prosit model
@@ -163,5 +164,5 @@ def freeze_old_embeddings(model: PrositIntensityPredictor):
     Args:
         model (PrositIntensityPredictor): model with a changed embedding layer named 'embedding'
     """
-    if model.get_layer('embedding').embeddings_constraint is not None:
-        model.get_layer('embedding').embeddings_constraint.freeze_weights = True
+    if model.embedding.embeddings_constraint is not None:
+        model.embedding.embeddings_constraint.freeze_weights = True

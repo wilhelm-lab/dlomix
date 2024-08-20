@@ -13,7 +13,6 @@ from dlomix.data.fragment_ion_intensity import FragmentIonIntensityDataset
 from dlomix.models.prosit import PrositIntensityPredictor
 
 logger = logging.getLogger(__name__)
-logger.propagate = False
 
 MODEL_FILENAME = 'prosit_baseline_model.keras'
 MODEL_DIR = Path.home() / '.dlomix' / 'models'
@@ -40,7 +39,7 @@ def download_model_from_github() -> str:
     with open(model_path, 'wb') as f:
         f.write(response.content)
     
-    print(f'Model downloaded successfully under {str(model_path)}')
+    logger.info(f'Model downloaded successfully under {str(model_path)}')
     return str(model_path)
 
 
@@ -62,13 +61,13 @@ def load_keras_model(model_file_path: str = 'baseline') -> PrositIntensityPredic
     # download the model file from github if the baseline model should be used, otherwise a model path can be specified
     if model_file_path == 'baseline':
         model_file_path = download_model_from_github()
-        return load_model(model_file_path)
+        return load_model(model_file_path, compile=False)
 
     if not str(model_file_path).endswith('.keras'):
         raise ValueError('The given model file is not saved with the .keras format! Please specify a path with the .keras extension.')
     if not Path(model_file_path).exists():
         raise FileNotFoundError('Given model file was not found. Please specify an existing saved model file.')
-    return load_model(model_file_path)
+    return load_model(model_file_path, compile=False)
 
 
 def save_keras_model(model: PrositIntensityPredictor, path_to_model: str) -> None:
@@ -202,6 +201,10 @@ def process_dataset(
                     Only new ion types are detected. A totally new output layer is necessary.
                     """
                 )
+                
+    # put additional columns in lower case TODO: remove if CAPS issue is fixed on Oktoberfest side
+    if additional_columns is not None:
+        additional_columns = [c.lower() for c in additional_columns]
 
     logger.info('Start processing the dataset...')
     dataset = FragmentIonIntensityDataset(

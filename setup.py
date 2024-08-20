@@ -46,7 +46,8 @@ setuptools.setup(
             "wandb >= 0.15",
         ],
         "rltl-report": [
-            "nbconvert"
+            "nbconvert",
+            "ipykernel"
         ]
     },
     classifiers=[
