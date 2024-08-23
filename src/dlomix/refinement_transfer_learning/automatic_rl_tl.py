@@ -516,7 +516,6 @@ class AutomaticRlTlTraining:
                 inflection_lr_reducer_patience=5000
             ))
     
-
     def _explore_data(self):
         """Generates and saves exploratory data plots in the results_log folder."""
         def save_json(data, filename):
@@ -528,12 +527,11 @@ class AutomaticRlTlTraining:
             def count_amino_acids(sequences):
                 aa_counts = {aa: 0 for aa in alphabet}
                 for seq in sequences:
-                    for aa in seq:
-                        if aa in aa_counts:
-                            aa_counts[aa] += 1
+                    for aa in alphabet: 
+                        aa_counts[aa] += seq.count(aa)
                 return list(aa_counts.values())
             
-            sequences = dataset[self.config.dataset.dataset_columns_to_keep[0]]
+            sequences = dataset['modified_sequence_raw']
             aa_counts = count_amino_acids(sequences)
             alphabet_keys = list(alphabet.keys())
 
@@ -576,18 +574,18 @@ class AutomaticRlTlTraining:
             'val': self.config.dataset.hf_dataset['val'],
             'test': self.config.dataset.hf_dataset['test'] if 'test' in self.config.dataset.hf_dataset else None
         }
-                
 
         for dataset_name, dataset in eval_datasets.items():            
             if dataset:
-                if self.config.dataset.dataset_columns_to_keep[0] is not None:
+                if 'modified_sequence_raw' in self.config.dataset.dataset_columns_to_keep:
                     plot_amino_acid_distribution(dataset, self.config.dataset.alphabet, dataset_name)
-                    plot_distribution(dataset, self.config.dataset.dataset_columns_to_keep[0], dataset_name, is_sequence=True, bins=None, xlabel='Sequence Length')
+                if 'sequence' in self.config.dataset.dataset_columns_to_keep:
+                    plot_distribution(dataset, 'sequence', dataset_name, is_sequence=True, bins=None, xlabel='Sequence Length')
 
                 plot_distribution(dataset, 'collision_energy_aligned_normed', dataset_name, xlabel='Collision Energy')
                 # plot_distribution(dataset, 'intensities_raw', dataset_name, lambda x: [i for sub in x for i in sub], xlabel='Intensity')                
                 plot_distribution(dataset, 'precursor_charge_onehot', dataset_name, lambda x: np.argmax(x, axis=1), bins=np.arange(6) - 0.5, xlabel='Precursor Charge')
-
+    
     def _compile_report(self):
         """Creates a visual PDF report from the jupyter notebook in the results folder
         """
