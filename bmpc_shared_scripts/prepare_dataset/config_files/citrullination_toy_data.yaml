@@ -1,0 +1,10 @@
+dataset:
+  hf_home: /cmnfs/proj/bmpc_dlomix/datasets
+  hf_cache: /cmnfs/proj/bmpc_dlomix/datasets/hf_cache
+  parquet_path: /cmnfs/proj/bmpc_dlomix/oktoberfest_output/citrullination_data2_test/data/dlomix/refinement_dataset/processed_dataset.parquet
+  processed_path: /cmnfs/proj/bmpc_dlomix/datasets/processed/citrullination_toy_dataset
+  seq_length: 30
+  batch_size: 1024
+  alphabet: PTMS_ALPHABET
+  val_ratio: 0.1 
+  test_ratio: 0.1 

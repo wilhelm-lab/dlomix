@@ -67,7 +67,7 @@ dataset = FragmentIonIntensityDataset(
     alphabet=alphabet,
     num_proc=config['processing']['num_proc'],
     model_features=["precursor_charge_onehot", "collision_energy_aligned_normed","method_nbr"], 
-    dataset_columns_to_keep=config['dataset'].get('columns_to_keep', ["sequence"])
+    dataset_columns_to_keep=config['dataset'].get('columns_to_keep', ["sequence", "modified_sequence_raw"])
 )
 
 
