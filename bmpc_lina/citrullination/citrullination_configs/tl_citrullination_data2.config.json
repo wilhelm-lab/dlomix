@@ -8,11 +8,11 @@
         "spectra_type": "mzML",
         "custom_modifications": {
             "var_mods": {
-                "R(ci)": [7, 0.984016, ""]
+                "R(Citrullination)": [7, 0.984016, ""]
             }
         }
     }, 
-    "output": "/cmnfs/proj/bmpc_dlomix/oktoberfest_output/citrullination_data2_test/", 
+    "output": "/cmnfs/proj/bmpc_dlomix/oktoberfest_output/citrullination_test3/", 
     "models": {
         "intensity": "/nfs/home/students/l.willruth/.dlomix/models/prosit_baseline_model.keras", 
         "irt": "Prosit_2019_irt"
