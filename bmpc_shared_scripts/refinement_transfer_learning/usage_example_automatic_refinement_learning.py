@@ -15,7 +15,7 @@ tf.config.threading.set_intra_op_parallelism_threads(num_proc)
 
 from dlomix.data import load_processed_dataset
 
-dataset = load_processed_dataset('/cmnfs/proj/bmpc_dlomix/datasets/processed/ptm_baseline_small_cleaned_bs1024')
+dataset = load_processed_dataset('/cmnfs/proj/bmpc_dlomix/datasets/processed/citrullination_toy_dataset')
 
 from dlomix.models import PrositIntensityPredictor
 from dlomix.losses import masked_spectral_distance, masked_pearson_correlation_distance
