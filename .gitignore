@@ -172,3 +172,4 @@ src/dlomix/reports/quarto/.local_quarto_plots
 
 # slurm out files
 *.out
+bmpc_lina/citrullination/config_files/old/*
