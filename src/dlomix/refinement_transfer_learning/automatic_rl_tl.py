@@ -480,6 +480,8 @@ class AutomaticRlTlTraining:
                 freeze_old_embedding_weights=self.requires_new_embedding_layer and self.can_reuse_old_embedding_weights, 
                 freeze_old_regressor_weights=self.requires_new_regressor_layer and self.can_reuse_old_regressor_weights 
             ))
+        else: 
+            self.csv_logger.reset_phase()
 
         # step 2:
         #   warmup whole model and do main fitting process
