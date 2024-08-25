@@ -56,6 +56,8 @@ class PeptideDataset:
         Ratio of the validation data to the training data. The value should be between 0 and 1.
     test_ratio : float
         Ratio of the test data to the validation data. The value should be between 0 and 1. (Splits the validation data again, not the train data.)
+    advanced_splitting: bool
+        Flag to indicate whether to use advanced train/val/test splitting if providing a single data file or not
     max_seq_len : int
         Maximum sequence length to pad the sequences to. If set to 0, the sequences will not be padded.
     dataset_type : str
@@ -814,11 +816,29 @@ def load_processed_dataset(path: str):
 
 
 def _argshuffle_splits(idx, traininsplit):
+    """Splits the input list of indices according to the given trainsplit and shuffles the indices 
+    inside both the train and validation split, so that all peptides are shuffeled
+
+    Args:
+        idx (list): All available indices
+        trainsplit (float): the ratio for the smaller dataset (e.g. 0.3 for 30% validation and 70% train split)
+    Returns:
+        tuple[list]: first entry are the shuffled train indices, second entry are the shuffled val/test indices
+    """
     train_idx = list(np.random.permutation(idx[:traininsplit]))
     test_idx = list(np.random.permutation(idx[traininsplit:]))
     return train_idx, test_idx
 
 def _peptide_argsort(sequence_integer, seed=42):
+    """Groups the peptides by sequence and shuffles both the peptides as groups and the peptides within each group
+
+    Args: 
+        sequence_integer: list of all peptide sequences present in the dataset
+        seed (int): Seed for reproducible results (defaults to 42)
+
+    Returns:
+        list: list of shuffled indices, which are ordered by unique peptides
+    """
     random.seed(seed)
     peptide_groups = collections.defaultdict(list)
     for index, row in enumerate(sequence_integer):
@@ -839,6 +859,17 @@ def _peptide_argsort(sequence_integer, seed=42):
     return indeces
 
 def _split_dataset_advanced(data_to_split: Dataset, ratio: float) -> tuple[Dataset]:
+    """Function to split a pyarrow dataset with advanced splitting logic. This function takes into account the peptide sequences and splits the dataset 
+    according to the given ratio in such a way, that at most one peptide overlaps in the resulting splits.
+
+    Args:
+        data_to_split: (Dataset): pyarrow dataset, which is to be used for splitting
+        ratio: (float): the ratio for the smaller dataset (e.g. 0.3 for 30% validation and 70% train split)
+
+    Returns:
+        tuple[Dataset]: first entry of the tuple is the train split, second entry is the validation/test split 
+    
+    """
     sequences = data_to_split['modified_sequence']
     n = len(sequences)
     n_split = int(n * float(1 - ratio))
