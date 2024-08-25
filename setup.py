@@ -19,7 +19,7 @@ setuptools.setup(
     packages=setuptools.find_packages(where="src"),
     package_dir={"": "src"},
     include_package_data=True,
-    package_data={"": ["data/processing/pickled_feature_dicts/*", "prosit_baseline_model.txt"]},
+    package_data={"": ["data/processing/pickled_feature_dicts/*", "prosit_baseline_model.txt", "refinement_transfer_learning/user_report.ipynb"]},
     install_requires=[
         "datasets",
         "fpdf",
@@ -45,6 +45,10 @@ setuptools.setup(
         "wandb": [
             "wandb >= 0.15",
         ],
+        "rltl-report": [
+            "nbconvert",
+            "ipykernel"
+        ]
     },
     classifiers=[
         "Programming Language :: Python :: 3",

@@ -6,6 +6,9 @@ import logging
 import os
 import warnings
 from typing import Callable, Dict, List, Optional, Union
+import random
+import collections
+import numpy as np
 
 from datasets import Dataset, DatasetDict, Sequence, Value, load_dataset, load_from_disk
 
@@ -26,6 +29,7 @@ from .processing.processors import (
 )
 
 logger = logging.getLogger(__name__)
+logging.captureWarnings(True)
 
 
 class PeptideDataset:
@@ -117,6 +121,7 @@ class PeptideDataset:
         label_column: str,
         val_ratio: float,
         test_ratio: float,
+        advanced_splitting: bool,
         max_seq_len: int,
         dataset_type: str,
         batch_size: int,
@@ -149,6 +154,7 @@ class PeptideDataset:
 
         self.val_ratio = val_ratio
         self.test_ratio = test_ratio
+        self.advanced_splitting = advanced_splitting
         self.max_seq_len = max_seq_len
         self.dataset_type = dataset_type
         self.batch_size = batch_size
@@ -397,9 +403,16 @@ class PeptideDataset:
             return
 
         # only a train dataset or a train and a test but no val -> split train into train/val
-        splitted_dataset = self.hf_dataset[
-            PeptideDataset.DEFAULT_SPLIT_NAMES[0]
-        ].train_test_split(test_size=self.val_ratio)
+        splitted_dataset = dict()
+        if not self.advanced_splitting:
+            splitted_dataset = self.hf_dataset[
+                PeptideDataset.DEFAULT_SPLIT_NAMES[0]
+            ].train_test_split(test_size=self.val_ratio)
+        else:
+            splitted_dataset["train"], splitted_dataset["test"] = _split_dataset_advanced(
+                self.hf_dataset[PeptideDataset.DEFAULT_SPLIT_NAMES[0]],
+                ratio=self.val_ratio
+                )
 
         self.hf_dataset["train"] = splitted_dataset["train"]
         self.hf_dataset["val"] = splitted_dataset["test"]
@@ -412,14 +425,20 @@ class PeptideDataset:
             return
         
         self.test_ratio = self.test_ratio / (1 - self.val_ratio)
-        splitted_dataset = self.hf_dataset["train"].train_test_split(test_size=self.test_ratio)
+        if not self.advanced_splitting:
+            splitted_dataset = self.hf_dataset["train"].train_test_split(test_size=self.test_ratio)
+        else: 
+            splitted_dataset = _split_dataset_advanced(
+                self.hf_dataset['train'],
+                ratio=self.test_ratio
+            )
+
         self.hf_dataset["train"] = splitted_dataset["train"]
         self.hf_dataset["test"] = splitted_dataset["test"]
         
         del splitted_dataset["train"]
         del splitted_dataset["test"]
         del splitted_dataset
-        
 
     def _parse_sequences(self):
         # parse sequence in all encoding schemes
@@ -553,7 +572,7 @@ If you prefer to encode the (amino-acids)+PTM combinations as tokens in the voca
 
             if isinstance(processor, SequencePaddingProcessor):
                 for split in self.hf_dataset.keys():
-                    if split != "test":
+                    if split != "test" and split != "inference":
                         logger.info(
                             f"Removing truncated sequences in the {split} split ..."
                         )
@@ -648,6 +667,7 @@ If you prefer to encode the (amino-acids)+PTM combinations as tokens in the voca
             label_column=config.label_column,
             val_ratio=config.val_ratio,
             test_ratio=config.test_ratio,
+            advanced_splitting=config.advanced_splitting,
             max_seq_len=config.max_seq_len,
             dataset_type=config.dataset_type,
             batch_size=config.batch_size,
@@ -791,3 +811,37 @@ def load_processed_dataset(path: str):
     dataset = class_obj.from_dataset_config(config)
     dataset.hf_dataset = hf_dataset
     return dataset
+
+
+def _argshuffle_splits(idx, traininsplit):
+    train_idx = list(np.random.permutation(idx[:traininsplit]))
+    test_idx = list(np.random.permutation(idx[traininsplit:]))
+    return train_idx, test_idx
+
+def _peptide_argsort(sequence_integer, seed=42):
+    random.seed(seed)
+    peptide_groups = collections.defaultdict(list)
+    for index, row in enumerate(sequence_integer):
+        peptide_groups[tuple(row)].append(index)
+
+    # shuffle within peptides
+    for indeces in peptide_groups.values():
+        random.shuffle(indeces)
+
+    # shuffle peptides
+    peptides = list(peptide_groups.keys())
+    random.shuffle(peptides)
+
+    # join indeces
+    indeces = []
+    for peptide in peptides:
+        indeces.extend(peptide_groups[peptide])
+    return indeces
+
+def _split_dataset_advanced(data_to_split: Dataset, ratio: float) -> tuple[Dataset]:
+    sequences = data_to_split['modified_sequence']
+    n = len(sequences)
+    n_split = int(n * float(1 - ratio))
+    idx = _peptide_argsort(sequences, seed=42)
+    idx_1, idx_2 = _argshuffle_splits(idx, n_split)
+    return data_to_split.select(idx_1), data_to_split.select(idx_2)

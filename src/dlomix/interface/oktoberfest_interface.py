@@ -1,13 +1,11 @@
-import warnings
-import os
-import requests
 import logging
+from pathlib import Path
 import importlib.resources as pkg_resources
 from copy import deepcopy
-import tensorflow as tf
+import requests
 from tensorflow.keras.models import load_model
 import pyarrow.parquet as pq
-from pathlib import Path
+
 
 import dlomix
 from dlomix.losses import masked_spectral_distance
@@ -15,7 +13,6 @@ from dlomix.data.fragment_ion_intensity import FragmentIonIntensityDataset
 from dlomix.models.prosit import PrositIntensityPredictor
 
 logger = logging.getLogger(__name__)
-logger.propagate = False
 
 MODEL_FILENAME = 'prosit_baseline_model.keras'
 MODEL_DIR = Path.home() / '.dlomix' / 'models'
@@ -26,7 +23,7 @@ def get_model_url():
         return url_file.read().strip()
     
 
-def download_model_from_github():
+def download_model_from_github() -> str:
     MODEL_DIR.mkdir(parents=True, exist_ok=True)
     model_path = MODEL_DIR / MODEL_FILENAME
 
@@ -42,8 +39,8 @@ def download_model_from_github():
     with open(model_path, 'wb') as f:
         f.write(response.content)
     
-    print(f'Model downloaded successfully under {str(model_path)}')
-    return model_path
+    logger.info(f'Model downloaded successfully under {str(model_path)}')
+    return str(model_path)
 
 
 def load_keras_model(model_file_path: str = 'baseline') -> PrositIntensityPredictor:
@@ -64,13 +61,32 @@ def load_keras_model(model_file_path: str = 'baseline') -> PrositIntensityPredic
     # download the model file from github if the baseline model should be used, otherwise a model path can be specified
     if model_file_path == 'baseline':
         model_file_path = download_model_from_github()
-        return load_model(model_file_path)
+        return load_model(model_file_path, compile=False)
 
-    if not model_file_path.endswith('.keras'):
+    if not str(model_file_path).endswith('.keras'):
         raise ValueError('The given model file is not saved with the .keras format! Please specify a path with the .keras extension.')
     if not Path(model_file_path).exists():
         raise FileNotFoundError('Given model file was not found. Please specify an existing saved model file.')
-    return load_model(model_file_path)
+    return load_model(model_file_path, compile=False)
+
+
+def save_keras_model(model: PrositIntensityPredictor, path_to_model: str) -> None:
+    """Saves a given keras model to the path_to_model path. 
+    Automatically adds the .keras extension, if the given path does not end in it. This is important, so that
+    the model is saved correctly to be loaded again.
+
+    Args:
+        model (PrositIntensityPredictor): The model object which should be saved
+        path_to_model (str): Path to the model where the model should be saved
+
+    Raises:
+        FileExistsError: If the model file already exists -> Raise Error
+    """
+    if Path(path_to_model).exists():
+        raise FileExistsError('This model file already exists. Specify a file, which does not exist yet.')
+    if not path_to_model.endswith('.keras'):
+        path_to_model += '.keras'
+    model.save(path_to_model)
 
 
 def process_dataset(
@@ -81,7 +97,8 @@ def process_dataset(
         label_column: str = 'intensities_raw',
         batch_size: int = 1024,
         val_ratio: float = 0.2,
-        test_ratio: float = 0.0
+        test_ratio: float = 0.0,
+        additional_columns: list[str] = None
         ) -> FragmentIonIntensityDataset:
     """Interface function for Oktoberfest package to correcly process a dataset and load a baseline model
 
@@ -102,6 +119,7 @@ def process_dataset(
         label_column (str, optional): The column identifier for where the intensity labels are, if there are any. Defaults to 'intensities_raw'.
         val_ratio (float, optional): A validation split ratio. Defaults to 0.2.
         test_ratio (float, optional): A test split ratio. Defaults to 0.0.
+        additional_columns (list[str], optional): List of additional columns to keep in dataset for downstream analysis (will not be returned as tensors).
 
     Raises:
         ValueError: If the parquet_file_path does not have the .parquet extension
@@ -120,8 +138,26 @@ def process_dataset(
     if model is None:
         model = load_keras_model('baseline')
 
+    val_data_source, test_data_source = None, None
     if not parquet_file_path.endswith('.parquet'):
-        raise ValueError('The specified file is not a parquet file! Please specify a path with the .parquet extension.')
+        # check if dataset is already split
+        train_path = parquet_file_path + '_train.parquet'
+        val_data_path = parquet_file_path + '_val.parquet'
+        test_data_path = parquet_file_path + '_test.parquet'
+
+        # check if the train split exists, if not -> raise ValueError (val and test split are not necessary)
+        if not Path(train_path).exists():
+            raise ValueError('The specified file is not a parquet file! Please specify a path with the .parquet extension.')
+        else:
+            parquet_file_path = train_path
+
+        # check if validation split exists
+        if Path(val_data_path).exists():
+            val_data_source = val_data_path 
+        # check if test split exists
+        if Path(test_data_path).exists():
+            test_data_source = test_data_path
+
     if not Path(parquet_file_path).exists():
         raise FileNotFoundError('Specified parquet file was not found. Please specify a valid parquet file.')
     
@@ -165,20 +201,28 @@ def process_dataset(
                     Only new ion types are detected. A totally new output layer is necessary.
                     """
                 )
+                
+    # put additional columns in lower case TODO: remove if CAPS issue is fixed on Oktoberfest side
+    if additional_columns is not None:
+        additional_columns = [c.lower() for c in additional_columns]
 
     logger.info('Start processing the dataset...')
     dataset = FragmentIonIntensityDataset(
         data_source=parquet_file_path,
+        val_data_source=val_data_source,
+        test_data_source=test_data_source,
         data_format='parquet',
         label_column=label_column,
         inference_only=inference_only,
         val_ratio=val_ratio,
+        advanced_splitting=True,
         batch_size=batch_size,
         test_ratio=test_ratio,
         alphabet=new_alphabet,
         encoding_scheme='naive-mods',
         model_features=['precursor_charge_onehot', 'collision_energy_aligned_normed', 'method_nbr'],
         ion_types=ion_types,
+        dataset_columns_to_keep=additional_columns
     )
 
     logger.info(f'The available data splits are: {", ".join(list(dataset.hf_dataset.keys()))}')
