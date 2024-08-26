@@ -6,6 +6,9 @@ import logging
 import os
 import warnings
 from typing import Callable, Dict, List, Optional, Union
+import random
+import collections
+import numpy as np
 
 from datasets import Dataset, DatasetDict, Sequence, Value, load_dataset, load_from_disk
 
@@ -26,6 +29,7 @@ from .processing.processors import (
 )
 
 logger = logging.getLogger(__name__)
+logging.captureWarnings(True)
 
 
 class PeptideDataset:
@@ -50,6 +54,10 @@ class PeptideDataset:
         Name of the column in the data source file that contains the labels.
     val_ratio : float
         Ratio of the validation data to the training data. The value should be between 0 and 1.
+    test_ratio : float
+        Ratio of the test data to the validation data. The value should be between 0 and 1. (Splits the validation data again, not the train data.)
+    advanced_splitting: bool
+        Flag to indicate whether to use advanced train/val/test splitting if providing a single data file or not
     max_seq_len : int
         Maximum sequence length to pad the sequences to. If set to 0, the sequences will not be padded.
     dataset_type : str
@@ -102,7 +110,7 @@ class PeptideDataset:
         Create a PeptideDataset object from a DatasetConfig object.
     """
 
-    DEFAULT_SPLIT_NAMES = ["train", "val", "test"]
+    DEFAULT_SPLIT_NAMES = ["train", "val", "test", "inference"]
     CONFIG_JSON_NAME = "dlomix_peptide_dataset_config.json"
 
     def __init__(
@@ -114,6 +122,8 @@ class PeptideDataset:
         sequence_column: str,
         label_column: str,
         val_ratio: float,
+        test_ratio: float,
+        advanced_splitting: bool,
         max_seq_len: int,
         dataset_type: str,
         batch_size: int,
@@ -131,6 +141,8 @@ class PeptideDataset:
         auto_cleanup_cache: bool = True,
         num_proc: Optional[int] = None,
         batch_processing_size: Optional[int] = 1000,
+        inference_only: bool = False,
+        ion_types: Optional[List[str]] = None,
     ):
         super(PeptideDataset, self).__init__()
         self.data_source = data_source
@@ -143,10 +155,17 @@ class PeptideDataset:
         self.label_column = label_column
 
         self.val_ratio = val_ratio
+        self.test_ratio = test_ratio
+        self.advanced_splitting = advanced_splitting
         self.max_seq_len = max_seq_len
         self.dataset_type = dataset_type
         self.batch_size = batch_size
         self.model_features = model_features
+        self.inference_only = inference_only
+        if isinstance(inference_only, bool) and inference_only:
+            self.label_column = None
+        # y and b ions are the standard ions which are used for Prosit
+        self.ion_types = ['y', 'b'] if ion_types is None else ion_types
 
         # to be kept in the hf dataset, but not returned in the tensor dataset
         if dataset_columns_to_keep is None:
@@ -174,6 +193,7 @@ class PeptideDataset:
             self.hf_dataset: Optional[Union[Dataset, DatasetDict]] = None
             self._empty_dataset_mode = False
             self._is_predefined_split = False
+            self._is_predefined_test_split = False
             self._test_set_only = False
             self._num_proc = num_proc
             self._set_num_proc()
@@ -224,6 +244,7 @@ class PeptideDataset:
             sequence_column=self.sequence_column,
             label_column=self.label_column,
             val_ratio=self.val_ratio,
+            test_ratio=self.test_ratio,
             max_seq_len=self.max_seq_len,
             dataset_type=self.dataset_type,
             batch_size=self.batch_size,
@@ -235,6 +256,7 @@ class PeptideDataset:
             alphabet=self.alphabet,
             encoding_scheme=self.encoding_scheme,
             processed=self.processed,
+            inference_only=self.inference_only
         )
 
         self._config._additional_data.update(
@@ -331,11 +353,15 @@ class PeptideDataset:
                 self._test_set_only = True
             if self.val_data_source is not None:
                 self._is_predefined_split = True
+            if self.test_ratio == 0.0 or self.test_ratio is None:
+                self._is_predefined_test_split = True
 
         # two or more data sources provided -> no splitting in all cases
         if count_loaded_data_sources >= 2:
             if self.val_data_source is not None:
                 self._is_predefined_split = True
+            if self.test_data_source is not None:
+                self._is_predefined_test_split = True
 
         if self._is_predefined_split:
             warnings.warn(
@@ -346,7 +372,17 @@ class PeptideDataset:
             )
 
     def _remove_unnecessary_columns(self):
-        self._relevant_columns = [self.sequence_column, self.label_column]
+        # if inference only dataset, no sequence column necessary
+        if self.inference_only:
+            warnings.warn(
+                """
+                This is a inference only dataset! You can only make predictions with this dataset! Attempting to
+                train a model with this dataset will result in an error!
+                """
+            )
+            self._relevant_columns = [self.sequence_column]
+        else:
+            self._relevant_columns = [self.sequence_column, self.label_column]
 
         if self.model_features is not None:
             self._relevant_columns.extend(self.model_features)
@@ -361,16 +397,47 @@ class PeptideDataset:
     def _split_dataset(self):
         if self._is_predefined_split or self._test_set_only:
             return
+        
+        if self.inference_only:
+            # if inference only dataset -> only keep the inference dataset and remove the train set
+            self.hf_dataset["inference"] = self.hf_dataset[PeptideDataset.DEFAULT_SPLIT_NAMES[0]]
+            self.hf_dataset.pop(PeptideDataset.DEFAULT_SPLIT_NAMES[0])
+            return
 
         # only a train dataset or a train and a test but no val -> split train into train/val
-
-        splitted_dataset = self.hf_dataset[
-            PeptideDataset.DEFAULT_SPLIT_NAMES[0]
-        ].train_test_split(test_size=self.val_ratio)
+        splitted_dataset = dict()
+        if not self.advanced_splitting:
+            splitted_dataset = self.hf_dataset[
+                PeptideDataset.DEFAULT_SPLIT_NAMES[0]
+            ].train_test_split(test_size=self.val_ratio)
+        else:
+            splitted_dataset["train"], splitted_dataset["test"] = _split_dataset_advanced(
+                self.hf_dataset[PeptideDataset.DEFAULT_SPLIT_NAMES[0]],
+                ratio=self.val_ratio
+                )
 
         self.hf_dataset["train"] = splitted_dataset["train"]
         self.hf_dataset["val"] = splitted_dataset["test"]
 
+        # if test set is not specified -> split train set into test set and remaining train set
+        if self._is_predefined_test_split:
+            del splitted_dataset["train"]
+            del splitted_dataset["test"]
+            del splitted_dataset
+            return
+        
+        self.test_ratio = self.test_ratio / (1 - self.val_ratio)
+        if not self.advanced_splitting:
+            splitted_dataset = self.hf_dataset["train"].train_test_split(test_size=self.test_ratio)
+        else: 
+            splitted_dataset = _split_dataset_advanced(
+                self.hf_dataset['train'],
+                ratio=self.test_ratio
+            )
+
+        self.hf_dataset["train"] = splitted_dataset["train"]
+        self.hf_dataset["test"] = splitted_dataset["test"]
+        
         del splitted_dataset["train"]
         del splitted_dataset["test"]
         del splitted_dataset
@@ -507,7 +574,7 @@ If you prefer to encode the (amino-acids)+PTM combinations as tokens in the voca
 
             if isinstance(processor, SequencePaddingProcessor):
                 for split in self.hf_dataset.keys():
-                    if split != "test":
+                    if split != "test" and split != "inference":
                         logger.info(
                             f"Removing truncated sequences in the {split} split ..."
                         )
@@ -601,6 +668,8 @@ If you prefer to encode the (amino-acids)+PTM combinations as tokens in the voca
             sequence_column=config.sequence_column,
             label_column=config.label_column,
             val_ratio=config.val_ratio,
+            test_ratio=config.test_ratio,
+            advanced_splitting=config.advanced_splitting,
             max_seq_len=config.max_seq_len,
             dataset_type=config.dataset_type,
             batch_size=config.batch_size,
@@ -612,6 +681,8 @@ If you prefer to encode the (amino-acids)+PTM combinations as tokens in the voca
             alphabet=config.alphabet,
             encoding_scheme=config.encoding_scheme,
             processed=config.processed,
+            inference_only=config.inference_only,
+            ion_types=config.ion_types,
         )
 
         for k, v in config._additional_data.items():
@@ -646,7 +717,10 @@ If you prefer to encode the (amino-acids)+PTM combinations as tokens in the voca
         input_tensor_columns = self._relevant_columns.copy()
 
         # remove the label column from the input tensor columns since the to_tf_dataset method has a separate label_cols argument
-        input_tensor_columns.remove(self.label_column)
+        try:
+            input_tensor_columns.remove(self.label_column)
+        except ValueError as e:
+            pass
 
         # remove the columns that are not needed in the tensor dataset
         input_tensor_columns = list(
@@ -686,6 +760,16 @@ If you prefer to encode the (amino-acids)+PTM combinations as tokens in the voca
         if self.enable_tf_dataset_cache:
             tf_dataset = tf_dataset.cache()
 
+        return tf_dataset
+    
+    @property
+    def tensor_inference_data(self):
+        """TensorFlow Dataset object for the inference data"""
+        tf_dataset = self._get_split_tf_dataset(PeptideDataset.DEFAULT_SPLIT_NAMES[3])
+
+        if self.enable_tf_dataset_cache:
+            tf_dataset = tf_dataset.cache()
+        
         return tf_dataset
 
     def _get_split_tf_dataset(self, split_name: str):
@@ -729,3 +813,66 @@ def load_processed_dataset(path: str):
     dataset = class_obj.from_dataset_config(config)
     dataset.hf_dataset = hf_dataset
     return dataset
+
+
+def _argshuffle_splits(idx, traininsplit):
+    """Splits the input list of indices according to the given trainsplit and shuffles the indices 
+    inside both the train and validation split, so that all peptides are shuffeled
+
+    Args:
+        idx (list): All available indices
+        trainsplit (float): the ratio for the smaller dataset (e.g. 0.3 for 30% validation and 70% train split)
+    Returns:
+        tuple[list]: first entry are the shuffled train indices, second entry are the shuffled val/test indices
+    """
+    train_idx = list(np.random.permutation(idx[:traininsplit]))
+    test_idx = list(np.random.permutation(idx[traininsplit:]))
+    return train_idx, test_idx
+
+def _peptide_argsort(sequence_integer, seed=42):
+    """Groups the peptides by sequence and shuffles both the peptides as groups and the peptides within each group
+
+    Args: 
+        sequence_integer: list of all peptide sequences present in the dataset
+        seed (int): Seed for reproducible results (defaults to 42)
+
+    Returns:
+        list: list of shuffled indices, which are ordered by unique peptides
+    """
+    random.seed(seed)
+    peptide_groups = collections.defaultdict(list)
+    for index, row in enumerate(sequence_integer):
+        peptide_groups[tuple(row)].append(index)
+
+    # shuffle within peptides
+    for indeces in peptide_groups.values():
+        random.shuffle(indeces)
+
+    # shuffle peptides
+    peptides = list(peptide_groups.keys())
+    random.shuffle(peptides)
+
+    # join indeces
+    indeces = []
+    for peptide in peptides:
+        indeces.extend(peptide_groups[peptide])
+    return indeces
+
+def _split_dataset_advanced(data_to_split: Dataset, ratio: float) -> tuple[Dataset]:
+    """Function to split a pyarrow dataset with advanced splitting logic. This function takes into account the peptide sequences and splits the dataset 
+    according to the given ratio in such a way, that at most one peptide overlaps in the resulting splits.
+
+    Args:
+        data_to_split: (Dataset): pyarrow dataset, which is to be used for splitting
+        ratio: (float): the ratio for the smaller dataset (e.g. 0.3 for 30% validation and 70% train split)
+
+    Returns:
+        tuple[Dataset]: first entry of the tuple is the train split, second entry is the validation/test split 
+    
+    """
+    sequences = data_to_split['modified_sequence']
+    n = len(sequences)
+    n_split = int(n * float(1 - ratio))
+    idx = _peptide_argsort(sequences, seed=42)
+    idx_1, idx_2 = _argshuffle_splits(idx, n_split)
+    return data_to_split.select(idx_1), data_to_split.select(idx_2)

@@ -42,6 +42,8 @@ class RetentionTimeDataset(PeptideDataset):
         sequence_column: str = "modified_sequence",
         label_column: str = "indexed_retention_time",
         val_ratio: float = 0.2,
+        test_ratio: float = 0.2,
+        advanced_splitting: bool = False,
         max_seq_len: Union[int, str] = 30,
         dataset_type: str = "tf",
         batch_size: int = 256,
@@ -59,6 +61,8 @@ class RetentionTimeDataset(PeptideDataset):
         auto_cleanup_cache: bool = True,
         num_proc: Optional[int] = None,
         batch_processing_size: int = 1000,
+        inference_only: bool = False,
+        ion_types: Optional[List[str]] = None,
     ):
         super().__init__(
             data_source,
@@ -68,6 +72,8 @@ class RetentionTimeDataset(PeptideDataset):
             sequence_column,
             label_column,
             val_ratio,
+            test_ratio,
+            advanced_splitting,
             max_seq_len,
             dataset_type,
             batch_size,
@@ -85,4 +91,6 @@ class RetentionTimeDataset(PeptideDataset):
             auto_cleanup_cache,
             num_proc,
             batch_processing_size,
+            inference_only,
+            ion_types,
         )

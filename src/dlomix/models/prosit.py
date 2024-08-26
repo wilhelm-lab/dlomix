@@ -1,3 +1,4 @@
+import logging
 import warnings
 
 import tensorflow as tf
@@ -5,6 +6,9 @@ import tensorflow as tf
 from ..constants import ALPHABET_UNMOD
 from ..data.processing.feature_extractors import FEATURE_EXTRACTORS_PARAMETERS
 from ..layers.attention import AttentionLayer, DecoderAttentionLayer
+
+logger = logging.getLogger(__name__)
+logging.captureWarnings(True)
 
 
 class PrositRetentionTimePredictor(tf.keras.Model):
@@ -123,6 +127,8 @@ class PrositIntensityPredictor(tf.keras.Model):
         List of string values corresponding to fixed keys in the inputs dict that are considered meta data. Defaults to None, which corresponds then to the default meta data keys `META_DATA_KEYS`.
     with_termini : boolean, optional
         Whether to consider the termini in the sequence. Defaults to True.
+    ion_types : list[str], optional
+        Save the ion types with the model to later check compatibility with a given dataset.
 
     Attributes
     ----------
@@ -167,6 +173,7 @@ class PrositIntensityPredictor(tf.keras.Model):
         input_keys=None,
         meta_data_keys=None,
         with_termini=True,
+        ion_types=None
     ):
         super(PrositIntensityPredictor, self).__init__()
 
@@ -180,6 +187,7 @@ class PrositIntensityPredictor(tf.keras.Model):
         self.use_prosit_ptm_features = use_prosit_ptm_features
         self.input_keys = input_keys
         self.meta_data_keys = meta_data_keys
+        self.ion_types = ion_types
 
         # maximum number of fragment ions
         self.max_ion = self.seq_length - 1
@@ -319,7 +327,7 @@ class PrositIntensityPredictor(tf.keras.Model):
                 encoded_ptm = self.ptm_input_encoder(ptm_ac_features)
             elif self.use_prosit_ptm_features:
                 warnings.warn(
-                    f"PTM features enabled and following PTM features are expected in the model for Prosit Intesity: {PrositIntensityPredictor.PTM_INPUT_KEYS}. The actual input passed to the model contains the following keys: {list(inputs.keys())}. Falling back to no PTM features."
+                    f"PTM features enabled and following PTM features are expected in the model for Prosit Intensity: {PrositIntensityPredictor.PTM_INPUT_KEYS}. The actual input passed to the model contains the following keys: {list(inputs.keys())}. Falling back to no PTM features."
                 )
 
         x = self.embedding(peptides_in)

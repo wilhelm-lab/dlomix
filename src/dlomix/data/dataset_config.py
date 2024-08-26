@@ -31,6 +31,10 @@ class DatasetConfig:
     encoding_scheme: Union[str, EncodingScheme]
     processed: bool
     _additional_data: dict = field(default_factory=dict)
+    test_ratio: Optional[float] = 0
+    inference_only: bool = False
+    ion_types: Optional[List[str]] = None
+    advanced_splitting: bool = False
 
     def save_config_json(self, path: str):
         """

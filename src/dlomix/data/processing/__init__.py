@@ -1,4 +1,5 @@
 import json
+import logging
 
 from .feature_extractors import (
     AVAILABLE_FEATURE_EXTRACTORS,
@@ -7,6 +8,8 @@ from .feature_extractors import (
     LookupFeatureExtractor,
 )
 from .processors import FunctionProcessor, SequenceParsingProcessor
+
+logger = logging.getLogger(__name__)
 
 __all__ = [
     "AVAILABLE_FEATURE_EXTRACTORS",
@@ -25,7 +28,7 @@ d = dict(
     )
 )
 
-print(
+logger.debug(
     f"""
 Avaliable feature extractors are (use the key of the following dict and pass it to features_to_extract in the Dataset Class):
 {json.dumps(d, indent=3, sort_keys=True)}.

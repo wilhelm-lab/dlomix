@@ -17,6 +17,7 @@ class FragmentIonIntensityDataset(PeptideDataset):
         sequence_column (str): The name of the column containing the peptide sequences.
         label_column (str): The name of the column containing the intensity labels.
         val_ratio (float): The ratio of validation data to split from the training data.
+        test_ratio (float): The ratio of the test data to split from the training data.
         max_seq_len (Union[int, str]): The maximum length of the peptide sequences.
         dataset_type (str): The type of dataset to use (e.g., "tf" for TensorFlow dataset).
         batch_size (int): The batch size for training and evaluation.
@@ -43,6 +44,8 @@ class FragmentIonIntensityDataset(PeptideDataset):
         sequence_column: str = "modified_sequence",
         label_column: str = "intensities_raw",
         val_ratio: float = 0.2,
+        test_ratio: float = 0.0,
+        advanced_splitting: bool = False,
         max_seq_len: Union[int, str] = 30,
         dataset_type: str = "tf",
         batch_size: int = 64,
@@ -60,6 +63,8 @@ class FragmentIonIntensityDataset(PeptideDataset):
         auto_cleanup_cache: bool = True,
         num_proc: Optional[int] = None,
         batch_processing_size: int = 1000,
+        inference_only: bool = False,
+        ion_types: Optional[List[str]] = None,
     ):
         super().__init__(
             data_source,
@@ -69,6 +74,8 @@ class FragmentIonIntensityDataset(PeptideDataset):
             sequence_column,
             label_column,
             val_ratio,
+            test_ratio,
+            advanced_splitting,
             max_seq_len,
             dataset_type,
             batch_size,
@@ -86,4 +93,6 @@ class FragmentIonIntensityDataset(PeptideDataset):
             auto_cleanup_cache,
             num_proc,
             batch_processing_size,
+            inference_only,
+            ion_types,
         )
