@@ -1,0 +1,24 @@
+{
+    "type": "Rescoring", 
+    "tag": "", 
+    "inputs": {
+        "search_results": "/cmnfs/data/proteomics/shabaz_exotic/ECD/trypsin/sage_out/results.sage.tsv", 
+        "search_results_type": "Sage", 
+        "spectra": "/cmnfs/data/proteomics/shabaz_exotic/ECD/trypsin/", 
+        "spectra_type": "raw"
+    }, 
+    "output": "../rescoring_etd_sage_wo_refine_out", 
+    "models": {
+        "intensity": "/cmnfs/home/f.kapitza/dlomix/finn_notebooks/refine_ETD_second_pool_improve_out/data/dlomix/refined.keras", 
+        "irt": "Prosit_2019_irt"
+    },
+    "thermoExe": "/cmnfs/home/students/j.schlensok/compomics/ThermoRawFileParser.exe",
+    "numThreads": 1, 
+    "refinementLearningOptions": {},
+    "fdr_estimation_method": "percolator", 
+    "regressionMethod": "spline", 
+    "allFeatures": false,
+    "massTolerance": 20, 
+    "unitMassTolerance": "ppm",
+    "fragmentation_method" : "ETD"
+}

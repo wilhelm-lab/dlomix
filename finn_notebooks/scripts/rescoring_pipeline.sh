@@ -1,12 +1,13 @@
 #!/bin/bash
 
-#SBATCH --job-name=oktoberfest_w_dlomix
+#SBATCH --job-name=oktoberfest
 #SBATCH --out=R-%x.%j.out
 #SBATCH --partition=compms-gpu-a40
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --gres=gpu:1
-#SBATCH --cpus-per-task=8
+#SBATCH --cpus-per-task=5
+#SBATCH --mem=16G
 
 
 # script
@@ -18,6 +19,4 @@ module load percolator/3.6.1 thermorawfileparser/1.4.3
 # DO NOT CHANGE THIS, only change with --cpus-per-task above!
 NUM_THREADS=$SLURM_CPUS_PER_TASK
 
-# =========== Run oktoberfest =========== #
- 
-python -m oktoberfest --config_path=../configs/refinement_etd_second_pool_improve_config.json
+python -m oktoberfest --config_path=../configs/rescoring_etd_sage_improved_model_config.json

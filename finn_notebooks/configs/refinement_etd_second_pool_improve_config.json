@@ -2,19 +2,19 @@
     "type": "Rescoring", 
     "tag": "", 
     "inputs": {
-        "search_results": "/cmnfs/data/proteomics/ProteomeTools/ETD/multiple_msms", 
+        "search_results": "/cmnfs/data/proteomics/ProteomeTools/ETD/multiple_msms/TUM_second_pool_1_to_99", 
         "search_results_type": "Maxquant", 
         "spectra": "/cmnfs/data/proteomics/ProteomeTools/ETD/raw", 
         "spectra_type": "raw"
     }, 
-    "output": "../refinement_ETD_dont_improve_out_2_rerun", 
+    "output": "../refinement_ETD_second_pool_improve_out", 
     "models": {
         "intensity": "baseline", 
         "irt": "Prosit_2019_irt"
     }, 
     "refinementLearningOptions": {
         "includeOriginalSequences": true,
-        "improveFurther": false,
+        "improveFurther": true,
         "wandbOptions": {
             "project": "ETD_refinement_final"
         }
