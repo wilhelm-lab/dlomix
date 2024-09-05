@@ -19,4 +19,4 @@ module load percolator/3.6.1 thermorawfileparser/1.4.3
 # DO NOT CHANGE THIS, only change with --cpus-per-task above!
 NUM_THREADS=$SLURM_CPUS_PER_TASK
 
-python -m oktoberfest --config_path=../configs/rescoring_etd_sage_improved_model_config.json
+python -m oktoberfest --config_path=../configs/rescoring_etd_sage_wo_refinement_improved_model_config.json

@@ -7,14 +7,13 @@
         "spectra": "/cmnfs/data/proteomics/shabaz_exotic/ECD/trypsin/", 
         "spectra_type": "raw"
     }, 
-    "output": "../rescoring_etd_sage_improved_out", 
+    "output": "../rescoring_etd_sage_wo_refinement_improved_out", 
     "models": {
         "intensity": "/cmnfs/home/f.kapitza/dlomix/finn_notebooks/refinement_ETD_second_pool_improve_out/data/dlomix/refined.keras", 
         "irt": "Prosit_2019_irt"
     },
     "thermoExe": "/cmnfs/home/students/j.schlensok/compomics/ThermoRawFileParser.exe",
-    "numThreads": 1, 
-    "refinementLearningOptions": {},
+    "numThreads": 1,
     "fdr_estimation_method": "percolator", 
     "regressionMethod": "spline", 
     "allFeatures": false,
