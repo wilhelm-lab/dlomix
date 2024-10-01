@@ -19,6 +19,7 @@ from .processing.feature_extractors import (
 )
 from .processing.processors import (
     FunctionProcessor,
+    PeptideDatasetBaseProcessor,
     SequenceEncodingProcessor,
     SequencePaddingProcessor,
     SequenceParsingProcessor,
@@ -105,79 +106,60 @@ class PeptideDataset:
     DEFAULT_SPLIT_NAMES = ["train", "val", "test"]
     CONFIG_JSON_NAME = "dlomix_peptide_dataset_config.json"
 
-    def __init__(
-        self,
-        data_source: Union[str, List],
-        val_data_source: Union[str, List],
-        test_data_source: Union[str, List],
-        data_format: str,
-        sequence_column: str,
-        label_column: str,
-        val_ratio: float,
-        max_seq_len: int,
-        dataset_type: str,
-        batch_size: int,
-        model_features: Optional[List[str]],
-        dataset_columns_to_keep: Optional[List[str]],
-        features_to_extract: Optional[List[Union[Callable, str]]] = None,
-        pad: bool = True,
-        padding_value: int = 0,
-        alphabet: Dict = ALPHABET_UNMOD,
-        with_termini: bool = True,
-        encoding_scheme: Union[str, EncodingScheme] = EncodingScheme.UNMOD,
-        processed: bool = False,
-        enable_tf_dataset_cache: bool = False,
-        disable_cache: bool = False,
-        auto_cleanup_cache: bool = True,
-        num_proc: Optional[int] = None,
-        batch_processing_size: Optional[int] = 1000,
-    ):
+    def __init__(self, config: DatasetConfig):
         super(PeptideDataset, self).__init__()
-        self.data_source = data_source
-        self.val_data_source = val_data_source
-        self.test_data_source = test_data_source
+        self.__dict__.update(**config.__dict__)
 
-        self.data_format = data_format
+        # self.data_source = data_source
+        # self.val_data_source = val_data_source
+        # self.test_data_source = test_data_source
 
-        self.sequence_column = sequence_column
-        self.label_column = label_column
+        # self.data_format = data_format
 
-        self.val_ratio = val_ratio
-        self.max_seq_len = max_seq_len
-        self.dataset_type = dataset_type
-        self.batch_size = batch_size
-        self.model_features = model_features
+        # self.sequence_column = sequence_column
+        # self.label_column = label_column
+
+        # self.val_ratio = val_ratio
+        # self.max_seq_len = max_seq_len
+        # self.dataset_type = dataset_type
+        # self.batch_size = batch_size
+        # self.model_features = model_features
 
         # to be kept in the hf dataset, but not returned in the tensor dataset
-        if dataset_columns_to_keep is None:
+        if config.dataset_columns_to_keep is None:
             self.dataset_columns_to_keep = []
         else:
-            self.dataset_columns_to_keep = dataset_columns_to_keep
+            self.dataset_columns_to_keep = config.dataset_columns_to_keep
 
-        self.features_to_extract = features_to_extract
-        self.pad = pad
-        self.padding_value = padding_value
-        self.alphabet = alphabet
-        self.with_termini = with_termini
-        self.encoding_scheme = EncodingScheme(encoding_scheme)
-        self.processed = processed
-        self.enable_tf_dataset_cache = enable_tf_dataset_cache
-        self.disable_cache = disable_cache
-        self.auto_cleanup_cache = auto_cleanup_cache
+        # self.features_to_extract = features_to_extract
+        # self.pad = pad
+        # self.padding_value = padding_value
+        # self.alphabet = alphabet
+        # self.with_termini = with_termini
+        self.encoding_scheme = EncodingScheme(config.encoding_scheme)
+        # self.processed = processed
+        # self.enable_tf_dataset_cache = enable_tf_dataset_cache
+        # self.disable_cache = disable_cache
+        # self.auto_cleanup_cache = auto_cleanup_cache
         self._set_hf_cache_management()
 
-        self.extended_alphabet = self.alphabet.copy()
+        self.extended_alphabet = None
+        self.learning_alphabet_mode = True
 
-        self._refresh_config()
+        if self.alphabet:
+            self.extended_alphabet = self.alphabet.copy()
+            self.learning_alphabet_mode = False
+
+        self._config = config
 
         if not self.processed:
             self.hf_dataset: Optional[Union[Dataset, DatasetDict]] = None
             self._empty_dataset_mode = False
             self._is_predefined_split = False
             self._test_set_only = False
-            self._num_proc = num_proc
+            self._num_proc = config.num_proc
             self._set_num_proc()
-            self._batch_processing_size = batch_processing_size
+            # self.batch_processing_size = config.batch_processing_size
 
             self._data_files_available_splits = {}
             self._load_dataset()
@@ -216,26 +198,26 @@ class PeptideDataset:
             disable_caching()
 
     def _refresh_config(self):
-        self._config = DatasetConfig(
-            data_source=self.data_source,
-            val_data_source=self.val_data_source,
-            test_data_source=self.test_data_source,
-            data_format=self.data_format,
-            sequence_column=self.sequence_column,
-            label_column=self.label_column,
-            val_ratio=self.val_ratio,
-            max_seq_len=self.max_seq_len,
-            dataset_type=self.dataset_type,
-            batch_size=self.batch_size,
-            model_features=self.model_features,
-            dataset_columns_to_keep=self.dataset_columns_to_keep,
-            features_to_extract=self.features_to_extract,
-            pad=self.pad,
-            padding_value=self.padding_value,
-            alphabet=self.alphabet,
-            encoding_scheme=self.encoding_scheme,
-            processed=self.processed,
-        )
+        self._config = DatasetConfig(**self._config.__dict__)
+        #     data_source=self.data_source,
+        #     val_data_source=self.val_data_source,
+        #     test_data_source=self.test_data_source,
+        #     data_format=self.data_format,
+        #     sequence_column=self.sequence_column,
+        #     label_column=self.label_column,
+        #     val_ratio=self.val_ratio,
+        #     max_seq_len=self.max_seq_len,
+        #     dataset_type=self.dataset_type,
+        #     batch_size=self.batch_size,
+        #     model_features=self.model_features,
+        #     dataset_columns_to_keep=self.dataset_columns_to_keep,
+        #     features_to_extract=self.features_to_extract,
+        #     pad=self.pad,
+        #     padding_value=self.padding_value,
+        #     alphabet=self.alphabet,
+        #     encoding_scheme=self.encoding_scheme,
+        #     processed=self.processed,
+        # )
 
         self._config._additional_data.update(
             {
@@ -423,8 +405,8 @@ If you prefer to encode the (amino-acids)+PTM combinations as tokens in the voca
                 sequence_column_name=self.sequence_column,
                 alphabet=self.extended_alphabet,
                 batched=True,
+                extend_alphabet=self.learning_alphabet_mode,
             )
-
         else:
             raise NotImplementedError(
                 f"Encoding scheme {self.encoding_scheme} is not implemented. Available encoding schemes are: {list(EncodingScheme.__members__)}."
@@ -500,20 +482,47 @@ If you prefer to encode the (amino-acids)+PTM combinations as tokens in the voca
 
     def _apply_processing_pipeline(self):
         for processor in self._processors:
-            logger.info(f"Applying step: {processor.__class__.__name__}...")
-            logger.debug(f"Applying step with arguments:\n\n{processor}...")
-            self.hf_dataset = self.hf_dataset.map(
-                processor,
-                desc=f"Mapping {processor.__class__.__name__}",
-                batched=processor.batched,
-                batch_size=self._batch_processing_size,
-                num_proc=self._num_proc,
-            )
-            logger.info(f"Done with step: {processor.__class__.__name__}.\n")
+            for split in self.hf_dataset.keys():
+                logger.info(
+                    f"Applying step: {processor.__class__.__name__} on split {split}..."
+                )
+                print(
+                    f"Applying step: {processor.__class__.__name__} on split {split}..."
+                )
+                logger.debug(
+                    f"Applying step with arguments:\n\n{processor} on split {split}..."
+                )
 
-            if isinstance(processor, SequencePaddingProcessor):
-                for split in self.hf_dataset.keys():
-                    if split != "test":
+                # split-specific logic for encoding
+                if isinstance(processor, SequenceEncodingProcessor):
+                    if split in PeptideDataset.DEFAULT_SPLIT_NAMES[0:2]:
+                        # train/val split -> learn the alphabet unless otherwise specified
+                        self._apply_processor_to_split(processor, split)
+
+                        self.extended_alphabet = processor.alphabet.copy()
+
+                    elif split == PeptideDataset.DEFAULT_SPLIT_NAMES[2]:
+                        # test split -> use the learned alphabet from the train/val split
+                        # and enable fallback to encoding unseen (AA, PTM) as unmodified Amino acids
+                        processor.extend_alphabet = False
+                        processor.set_alphabet(self.extended_alphabet)
+                        processor.set_fallback(True)
+
+                        self._apply_processor_to_split(processor, split)
+
+                    else:
+                        raise Warning(
+                            f"When applying processors, found split '{split}' which is not a valid split name. Please use one of the default split names: {PeptideDataset.DEFAULT_SPLIT_NAMES} to ensure correct behavior."
+                        )
+                else:
+                    # --------------------------------------------------------------------
+                    # split-agnostic logic -> run processor for all splits
+                    self._apply_processor_to_split(processor, split)
+                    # --------------------------------------------------------------------
+
+                # split-specific logic for truncating train/val sequences only after padding
+                if isinstance(processor, SequencePaddingProcessor):
+                    if split != PeptideDataset.DEFAULT_SPLIT_NAMES[2]:
                         logger.info(
                             f"Removing truncated sequences in the {split} split ..."
                         )
@@ -522,11 +531,25 @@ If you prefer to encode the (amino-acids)+PTM combinations as tokens in the voca
                             lambda batch: batch[processor.KEEP_COLUMN_NAME],
                             batched=True,
                             num_proc=self._num_proc,
-                            batch_size=self._batch_processing_size,
+                            batch_size=self.batch_processing_size,
                         )
-                self.hf_dataset = self.hf_dataset.remove_columns(
-                    processor.KEEP_COLUMN_NAME
-                )
+
+                logger.info(f"Done with step: {processor.__class__.__name__}.\n")
+
+        self.hf_dataset = self.hf_dataset.remove_columns(
+            SequencePaddingProcessor.KEEP_COLUMN_NAME
+        )
+
+    def _apply_processor_to_split(
+        self, processor: PeptideDatasetBaseProcessor, split: str
+    ):
+        self.hf_dataset[split] = self.hf_dataset[split].map(
+            processor,
+            desc=f"Mapping {processor.__class__.__name__}",
+            batched=processor.batched,
+            batch_size=self.batch_processing_size,
+            num_proc=self._num_proc,
+        )
 
     def _cast_model_feature_types_to_float(self):
         for split in self.hf_dataset.keys():
@@ -546,7 +569,7 @@ If you prefer to encode the (amino-acids)+PTM combinations as tokens in the voca
             self.hf_dataset[split] = self.hf_dataset[split].cast(
                 new_features,
                 num_proc=self._num_proc,
-                batch_size=self._batch_processing_size,
+                batch_size=self.batch_processing_size,
             )
 
     def _cleanup_temp_dataset_cache_files(self):
@@ -599,26 +622,26 @@ If you prefer to encode the (amino-acids)+PTM combinations as tokens in the voca
 
     @classmethod
     def from_dataset_config(cls, config: DatasetConfig):
-        d = cls(
-            data_source=config.data_source,
-            val_data_source=config.val_data_source,
-            test_data_source=config.test_data_source,
-            data_format=config.data_format,
-            sequence_column=config.sequence_column,
-            label_column=config.label_column,
-            val_ratio=config.val_ratio,
-            max_seq_len=config.max_seq_len,
-            dataset_type=config.dataset_type,
-            batch_size=config.batch_size,
-            model_features=config.model_features,
-            dataset_columns_to_keep=config.dataset_columns_to_keep,
-            features_to_extract=config.features_to_extract,
-            pad=config.pad,
-            padding_value=config.padding_value,
-            alphabet=config.alphabet,
-            encoding_scheme=config.encoding_scheme,
-            processed=config.processed,
-        )
+        d = cls(**config.__dict__)
+        # data_source=config.data_source,
+        # val_data_source=config.val_data_source,
+        # test_data_source=config.test_data_source,
+        # data_format=config.data_format,
+        # sequence_column=config.sequence_column,
+        # label_column=config.label_column,
+        # val_ratio=config.val_ratio,
+        # max_seq_len=config.max_seq_len,
+        # dataset_type=config.dataset_type,
+        # batch_size=config.batch_size,
+        # model_features=config.model_features,
+        # dataset_columns_to_keep=config.dataset_columns_to_keep,
+        # features_to_extract=config.features_to_extract,
+        # pad=config.pad,
+        # padding_value=config.padding_value,
+        # alphabet=config.alphabet,
+        # encoding_scheme=config.encoding_scheme,
+        # processed=config.processed,
+        # )
 
         for k, v in config._additional_data.items():
             setattr(d, k, v)

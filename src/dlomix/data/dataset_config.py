@@ -28,8 +28,14 @@ class DatasetConfig:
     pad: bool
     padding_value: int
     alphabet: Dict
+    with_termini: bool
     encoding_scheme: Union[str, EncodingScheme]
     processed: bool
+    enable_tf_dataset_cache: bool
+    disable_cache: bool
+    auto_cleanup_cache: bool
+    num_proc: Optional[int]
+    batch_processing_size: int
     _additional_data: dict = field(default_factory=dict)
 
     def save_config_json(self, path: str):
