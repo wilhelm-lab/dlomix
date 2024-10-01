@@ -217,3 +217,7 @@ def test_csv_intensitydataset():
         intensity_dataset[FragmentIonIntensityDataset.DEFAULT_SPLIT_NAMES[1]].num_rows
         > 0
     )
+
+    # test saving and loading datasets with config
+
+    # test learning alphabet for train/val and then using it for test with fallback
