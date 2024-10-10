@@ -2,6 +2,7 @@ from typing import Callable, Dict, List, Optional, Union
 
 from ..constants import ALPHABET_UNMOD
 from .dataset import PeptideDataset
+from .dataset_config import DatasetConfig
 from .dataset_utils import EncodingScheme
 
 
@@ -60,29 +61,5 @@ class ChargeStateDataset(PeptideDataset):
         num_proc: Optional[int] = None,
         batch_processing_size: int = 1000,
     ):
-        super().__init__(
-            data_source,
-            val_data_source,
-            test_data_source,
-            data_format,
-            sequence_column,
-            label_column,
-            val_ratio,
-            max_seq_len,
-            dataset_type,
-            batch_size,
-            model_features,
-            dataset_columns_to_keep,
-            features_to_extract,
-            pad,
-            padding_value,
-            alphabet,
-            with_termini,
-            encoding_scheme,
-            processed,
-            enable_tf_dataset_cache,
-            disable_cache,
-            auto_cleanup_cache,
-            num_proc,
-            batch_processing_size,
-        )
+        kwargs = {k: v for k, v in locals().items() if k not in ["self", "__class__"]}
+        super().__init__(DatasetConfig(**kwargs))
