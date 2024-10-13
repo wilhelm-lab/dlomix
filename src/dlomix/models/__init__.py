@@ -1,5 +1,6 @@
 from .base import *
 from .deepLC import *
+from .detectability import *
 from .prosit import *
 
 __all__ = [
@@ -7,4 +8,5 @@ __all__ = [
     "PrositRetentionTimePredictor",
     "DeepLCRetentionTimePredictor",
     "PrositIntensityPredictor",
+    "DetectabilityModel",
 ]
