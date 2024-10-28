@@ -322,8 +322,7 @@ class PeptideDataset:
 
         # two or more data sources provided -> no splitting in all cases
         if count_loaded_data_sources >= 2:
-            if self.val_data_source is not None:
-                self._is_predefined_split = True
+            self._is_predefined_split = True
 
         if self._is_predefined_split:
             warnings.warn(
