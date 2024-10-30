@@ -47,6 +47,9 @@ $ pip install dlomix[wandb]
 - Fragment Ion Intensity Prediction:
     - a multi-output regression problem where the intensity values for fragment ions are predicted given a peptide sequence along with some additional features.
 
+- Peptide Detectability:
+    - a multi-class classification problem where the detectability of a peptide is predicted given the peptide sequence.
+
 
 
 **To-Do**
@@ -59,6 +62,7 @@ Functionality:
 - [X] add residual plots to reporting, possibly other regression analysis tools
 - [X] output reporting results as PDF
 - [X] refactor reporting module to use W&B Report API (Retention Time)
+- [X] add additional detectability task
 - [ ] extend pipeline for different types of models and backbones
 - [ ] extend pipeline to allow for fine-tuning with custom datasets
 
