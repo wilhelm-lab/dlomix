@@ -259,6 +259,7 @@ class PeptideDataset:
     def _load_from_hub(self):
         self.hf_dataset = load_dataset(self.data_source)
         self._empty_dataset_mode = False
+        self._is_predefined_split = True
         warnings.warn(
             'The provided data is assumed to be hosted on the Hugging Face Hub since data_format is set to "hub". Validation and test data sources will be ignored.'
         )
@@ -282,6 +283,7 @@ class PeptideDataset:
 
     def _load_from_inmemory_hf_dataset(self):
         self._empty_dataset_mode = False
+        self._is_predefined_split = True
         warnings.warn(
             f'The provided data is assumed to be an in-memory Hugging Face Dataset or DatasetDict object since data_format is set to "hf". Validation and test data sources will be ignored and the split names of the DatasetDict has to follow the default namings {PeptideDataset.DEFAULT_SPLIT_NAMES}.'
         )
@@ -308,7 +310,7 @@ class PeptideDataset:
     def _decide_on_splitting(self):
         count_loaded_data_sources = len(self._data_files_available_splits)
 
-        # one non-train data source provided -> if test, then test only, if val, then do not split
+        # one data source provided -> if test, then test only, if val, then do not split
         if count_loaded_data_sources == 1:
             if (
                 self.test_data_source is not None
@@ -551,19 +553,23 @@ If you prefer to encode the (amino-acids)+PTM combinations as tokens in the voca
         )
 
     def _cast_model_feature_types_to_float(self):
+        def cast_to_float(feature):
+            """Recursively casts Sequence and Value features to float32."""
+            if isinstance(feature, Sequence):
+                # Recursively apply the transformation to the nested feature
+                return Sequence(cast_to_float(feature.feature))
+            if isinstance(feature, Value):
+                return Value("float32")
+            return feature  # Return as is for unsupported feature types
+
         for split in self.hf_dataset.keys():
             new_features = self.hf_dataset[split].features.copy()
 
             for feature_name, feature_type in self.hf_dataset[split].features.items():
-                # ensure model features are casted to float for concatenation later
+                # Ensure model features are casted to float for concatenation later
                 if feature_name not in self.model_features:
                     continue
-                if feature_type.dtype.startswith("float"):
-                    continue
-                if isinstance(feature_type, Sequence):
-                    new_features[feature_name] = Sequence(Value("float32"))
-                if isinstance(feature_type, Value):
-                    new_features[feature_name] = Value("float32")
+                new_features[feature_name] = cast_to_float(feature_type)
 
             self.hf_dataset[split] = self.hf_dataset[split].cast(
                 new_features,
