@@ -5,7 +5,7 @@ from os import makedirs
 from os.path import exists, join
 
 import pytest
-from datasets import load_dataset
+from datasets import Dataset, DatasetDict, load_dataset
 
 from dlomix.data import FragmentIonIntensityDataset, RetentionTimeDataset
 
@@ -16,6 +16,12 @@ RT_CSV_EXAMPLE_URL = "https://raw.githubusercontent.com/wilhelm-lab/dlomix/devel
 INTENSITY_PARQUET_EXAMPLE_URL = "https://raw.githubusercontent.com/wilhelm-lab/dlomix/develop/example_dataset/intensity/intensity_data.parquet"
 INTENSITY_CSV_EXAMPLE_URL = "https://raw.githubusercontent.com/wilhelm-lab/dlomix/develop/example_dataset/intensity/intensity_data.csv"
 RT_HUB_DATASET_NAME = "Wilhelmlab/prospect-ptms-irt"
+
+RAW_GENERIC_NESTED_DATA = {
+    "seq": ["[UNIMOD:737]-DASAQTTSHELTIPN-[]", "[UNIMOD:737]-DLHTGRLC[UNIMOD:4]-[]"],
+    "nested_feature": [[[30, 64]], [[25, 35]]],
+    "label": [0.1, 0.2],
+}
 
 TEST_ASSETS_TO_DOWNLOAD = [
     RT_PARQUET_EXAMPLE_URL,
@@ -216,6 +222,51 @@ def test_csv_intensitydataset():
     assert (
         intensity_dataset[FragmentIonIntensityDataset.DEFAULT_SPLIT_NAMES[1]].num_rows
         > 0
+    )
+
+
+def test_nested_model_features():
+    hfdata = Dataset.from_dict(RAW_GENERIC_NESTED_DATA)
+
+    intensity_dataset = FragmentIonIntensityDataset(
+        data_format="hf",
+        data_source=hfdata,
+        sequence_column="seq",
+        label_column="label",
+        model_features=["nested_feature"],
+    )
+
+    assert intensity_dataset.hf_dataset is not None
+    assert intensity_dataset._empty_dataset_mode is False
+
+    example = iter(intensity_dataset.tensor_train_data).next()
+    assert example[0]["nested_feature"].shape == [2, 1, 2]
+
+
+def test_no_split_datasetDict_hf_inmemory():
+    hfdata = Dataset.from_dict(RAW_GENERIC_NESTED_DATA)
+    hf_dataset = DatasetDict({"train": hfdata})
+
+    intensity_dataset = FragmentIonIntensityDataset(
+        data_format="hf",
+        data_source=hf_dataset,
+        sequence_column="seq",
+        label_column="label",
+    )
+
+    assert intensity_dataset.hf_dataset is not None
+    assert intensity_dataset._empty_dataset_mode is False
+    assert FragmentIonIntensityDataset.DEFAULT_SPLIT_NAMES[0] in list(
+        intensity_dataset.hf_dataset.keys()
+    )
+
+    assert (
+        len(
+            intensity_dataset.hf_dataset[
+                FragmentIonIntensityDataset.DEFAULT_SPLIT_NAMES[0]
+            ]
+        )
+        == 2
     )
 
     # test saving and loading datasets with config
