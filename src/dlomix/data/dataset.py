@@ -223,7 +223,7 @@ class PeptideDataset:
             {
                 k: v
                 for k, v in self.__dict__.items()
-                if k.startswith("_") and k != "_config"
+                if k.startswith("_") and k not in ["_config", "_additional_data"]
             }
         )
 
@@ -627,7 +627,12 @@ If you prefer to encode the (amino-acids)+PTM combinations as tokens in the voca
 
     @classmethod
     def from_dataset_config(cls, config: DatasetConfig):
-        d = cls(**config.__dict__)
+        config_dict = config.__dict__.copy()
+
+        # remove the additional data from the config dict
+        config_dict.pop("_additional_data")
+
+        d = cls(**config_dict)
         # data_source=config.data_source,
         # val_data_source=config.val_data_source,
         # test_data_source=config.test_data_source,
