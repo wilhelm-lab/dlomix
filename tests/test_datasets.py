@@ -3,11 +3,16 @@ import urllib.request
 import zipfile
 from os import makedirs
 from os.path import exists, join
+from shutil import rmtree
 
 import pytest
 from datasets import Dataset, DatasetDict, load_dataset
 
-from dlomix.data import FragmentIonIntensityDataset, RetentionTimeDataset
+from dlomix.data import (
+    FragmentIonIntensityDataset,
+    RetentionTimeDataset,
+    load_processed_dataset,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -241,6 +246,41 @@ def test_nested_model_features():
 
     example = iter(intensity_dataset.tensor_train_data).next()
     assert example[0]["nested_feature"].shape == [2, 1, 2]
+
+
+def test_save_dataset():
+    hfdata = Dataset.from_dict(RAW_GENERIC_NESTED_DATA)
+
+    intensity_dataset = FragmentIonIntensityDataset(
+        data_format="hf",
+        data_source=hfdata,
+        sequence_column="seq",
+        label_column="label",
+        model_features=["nested_feature"],
+    )
+
+    save_path = "./test_dataset"
+    intensity_dataset.save_to_disk(save_path)
+    rmtree(save_path)
+
+
+def test_load_dataset():
+    rtdataset = RetentionTimeDataset(
+        data_source=join(DOWNLOAD_PATH_FOR_ASSETS, "file_2.csv"),
+        data_format="csv",
+        sequence_column="sequence",
+        label_column="irt",
+        val_ratio=0.2,
+    )
+
+    save_path = "./test_dataset"
+    rtdataset.save_to_disk(save_path)
+    splits = rtdataset._data_files_available_splits
+
+    loaded_dataset = load_processed_dataset(save_path)
+    assert loaded_dataset._data_files_available_splits == splits
+    assert loaded_dataset.hf_dataset is not None
+    rmtree(save_path)
 
 
 def test_no_split_datasetDict_hf_inmemory():
