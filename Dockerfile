@@ -15,6 +15,10 @@ RUN set -ex && \
     openssh-client \
     ca-certificates \
     rsync \
+    vim \
+    nano \
+    wget \
+    curl \
     && update-ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
