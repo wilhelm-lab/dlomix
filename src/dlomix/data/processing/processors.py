@@ -1,5 +1,6 @@
 import abc
 import re
+from typing import Optional
 
 
 class PeptideDatasetBaseProcessor(abc.ABC):
@@ -240,18 +241,46 @@ class SequenceEncodingProcessor(PeptideDatasetBaseProcessor):
     ----------
     sequence_column_name : str
         Name of the column containing the peptide sequence.
-    alphabet : dict
-        Dictionary mapping amino acids to integers.
+    alphabet : dict (default=None)
+        Dictionary mapping amino acids to integers. If None, the alphabet will be learned from the data.
     batched : bool (default=False)
         Whether to process data in batches.
     """
 
     def __init__(
-        self, sequence_column_name: str, alphabet: dict, batched: bool = False
+        self,
+        sequence_column_name: str,
+        alphabet: Optional[dict] = None,
+        batched: bool = False,
+        extend_alphabet: bool = False,
+        unknown_token: int = 0,
+        fallback_unmodified: bool = False,
     ):
         super().__init__(sequence_column_name, batched)
 
-        self.alphabet = alphabet
+        self.extend_alphabet = extend_alphabet
+
+        self.alphabet = {}
+        self.set_alphabet(alphabet)
+        self.set_fallback(fallback_unmodified)
+
+        self.unknown_token = unknown_token
+
+    def set_alphabet(self, alphabet):
+        if alphabet and not self.extend_alphabet:
+            self.alphabet = alphabet
+            self._encode = self._encode_with_vocab
+        else:
+            self._encode = self._encode_learn_vocab
+
+    def set_fallback(self, fallback_unmodified):
+        self.fallback_unmodified = fallback_unmodified
+        if self.fallback_unmodified:
+            self._encode = self._encode_with_vocab_fallback
+            if len(self.alphabet) == 0:
+                raise ValueError(
+                    "Alphabet must be provided if fallback_unmodified is True, to encode unseen modifications with the respective unmodified amino acid token."
+                )
 
     def batch_process(self, input_data, **kwargs):
         return {
@@ -267,8 +296,33 @@ class SequenceEncodingProcessor(PeptideDatasetBaseProcessor):
             )
         }
 
-    def _encode(self, sequence):
-        encoded = [self.alphabet.get(amino_acid) for amino_acid in sequence]
+    def _encode_learn_vocab(self, sequence):
+        encoded = []
+        for amino_acid in sequence:
+            if amino_acid not in self.alphabet:
+                self.alphabet[amino_acid] = len(self.alphabet)
+            encoded.append(self.alphabet.get(amino_acid))
+
+        return encoded
+
+    def _encode_with_vocab(self, sequence):
+        encoded = [
+            self.alphabet.get(amino_acid, self.unknown_token) for amino_acid in sequence
+        ]
+        return encoded
+
+    def _encode_with_vocab_fallback(self, sequence):
+        encoded = []
+        for amino_acid in sequence:
+            if amino_acid not in self.alphabet:
+                if amino_acid.startswith(("[")):
+                    amino_acid = "[]-"
+                elif amino_acid.startswith(("-[")):
+                    amino_acid = "-[]"
+                else:
+                    amino_acid = amino_acid[0]
+
+            encoded.append(self.alphabet.get(amino_acid, self.unknown_token))
 
         return encoded
 

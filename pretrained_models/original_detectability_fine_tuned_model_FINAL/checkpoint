@@ -1,0 +1,2 @@
+model_checkpoint_path: "fine_tuned_weights_attention_model_FINAL_NON"
+all_model_checkpoint_paths: "fine_tuned_weights_attention_model_FINAL_NON"
