@@ -28,7 +28,7 @@ setuptools.setup(
         "matplotlib",
         "scikit-learn",
         "tensorflow>=2.13,<2.16",  # 2.16 introduces breaking changes and has Keras 3 as default
-        "tensorflow_probability>=0.21",
+        "tensorflow_probability==0.22",  # fixed for compatibility with tensorflow < 2.16
         "pyarrow",
         "seaborn",
     ],
