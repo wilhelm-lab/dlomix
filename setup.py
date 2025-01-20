@@ -34,7 +34,7 @@ setuptools.setup(
     ],
     extras_require={
         "dev": [
-            "pytest >= 3.7",
+            "pytest >= 3.9",
             "pytest-cov",
             "black",
             "twine",
@@ -48,7 +48,7 @@ setuptools.setup(
     },
     classifiers=[
         "Programming Language :: Python :: 3",
-        "Programming Language :: Python :: 3.8",
+        "Programming Language :: Python :: 3.9",
         "License :: OSI Approved :: MIT License",
         "Operating System :: OS Independent",
         "Topic :: Scientific/Engineering :: Bio-Informatics",
