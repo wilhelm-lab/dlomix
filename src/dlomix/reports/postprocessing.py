@@ -66,20 +66,27 @@ def get_spectral_angle(true, pred, batch_size=600):
     return sa
 
 
-def normalize_intensity_predictions(data, batch_size=600):
+def normalize_intensity_predictions(
+    data,
+    sequence_column_name="sequences",
+    labels_column_name="intensities_raw",
+    predictions_column_name="intensities_pred",
+    precursor_charge_column_name="precursor_charge_onehot",
+    batch_size=600,
+):
     assert (
-        "sequences" in data
+        sequence_column_name in data
     ), "Key sequences is missing in the data provided for post-processing"
     assert (
-        "intensities_pred" in data
+        predictions_column_name in data
     ), "Key intensities_pred is missing in the data provided for post-processing"
     assert (
-        "precursor_charge_onehot" in data
+        precursor_charge_column_name in data
     ), "Key precursor_charge_onehot is missing in the data provided for post-processing"
 
-    sequence_lengths = data["sequences"].apply(lambda x: len(x))
-    intensities = np.stack(data["intensities_pred"].to_numpy()).astype(np.float32)
-    precursor_charge_onehot = np.stack(data["precursor_charge_onehot"].to_numpy())
+    sequence_lengths = data[sequence_column_name].apply(lambda x: len(x))
+    intensities = np.stack(data[predictions_column_name].to_numpy()).astype(np.float32)
+    precursor_charge_onehot = np.stack(data[predictions_column_name].to_numpy())
     charges = list(precursor_charge_onehot.argmax(axis=1) + 1)
 
     intensities[intensities < 0] = 0
@@ -90,11 +97,11 @@ def normalize_intensity_predictions(data, batch_size=600):
     m_idx = intensities == -1
     intensities = normalize_base_peak(intensities)
     intensities[m_idx] = -1
-    data["intensities_pred"] = intensities.tolist()
+    data[predictions_column_name] = intensities.tolist()
 
-    if "intensities_raw" in data:
+    if labels_column_name in data:
         data["spectral_angle"] = get_spectral_angle(
-            np.stack(data["intensities_raw"].to_numpy()).astype(np.float32),
+            np.stack(data[labels_column_name].to_numpy()).astype(np.float32),
             intensities,
             batch_size=batch_size,
         )
