@@ -36,7 +36,7 @@ test_sequences = d["test"]["modified_sequence"]
 
 # callbacks
 
-weights_file = "./prosit_charge_dist_ms1_test"
+weights_file = "./output/prosit_charge_dist_ms1_test"
 checkpoint = tf.keras.callbacks.ModelCheckpoint(
     weights_file, save_best_only=True, save_weights_only=True
 )
