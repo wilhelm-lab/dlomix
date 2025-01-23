@@ -1,0 +1,2 @@
+model_checkpoint_path: "prosit_charge_dist_ms1_test"
+all_model_checkpoint_paths: "prosit_charge_dist_ms1_test"

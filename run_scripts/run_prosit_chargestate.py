@@ -1,11 +1,7 @@
 import tensorflow as tf
 
 from dlomix.data import ChargeStateDataset
-from dlomix.models import (
-    ChargeStateDistributionPredictor,
-    DominantChargeStatePredictor,
-    ObservedChargeStatePredictor,
-)
+from dlomix.models import DominantChargeStatePredictor
 
 model = DominantChargeStatePredictor(seq_length=30)
 
