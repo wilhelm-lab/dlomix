@@ -5,6 +5,9 @@ import tensorflow as tf
 from ..constants import ALPHABET_UNMOD
 from ..data.processing.feature_extractors import FEATURE_EXTRACTORS_PARAMETERS
 from ..layers.attention import AttentionLayer, DecoderAttentionLayer
+from ..layers.transformer_encoder import TransformerEncoder
+from ..layers.positional_embedding import PositionalEmbedding
+from ..layers.meta_encoder import MetaEncoder
 
 
 class PrositRetentionTimePredictor(tf.keras.Model):
@@ -361,3 +364,92 @@ class PrositIntensityPredictor(tf.keras.Model):
                     single_input = tf.expand_dims(single_input, axis=-1)
                 collected_values.append(single_input)
         return collected_values
+    
+
+class PrositTransformerIntensityPredictor(tf.keras.Model):
+
+    DEFAULT_INPUT_KEYS = {
+        "SEQUENCE_KEY": "sequence",
+        "COLLISION_ENERGY_KEY": "collision_energy",
+        "PRECURSOR_CHARGE_KEY": "precursor_charge",
+        "FRAGMENTATION_TYPE_KEY": "fragmentation_type",
+    }
+
+    # can be extended to include all possible meta data
+    META_DATA_KEYS = [
+        "COLLISION_ENERGY_KEY",
+        "PRECURSOR_CHARGE_KEY",
+        "FRAGMENTATION_TYPE_KEY",
+    ]
+
+    def __init__(
+        self,
+        embedding_output_dim=64,
+        seq_length=30,
+        vocab_dict=ALPHABET_UNMOD,
+        dropout_rate=0.2,
+        num_heads=8,
+        ff_dim=32,
+        transformer_dropout=0.1,
+        num_transformers=2,
+        input_keys=None,
+        meta_data_keys=None,
+        **kwargs,
+    ):
+        super(PrositTransformerIntensityPredictor, self).__init__()
+
+        self.embeddings_count = len(vocab_dict) + 2
+        self.max_ion = seq_length - 1
+        self.pos_embedding = PositionalEmbedding(
+            self.embeddings_count, 64
+        )
+        self.meta_encoder = MetaEncoder(
+            32, dropout_rate
+        )
+        self.transformer_encoder = TransformerEncoder(
+            embed_dim=embedding_output_dim,
+            num_heads=num_heads,
+            ff_dim=ff_dim,
+            rate=transformer_dropout,
+            num_transformers=num_transformers,
+        )
+
+        self.dense_1 = tf.keras.layers.Dense(64)
+        self.dense_2 = tf.keras.layers.Dense(256)
+        self.dense_3 = tf.keras.layers.Dense(174)
+        self.batch_norm = tf.keras.layers.BatchNormalization() 
+        self.leaky_relu = tf.keras.layers.LeakyReLU()
+        self.input_keys = input_keys
+        self.meta_data_keys = meta_data_keys
+
+
+    def call(self, inputs, **kwargs):
+        peptides_in = inputs.get(self.input_keys["SEQUENCE_KEY"])
+        collision_energy_in = inputs.get(self.meta_data_keys["COLLISION_ENERGY_KEY"])
+        precursor_charge_in = inputs.get(self.meta_data_keys["PRECURSOR_CHARGE_KEY"])
+        fragm_method_in = inputs.get(self.meta_data_keys["FRAGMENTATION_TYPE_KEY"])
+        precursor_charge_in = tf.cast(precursor_charge_in, tf.float32)
+        if len(collision_energy_in.shape) == 1:
+            collision_energy_in = tf.expand_dims(collision_energy_in, axis=-1)
+
+        if len(fragm_method_in.shape) == 1:
+            fragm_method_in = tf.expand_dims(fragm_method_in, axis=1) 
+
+        x = peptides_in
+        x = self.pos_embedding(x)
+
+        encoded_meta = self.meta_encoder([collision_energy_in, precursor_charge_in, fragm_method_in])
+        encoded_meta = tf.expand_dims(encoded_meta, axis=-1)
+        encoded_meta = tf.tile(encoded_meta, [1, 1, 64])
+
+        x = tf.concat([x, encoded_meta], axis=-1) 
+        x = self.dense_1(x)
+        x = self.transformer_encoder(x)
+        x = self.dense_2(x)
+        x = self.batch_norm(x)
+        x = self.leaky_relu(x)
+        x = self.dense_3(x)
+        x = tf.reduce_mean(x, axis=1)
+
+        return x
+

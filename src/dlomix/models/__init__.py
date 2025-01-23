@@ -9,4 +9,5 @@ __all__ = [
     "DeepLCRetentionTimePredictor",
     "PrositIntensityPredictor",
     "DetectabilityModel",
+    "PrositTransformerIntensityPredictor",
 ]
