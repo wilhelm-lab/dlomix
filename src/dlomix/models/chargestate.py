@@ -192,6 +192,7 @@ class ChargeStateDistributionPredictor(tf.keras.Model):
         recurrent_layers_sizes (tuple): The sizes of the recurrent layers. Defaults to (256, 512).
         regressor_layer_size (int): The size of the regressor layer. Defaults to 512.
         num_classes (int): The number of classes for the output corresponding to charge states available in the data. Defaults to 6.
+        output_activation_fn (str): The activation function for the output layer. Defaults to "linear".
     """
 
     def __init__(
@@ -203,7 +204,8 @@ class ChargeStateDistributionPredictor(tf.keras.Model):
         latent_dropout_rate=0.1,
         recurrent_layers_sizes=(256, 512),
         regressor_layer_size=512,
-        num_classes=6,  # TODO number of charge states etc
+        num_classes=6,  # number of charge states
+        output_activation_fn="linear",
     ):
         super(ChargeStateDistributionPredictor, self).__init__()
 
@@ -214,6 +216,7 @@ class ChargeStateDistributionPredictor(tf.keras.Model):
         self.latent_dropout_rate = latent_dropout_rate
         self.regressor_layer_size = regressor_layer_size
         self.recurrent_layers_sizes = recurrent_layers_sizes
+        self.output_activation_fn = output_activation_fn
 
         self.embedding = tf.keras.layers.Embedding(
             input_dim=self.embeddings_count,
@@ -231,7 +234,9 @@ class ChargeStateDistributionPredictor(tf.keras.Model):
             ]
         )
 
-        self.output_layer = tf.keras.layers.Dense(num_classes, activation="softmax")
+        self.output_layer = tf.keras.layers.Dense(
+            num_classes, activation=self.output_activation_fn
+        )
 
     def _build_encoder(self):
         self.encoder = tf.keras.Sequential(
