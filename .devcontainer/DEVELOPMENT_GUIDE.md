@@ -3,8 +3,8 @@
 This file provides guidelines for contributing PyTorch implementations to the dlomix project, a deep learning framework for proteomics. Based on your environment, please follow the respective guide:
 
 - [Dev Containers in VSCode](#dev-containers-in-vscode)
-- [Google Colab Development Guide](#google-colab-development-guide)
 - [Local Development Guide](#local-development-guide)
+- [Google Colab Development Guide](#google-colab-development-guide)
 
 
 ## Dev Containers in VSCode
@@ -20,19 +20,19 @@ docker ps
 
 3. Clone the forked GitHub repository of DLOmix https://github.com/omsh/dlomix
 
-3. Open the repository in a DevContainer by clicking on the arrows in the botton left corner, and choosing "Reopen in Container".
+4. Open the repository in a DevContainer by clicking on the arrows in the botton left corner, and choosing "Reopen in Container".
 
 ![alt text](vscode-screenshot.png)
 
-4. During the first time, the container build will take some time and then VSCode will connect to the running container. Once it is done, please run the following command to install DLOmix with development packages in the editable mode:
+5. During the first time, the container build will take some time and then VSCode will connect to the running container. Once it is done, please run the following command to install DLOmix with development packages in the editable mode:
 
 ```bash
 make install-dev
 ```
 
-5. You are ready to make changes to the source code and see the impact directly. Once you make the changes, they should be reflected in the editable install inside your dev container.
+6. You are ready to make changes to the source code and see the impact directly. Once you make the changes, they should be reflected in the editable install inside your dev container.
 
-6. Write tests under `./tests` to ensure your code runs as expected. You can run all tests by running the command:
+7. Write tests under `./tests` to ensure your code runs as expected. You can run all tests by running the command:
 ```bash
 make test-local
 ```
@@ -40,78 +40,6 @@ make test-local
 VSCode Official Tutorial: https://code.visualstudio.com/docs/devcontainers/tutorial
 VSCode documentaion for DevContainers: https://code.visualstudio.com/docs/devcontainers/containers
 
-
-
-
-## Google Colab Development Guide
-
-### Initial Setup
-
-1. Create a new Colab notebook and mount your Google Drive:
-```python
-from google.colab import drive
-drive.mount('/content/drive')
-```
-
-2. Clone the forked dlomix repository:
-```bash
-!git clone https://github.com/omsh/dlomix.git
-```
-
-3. Install development dependencies and ensure torch-related packages are in this file, otherwise extend it:
-```bash
-pip install -r ./dlomix/.devcontainer/dev-requirements.txt
-```
-
-4. Install the package in development mode:
-```bash
-!pip install -e "./dlomix[dev]"
-```
-
-### Running Tests
-
-1. Execute the test suite:
-```bash
-!python -m pytest tests/
-```
-
-
-### Making Changes
-
-1. Create a new branch for your PyTorch implementation:
-```bash
-!git checkout -b feature/NAME_OF_FEATURE_OR_TASK
-```
-
-2. When implementing PyTorch versions of existing models, follow the current project structure:
-```python
-# dlomix/models/pytorch/model.py
-import torch
-import torch.nn as nn
-
-class PrositRetentionTimeModelPyTorch(nn.Module):
-    """PyTorch implementation of Prosit retention time model"""
-    def __init__(self, *args, **kwargs):
-        super().__init__()
-        # PyTorch implementation here
-```
-
-3. Add corresponding tests:
-```python
-# tests/test_pytorch_models.py
-import torch
-import pytest
-from dlomix.models.pytorch import PrositRetentionTimeModelPyTorch
-
-def test_model_forward_pass():
-    model = PrositRetentionTimeModelPyTorch()
-    expected_shape = (128, 1)
-    input_size = 30
-
-    x = torch.randn(128, input_size)  # Match existing input dimensions
-    output = model(x)
-    assert output.shape == expected_shape
-```
 
 ## Local Development Guide
 
@@ -207,6 +135,77 @@ def test_model_compatibility():
 
     assert tf_output.shape == , pt_output.detach().numpy().shape
 ```
+
+## Google Colab Development Guide
+
+### Initial Setup
+
+1. Create a new Colab notebook and mount your Google Drive:
+```python
+from google.colab import drive
+drive.mount('/content/drive')
+```
+
+2. Clone the forked dlomix repository:
+```bash
+!git clone https://github.com/omsh/dlomix.git
+```
+
+3. Install development dependencies and ensure torch-related packages are in this file, otherwise extend it:
+```bash
+pip install -r ./dlomix/.devcontainer/dev-requirements.txt
+```
+
+4. Install the package in development mode:
+```bash
+!pip install -e "./dlomix[dev]"
+```
+
+### Running Tests
+
+1. Execute the test suite:
+```bash
+!python -m pytest tests/
+```
+
+
+### Making Changes
+
+1. Create a new branch for your PyTorch implementation:
+```bash
+!git checkout -b feature/NAME_OF_FEATURE_OR_TASK
+```
+
+2. When implementing PyTorch versions of existing models, follow the current project structure:
+```python
+# dlomix/models/pytorch/model.py
+import torch
+import torch.nn as nn
+
+class PrositRetentionTimeModelPyTorch(nn.Module):
+    """PyTorch implementation of Prosit retention time model"""
+    def __init__(self, *args, **kwargs):
+        super().__init__()
+        # PyTorch implementation here
+```
+
+3. Add corresponding tests:
+```python
+# tests/test_pytorch_models.py
+import torch
+import pytest
+from dlomix.models.pytorch import PrositRetentionTimeModelPyTorch
+
+def test_model_forward_pass():
+    model = PrositRetentionTimeModelPyTorch()
+    expected_shape = (128, 1)
+    input_size = 30
+
+    x = torch.randn(128, input_size)  # Match existing input dimensions
+    output = model(x)
+    assert output.shape == expected_shape
+```
+
 
 ### Submission Guidelines
 
