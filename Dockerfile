@@ -1,14 +1,17 @@
 FROM python:3.9-slim
 
-# Install development dependencies using uv
+ENV PYTHONUNBUFFERED=1
+ENV PYTHONDONTWRITEBYTECODE=1
+
+# Install extra development dependencies
 COPY dev-requirements.txt /tmp/dev-requirements.txt
-RUN pip install --upgrade pip && \
+RUN pip install --upgrade --no-cache-dir pip && \
     pip install --no-cache-dir -r /tmp/dev-requirements.txt
 
 # Install system dependencies
 RUN set -ex && \
     apt-get update && \
-    apt-get install -y \
+    apt-get install -y --no-install-recommends \
     build-essential \
     bash-completion \
     git \

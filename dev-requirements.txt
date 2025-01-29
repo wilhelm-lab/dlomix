@@ -1,20 +1,2 @@
-datasets
-fpdf
-pandas
-numpy
-matplotlib
-scikit-learn
-tensorflow>=2.13,<2.16
-tensorflow_probability>=0.21
-pyarrow
-seaborn
 torch
-torchvision
-pytest >= 3.7
-pytest-cov
-black
-twine
-setuptools
-wheel
-pylint
-wandb >= 0.15
+#wandb >= 0.15 # enable this line to install wandb
