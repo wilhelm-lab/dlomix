@@ -385,13 +385,13 @@ class PrositTransformerIntensityPredictor(tf.keras.Model):
     def __init__(
         self,
         embedding_output_dim=64,
-        seq_length=30,
+        seq_length=32,
         vocab_dict=ALPHABET_UNMOD,
         dropout_rate=0.2,
-        num_heads=8,
+        num_heads=16,
         ff_dim=32,
         transformer_dropout=0.1,
-        num_transformers=2,
+        num_transformers=6,
         input_keys=None,
         meta_data_keys=None,
         **kwargs,
@@ -421,7 +421,6 @@ class PrositTransformerIntensityPredictor(tf.keras.Model):
         self.leaky_relu = tf.keras.layers.LeakyReLU()
         self.input_keys = input_keys
         self.meta_data_keys = meta_data_keys
-
 
     def call(self, inputs, **kwargs):
         peptides_in = inputs.get(self.input_keys["SEQUENCE_KEY"])
