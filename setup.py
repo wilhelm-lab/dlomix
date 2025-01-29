@@ -22,19 +22,20 @@ setuptools.setup(
     package_data={"": ["data/processing/pickled_feature_dicts/*"]},
     install_requires=[
         "datasets",
+        "huggingface_hub",
         "fpdf",
         "pandas",
         "numpy",
         "matplotlib",
         "scikit-learn",
         "tensorflow>=2.13,<2.16",  # 2.16 introduces breaking changes and has Keras 3 as default
-        "tensorflow_probability>=0.21",
+        "tensorflow_probability==0.22",  # fixed for compatibility with tensorflow < 2.16
         "pyarrow",
         "seaborn",
     ],
     extras_require={
         "dev": [
-            "pytest >= 3.7",
+            "pytest >= 3.9",
             "pytest-cov",
             "black",
             "twine",
@@ -48,7 +49,7 @@ setuptools.setup(
     },
     classifiers=[
         "Programming Language :: Python :: 3",
-        "Programming Language :: Python :: 3.8",
+        "Programming Language :: Python :: 3.9",
         "License :: OSI Approved :: MIT License",
         "Operating System :: OS Independent",
         "Topic :: Scientific/Engineering :: Bio-Informatics",

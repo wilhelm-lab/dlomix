@@ -89,6 +89,12 @@ PTMS_ALPHABET = {
     "Y[UNIMOD:354]": 54,
 }
 
+# ToDo: double check chargestate data additional tokens for the alphabet
+
+# PTMS_ALPHABET['W[UNIMOD:425]'] = 57
+# PTMS_ALPHABET['K[UNIMOD:1342]'] = 58
+# PTMS_ALPHABET['[UNIMOD:27]-'] = 59
+
 
 # ---- detectability_model_constants.py ----
 CLASSES_LABELS = ["Non-Flyer", "Weak Flyer", "Intermediate Flyer", "Strong Flyer"]
