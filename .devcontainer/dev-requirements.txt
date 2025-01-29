@@ -1,2 +1,3 @@
+--index-url https://download.pytorch.org/whl/cpu
 torch
 #wandb >= 0.15 # enable this line to install wandb
