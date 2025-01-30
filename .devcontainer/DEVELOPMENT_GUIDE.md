@@ -1,10 +1,14 @@
 # Development Guides for dlomix PyTorch Implementation
 
-This file provides guidelines for contributing PyTorch implementations to the dlomix project, a deep learning framework for proteomics. Based on your environment, please follow the respective guide:
+This file provides guidelines for contributing PyTorch implementations to the dlomix project, a deep learning framework for proteomics. 
+
+Based on your environment, please follow the respective setup guide:
 
 - [Dev Containers in VSCode](#dev-containers-in-vscode)
 - [Local Development Guide](#local-development-guide)
 - [Google Colab Development Guide](#google-colab-development-guide)
+
+For contributing, please follow our [implementation guidelines](#implementation-guidelines)
 
 
 ## Dev Containers in VSCode
@@ -15,27 +19,24 @@ This file provides guidelines for contributing PyTorch implementations to the dl
 ```bash
 docker ps
 ```
+2. If you don't yet have docker installed, follow these instructions: https://docs.docker.com/engine/install/ubuntu/#install-using-the-repository
 
-2. Open VSCode and install the Devcontainers extensions from the extensions tab
+3. To run docker without sudo (VSCode requirement), follow these post-installation steps: https://docs.docker.com/engine/install/linux-postinstall/
 
-3. Clone the forked GitHub repository of DLOmix https://github.com/omsh/dlomix
+4. Open VSCode and install the Devcontainers extensions from the extensions tab
 
-4. Open the repository in a DevContainer by clicking on the arrows in the botton left corner, and choosing "Reopen in Container".
+5. Clone the forked GitHub repository of DLOmix https://github.com/omsh/dlomix
+
+6. Open the repository in a DevContainer by clicking on the arrows in the botton left corner, and choosing "Reopen in Container".
 
 ![alt text](vscode-screenshot.png)
 
-5. During the first time, the container build will take some time and then VSCode will connect to the running container. Once it is done, please run the following command to install DLOmix with development packages in the editable mode:
+7. During the first time, the container build will take some time and then VSCode will connect to the running container. Once it is done, please run the following command in the VSCode Terminal to install DLOmix with development packages in the editable mode:
 
 ```bash
 make install-dev
 ```
-
-6. You are ready to make changes to the source code and see the impact directly. Once you make the changes, they should be reflected in the editable install inside your dev container.
-
-7. Write tests under `./tests` to ensure your code runs as expected. You can run all tests by running the command:
-```bash
-make test-local
-```
+8. You are now ready to make changes to the source code and see the impact directly. Once you make the changes, they should be reflected in the editable install inside your dev container.
 
 VSCode Official Tutorial: https://code.visualstudio.com/docs/devcontainers/tutorial
 VSCode documentaion for DevContainers: https://code.visualstudio.com/docs/devcontainers/containers
@@ -77,64 +78,11 @@ pip install -r ./.devcontainer/dev-requirements.txt
 
 ### DLOmix Editable installation
 
-2. Install the package with the dev option and in editable mode:
+Install the package with the dev option and in editable mode:
 ```bash
 pip install -e .[dev]
 ```
 
-### Development Workflow
-
-1. Create a new branch:
-```bash
-git checkout -b feature/FEATURE_NAME
-```
-
-2. Run the test suite using make:
-```bash
-make test-local
-```
-
-3. Format your code using the project's style guidelines:
-```bash
-make format
-```
-
-### Implementation Guidelines
-
-1. Add PyTorch implementations following the current project structure:
-```
-dlomix/
-├── models/
-│   ├── pytorch/
-│   │   ├── __init__.py
-│   │   └── model.py
-│   └── existing_models/
-```
-
-2. Ensure compatibility with existing APIs:
-```python
-# Example of maintaining consistent API
-class PrositRTPyTorch(nn.Module):
-    def forward(self, sequences):
-        # Maintain same input/output structure as TensorFlow version
-
-        return retention_times
-```
-
-3. Add corresponding tests:
-```python
-# tests/test_pytorch_models.py
-def test_model_compatibility():
-    tf_model = PrositRT()  # Existing TF implementation
-    pt_model = PrositRTPyTorch()
-
-    # Test with same input
-    sequence_input = "PEPTIDE"
-    tf_output = tf_model.predict(sequence_input)
-    pt_output = pt_model(torch.tensor(encoded_sequence))
-
-    assert tf_output.shape == , pt_output.detach().numpy().shape
-```
 
 ## Google Colab Development Guide
 
@@ -161,32 +109,37 @@ pip install -r ./dlomix/.devcontainer/dev-requirements.txt
 !pip install -e "./dlomix[dev]"
 ```
 
-### Running Tests
 
-1. Execute the test suite:
-```bash
-!python -m pytest tests/
+## Implementation Guidelines
+
+1. Add PyTorch implementations following the current project structure:
+```
+dlomix/
+├── models/
+│   ├── pytorch/
+│   │   ├── __init__.py
+│   │   └── model.py
+│   └── existing_models/
 ```
 
-
-### Making Changes
-
-1. Create a new branch for your PyTorch implementation:
-```bash
-!git checkout -b feature/NAME_OF_FEATURE_OR_TASK
-```
-
-2. When implementing PyTorch versions of existing models, follow the current project structure:
+2. Ensure compatibility with existing APIs:
 ```python
 # dlomix/models/pytorch/model.py
 import torch
 import torch.nn as nn
 
-class PrositRetentionTimeModelPyTorch(nn.Module):
+# Example of maintaining consistent API
+class PrositRTPyTorch(nn.Module):
     """PyTorch implementation of Prosit retention time model"""
+
     def __init__(self, *args, **kwargs):
         super().__init__()
         # PyTorch implementation here
+
+    def forward(self, sequences):
+        # Maintain same input/output structure as TensorFlow version
+
+        return retention_times
 ```
 
 3. Add corresponding tests:
@@ -194,10 +147,21 @@ class PrositRetentionTimeModelPyTorch(nn.Module):
 # tests/test_pytorch_models.py
 import torch
 import pytest
-from dlomix.models.pytorch import PrositRetentionTimeModelPyTorch
+from dlomix.models.pytorch import PrositRTPyTorch
+
+def test_model_compatibility():
+    tf_model = PrositRT()  # Existing TF implementation
+    pt_model = PrositRTPyTorch()
+
+    # Test with same input
+    sequence_input = "PEPTIDE"
+    tf_output = tf_model.predict(sequence_input)
+    pt_output = pt_model(torch.tensor(encoded_sequence))
+
+    assert tf_output.shape == , pt_output.detach().numpy().shape
 
 def test_model_forward_pass():
-    model = PrositRetentionTimeModelPyTorch()
+    model = PrositRTPyTorch()
     expected_shape = (128, 1)
     input_size = 30
 
@@ -206,18 +170,40 @@ def test_model_forward_pass():
     assert output.shape == expected_shape
 ```
 
+4. Add a usage example of the new PyTorch implementation, preferably in a notebook under `./notebooks`
 
-### Submission Guidelines
 
-1. Ensure all tests pass:
+### Development Workflow
+
+1. Create a new branch:
+```bash
+git checkout -b feature/FEATURE_NAME
+```
+
+2. Add your implementation
+
+3. Write tests under `./tests` to ensure your code runs as expected.
+
+4. Run the test suite using make:
 ```bash
 make test-local
 ```
 
-2. Create a pull request with:
+For google Colab you can run:
+```bash
+!python -m pytest tests/
+```
+
+5. Format your code using the project's style guidelines:
+```bash
+make format
+```
+
+6. Create a pull request with:
 - Clear description of changes
 - Any new dependencies added
-- Example usage of new PyTorch implementation, preferably in a notebook under `./notebooks`
+- Mention the usage example under `./notebooks`
+
 
 ### General Considerations
 
