@@ -1,6 +1,6 @@
 # Development Guides for dlomix PyTorch Implementation
 
-This file provides guidelines for contributing PyTorch implementations to the dlomix project, a deep learning framework for proteomics. 
+This file provides guidelines for contributing PyTorch implementations to the dlomix project, a deep learning framework for proteomics.
 
 Based on your environment, please follow the respective setup guide:
 
@@ -158,7 +158,7 @@ def test_model_compatibility():
     tf_output = tf_model.predict(sequence_input)
     pt_output = pt_model(torch.tensor(encoded_sequence))
 
-    assert tf_output.shape == , pt_output.detach().numpy().shape
+    assert tf_output.shape == pt_output.detach().numpy().shape
 
 def test_model_forward_pass():
     model = PrositRTPyTorch()
