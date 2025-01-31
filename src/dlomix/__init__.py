@@ -1,10 +1,10 @@
-__version__ = "0.1.1"
+__version__ = "0.1.8"
 
 META_DATA = {
-    "author": "Omar Shouman",
+    "author": "Wilhelm Lab",
     "author_email": "o.shouman@tum.de",
     "description": "Deep Learning for Proteomics",
     "package_name": "DLOmix",
-    "copyright_text": "2024, Wilhelm Lab, TU Munich.",
+    "copyright_text": "2025, Wilhelm Lab, TU Munich, School of Life Sciences",
     "github_url": "https://github.com/wilhelm-lab/dlomix",
 }

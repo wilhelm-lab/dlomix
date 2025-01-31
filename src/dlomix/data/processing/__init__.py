@@ -6,13 +6,23 @@ from .feature_extractors import (
     FeatureExtractor,
     LookupFeatureExtractor,
 )
-from .processors import FunctionProcessor, SequenceParsingProcessor
+from .processors import (
+    FunctionProcessor,
+    SequenceEncodingProcessor,
+    SequencePaddingProcessor,
+    SequenceParsingProcessor,
+    SequencePTMRemovalProcessor,
+)
 
 __all__ = [
     "AVAILABLE_FEATURE_EXTRACTORS",
     "LookupFeatureExtractor",
     "FeatureExtractor",
     "FunctionProcessor",
+    "SequenceParsingProcessor",
+    "SequenceEncodingProcessor",
+    "SequencePaddingProcessor",
+    "SequencePTMRemovalProcessor",
 ]
 
 d = dict(

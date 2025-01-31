@@ -44,7 +44,7 @@ class PrositRetentionTimePredictor(tf.keras.Model):
         super(PrositRetentionTimePredictor, self).__init__()
 
         # tie the count of embeddings to the size of the vocabulary (count of amino acids)
-        self.embeddings_count = len(alphabet) + 2
+        self.embeddings_count = len(alphabet)
 
         self.dropout_rate = dropout_rate
         self.latent_dropout_rate = latent_dropout_rate
@@ -194,7 +194,7 @@ class PrositIntensityPredictor(tf.keras.Model):
             self.alphabet = ALPHABET_UNMOD
 
         # tie the count of embeddings to the size of the vocabulary (count of amino acids)
-        self.embeddings_count = len(self.alphabet) + 2
+        self.embeddings_count = len(self.alphabet)
 
         self.embedding = tf.keras.layers.Embedding(
             input_dim=self.embeddings_count,

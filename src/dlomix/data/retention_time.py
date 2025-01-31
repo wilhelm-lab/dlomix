@@ -2,6 +2,7 @@ from typing import Callable, Dict, List, Optional, Union
 
 from ..constants import ALPHABET_UNMOD
 from .dataset import PeptideDataset
+from .dataset_config import DatasetConfig
 from .dataset_utils import EncodingScheme
 
 
@@ -26,6 +27,7 @@ class RetentionTimeDataset(PeptideDataset):
         pad (bool): Whether to pad sequences to the maximum length. Defaults to True.
         padding_value (int): The value to use for padding sequences. Defaults to 0.
         alphabet (Dict): The alphabet used for encoding sequences. Defaults to ALPHABET_UNMOD.
+        with_termini (bool): Whether to add the N- and C-termini in the sequence column, even if they do not exist. Defaults to True.
         encoding_scheme (Union[str, EncodingScheme]): The encoding scheme to use for sequences. Defaults to EncodingScheme.UNMOD.
         processed (bool): Whether the dataset has been preprocessed. Defaults to False.
         enable_tf_dataset_cache (bool): Flag to indicate whether to enable TensorFlow Dataset caching (call `.cahce()` on the generate TF Datasets).
@@ -50,6 +52,7 @@ class RetentionTimeDataset(PeptideDataset):
         pad: bool = True,
         padding_value: int = 0,
         alphabet: Dict = ALPHABET_UNMOD,
+        with_termini: bool = True,
         encoding_scheme: Union[str, EncodingScheme] = EncodingScheme.UNMOD,
         processed: bool = False,
         enable_tf_dataset_cache: bool = False,
@@ -58,28 +61,5 @@ class RetentionTimeDataset(PeptideDataset):
         num_proc: Optional[int] = None,
         batch_processing_size: int = 1000,
     ):
-        super().__init__(
-            data_source,
-            val_data_source,
-            test_data_source,
-            data_format,
-            sequence_column,
-            label_column,
-            val_ratio,
-            max_seq_len,
-            dataset_type,
-            batch_size,
-            model_features,
-            dataset_columns_to_keep,
-            features_to_extract,
-            pad,
-            padding_value,
-            alphabet,
-            encoding_scheme,
-            processed,
-            enable_tf_dataset_cache,
-            disable_cache,
-            auto_cleanup_cache,
-            num_proc,
-            batch_processing_size,
-        )
+        kwargs = {k: v for k, v in locals().items() if k not in ["self", "__class__"]}
+        super().__init__(DatasetConfig(**kwargs))

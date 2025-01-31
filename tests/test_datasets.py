@@ -3,20 +3,30 @@ import urllib.request
 import zipfile
 from os import makedirs
 from os.path import exists, join
+from shutil import rmtree
 
-import numpy as np
-import pandas as pd
 import pytest
+from datasets import Dataset, DatasetDict, load_dataset
 
-from dlomix.data import FragmentIonIntensityDataset, RetentionTimeDataset
+from dlomix.data import (
+    FragmentIonIntensityDataset,
+    RetentionTimeDataset,
+    load_processed_dataset,
+)
 
 logger = logging.getLogger(__name__)
 
 RT_PARQUET_EXAMPLE_URL = "https://zenodo.org/record/6602020/files/TUM_missing_first_meta_data.parquet?download=1"
 RT_CSV_EXAMPLE_URL = "https://raw.githubusercontent.com/wilhelm-lab/dlomix/develop/example_dataset/proteomTools_train_val.csv"
-# INTENSITY_PARQUET_EXAMPLE_URL = "https://raw.githubusercontent.com/wilhelm-lab/dlomix/develop/example_dataset/intensity/intensity_data.parquet"
-INTENSITY_PARQUET_EXAMPLE_URL = "https://raw.githubusercontent.com/wilhelm-lab/dlomix/feature/migrate-to-huggingface-datasets/example_dataset/intensity/intensity_data.parquet"
+INTENSITY_PARQUET_EXAMPLE_URL = "https://raw.githubusercontent.com/wilhelm-lab/dlomix/develop/example_dataset/intensity/intensity_data.parquet"
 INTENSITY_CSV_EXAMPLE_URL = "https://raw.githubusercontent.com/wilhelm-lab/dlomix/develop/example_dataset/intensity/intensity_data.csv"
+RT_HUB_DATASET_NAME = "Wilhelmlab/prospect-ptms-irt"
+
+RAW_GENERIC_NESTED_DATA = {
+    "seq": ["[UNIMOD:737]-DASAQTTSHELTIPN-[]", "[UNIMOD:737]-DLHTGRLC[UNIMOD:4]-[]"],
+    "nested_feature": [[[30, 64]], [[25, 35]]],
+    "label": [0.1, 0.2],
+}
 
 TEST_ASSETS_TO_DOWNLOAD = [
     RT_PARQUET_EXAMPLE_URL,
@@ -84,6 +94,49 @@ def test_parquet_rtdataset():
     )
     assert rtdataset[RetentionTimeDataset.DEFAULT_SPLIT_NAMES[0]].num_rows > 0
     assert rtdataset[RetentionTimeDataset.DEFAULT_SPLIT_NAMES[1]].num_rows > 0
+
+
+def test_rtdataset_inmemory():
+    hf_dataset = load_dataset(
+        "parquet", data_files=join(DOWNLOAD_PATH_FOR_ASSETS, "file_1.parquet")
+    )
+
+    rtdataset = RetentionTimeDataset(
+        data_source=hf_dataset,
+        data_format="hf",
+        sequence_column="modified_sequence",
+        label_column="indexed_retention_time",
+    )
+    assert rtdataset.hf_dataset is not None
+    assert rtdataset._empty_dataset_mode is False
+    assert RetentionTimeDataset.DEFAULT_SPLIT_NAMES[0] in list(
+        rtdataset.hf_dataset.keys()
+    )
+
+    assert rtdataset[RetentionTimeDataset.DEFAULT_SPLIT_NAMES[0]].num_rows > 0
+
+
+def test_rtdataset_hub():
+    rtdataset = RetentionTimeDataset(
+        data_source=RT_HUB_DATASET_NAME,
+        data_format="hub",
+        sequence_column="modified_sequence",
+        label_column="indexed_retention_time",
+    )
+    assert rtdataset.hf_dataset is not None
+    assert rtdataset._empty_dataset_mode is False
+    assert RetentionTimeDataset.DEFAULT_SPLIT_NAMES[0] in list(
+        rtdataset.hf_dataset.keys()
+    )
+    assert RetentionTimeDataset.DEFAULT_SPLIT_NAMES[1] in list(
+        rtdataset.hf_dataset.keys()
+    )
+    assert RetentionTimeDataset.DEFAULT_SPLIT_NAMES[2] in list(
+        rtdataset.hf_dataset.keys()
+    )
+    assert rtdataset[RetentionTimeDataset.DEFAULT_SPLIT_NAMES[0]].num_rows > 0
+    assert rtdataset[RetentionTimeDataset.DEFAULT_SPLIT_NAMES[1]].num_rows > 0
+    assert rtdataset[RetentionTimeDataset.DEFAULT_SPLIT_NAMES[2]].num_rows > 0
 
 
 def test_csv_rtdataset():
@@ -175,3 +228,87 @@ def test_csv_intensitydataset():
         intensity_dataset[FragmentIonIntensityDataset.DEFAULT_SPLIT_NAMES[1]].num_rows
         > 0
     )
+
+
+def test_nested_model_features():
+    hfdata = Dataset.from_dict(RAW_GENERIC_NESTED_DATA)
+
+    intensity_dataset = FragmentIonIntensityDataset(
+        data_format="hf",
+        data_source=hfdata,
+        sequence_column="seq",
+        label_column="label",
+        model_features=["nested_feature"],
+    )
+
+    assert intensity_dataset.hf_dataset is not None
+    assert intensity_dataset._empty_dataset_mode is False
+
+    example = iter(intensity_dataset.tensor_train_data).next()
+    assert example[0]["nested_feature"].shape == [2, 1, 2]
+
+
+def test_save_dataset():
+    hfdata = Dataset.from_dict(RAW_GENERIC_NESTED_DATA)
+
+    intensity_dataset = FragmentIonIntensityDataset(
+        data_format="hf",
+        data_source=hfdata,
+        sequence_column="seq",
+        label_column="label",
+        model_features=["nested_feature"],
+    )
+
+    save_path = "./test_dataset"
+    intensity_dataset.save_to_disk(save_path)
+    rmtree(save_path)
+
+
+def test_load_dataset():
+    rtdataset = RetentionTimeDataset(
+        data_source=join(DOWNLOAD_PATH_FOR_ASSETS, "file_2.csv"),
+        data_format="csv",
+        sequence_column="sequence",
+        label_column="irt",
+        val_ratio=0.2,
+    )
+
+    save_path = "./test_dataset"
+    rtdataset.save_to_disk(save_path)
+    splits = rtdataset._data_files_available_splits
+
+    loaded_dataset = load_processed_dataset(save_path)
+    assert loaded_dataset._data_files_available_splits == splits
+    assert loaded_dataset.hf_dataset is not None
+    rmtree(save_path)
+
+
+def test_no_split_datasetDict_hf_inmemory():
+    hfdata = Dataset.from_dict(RAW_GENERIC_NESTED_DATA)
+    hf_dataset = DatasetDict({"train": hfdata})
+
+    intensity_dataset = FragmentIonIntensityDataset(
+        data_format="hf",
+        data_source=hf_dataset,
+        sequence_column="seq",
+        label_column="label",
+    )
+
+    assert intensity_dataset.hf_dataset is not None
+    assert intensity_dataset._empty_dataset_mode is False
+    assert FragmentIonIntensityDataset.DEFAULT_SPLIT_NAMES[0] in list(
+        intensity_dataset.hf_dataset.keys()
+    )
+
+    assert (
+        len(
+            intensity_dataset.hf_dataset[
+                FragmentIonIntensityDataset.DEFAULT_SPLIT_NAMES[0]
+            ]
+        )
+        == 2
+    )
+
+    # test saving and loading datasets with config
+
+    # test learning alphabet for train/val and then using it for test with fallback

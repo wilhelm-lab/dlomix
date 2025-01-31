@@ -53,6 +53,9 @@ $ pip install dlomix[quarto]
 - Fragment Ion Intensity Prediction:
     - a multi-output regression problem where the intensity values for fragment ions are predicted given a peptide sequence along with some additional features.
 
+- Peptide Detectability (Pfly) [4]:
+    - a multi-class classification problem where the detectability of a peptide is predicted given the peptide sequence.
+
 
 
 **To-Do**
@@ -65,6 +68,7 @@ Functionality:
 - [X] add residual plots to reporting, possibly other regression analysis tools
 - [X] output reporting results as PDF
 - [X] refactor reporting module to use W&B Report API (Retention Time)
+- [X] add additional detectability task
 - [ ] extend pipeline for different types of models and backbones
 - [ ] extend pipeline to allow for fine-tuning with custom datasets
 
@@ -99,3 +103,7 @@ Robbin Bouwmeester, Ralf Gabriels, Niels Hulstaert, Lennart Martens, Sven Degroe
 bioRxiv 2020.03.28.013003; doi: 10.1101/2020.03.28.013003
 
 [3] Bouwmeester, R., Gabriels, R., Hulstaert, N. et al. DeepLC can predict retention times for peptides that carry as-yet unseen modifications. Nat Methods 18, 1363–1369 (2021). https://doi.org/10.1038/s41592-021-01301-5
+
+[**Detectability - Pfly**]
+
+[4] Abdul-Khalek, N., Picciani, M., Wimmer, R., Overgaard, M. T., Wilhelm, M., & Gregersen Echers, S. (2024). To fly, or not to fly, that is the question: A deep learning model for peptide detectability prediction in mass spectrometry. bioRxiv, 2024-10.
