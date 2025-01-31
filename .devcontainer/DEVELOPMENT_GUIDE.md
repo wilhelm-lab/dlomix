@@ -175,6 +175,12 @@ def test_model_forward_pass():
 
 ### Development Workflow
 
+#### (Optional, but recommended) Pre-commit hooks
+We use some simple pre-commit hooks to ensure consistency in file and code formatting. To use pre-commit hooks:
+- install pre-commit with `pip install pre-commit`
+- add the hooks by running in the root directory of the repo `pre-commit install`
+- If you like, you can manually run the checks after staging but before commiting using `pre-commit run` to run the hooks against youur changes.
+
 1. Create a new branch:
 ```bash
 git checkout -b feature/FEATURE_NAME
