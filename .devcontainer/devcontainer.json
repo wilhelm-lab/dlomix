@@ -1,0 +1,34 @@
+{
+    "name": "DLOmix Dev Container",
+    "build": {
+        "dockerfile": "Dockerfile"
+    },
+    "runArgs": [
+        "--platform=linux/amd64"
+    ],
+    "remoteUser": "root",
+    "containerUser": "root",
+    "workspaceFolder": "/workspaces/dlomix",
+    "workspaceMount": "source=${localWorkspaceFolder},target=/workspaces/dlomix,type=bind,consistency=cached",
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "ms-azuretools.vscode-docker",
+                "eamodio.gitlens",
+                "ms-python.python",
+                "ms-python.black-formatter",
+                "ms-python.vscode-pylance",
+                "tamasfe.even-better-toml",
+                "ms-toolsai.jupyter"
+            ],
+            "settings": {
+                "git.path": "/usr/bin/git",
+                "[python]": {
+                    "python.pythonPath": "/usr/local/bin/python",
+                    "editor.defaultFormatter": "ms-python.black-formatter"
+                }
+            },
+            "postCreateCommand": "pip install -e .[dev]"
+        }
+    }
+}

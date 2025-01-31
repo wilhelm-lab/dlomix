@@ -110,37 +110,14 @@ class PeptideDataset:
         super(PeptideDataset, self).__init__()
         self.__dict__.update(**config.__dict__)
 
-        # self.data_source = data_source
-        # self.val_data_source = val_data_source
-        # self.test_data_source = test_data_source
-
-        # self.data_format = data_format
-
-        # self.sequence_column = sequence_column
-        # self.label_column = label_column
-
-        # self.val_ratio = val_ratio
-        # self.max_seq_len = max_seq_len
-        # self.dataset_type = dataset_type
-        # self.batch_size = batch_size
-        # self.model_features = model_features
-
         # to be kept in the hf dataset, but not returned in the tensor dataset
         if config.dataset_columns_to_keep is None:
             self.dataset_columns_to_keep = []
         else:
             self.dataset_columns_to_keep = config.dataset_columns_to_keep
 
-        # self.features_to_extract = features_to_extract
-        # self.pad = pad
-        # self.padding_value = padding_value
-        # self.alphabet = alphabet
-        # self.with_termini = with_termini
         self.encoding_scheme = EncodingScheme(config.encoding_scheme)
-        # self.processed = processed
-        # self.enable_tf_dataset_cache = enable_tf_dataset_cache
-        # self.disable_cache = disable_cache
-        # self.auto_cleanup_cache = auto_cleanup_cache
+
         self._set_hf_cache_management()
 
         self.extended_alphabet = None
@@ -159,7 +136,6 @@ class PeptideDataset:
             self._test_set_only = False
             self._num_proc = config.num_proc
             self._set_num_proc()
-            # self.batch_processing_size = config.batch_processing_size
 
             self._data_files_available_splits = {}
             self._load_dataset()
@@ -199,25 +175,6 @@ class PeptideDataset:
 
     def _refresh_config(self):
         self._config = DatasetConfig(**self._config.__dict__)
-        #     data_source=self.data_source,
-        #     val_data_source=self.val_data_source,
-        #     test_data_source=self.test_data_source,
-        #     data_format=self.data_format,
-        #     sequence_column=self.sequence_column,
-        #     label_column=self.label_column,
-        #     val_ratio=self.val_ratio,
-        #     max_seq_len=self.max_seq_len,
-        #     dataset_type=self.dataset_type,
-        #     batch_size=self.batch_size,
-        #     model_features=self.model_features,
-        #     dataset_columns_to_keep=self.dataset_columns_to_keep,
-        #     features_to_extract=self.features_to_extract,
-        #     pad=self.pad,
-        #     padding_value=self.padding_value,
-        #     alphabet=self.alphabet,
-        #     encoding_scheme=self.encoding_scheme,
-        #     processed=self.processed,
-        # )
 
         self._config._additional_data.update(
             {
@@ -633,25 +590,6 @@ If you prefer to encode the (amino-acids)+PTM combinations as tokens in the voca
         config_dict.pop("_additional_data")
 
         d = cls(**config_dict)
-        # data_source=config.data_source,
-        # val_data_source=config.val_data_source,
-        # test_data_source=config.test_data_source,
-        # data_format=config.data_format,
-        # sequence_column=config.sequence_column,
-        # label_column=config.label_column,
-        # val_ratio=config.val_ratio,
-        # max_seq_len=config.max_seq_len,
-        # dataset_type=config.dataset_type,
-        # batch_size=config.batch_size,
-        # model_features=config.model_features,
-        # dataset_columns_to_keep=config.dataset_columns_to_keep,
-        # features_to_extract=config.features_to_extract,
-        # pad=config.pad,
-        # padding_value=config.padding_value,
-        # alphabet=config.alphabet,
-        # encoding_scheme=config.encoding_scheme,
-        # processed=config.processed,
-        # )
 
         for k, v in config._additional_data.items():
             setattr(d, k, v)
