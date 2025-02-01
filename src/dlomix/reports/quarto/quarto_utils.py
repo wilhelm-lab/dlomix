@@ -3,6 +3,7 @@ import os
 import re
 from itertools import combinations
 from os.path import join
+from typing import List
 
 import matplotlib.image as mpimg
 import matplotlib.pyplot as plt
@@ -204,15 +205,16 @@ def plot_all_train_val_metrics(output_path, history_dict):
     save_path = join(
         output_path, report_constants_quarto.DEFAULT_LOCAL_PLOTS_DIR, "train_val"
     )
-    metrics_dict = {
-        key: value for key, value in history_dict.items() if "val" not in key
-    }
-    for key in metrics_dict:
+
+    metrics = history_dict.keys()
+    metrics = filter(lambda x: not x.startswith(tuple(["val_", "_", "lr"])), metrics)
+    for key in metrics:
+        print("plotting key: ", key)
         plot_train_vs_val_keras_metric(history_dict, key, save_path)
     return save_path
 
 
-def plot_train_vs_val_keras_metric(history_dict, metric_name, save_path=""):
+def plot_train_vs_val_keras_metric(history_dict, metric_name, save_path):
     """
     Function that creates a basic line plot containing two lines of the same metric during training and validation.
     :param metric_name: name of the metric to plot
@@ -230,9 +232,14 @@ def plot_train_vs_val_keras_metric(history_dict, metric_name, save_path=""):
 
     plt.figure(figsize=(8, 6))
 
+    print("plotting, metric_name: ", metric_name)
+    print("plotting, y_1: ", y_1)
+    print("plotting, y_2: ", y_2)
+    print("plotting, x: ", x)
+
     # Create a basic line plot
-    plt.plot(x, y_1, label="Validation loss", color="blue")
-    plt.plot(x, y_2, label="Training loss", color="orange")
+    plt.plot(x, y_1, label="Training loss", color="blue")
+    plt.plot(x, y_2, label="Validation loss", color="orange")
 
     # Add labels and title
     plt.xlabel("Epoch")
@@ -288,3 +295,12 @@ def create_plot_image(path, n_cols=2):
     plt.savefig(save_path, bbox_inches="tight")
     plt.clf()
     return save_path
+
+
+def join_parsed_sequences(sequences: List[List[str]]) -> List[str]:
+    """
+    Function to join the sequences in the list of lists to a single list of strings.
+    :param sequences: list of lists of strings
+    :return: list of strings
+    """
+    return ["".join(seq) for seq in sequences]

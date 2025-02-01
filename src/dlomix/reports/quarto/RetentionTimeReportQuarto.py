@@ -115,29 +115,31 @@ class RetentionTimeReportQuarto:
 
         if self.data is not None:
             data_plots_path = self.plot_all_data_plots()
+            relative_data_images_path = data_plots_path.split(self.output_path)[-1]
+
             qmd.insert_section_block(
                 section_title="Data", section_text=report_constants_quarto.DATA_SECTION
             )
             qmd.insert_image(
-                image_path=f"{data_plots_path}/Peptide length.png",
+                image_path=f"{relative_data_images_path}/peptide_length.png",
                 caption="Histogram of peptide length distribution",
                 cross_reference_id="fig-pep_len",
                 page_break=True,
             )
             qmd.insert_image(
-                image_path=f"{data_plots_path}/Indexed retention time.png",
+                image_path=f"{relative_data_images_path}/indexed_retention_time.png",
                 caption="Histogram of indexed retention time distribution",
                 cross_reference_id="fig-irt",
                 page_break=True,
             )
             qmd.insert_image(
-                image_path=f"{data_plots_path}/rt_dist.png",
+                image_path=f"{relative_data_images_path}/rt_dist.png",
                 caption="Density of retention time per peptide length",
                 cross_reference_id="fig-rt_dist",
                 page_break=True,
             )
             qmd.insert_image(
-                image_path=f"{data_plots_path}/levenshtein.png",
+                image_path=f"{relative_data_images_path}/levenshtein.png",
                 caption="Density of levenshtein distance sequence similarity per peptide length",
                 cross_reference_id="fig-levenshtein",
                 page_break=True,
@@ -148,12 +150,15 @@ class RetentionTimeReportQuarto:
                 self.output_path, self._history_dict
             )
             train_image_path = quarto_utils.create_plot_image(train_plots_path)
+            relative_train_section_images_path = train_image_path.split(
+                self.output_path
+            )[-1]
             qmd.insert_section_block(
                 section_title="Train metrics per epoch",
                 section_text=report_constants_quarto.TRAIN_SECTION,
             )
             qmd.insert_image(
-                image_path=train_image_path,
+                image_path=relative_train_section_images_path,
                 caption="Plots of all metrics logged during training",
                 page_break=True,
             )
@@ -163,12 +168,15 @@ class RetentionTimeReportQuarto:
                 self.output_path, self._history_dict
             )
             val_image_path = quarto_utils.create_plot_image(val_plots_path)
+            relative_val_section_images_path = val_image_path.split(self.output_path)[
+                -1
+            ]
             qmd.insert_section_block(
                 section_title="Validation metrics per epoch",
                 section_text=report_constants_quarto.VAL_SECTION,
             )
             qmd.insert_image(
-                image_path=val_image_path,
+                image_path=relative_val_section_images_path,
                 caption="Plots of all metrics logged during validation",
                 page_break=True,
             )
@@ -176,27 +184,38 @@ class RetentionTimeReportQuarto:
         train_val_plots_path = quarto_utils.plot_all_train_val_metrics(
             self.output_path, self._history_dict
         )
+
         train_val_image_path = quarto_utils.create_plot_image(train_val_plots_path)
+        relative_train_val_section_images_path = train_val_image_path.split(
+            self.output_path
+        )[-1]
         qmd.insert_section_block(
             section_title="Train-Validation metrics per epoch",
             section_text=report_constants_quarto.TRAIN_VAL_SECTION,
         )
         qmd.insert_image(
-            image_path=train_val_image_path,
+            image_path=relative_train_val_section_images_path,
             caption="Plots of training metrics in comparison with validation metrics",
             page_break=True,
         )
 
-        if self.test_targets is not None and predictions is not None:
+        if self.test_targets is not None and self.predictions is not None:
             residuals_plot_path = self.plot_residuals()
+            relative_residual_plot_path = residuals_plot_path.split(self.output_path)[
+                -1
+            ]
+
             density_plot_path = self.plot_density()
+            relative_density_plot_path = density_plot_path.split(self.output_path)[-1]
             r2 = self.calculate_r2(self.test_targets, self.predictions)
             qmd.insert_section_block(
                 section_title="Residuals",
                 section_text=report_constants_quarto.RESIDUALS_SECTION,
             )
             qmd.insert_image(
-                image_path=residuals_plot_path, caption="Residual plot", page_break=True
+                image_path=relative_residual_plot_path,
+                caption="Residual plot",
+                page_break=True,
             )
 
             qmd.insert_section_block(
@@ -204,7 +223,9 @@ class RetentionTimeReportQuarto:
                 section_text=report_constants_quarto.DENSITY_SECTION,
             )
             qmd.insert_image(
-                image_path=density_plot_path, caption="Density plot", page_break=True
+                image_path=relative_density_plot_path,
+                caption="Density plot",
+                page_break=True,
             )
 
             r2_text = report_constants_quarto.R2_SECTION.replace(
@@ -223,9 +244,10 @@ class RetentionTimeReportQuarto:
         :param save_path: string where to save the plot
         """
 
-        train_data_sequences = self.data["train"][
-            SequenceParsingProcessor.PARSED_COL_NAMES["seq"]
-        ]
+        train_data_sequences = quarto_utils.join_parsed_sequences(
+            self.data["train"][SequenceParsingProcessor.PARSED_COL_NAMES["seq"]]
+        )
+
         train_data_labels = self.data["train"][self.data.label_column]
 
         df = pd.DataFrame(train_data_sequences, columns=["seq"])
@@ -255,7 +277,7 @@ class RetentionTimeReportQuarto:
         plt.savefig(f"{save_path}/rt_dist.png", bbox_inches="tight")
         plt.clf()
 
-    def plot_histogram(self, x, label="numeric variable", bins=10, save_path=""):
+    def plot_histogram(self, x, label="numeric_variable", bins=10, save_path=""):
         """
         Function to create and save a histogram
         :param x: x variable of histogram
@@ -281,9 +303,10 @@ class RetentionTimeReportQuarto:
             self.output_path, report_constants_quarto.DEFAULT_LOCAL_PLOTS_DIR, "data"
         )
         if "train" in self.data.keys():
-            train_data_sequences = self.data["train"][
-                SequenceParsingProcessor.PARSED_COL_NAMES["seq"]
-            ]
+            train_data_sequences = quarto_utils.join_parsed_sequences(
+                self.data["train"][SequenceParsingProcessor.PARSED_COL_NAMES["seq"]]
+            )
+
             train_data_labels = self.data["train"][self.data.label_column]
         else:
             raise ValueError(
@@ -295,12 +318,12 @@ class RetentionTimeReportQuarto:
         vek_len = np.vectorize(len)
         seq_lens = vek_len(train_data_sequences)
 
-        self.plot_histogram(x=seq_lens, label="Peptide length", save_path=save_path)
+        self.plot_histogram(x=seq_lens, label="peptide_length", save_path=save_path)
 
         # plot irt histogram
         self.plot_histogram(
             x=train_data_labels,
-            label="Indexed retention time",
+            label="indexed_retention_time",
             bins=30,
             save_path=save_path,
         )
@@ -318,7 +341,7 @@ class RetentionTimeReportQuarto:
         )
         file_name = "Residuals.png"
         error = np.ravel(self.test_targets) - np.ravel(self.predictions)
-        self.plot_histogram(x=error, label="Residuals", bins=100, save_path=save_path)
+        self.plot_histogram(x=error, label="residuals", bins=100, save_path=save_path)
         image_path = join(save_path, file_name)
         return image_path
 
