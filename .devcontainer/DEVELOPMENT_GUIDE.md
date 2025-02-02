@@ -4,9 +4,11 @@ This file provides guidelines for contributing PyTorch implementations to the dl
 
 Based on your environment, please follow the respective setup guide:
 
-- [Dev Containers in VSCode](#dev-containers-in-vscode)
-- [Local Development Guide](#local-development-guide)
-- [Google Colab Development Guide](#google-colab-development-guide)
+- [Dev Containers in VSCode](#dev-containers-in-vscode): Recommended if you would like to isolate everything in a Docker container. If you have Apple Silicon, local development would be a better option.
+- [Local Development Guide](#local-development-guide): Recommended if you have good command of your Python virtual environments, dependencies, etc..
+- [Google Colab Development Guide](#google-colab-development-guide): More explorative and would not provide full control on the development environment (temrinal, etc..)
+
+Other options: GitHub Codespaces or similar, please follow the local development guide.
 
 For contributing, please follow our [implementation guidelines](#implementation-guidelines)
 
@@ -219,3 +221,21 @@ make format
 2. Model Architecture:
    - Closely mimic the existing Keras implementations or the original implementations of papers
    - Maintain similar model inputs and outputs (datatype, shape, etc..)
+
+### Resources
+
+#### PyTorch
+- PyTorch Installation https://pytorch.org/get-started/locally/
+- PyTorch Documentation, please always ensure  you have the right version on the top left corner https://pytorch.org/docs/stable/index.html
+
+### Keras and TensorFlow
+- TensorFlow API Documentation 2.15 (Version 2.16 introduced some breaking changes with respect to Keras) https://www.tensorflow.org/versions/r2.15/api_docs/python/tf
+- TensorFlow Keras Guide https://www.tensorflow.org/guide/keras
+
+### HuggingFace Datasets
+
+- PROSPECT PTMs is available on HuggingFace for Retention time, Fragment ion intensity, and Charge state prediction https://huggingface.co/collections/Wilhelmlab/prospect-ptms-665db48431a7e844634660ba
+
+
+### Python Environments
+- If you like to use conda, try out miniforge https://github.com/conda-forge/miniforge
