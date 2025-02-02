@@ -101,12 +101,14 @@ class IntensityReportQuarto:
         if self.test_data is not None and self.train_data is not None:
             data_plots_path = self.plot_all_data_plots()
 
-            train_data_sequences = self.train_data["train"][
-                SequenceParsingProcessor.PARSED_COL_NAMES["seq"]
-            ]
-            test_data_sequences = self.test_data["test"][
-                SequenceParsingProcessor.PARSED_COL_NAMES["seq"]
-            ]
+            train_data_sequences = quarto_utils.join_parsed_sequences(
+                self.train_data["train"][
+                    SequenceParsingProcessor.PARSED_COL_NAMES["seq"]
+                ]
+            )
+            test_data_sequences = quarto_utils.join_parsed_sequences(
+                self.test_data["test"][SequenceParsingProcessor.PARSED_COL_NAMES["seq"]]
+            )
 
             dataset = ["Train", "Test"]
             peptides = [
@@ -127,8 +129,9 @@ class IntensityReportQuarto:
             qmd.insert_table_from_df(
                 df, "Information on the used data", cross_reference_id="tbl-data"
             )
+            relative_levenshtein_plot_path = data_plots_path.split(self.output_path)[-1]
             qmd.insert_image(
-                image_path=f"{data_plots_path}/levenshtein.png",
+                image_path=f"{relative_levenshtein_plot_path}/levenshtein.png",
                 caption="Density of levenshtein distance sequence similarity per peptide length",
                 cross_reference_id="fig-levenshtein",
                 page_break=True,
@@ -150,8 +153,12 @@ class IntensityReportQuarto:
                 section_title="Train metrics per epoch",
                 section_text=report_constants_quarto.TRAIN_SECTION,
             )
+
+            relative_train_image_plot_path = train_image_path.split(self.output_path)[
+                -1
+            ]
             qmd.insert_image(
-                image_path=train_image_path,
+                image_path=relative_train_image_plot_path,
                 caption="Plots of all metrics logged during training",
                 page_break=True,
             )
@@ -165,8 +172,10 @@ class IntensityReportQuarto:
                 section_title="Validation metrics per epoch",
                 section_text=report_constants_quarto.VAL_SECTION,
             )
+
+            relative_val_image_plot_path = val_image_path.split(self.output_path)[-1]
             qmd.insert_image(
-                image_path=val_image_path,
+                image_path=relative_val_image_plot_path,
                 caption="Plots of all metrics logged during validation",
                 page_break=True,
             )
@@ -179,8 +188,12 @@ class IntensityReportQuarto:
             section_title="Train-Validation metrics per epoch",
             section_text=report_constants_quarto.TRAIN_VAL_SECTION,
         )
+
+        relative_train_val_image_plot_path = train_val_image_path.split(
+            self.output_path
+        )[-1]
         qmd.insert_image(
-            image_path=train_val_image_path,
+            image_path=relative_train_val_image_plot_path,
             caption="Plots of training metrics in comparison with validation metrics",
             page_break=True,
         )
@@ -198,23 +211,31 @@ class IntensityReportQuarto:
             section_title="Spectral angle plots",
             section_text=report_constants_quarto.SPECTRAL_ANGLE_SECTION,
         )
+
+        relative_violin_plot_path = violin_plot.split(self.output_path)[-1]
         qmd.insert_image(
-            image_path=violin_plot,
+            image_path=relative_violin_plot_path,
             caption="Violin plot of spectral angle",
             page_break=True,
         )
+
+        relative_violin_plot_pc_path = violin_plot_pc.split(self.output_path)[-1]
         qmd.insert_image(
-            image_path=violin_plot_pc,
+            image_path=relative_violin_plot_pc_path,
             caption="Violin plot of spectral angle faceted by precursor charge",
             page_break=True,
         )
+
+        relative_violin_plot_ce_path = violin_plot_ce.split(self.output_path)[-1]
         qmd.insert_image(
-            image_path=violin_plot_ce,
+            image_path=relative_violin_plot_ce_path,
             caption="Violin plot of spectral angle faceted by collision energy",
             page_break=True,
         )
+
+        relative_violin_plot_pl_path = violin_plot_pl.split(self.output_path)[-1]
         qmd.insert_image(
-            image_path=violin_plot_pl,
+            image_path=relative_violin_plot_pl_path,
             caption="Violin plot of spectral angle faceted by peptide length",
             page_break=True,
         )
