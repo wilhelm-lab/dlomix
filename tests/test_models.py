@@ -2,7 +2,13 @@ import logging
 
 import pytest
 
-from dlomix.models import PrositIntensityPredictor, PrositRetentionTimePredictor
+from dlomix.models import (
+    ChargeStateDistributionPredictor,
+    DominantChargeStatePredictor,
+    ObservedChargeStatePredictor,
+    PrositIntensityPredictor,
+    PrositRetentionTimePredictor,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -118,3 +124,21 @@ def test_prosit_intensity_model_encoding_metadata_missing():
                 # no meta-data while expected
             }
         )
+
+
+def test_dominant_chargestate_model():
+    model = DominantChargeStatePredictor()
+    logger.info(model)
+    assert model is not None
+
+
+def test_observed_chargestate_model():
+    model = ObservedChargeStatePredictor()
+    logger.info(model)
+    assert model is not None
+
+
+def test_chargestate_distribution_model():
+    model = ChargeStateDistributionPredictor()
+    logger.info(model)
+    assert model is not None

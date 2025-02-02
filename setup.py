@@ -22,6 +22,7 @@ setuptools.setup(
     package_data={"": ["data/processing/pickled_feature_dicts/*"]},
     install_requires=[
         "datasets",
+        "huggingface_hub",
         "fpdf",
         "pandas",
         "numpy",
