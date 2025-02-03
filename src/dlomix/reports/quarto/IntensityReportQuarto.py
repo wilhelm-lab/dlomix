@@ -16,6 +16,8 @@ from .QMDFile import QMDFile
 
 
 class IntensityReportQuarto:
+    PREDICTIONS_COL_NAME = "intensities_pred"
+
     def __init__(
         self,
         history,
@@ -200,10 +202,15 @@ class IntensityReportQuarto:
 
         results_df = self.generate_prediction_df()
         violin_plot = self.plot_spectral_angle(results_df)
-        violin_plot_pc = self.plot_spectral_angle(results_df, facet="precursor_charge")
-        violin_plot_ce = self.plot_spectral_angle(results_df, facet="collision_energy")
+        violin_plot_pc = self.plot_spectral_angle(
+            results_df, facet=self.precursor_charge_column_name
+        )
+        violin_plot_ce = self.plot_spectral_angle(
+            results_df, facet=self.collision_energy_column_name
+        )
+
         results_df["unmod_seq"] = quarto_utils.internal_without_mods(
-            results_df["sequences"]
+            results_df[SequenceParsingProcessor.PARSED_COL_NAMES["seq"]]
         )
         results_df["peptide_length"] = results_df["unmod_seq"].str.len()
         violin_plot_pl = self.plot_spectral_angle(results_df, facet="peptide_length")
@@ -250,94 +257,76 @@ class IntensityReportQuarto:
         :return: dataframe
         """
 
-        train_data_sequences = self.train_data["train"][
-            SequenceParsingProcessor.PARSED_COL_NAMES["seq"]
-        ]
-        train_data_labels = self.train_data["train"][self.train_data.label_column]
-
-        test_data_sequences = self.test_data["test"][
-            SequenceParsingProcessor.PARSED_COL_NAMES["seq"]
-        ]
-        test_data_labels = self.test_data["test"][self.test_data.label_column]
-
-        test_data_precursor_charge = self.test_data["test"][
-            self.precursor_charge_column_name
-        ]
-        test_data_collision_energy = self.test_data["test"][
-            self.collision_energy_column_name
-        ]
-
-        predictions_df_test = pd.DataFrame()
-        predictions_df_test["sequences"] = test_data_sequences
-        predictions_test = self.model.predict(self.test_data.tensor_test_data)
-        predictions_df_test["intensities_pred"] = predictions_test.tolist()
-        predictions_df_test["precursor_charge"] = (
-            np.argmax(test_data_precursor_charge, axis=1) + 1
+        predictions_df_val = (
+            self.train_data["val"]
+            .select_columns(
+                [
+                    SequenceParsingProcessor.PARSED_COL_NAMES["seq"],
+                    self.train_data.label_column,
+                    *self.train_data.model_features,
+                ]
+            )
+            .to_pandas()
         )
-        predictions_df_test["precursor_charge_onehot"] = test_data_precursor_charge
-        predictions_df_test["collision_energy"] = test_data_collision_energy
-        predictions_df_test["intensities_raw"] = test_data_labels
+
+        predictions_val = self.model.predict(self.train_data.tensor_val_data)
+        predictions_df_val[
+            IntensityReportQuarto.PREDICTIONS_COL_NAME
+        ] = predictions_val.tolist()
+        predictions_df_val.loc[
+            :, self.precursor_charge_column_name
+        ] = predictions_df_val[self.precursor_charge_column_name].apply(
+            lambda x: np.argmax(x) + 1
+        )
+        predictions_df_val.loc[
+            :, SequenceParsingProcessor.PARSED_COL_NAMES["seq"]
+        ] = quarto_utils.join_parsed_sequences(
+            predictions_df_val[SequenceParsingProcessor.PARSED_COL_NAMES["seq"]].values
+        )
+
+        predictions_df_val["set"] = "val"
+
+        predictions_df_test = (
+            self.test_data["test"]
+            .select_columns(
+                [
+                    SequenceParsingProcessor.PARSED_COL_NAMES["seq"],
+                    self.test_data.label_column,
+                    *self.test_data.model_features,
+                ]
+            )
+            .to_pandas()
+        )
+
+        predictions_test = self.model.predict(self.test_data.tensor_test_data)
+        predictions_df_test[
+            IntensityReportQuarto.PREDICTIONS_COL_NAME
+        ] = predictions_test.tolist()
+        predictions_df_test.loc[
+            :, self.precursor_charge_column_name
+        ] = predictions_df_test[self.precursor_charge_column_name].apply(
+            lambda x: np.argmax(x) + 1
+        )
+        predictions_df_test.loc[
+            :, SequenceParsingProcessor.PARSED_COL_NAMES["seq"]
+        ] = quarto_utils.join_parsed_sequences(
+            predictions_df_test[SequenceParsingProcessor.PARSED_COL_NAMES["seq"]].values
+        )
         predictions_df_test["set"] = "test"
 
-        l = []
-        for a in self.train_data.val_data.take(-1):
-            for b in a:
-                l.append(b)
-
-        seqs = []
-        for sequences in l[::2]:
-            seqs.append(sequences.get("sequence").numpy().astype(str))
-
-        result_seqs = []
-        for arr in seqs:
-            for row in arr:
-                # Convert row elements to strings
-                row_str = np.char.decode(row.astype("|S"), "utf-8")
-
-                # Concatenate characters into a single string and remove whitespace
-                result_string = "".join(row_str).replace(" ", "")
-
-                # Append the result to the list
-                result_seqs.append(result_string)
-
-        ce = []
-        for sequences in l[::2]:
-            ce.append(sequences.get("collision_energy").numpy())
-
-        result_ce = [item for array in ce for item in array.tolist()]
-        result_ce = [item for sublist in result_ce for item in sublist]
-
-        pc = []
-        for sequences in l[::2]:
-            pc.append(sequences.get("precursor_charge").numpy())
-        pc_one_hot = np.concatenate(pc).tolist()
-        pc = np.argmax(pc_one_hot, axis=1) + 1
-        result_pc = pc.tolist()
-
-        int = []
-        for intensities in l[1::2]:
-            int.append(intensities.numpy())
-        result_int = np.concatenate(int).tolist()
-
-        predictions_df_val = pd.DataFrame(
-            {
-                "sequences": result_seqs,
-                "precursor_charge": result_pc,
-                "collision_energy": result_ce,
-                "intensities_raw": result_int,
-                "precursor_charge_onehot": pc_one_hot,
-            }
-        )
-        predictions_df_val["set"] = "val"
-        predictions_val = self.model.predict(self.train_data.val_data)
-        predictions_df_val["intensities_pred"] = predictions_val.tolist()
-        pd.set_option("display.max_columns", None)
         predictions_df = pd.concat(
             [predictions_df_test, predictions_df_val], ignore_index=True
         )
+
         predictions_acc = normalize_intensity_predictions(
-            predictions_df, self.test_data.batch_size
+            predictions_df,
+            sequence_column_name=SequenceParsingProcessor.PARSED_COL_NAMES["seq"],
+            labels_column_name=self.train_data.label_column,
+            predictions_column_name=IntensityReportQuarto.PREDICTIONS_COL_NAME,
+            precursor_charge_column_name=self.precursor_charge_column_name,
         )
+
+        pd.set_option("display.max_columns", None)
 
         return predictions_acc
 
@@ -347,9 +336,9 @@ class IntensityReportQuarto:
         :return: string path of where the plots are saved
         """
 
-        test_data_sequences = self.test_data["test"][
-            SequenceParsingProcessor.PARSED_COL_NAMES["seq"]
-        ]
+        test_data_sequences = quarto_utils.join_parsed_sequences(
+            self.test_data["test"][SequenceParsingProcessor.PARSED_COL_NAMES["seq"]]
+        )
 
         save_path = join(
             self.output_path, report_constants_quarto.DEFAULT_LOCAL_PLOTS_DIR, "data"
@@ -407,6 +396,7 @@ class IntensityReportQuarto:
         :param facet: String to facet the plot on
         :return: string path of image containing the plots
         """
+
         plt.figure(figsize=(8, 6))
         violin_plot = sns.violinplot(
             data=predictions_df,

@@ -71,7 +71,7 @@ d_test = FragmentIonIntensityDataset(
 test_targets = d_test["test"]["intensities_raw"]
 test_sequences = d_test["test"]["modified_sequence"]
 
-predictions = model.predict(test_sequences)
+predictions = model.predict(d_test.tensor_test_data)
 predictions = predictions.ravel()
 
 print(predictions.shape)
@@ -87,7 +87,7 @@ report = IntensityReportQuarto(
     val_section=False,
     output_path="./run_scripts/output/intensity_quarto_report",
     precursor_charge_column_name="precursor_charge_onehot",
-    collision_energy_column_name="collision_energy",
+    collision_energy_column_name="collision_energy_aligned_normed",
 )
 
 report.generate_report("int_quarto_report.qmd")

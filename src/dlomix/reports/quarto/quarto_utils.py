@@ -209,7 +209,6 @@ def plot_all_train_val_metrics(output_path, history_dict):
     metrics = history_dict.keys()
     metrics = filter(lambda x: not x.startswith(tuple(["val_", "_", "lr"])), metrics)
     for key in metrics:
-        print("plotting key: ", key)
         plot_train_vs_val_keras_metric(history_dict, key, save_path)
     return save_path
 
@@ -231,11 +230,6 @@ def plot_train_vs_val_keras_metric(history_dict, metric_name, save_path):
     x = range(1, len(y_1) + 1)
 
     plt.figure(figsize=(8, 6))
-
-    print("plotting, metric_name: ", metric_name)
-    print("plotting, y_1: ", y_1)
-    print("plotting, y_2: ", y_2)
-    print("plotting, x: ", x)
 
     # Create a basic line plot
     plt.plot(x, y_1, label="Training loss", color="blue")

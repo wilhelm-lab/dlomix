@@ -85,7 +85,7 @@ report = RetentionTimeReportQuarto(
     fold_code=True,
     train_section=False,
     val_section=False,
-    output_path="./run_scripts/output",
+    output_path="./run_scripts/output/rt",
 )
 
 report.generate_report("rt_quarto_report.qmd")
