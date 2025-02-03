@@ -247,8 +247,15 @@ class IntensityReportQuarto:
             page_break=True,
         )
         qmd.write_qmd_file(f"{self.output_path}/{qmd_report_filename}")
+
         print(
-            f"File Saved to disk under: {self.output_path}.\nUse Quarto to render the report by running:\n\nquarto render {self.output_path}/{qmd_report_filename} --to pdf"
+            f"""
+------------------------------------------------
+File Saved to disk under: {self.output_path}.
+Use Quarto to render the report by running:
+$ quarto render {self.output_path}/{qmd_report_filename} --to pdf
+------------------------------------------------
+"""
         )
 
     def generate_prediction_df(self):
