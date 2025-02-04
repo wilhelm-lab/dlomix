@@ -170,7 +170,6 @@ run_scripts/*.csv
 run_scripts/*.pkl
 run_scripts/output/
 
-
 # test assets (will be downloaded the first time tests are run and then ignore by git)
 assets/
 
