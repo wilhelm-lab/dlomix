@@ -1,7 +1,8 @@
+import tensorflow as tf
 from keras import backend as K
 
 
-def adjusted_mean_absolute_error(y_true, y_pred):
+def adjusted_mean_absolute_error(y_true: tf.Tensor, y_pred: tf.Tensor) -> tf.Tensor:
     """
     Used as an evaluation metric for charge state prediction.
 
@@ -32,7 +33,7 @@ def adjusted_mean_absolute_error(y_true, y_pred):
     return mean_absolute_error
 
 
-def adjusted_mean_squared_error(y_true, y_pred):
+def adjusted_mean_squared_error(y_true: tf.Tensor, y_pred: tf.Tensor) -> tf.Tensor:
     """
     For two vectors, discard those components that
     are 0 in both vectors and compute the mean
