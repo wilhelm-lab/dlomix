@@ -401,7 +401,7 @@ class PrositTransformerIntensityPredictor(tf.keras.Model):
         self.embeddings_count = len(vocab_dict) + 2
         self.max_ion = seq_length - 1
         self.pos_embedding = PositionalEmbedding(
-            self.embeddings_count, 64
+            self.embeddings_count, 32
         )
         self.meta_encoder = MetaEncoder(
             32, dropout_rate
