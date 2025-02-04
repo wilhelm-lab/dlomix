@@ -100,10 +100,11 @@ def delta95_metric(y_true, y_pred):
     )
     abs_error = K.abs(y_true - y_pred)
     delta = tf.sort(abs_error)[mark95 - 1]
-    norm_range = K.max(y_true) - K.min(y_true)
+    norm_range = K.max(y_true) - K.min(y_true)  # ! different from self.batch_count
     return (delta * 2) / (norm_range)
 
 
+# ! not yet used in this repository
 def TimeDeltaMetric2():
     """
     The 95th percentile of absolute error between label and prediction
