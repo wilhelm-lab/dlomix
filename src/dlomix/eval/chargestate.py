@@ -1,7 +1,11 @@
-from keras import backend as K
+import tensorflow as tf
+
+from dlomix.eval import tf as tf_eval
+from dlomix.eval import torch as torch_eval
+from dlomix.types import Tensor
 
 
-def adjusted_mean_absolute_error(y_true, y_pred):
+def adjusted_mean_absolute_error(y_true: Tensor, y_pred: Tensor) -> Tensor:
     """
     Used as an evaluation metric for charge state prediction.
 
@@ -9,53 +13,45 @@ def adjusted_mean_absolute_error(y_true, y_pred):
     are 0 in both vectors and compute the mean
     absolute error for the adjusted vector.
     """
-    # Convert y_true and y_pred to float tensors
-    y_true = K.cast(y_true, dtype="float32")
-    y_pred = K.cast(y_pred, dtype="float32")
-
-    # Create a mask for elements that are not both zero
-    mask = K.cast(K.not_equal(y_true + y_pred, 0.0), dtype="float32")
-
-    # Apply mask to both y_true and y_pred
-    y_true_adjusted = y_true * mask
-    y_pred_adjusted = y_pred * mask
-
-    # Compute the mean absolute error
-    absolute_errors = K.abs(y_true_adjusted - y_pred_adjusted)
-    sum_absolute_errors = K.sum(absolute_errors)
-    count_non_zero = K.sum(mask)
-
-    # Avoid division by zero by adding a small epsilon to the denominator
-    epsilon = K.epsilon()
-    mean_absolute_error = sum_absolute_errors / (count_non_zero + epsilon)
-
-    return mean_absolute_error
+    if isinstance(y_true, tf.Tensor):
+        ret = tf_eval.chargestate.adjusted_mean_absolute_error(y_true, y_pred)
+    else:
+        ret = torch_eval.chargestate.adjusted_mean_absolute_error(y_true, y_pred)
+    return ret
 
 
-def adjusted_mean_squared_error(y_true, y_pred):
+def adjusted_mean_squared_error(y_true: Tensor, y_pred: Tensor) -> Tensor:
     """
     For two vectors, discard those components that
     are 0 in both vectors and compute the mean
     squared error for the adjusted vector.
     """
-    # Convert y_true and y_pred to float tensors
-    y_true = K.cast(y_true, dtype="float32")
-    y_pred = K.cast(y_pred, dtype="float32")
+    if isinstance(y_true, tf.Tensor):
+        ret = tf_eval.chargestate.adjusted_mean_squared_error(y_true, y_pred)
+    else:
+        ret = torch_eval.chargestate.adjusted_mean_squared_error(y_true, y_pred)
+    return ret
 
-    # Create a mask for elements that are not both zero
-    mask = K.cast(K.not_equal(y_true + y_pred, 0.0), dtype="float32")
 
-    # Apply mask to both y_true and y_pred
-    y_true_adjusted = y_true * mask
-    y_pred_adjusted = y_pred * mask
+if __name__ == "__main__":
+    import os
 
-    # Compute the mean squared error
-    squared_errors = K.square(y_true_adjusted - y_pred_adjusted)
-    sum_squared_errors = K.sum(squared_errors)
-    count_non_zero = K.sum(mask)
+    os.chdir("./..")
+    import numpy as np
+    import torch
 
-    # Avoid division by zero by adding a small epsilon to the denominator
-    epsilon = K.epsilon()
-    mean_squared_error = sum_squared_errors / (count_non_zero + epsilon)
+    y_true = [0, 1, 2, 2, 0, 0, 0, 0]
+    y_pred = [0, 3, 0, 4, 0, 0, 2, 0]
 
-    return mean_squared_error
+    # y_true = K.constant(y_true, dtype="float32")
+    # y_pred = K.constant(y_pred, dtype="float32")
+
+    y_true = torch.tensor(data=y_true, dtype=torch.float32)
+    y_pred = torch.tensor([y_pred], dtype=torch.float32)
+
+    mae = adjusted_mean_absolute_error(y_true, y_pred)
+    mse = adjusted_mean_squared_error(y_true, y_pred)
+    assert np.isclose(mae, 2.0)
+    assert np.isclose(mse, 4.0)
+    print(f"Adjusted MAE: {mae:.4f}")
+    print(f"Adjusted MSE: {mse:.4f}")
