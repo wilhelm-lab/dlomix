@@ -54,7 +54,7 @@ class PeptideDataset:
     max_seq_len : int
         Maximum sequence length to pad the sequences to. If set to 0, the sequences will not be padded.
     dataset_type : str
-        Type of the tensor dataset to be generated afterwards. Possible values are "tf" and "pt" for TensorFlow and PyTorch respectively.
+        Type of the tensor dataset to be generated afterwards. Possible values are "tf" and "pt" for TensorFlow and PyTorch, respectively. Fallback is to TensorFlow dataset tensors.
     batch_size : int
         Batch size for the tensor dataset.
     model_features : List[str]
@@ -637,40 +637,59 @@ If you prefer to encode the (amino-acids)+PTM combinations as tokens in the voca
 
     @property
     def tensor_train_data(self):
-        """TensorFlow Dataset object for the training data"""
-        tf_dataset = self._get_split_tf_dataset(PeptideDataset.DEFAULT_SPLIT_NAMES[0])
+        """TensorFlow or Torch Dataset object for the training data"""
+        if self.dataset_type == "pt":
+            return self._get_split_torch_dataset(PeptideDataset.DEFAULT_SPLIT_NAMES[0])
+        else:
+            tf_dataset = self._get_split_tf_dataset(
+                PeptideDataset.DEFAULT_SPLIT_NAMES[0]
+            )
 
-        if self.enable_tf_dataset_cache:
-            tf_dataset = tf_dataset.cache()
+            if self.enable_tf_dataset_cache:
+                tf_dataset = tf_dataset.cache()
 
-        return tf_dataset
+            return tf_dataset
 
     @property
     def tensor_val_data(self):
-        """TensorFlow Dataset object for the val data"""
-        tf_dataset = self._get_split_tf_dataset(PeptideDataset.DEFAULT_SPLIT_NAMES[1])
+        """TensorFlow or Torch Dataset object for the val data"""
+        if self.dataset_type == "pt":
+            return self._get_split_torch_dataset(PeptideDataset.DEFAULT_SPLIT_NAMES[1])
+        else:
+            tf_dataset = self._get_split_tf_dataset(
+                PeptideDataset.DEFAULT_SPLIT_NAMES[1]
+            )
 
-        if self.enable_tf_dataset_cache:
-            tf_dataset = tf_dataset.cache()
+            if self.enable_tf_dataset_cache:
+                tf_dataset = tf_dataset.cache()
 
-        return tf_dataset
+            return tf_dataset
 
     @property
     def tensor_test_data(self):
-        """TensorFlow Dataset object for the test data"""
-        tf_dataset = self._get_split_tf_dataset(PeptideDataset.DEFAULT_SPLIT_NAMES[2])
+        """TensorFlow or Torch Dataset object for the test data"""
+        if self.dataset_type == "pt":
+            return self._get_split_torch_dataset(PeptideDataset.DEFAULT_SPLIT_NAMES[2])
+        else:
+            tf_dataset = self._get_split_tf_dataset(
+                PeptideDataset.DEFAULT_SPLIT_NAMES[2]
+            )
 
-        if self.enable_tf_dataset_cache:
-            tf_dataset = tf_dataset.cache()
+            if self.enable_tf_dataset_cache:
+                tf_dataset = tf_dataset.cache()
 
-        return tf_dataset
+            return tf_dataset
 
-    def _get_split_tf_dataset(self, split_name: str):
+    def _check_if_split_exists(self, split_name: str):
         existing_splits = list(self.hf_dataset.keys())
         if split_name not in existing_splits:
             raise ValueError(
                 f"Split '{split_name}' does not exist in the dataset. Available splits are: {existing_splits}"
             )
+        return True
+
+    def _get_split_tf_dataset(self, split_name: str):
+        self._check_if_split_exists(split_name)
 
         return self.hf_dataset[split_name].to_tf_dataset(
             columns=self._get_input_tensor_column_names(),
@@ -678,6 +697,25 @@ If you prefer to encode the (amino-acids)+PTM combinations as tokens in the voca
             shuffle=False,
             batch_size=self.batch_size,
         )
+
+    def _get_split_torch_dataset(self, split_name: str):
+        self._check_if_split_exists(split_name)
+
+        from torch.utils.data import DataLoader
+
+        data_loader = DataLoader(
+            dataset=self.hf_dataset[split_name].with_format(
+                type="torch",
+                columns=[*self._get_input_tensor_column_names(), self.label_column],
+            ),
+            batch_size=self.batch_size,
+            shuffle=False,
+        )
+
+        return data_loader
+
+
+# ------------------------------------------------------------------------------------------------
 
 
 def load_processed_dataset(path: str):

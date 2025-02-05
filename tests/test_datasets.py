@@ -1,8 +1,5 @@
 import logging
-import urllib.request
-import zipfile
-from os import makedirs
-from os.path import exists, join
+from os.path import join
 from shutil import rmtree
 
 import pytest
@@ -16,57 +13,7 @@ from dlomix.data import (
 
 logger = logging.getLogger(__name__)
 
-RT_PARQUET_EXAMPLE_URL = "https://zenodo.org/record/6602020/files/TUM_missing_first_meta_data.parquet?download=1"
-RT_CSV_EXAMPLE_URL = "https://raw.githubusercontent.com/wilhelm-lab/dlomix/develop/example_dataset/proteomTools_train_val.csv"
-INTENSITY_PARQUET_EXAMPLE_URL = "https://raw.githubusercontent.com/wilhelm-lab/dlomix/develop/example_dataset/intensity/intensity_data.parquet"
-INTENSITY_CSV_EXAMPLE_URL = "https://raw.githubusercontent.com/wilhelm-lab/dlomix/develop/example_dataset/intensity/intensity_data.csv"
 RT_HUB_DATASET_NAME = "Wilhelmlab/prospect-ptms-irt"
-
-RAW_GENERIC_NESTED_DATA = {
-    "seq": ["[UNIMOD:737]-DASAQTTSHELTIPN-[]", "[UNIMOD:737]-DLHTGRLC[UNIMOD:4]-[]"],
-    "nested_feature": [[[30, 64]], [[25, 35]]],
-    "label": [0.1, 0.2],
-}
-
-TEST_ASSETS_TO_DOWNLOAD = [
-    RT_PARQUET_EXAMPLE_URL,
-    RT_CSV_EXAMPLE_URL,
-    INTENSITY_PARQUET_EXAMPLE_URL,
-    INTENSITY_CSV_EXAMPLE_URL,
-]
-DOWNLOAD_PATH_FOR_ASSETS = join("tests", "assets")
-
-
-def unzip_file(zip_file_path, dest_dir):
-    with zipfile.ZipFile(zip_file_path, "r") as f:
-        f.extractall(dest_dir)
-
-
-@pytest.fixture(scope="session", autouse=True)
-def download_assets():
-    makedirs(DOWNLOAD_PATH_FOR_ASSETS, exist_ok=True)
-    for i, http_address in enumerate(TEST_ASSETS_TO_DOWNLOAD, start=1):
-        filename = f"file_{i}"
-        filepath = join(DOWNLOAD_PATH_FOR_ASSETS, filename)
-        if ".parquet" in http_address:
-            filepath += ".parquet"
-        if ".csv" in http_address:
-            filepath += ".csv"
-        if ".zip" in http_address:
-            filepath += ".zip"
-        if exists(filepath):
-            logger.info(
-                "Skipping {} since it exists at {}".format(http_address, filepath)
-            )
-            continue
-        logger.info("Downloading: {}, to: {}".format(http_address, filepath))
-        urllib.request.urlretrieve(http_address, filepath)
-        if ".zip" in filepath:
-            logger.info(
-                "Unzipping: {}, to: {}".format(filepath, DOWNLOAD_PATH_FOR_ASSETS)
-            )
-            unzip_file(filepath, DOWNLOAD_PATH_FOR_ASSETS)
-    return True
 
 
 def test_empty_rtdataset():
@@ -77,7 +24,9 @@ def test_empty_rtdataset():
 
 def test_parquet_rtdataset():
     rtdataset = RetentionTimeDataset(
-        data_source=join(DOWNLOAD_PATH_FOR_ASSETS, "file_1.parquet"),
+        data_source=join(
+            pytest.global_variables["DOWNLOAD_PATH_FOR_ASSETS"], "file_1.parquet"
+        ),
         sequence_column="modified_sequence",
         label_column="indexed_retention_time",
     )
@@ -98,7 +47,10 @@ def test_parquet_rtdataset():
 
 def test_rtdataset_inmemory():
     hf_dataset = load_dataset(
-        "parquet", data_files=join(DOWNLOAD_PATH_FOR_ASSETS, "file_1.parquet")
+        "parquet",
+        data_files=join(
+            pytest.global_variables["DOWNLOAD_PATH_FOR_ASSETS"], "file_1.parquet"
+        ),
     )
 
     rtdataset = RetentionTimeDataset(
@@ -141,7 +93,9 @@ def test_rtdataset_hub():
 
 def test_csv_rtdataset():
     rtdataset = RetentionTimeDataset(
-        data_source=join(DOWNLOAD_PATH_FOR_ASSETS, "file_2.csv"),
+        data_source=join(
+            pytest.global_variables["DOWNLOAD_PATH_FOR_ASSETS"], "file_2.csv"
+        ),
         data_format="csv",
         sequence_column="sequence",
         label_column="irt",
@@ -170,7 +124,9 @@ def test_empty_intensitydataset():
 
 
 def test_parquet_intensitydataset():
-    filepath = join(DOWNLOAD_PATH_FOR_ASSETS, "file_3.parquet")
+    filepath = join(
+        pytest.global_variables["DOWNLOAD_PATH_FOR_ASSETS"], "file_3.parquet"
+    )
     intensity_dataset = FragmentIonIntensityDataset(
         data_format="parquet",
         data_source=filepath,
@@ -201,7 +157,7 @@ def test_parquet_intensitydataset():
 
 
 def test_csv_intensitydataset():
-    filepath = join(DOWNLOAD_PATH_FOR_ASSETS, "file_4.csv")
+    filepath = join(pytest.global_variables["DOWNLOAD_PATH_FOR_ASSETS"], "file_4.csv")
     intensity_dataset = FragmentIonIntensityDataset(
         data_format="csv",
         data_source=filepath,
@@ -231,7 +187,7 @@ def test_csv_intensitydataset():
 
 
 def test_nested_model_features():
-    hfdata = Dataset.from_dict(RAW_GENERIC_NESTED_DATA)
+    hfdata = Dataset.from_dict(pytest.global_variables["RAW_GENERIC_NESTED_DATA"])
 
     intensity_dataset = FragmentIonIntensityDataset(
         data_format="hf",
@@ -249,7 +205,7 @@ def test_nested_model_features():
 
 
 def test_save_dataset():
-    hfdata = Dataset.from_dict(RAW_GENERIC_NESTED_DATA)
+    hfdata = Dataset.from_dict(pytest.global_variables["RAW_GENERIC_NESTED_DATA"])
 
     intensity_dataset = FragmentIonIntensityDataset(
         data_format="hf",
@@ -266,7 +222,9 @@ def test_save_dataset():
 
 def test_load_dataset():
     rtdataset = RetentionTimeDataset(
-        data_source=join(DOWNLOAD_PATH_FOR_ASSETS, "file_2.csv"),
+        data_source=join(
+            pytest.global_variables["DOWNLOAD_PATH_FOR_ASSETS"], "file_2.csv"
+        ),
         data_format="csv",
         sequence_column="sequence",
         label_column="irt",
@@ -284,7 +242,7 @@ def test_load_dataset():
 
 
 def test_no_split_datasetDict_hf_inmemory():
-    hfdata = Dataset.from_dict(RAW_GENERIC_NESTED_DATA)
+    hfdata = Dataset.from_dict(pytest.global_variables["RAW_GENERIC_NESTED_DATA"])
     hf_dataset = DatasetDict({"train": hfdata})
 
     intensity_dataset = FragmentIonIntensityDataset(

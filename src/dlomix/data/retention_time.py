@@ -19,7 +19,7 @@ class RetentionTimeDataset(PeptideDataset):
         label_column (str): The column name for the retention time label in the dataset. Defaults to "indexed_retention_time".
         val_ratio (float): The ratio of validation data to split from the main dataset. Defaults to 0.2.
         max_seq_len (Union[int, str]): The maximum sequence length allowed in the dataset. Defaults to 30.
-        dataset_type (str): The type of dataset to use. Defaults to "tf".
+        dataset_type (str): The type of dataset to use. Defaults to "tf". Fallback is to TensorFlow dataset tensors.
         batch_size (int): The batch size for the dataset. Defaults to 256.
         model_features (Optional[List[str]]): The features to use in the model. Defaults to None.
         dataset_columns_to_keep (Optional[List[str]]): The columns to keep in the dataset. Defaults to None.
