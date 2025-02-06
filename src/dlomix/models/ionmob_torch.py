@@ -2,6 +2,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 
+
 class SquareRootProjectionLayer(nn.Module):
     def __init__(self, weights, bias, trainable=True):
         """
@@ -19,8 +20,8 @@ class SquareRootProjectionLayer(nn.Module):
             self.slopes = nn.Parameter(weights)
             self.intercepts = nn.Parameter(bias)
         else:
-            self.register_buffer('weights', weights)
-            self.register_buffer('bias', bias)
+            self.register_buffer("weights", weights)
+            self.register_buffer("bias", bias)
 
     def forward(self, mz, charge):
         sqrt_mz = torch.sqrt(mz)
@@ -32,17 +33,19 @@ class SquareRootProjectionLayer(nn.Module):
 
 
 class Ionmob(nn.Module):
-    def __init__(self,
-                 num_tokens,
-                 initial_weights: np.ndarray = np.array([12.3177, 15.0300, 17.1686, 21.1792]),
-                 initial_bias: np.ndarray = np.array([-81.5547,   1.8667,  99.4165, 180.1543]),
-                 max_charge: int = 4,
-                 max_peptide_length: int = 50,
-                 emb_dim: int = 64,
-                 gru_1: int = 64,
-                 gru_2: int = 32,
-                 rdo: float = 0.0,
-                 do: float = 0.2):
+    def __init__(
+        self,
+        num_tokens,
+        initial_weights: np.ndarray = np.array([12.3177, 15.0300, 17.1686, 21.1792]),
+        initial_bias: np.ndarray = np.array([-81.5547, 1.8667, 99.4165, 180.1543]),
+        max_charge: int = 4,
+        max_peptide_length: int = 50,
+        emb_dim: int = 64,
+        gru_1: int = 64,
+        gru_2: int = 32,
+        rdo: float = 0.0,
+        do: float = 0.2,
+    ):
         """
         Initialize the Ionmob model for CCS mean and std prediction.
         Args:
@@ -59,10 +62,16 @@ class Ionmob(nn.Module):
         super(Ionmob, self).__init__()
         self.max_charge = max_charge
         self.max_peptide_length = max_peptide_length
-        self.initial = SquareRootProjectionLayer(initial_weights, initial_bias, trainable=True)
+        self.initial = SquareRootProjectionLayer(
+            initial_weights, initial_bias, trainable=True
+        )
         self.emb = nn.Embedding(num_tokens, emb_dim)
-        self.gru1 = nn.GRU(emb_dim, gru_1, batch_first=True, bidirectional=True, dropout=rdo)
-        self.gru2 = nn.GRU(gru_1 * 2, gru_2, batch_first=True, bidirectional=True, dropout=rdo)
+        self.gru1 = nn.GRU(
+            emb_dim, gru_1, batch_first=True, bidirectional=True, dropout=rdo
+        )
+        self.gru2 = nn.GRU(
+            gru_1 * 2, gru_2, batch_first=True, bidirectional=True, dropout=rdo
+        )
         self.dropout = nn.Dropout(do)
 
         # The dense layer input size is the size of the
@@ -99,7 +108,9 @@ class Ionmob(nn.Module):
         x_emb = self.emb(seq)
 
         # one-hot encode charge
-        charge = torch.nn.functional.one_hot(charge - 1, num_classes=self.max_charge).float()
+        charge = torch.nn.functional.one_hot(
+            charge - 1, num_classes=self.max_charge
+        ).float()
 
         # check if mz is (batch_, 1) and not (batch_,), otherwise expand
         if mz.dim() == 1:

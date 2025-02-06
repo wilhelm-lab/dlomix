@@ -16,8 +16,8 @@ optimizer = tf.keras.optimizers.Adam(lr=0.0001)
 TESTING_DATA = "example_dataset/chargestate/chargestate_data.parquet"
 
 d = ChargeStateDataset(
-    data_format="parquet", #"hub",
-    data_source=TESTING_DATA, #"Wilhelmlab/prospect-ptms-charge",
+    data_format="parquet",  # "hub",
+    data_source=TESTING_DATA,  # "Wilhelmlab/prospect-ptms-charge",
     sequence_column="modified_sequence",
     label_column="observed_charge_states",
     max_seq_len=30,
@@ -29,8 +29,8 @@ for x in d.tensor_train_data:
     break
 
 test_d = ChargeStateDataset(
-    data_format="parquet", #"hub",
-    test_data_source=TESTING_DATA, #"Wilhelmlab/prospect-ptms-charge",
+    data_format="parquet",  # "hub",
+    test_data_source=TESTING_DATA,  # "Wilhelmlab/prospect-ptms-charge",
     sequence_column="modified_sequence",
     label_column="observed_charge_states",
     max_seq_len=30,
@@ -59,13 +59,13 @@ model.compile(
 
 history = model.fit(
     d.tensor_train_data,
-    epochs=1, #2,
+    epochs=1,  # 2,
     validation_data=d.tensor_val_data,
     callbacks=callbacks,
 )
 
 predictions = model.predict(test_sequences)
-predictions = predictions #.ravel()
+predictions = predictions  # .ravel()
 
 print(test_sequences[:5])
 print(test_targets[:5])

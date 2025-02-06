@@ -40,7 +40,9 @@ class MaskedIonmobLoss(nn.Module):
         mask = target_ccs_std != -1
 
         if mask.any():  # Ensure at least one valid target exists
-            loss_ccs_std = self.loss_function(ccs_std_output[mask], target_ccs_std[mask])
+            loss_ccs_std = self.loss_function(
+                ccs_std_output[mask], target_ccs_std[mask]
+            )
         else:
             loss_ccs_std = torch.tensor(0.0, device=device)
 

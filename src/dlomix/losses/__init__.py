@@ -10,5 +10,5 @@ __all__ = [
     "masked_pearson_correlation_distance",
     "masked_spectral_distance_torch",
     "masked_pearson_correlation_distance_torch",
-    "MaskedIonmobLoss"
+    "MaskedIonmobLoss",
 ]

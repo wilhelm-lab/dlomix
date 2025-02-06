@@ -74,7 +74,9 @@ class ChargeStatePredictorTorch(nn.Module):
 
         if model_flavour == "relative":
             # regression problem
-            self.final_activation = nn.Identity()  # this is how a "linear activation" is done in torch
+            self.final_activation = (
+                nn.Identity()
+            )  # this is how a "linear activation" is done in torch
         elif model_flavour == "observed":
             # multi-label multi-class classification problem
             self.final_activation = nn.Sigmoid()

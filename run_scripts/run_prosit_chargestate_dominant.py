@@ -1,5 +1,5 @@
-import tensorflow as tf
 import numpy as np
+import tensorflow as tf
 
 from dlomix.constants import PTMS_ALPHABET
 from dlomix.data import ChargeStateDataset
@@ -17,8 +17,8 @@ optimizer = tf.keras.optimizers.Adam(lr=0.0001)
 TESTING_DATA = "example_dataset/chargestate/chargestate_data.parquet"
 
 d = ChargeStateDataset(
-    data_format="parquet", #"hub",
-    data_source=TESTING_DATA, #"Wilhelmlab/prospect-ptms-charge",
+    data_format="parquet",  # "hub",
+    data_source=TESTING_DATA,  # "Wilhelmlab/prospect-ptms-charge",
     sequence_column="modified_sequence",
     label_column="most_abundant_charge_state",
     max_seq_len=30,
@@ -30,8 +30,8 @@ for x in d.tensor_train_data:
     break
 
 test_d = ChargeStateDataset(
-    data_format="parquet", #"hub",
-    test_data_source=TESTING_DATA, #"Wilhelmlab/prospect-ptms-charge",
+    data_format="parquet",  # "hub",
+    test_data_source=TESTING_DATA,  # "Wilhelmlab/prospect-ptms-charge",
     sequence_column="modified_sequence",
     label_column="most_abundant_charge_state",
     max_seq_len=30,
@@ -60,14 +60,14 @@ model.compile(
 
 history = model.fit(
     d.tensor_train_data,
-    epochs=1, #2,
+    epochs=1,  # 2,
     validation_data=d.tensor_val_data,
     callbacks=callbacks,
 )
 
 predictions = model.predict(test_sequences)
 # this returns the index (== the charge state -1) of the predicted most abundant charge state
-predicted_class = np.argmax(predictions, axis=1) #.ravel()
+predicted_class = np.argmax(predictions, axis=1)  # .ravel()
 
 print(test_sequences[:5])
 print(test_targets[:5])

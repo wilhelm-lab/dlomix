@@ -1,12 +1,9 @@
-import pandas as pd
 import torch
 import torch.nn as nn
 import torch.optim as optim
 
-from dlomix.constants import PTMS_ALPHABET
-from dlomix.data import ChargeStateDataset
-from dlomix.eval import adjusted_mean_absolute_error
-from dlomix.models import ChargeStatePredictorTorch
+from dlomix.data import RetentionTimeDataset
+from dlomix.models import PrositRetentionTimePredictorTorch
 
 if torch.cuda.is_available():
     device = torch.device("cuda")
@@ -17,15 +14,19 @@ else:
 print(f"Using device: {device}")
 
 
-TESTING_DATA = "example_dataset/chargestate/chargestate_data.parquet"
+TRAIN_DATA = "example_dataset/proteomTools_train.csv"
+VAL_DATA = "example_dataset/proteomTools_val.csv"
+TEST_DATA = "example_dataset/proteomTools_test.csv"
 
-d = ChargeStateDataset(
-    data_format="parquet",  # "hub",
-    data_source=TESTING_DATA,  # "Wilhelmlab/prospect-ptms-charge",
-    sequence_column="modified_sequence",
-    label_column="charge_state_dist",
+d = RetentionTimeDataset(
+    data_format="csv",  # "hub",
+    data_source=TRAIN_DATA,  # "Wilhelmlab/prospect-ptms-charge",
+    val_data_source=VAL_DATA,
+    test_data_source=TEST_DATA,
+    sequence_column="sequence",
+    label_column="irt",
     max_seq_len=30,
-    batch_size=8,
+    batch_size=128,
     dataset_type="pt",
 )
 print(d)
@@ -33,19 +34,9 @@ for x in d.tensor_train_data:
     print(x)
     break
 
-test_d = ChargeStateDataset(
-    data_format="parquet",  # "hub",
-    test_data_source=TESTING_DATA,  # "Wilhelmlab/prospect-ptms-charge",
-    sequence_column="modified_sequence",
-    label_column="charge_state_dist",
-    max_seq_len=30,
-    batch_size=8,
-    dataset_type="pt",
-)
 
-
-model = model = ChargeStatePredictorTorch(
-    num_classes=6, seq_length=30, alphabet=PTMS_ALPHABET, model_flavour="relative"
+model = model = PrositRetentionTimePredictorTorch(
+    seq_length=30
 )
 print(model)
 model.to(device)
@@ -78,8 +69,8 @@ for epoch in range(1, 2):
     local_step = 0
 
     for batch in d.tensor_train_data:
-        train_seq = batch["modified_sequence"]
-        train_label = batch["charge_state_dist"]
+        train_seq = batch["sequence"]
+        train_label = batch["irt"]
 
         # Ensure tensors are on the correct device and type
         train_seq = train_seq.to(device, dtype=torch.int32)
@@ -92,7 +83,7 @@ for epoch in range(1, 2):
         optimizer.step()
 
         running_loss += loss.item()
-        if local_step % 25 == 0:
+        if local_step % 100 == 0:
             avg_loss = running_loss / (local_step + 1)
             print(f"Epoch {epoch}, Step {local_step}, Training Loss: {avg_loss:.4f}")
         local_step += 1
@@ -104,8 +95,8 @@ for epoch in range(1, 2):
     val_loss_total = 0.0
     with torch.no_grad():
         for batch in d.tensor_val_data:
-            val_seq = batch["modified_sequence"]
-            val_label = batch["charge_state_dist"]
+            val_seq = batch["sequence"]
+            val_label = batch["irt"]
 
             # Ensure tensors are on the correct device and type
             val_seq = val_seq.to(device, dtype=torch.int32)
@@ -177,9 +168,9 @@ if best_model_state is not None:
 model.eval()
 test_loss_total = 0.0
 with torch.no_grad():
-    for batch in test_d.tensor_test_data:
-        test_seq = batch["modified_sequence"]
-        test_label = batch["charge_state_dist"]
+    for batch in d.tensor_test_data:
+        test_seq = batch["sequence"]
+        test_label = batch["irt"]
 
         # Ensure tensors are on the correct device and type
         test_seq = test_seq.to(device, dtype=torch.int32)
@@ -189,7 +180,7 @@ with torch.no_grad():
         test_loss = criterion(test_pred_cs, test_label)
 
         test_loss_total += test_loss.item()
-avg_test_loss = test_loss_total / len(test_d.tensor_test_data)
+avg_test_loss = test_loss_total / len(d.tensor_test_data)
 print(f"Test Loss: {avg_test_loss:.4f}")
 
 # Append final test metrics as an extra row in our log.
