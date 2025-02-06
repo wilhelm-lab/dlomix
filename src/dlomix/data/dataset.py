@@ -47,8 +47,8 @@ class PeptideDataset:
         Format of the data source file(s). Example formats are 'csv', 'json', 'parquet', etc. Use 'hub' for datasets from the Hugging Face Hub and 'hf' for in-memory HF Dataset/DatasetDict objects.
     sequence_column : str
         Name of the column in the data source file that contains the peptide sequences.
-    label_column : str
-        Name of the column in the data source file that contains the labels.
+    label_column : Union[str, List]
+        Name of the column(s) in the data source file that contains the labels.
     val_ratio : float
         Ratio of the validation data to the training data. The value should be between 0 and 1.
     max_seq_len : int
@@ -118,6 +118,15 @@ class PeptideDataset:
 
         self.encoding_scheme = EncodingScheme(config.encoding_scheme)
 
+        if isinstance(config.label_column, str):
+            self.label_column = [config.label_column]
+        elif isinstance(config.label_column, list):
+            self.label_column = config.label_column
+        else:
+            raise ValueError(
+                "The label_column parameter should be a string or a list of strings."
+            )
+
         self._set_hf_cache_management()
 
         self.extended_alphabet = None
@@ -125,6 +134,7 @@ class PeptideDataset:
 
         if self.alphabet:
             self.extended_alphabet = self.alphabet.copy()
+            self.extended_alphabet.update({str(self.padding_value): 0})
             self.learning_alphabet_mode = False
 
         self._config = config
@@ -292,7 +302,7 @@ class PeptideDataset:
             )
 
     def _remove_unnecessary_columns(self):
-        self._relevant_columns = [self.sequence_column, self.label_column]
+        self._relevant_columns = [self.sequence_column, *self.label_column]
 
         if self.model_features is not None:
             self._relevant_columns.extend(self.model_features)
@@ -622,8 +632,9 @@ If you prefer to encode the (amino-acids)+PTM combinations as tokens in the voca
         # return a list of columns to be used as input tensors
         input_tensor_columns = self._relevant_columns.copy()
 
-        # remove the label column from the input tensor columns since the to_tf_dataset method has a separate label_cols argument
-        input_tensor_columns.remove(self.label_column)
+        # remove the label column(s) from the input tensor columns since the to_tf_dataset method has a separate label_cols argument
+        for label in self.label_column:
+            input_tensor_columns.remove(label)
 
         # remove the columns that are not needed in the tensor dataset
         input_tensor_columns = list(
@@ -706,7 +717,7 @@ If you prefer to encode the (amino-acids)+PTM combinations as tokens in the voca
         data_loader = DataLoader(
             dataset=self.hf_dataset[split_name].with_format(
                 type="torch",
-                columns=[*self._get_input_tensor_column_names(), self.label_column],
+                columns=[*self._get_input_tensor_column_names(), *self.label_column],
             ),
             batch_size=self.batch_size,
             shuffle=False,
