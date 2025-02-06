@@ -15,7 +15,7 @@ class DecoderAttentionLayerTorch(nn.Module):
     Parameters
     ----------
     time_steps : int
-        Number of time steps in the input data.
+        Number of time steps in the input data (i.e. the sequence dimension)
     """
 
     def __init__(self, time_steps):
@@ -40,10 +40,12 @@ class DecoderAttentionLayerTorch(nn.Module):
         """
         # Permute the tensor from (batch, time_steps, features) to (batch, features, time_steps)
         x_permuted = x.transpose(1, 2)
+
         # Apply the linear layer on the last dimension (which has size time_steps)
         # and then apply softmax along that dimension.
         attn = self.linear(x_permuted)
         attn = F.softmax(attn, dim=-1)
+
         # Permute the attention tensor back to (batch, time_steps, features)
         attn = attn.transpose(1, 2)
         # Multiply the original input with the attention weights elementwise
@@ -77,17 +79,18 @@ class AttentionLayerTorch(nn.Module):
         Whether to use a learned bias (with one bias per time step). Defaults to True.
     """
 
-    def __init__(self, feature_dim, seq_len, context=False, bias=True):
+    def __init__(self, feature_dim, seq_len, context=False, bias=True, epsilon=1e-8):
         super(AttentionLayerTorch, self).__init__()
         self.feature_dim = feature_dim
         self.seq_len = seq_len
         self.context = context
         self.bias = bias
+        self.epsilon = epsilon
 
         # Weight vector W of shape (feature_dim,)
         self.W = nn.Parameter(torch.Tensor(feature_dim))
 
-        # Optional bias of shape (seq_len,). In the original TF layer the bias is per time step.
+        # Optional bias of shape (seq_len,)
         if bias:
             self.b = nn.Parameter(torch.Tensor(seq_len))
         else:
@@ -155,7 +158,7 @@ class AttentionLayerTorch(nn.Module):
 
         # Normalize the attention scores over the time dimension.
         # Add a small epsilon to avoid division by zero.
-        a_sum = torch.sum(a, dim=1, keepdim=True) + 1e-8
+        a_sum = torch.sum(a, dim=1, keepdim=True) + self.epsilon
         a = a / a_sum  # Shape: (batch_size, seq_len)
 
         # Expand the attention weights for multiplication with x.
