@@ -1,9 +1,11 @@
 import warnings
+from collections import OrderedDict
 
-import tensorflow as tf
+import torch.nn as nn
 
 from ..constants import ALPHABET_UNMOD
-from ..layers.attention import AttentionLayer
+from ..layers.attention_torch import AttentionLayerTorch
+from ..layers.bi_gru_seq_encoder_torch import BiGRUSequentialEncoder
 
 """
 This module contains a model coming in three flavours of predicting precursor charge states for peptide sequences in mass spectrometry data.
@@ -23,13 +25,15 @@ The three flavours are:
 """
 
 
-class ChargeStatePredictor(tf.keras.Model):
+class ChargeStatePredictorTorch(nn.Module):
     """
     Precursor Charge State Prediction Model for predicting either:
     * the dominant charge state or
     * all observed charge states or
     * the relative charge state distribution
     of a peptide sequence.
+
+    batch_first used internally (batch, sequence, feature)
 
     Args:
         embedding_output_dim (int): The size of the embedding output dimension. Defaults to 16.
@@ -57,10 +61,11 @@ class ChargeStatePredictor(tf.keras.Model):
         num_classes=6,
         model_flavour="relative",
     ):
-        super(ChargeStatePredictor, self).__init__()
+        super(ChargeStatePredictorTorch, self).__init__()
 
         # tie the count of embeddings to the size of the vocabulary (count of amino acids)
         self.embeddings_count = len(alphabet)
+        self.seq_length = seq_length
 
         self.dropout_rate = dropout_rate
         self.latent_dropout_rate = latent_dropout_rate
@@ -69,57 +74,71 @@ class ChargeStatePredictor(tf.keras.Model):
 
         if model_flavour == "relative":
             # regression problem
-            self.final_activation = "linear"
+            self.final_activation = nn.Identity()  # this is how a "linear activation" is done in torch
         elif model_flavour == "observed":
             # multi-label multi-class classification problem
-            self.final_activation = "sigmoid"
+            self.final_activation = nn.Sigmoid()
         elif model_flavour == "dominant":
             # multi-class classification problem
-            self.final_activation = "softmax"
+            self.final_activation = nn.Softmax()
         else:
             warnings.warn(f"{model_flavour} not available")
             exit
 
-        self.embedding = tf.keras.layers.Embedding(
-            input_dim=self.embeddings_count,
-            output_dim=embedding_output_dim,
-            input_length=seq_length,
-        )
-        self._build_encoder()
-
-        self.attention = AttentionLayer()
-
-        self.regressor = tf.keras.Sequential(
-            [
-                tf.keras.layers.Dense(self.regressor_layer_size, activation="relu"),
-                tf.keras.layers.Dropout(rate=self.latent_dropout_rate),
-            ]
+        self.embedding = nn.Embedding(
+            num_embeddings=self.embeddings_count,
+            embedding_dim=embedding_output_dim,
+            padding_idx=0,  # TODO check this
         )
 
-        self.output_layer = tf.keras.layers.Dense(
-            num_classes, activation=self.final_activation
+        self.encoder = BiGRUSequentialEncoder(
+            embedding_output_dim, self.recurrent_layers_sizes, self.dropout_rate
         )
 
-    def _build_encoder(self):
-        self.encoder = tf.keras.Sequential(
-            [
-                tf.keras.layers.Bidirectional(
-                    tf.keras.layers.GRU(
-                        units=self.recurrent_layers_sizes[0], return_sequences=True
-                    )
-                ),
-                tf.keras.layers.Dropout(rate=self.dropout_rate),
-                tf.keras.layers.GRU(
-                    units=self.recurrent_layers_sizes[1], return_sequences=True
-                ),
-                tf.keras.layers.Dropout(rate=self.dropout_rate),
-            ]
+        self.attention = AttentionLayerTorch(
+            feature_dim=self.recurrent_layers_sizes[1], seq_len=self.seq_length
         )
 
-    def call(self, inputs):
+        self.regressor = nn.Sequential(
+            OrderedDict(
+                [
+                    (
+                        "dense",
+                        nn.Linear(
+                            in_features=self.recurrent_layers_sizes[1],
+                            out_features=self.regressor_layer_size,
+                        ),
+                    ),
+                    ("activation_relu", nn.ReLU()),
+                    ("regressor_dropout", nn.Dropout(self.latent_dropout_rate)),
+                ]
+            )
+        )
+
+        self.output_layer = nn.Linear(
+            in_features=self.regressor_layer_size, out_features=num_classes
+        )
+
+        self.activation = self.final_activation
+
+    def forward(self, inputs):
+        """
+        Forward pass of the model.
+
+        Parameters
+        ----------
+        x : tensor
+            Input tensor (shape: [batch_size, seq_length]).
+
+        Returns
+        -------
+        tensor
+            Predicted output (shape: [batch_size, num_classes]).
+        """
         x = self.embedding(inputs)
         x = self.encoder(x)
         x = self.attention(x)
         x = self.regressor(x)
         x = self.output_layer(x)
+        x = self.activation(x)
         return x

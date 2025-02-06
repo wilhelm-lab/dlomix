@@ -1,5 +1,6 @@
 from .base import *
 from .chargestate import *
+from .chargestate_torch import *
 from .deepLC import *
 from .detectability import *
 from .prosit import *
@@ -10,9 +11,8 @@ __all__ = [
     "PrositRetentionTimePredictor",
     "DeepLCRetentionTimePredictor",
     "PrositIntensityPredictor",
-    "DominantChargeStatePredictor",
-    "ObservedChargeStatePredictor",
-    "ChargeStateDistributionPredictor",
+    "ChargeStatePredictor",
     "DetectabilityModel",
+    "ChargeStatePredictorTorch",
     "Ionmob"
 ]

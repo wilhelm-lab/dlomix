@@ -3,7 +3,9 @@ import torch
 import torch.nn.functional as F
 
 
-def masked_spectral_distance_torch(y_true: torch.Tensor, y_pred: torch.Tensor) -> torch.Tensor:
+def masked_spectral_distance_torch(
+    y_true: torch.Tensor, y_pred: torch.Tensor
+) -> torch.Tensor:
     """
     Calculates the masked spectral distance between true and predicted intensity vectors.
     The masked spectral distance is a metric for comparing the similarity between two intensity vectors.
@@ -51,7 +53,9 @@ def masked_spectral_distance_torch(y_true: torch.Tensor, y_pred: torch.Tensor) -
     return 2 * arccos / np.pi
 
 
-def masked_pearson_correlation_distance_torch(y_true: torch.Tensor, y_pred: torch.Tensor) -> torch.Tensor:
+def masked_pearson_correlation_distance_torch(
+    y_true: torch.Tensor, y_pred: torch.Tensor
+) -> torch.Tensor:
     """
     Calculates the masked Pearson correlation distance between true and predicted intensity vectors.
     The masked Pearson correlation distance is a metric for comparing the similarity between two intensity vectors,

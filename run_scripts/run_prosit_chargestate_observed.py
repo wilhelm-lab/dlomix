@@ -2,11 +2,10 @@ import tensorflow as tf
 
 from dlomix.constants import PTMS_ALPHABET
 from dlomix.data import ChargeStateDataset
-from dlomix.eval import adjusted_mean_absolute_error
 from dlomix.models import ChargeStatePredictor
 
-model = model = ChargeStatePredictor(
-    num_classes=6, seq_length=32, alphabet=PTMS_ALPHABET, model_flavour="relative"
+model = ChargeStatePredictor(
+    num_classes=6, seq_length=32, alphabet=PTMS_ALPHABET, model_flavour="observed"
 )
 print(model)
 
@@ -20,7 +19,7 @@ d = ChargeStateDataset(
     data_format="parquet", #"hub",
     data_source=TESTING_DATA, #"Wilhelmlab/prospect-ptms-charge",
     sequence_column="modified_sequence",
-    label_column="charge_state_dist",
+    label_column="observed_charge_states",
     max_seq_len=30,
     batch_size=8,
 )
@@ -33,27 +32,28 @@ test_d = ChargeStateDataset(
     data_format="parquet", #"hub",
     test_data_source=TESTING_DATA, #"Wilhelmlab/prospect-ptms-charge",
     sequence_column="modified_sequence",
-    label_column="charge_state_dist",
+    label_column="observed_charge_states",
     max_seq_len=30,
     batch_size=8,
 )
-test_targets = test_d["test"]["charge_state_dist"]
+test_targets = test_d["test"]["observed_charge_states"]
 test_sequences = test_d["test"]["modified_sequence"]
 
 
 # callbacks
-weights_file = "./output/prosit_charge_dist_test"
+weights_file = "./output/prosit_charge_observed_test"
 checkpoint = tf.keras.callbacks.ModelCheckpoint(
     weights_file, save_best_only=True, save_weights_only=True
 )
 early_stop = tf.keras.callbacks.EarlyStopping(patience=20)
-callbacks = [checkpoint, early_stop]
+decay = tf.keras.callbacks.ReduceLROnPlateau(
+    monitor="val_loss", factor=0.1, patience=10, verbose=1, min_lr=0
+)
+callbacks = [checkpoint, early_stop, decay]
 
 
 model.compile(
-    optimizer=optimizer,
-    loss="mean_squared_error",
-    metrics=[adjusted_mean_absolute_error],
+    optimizer=optimizer, loss="categorical_crossentropy", metrics=["accuracy"]
 )
 
 
