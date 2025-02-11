@@ -386,7 +386,7 @@ class PrositTransformerIntensityPredictor(tf.keras.Model):
         self,
         embedding_output_dim=64,
         seq_length=32,
-        vocab_dict=ALPHABET_UNMOD,
+        alphabet=ALPHABET_UNMOD,
         dropout_rate=0.2,
         num_heads=16,
         ff_dim=32,
@@ -398,13 +398,12 @@ class PrositTransformerIntensityPredictor(tf.keras.Model):
     ):
         super(PrositTransformerIntensityPredictor, self).__init__()
 
-        self.embeddings_count = len(vocab_dict) + 2
-        self.max_ion = seq_length - 1
+        self.embeddings_count = len(alphabet) + 2
         self.pos_embedding = PositionalEmbedding(
-            self.embeddings_count, 32
+            self.embeddings_count, seq_length
         )
         self.meta_encoder = MetaEncoder(
-            32, dropout_rate
+            seq_length, dropout_rate
         )
         self.transformer_encoder = TransformerEncoder(
             embed_dim=embedding_output_dim,
