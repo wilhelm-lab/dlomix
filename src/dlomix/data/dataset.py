@@ -174,8 +174,19 @@ class PeptideDataset:
             disable_caching()
 
     def _refresh_config(self):
+        # load original config
         self._config = DatasetConfig(**self._config.__dict__)
 
+        # update the config with the current object's attributes
+        self._config.__dict__.update(
+            {
+                k: self.__dict__[k]
+                for k in self._config.__dict__.keys()
+                if k not in ["_additional_data"]
+            }
+        )
+
+        # update the additional data in the config with the current object's attributes
         self._config._additional_data.update(
             {
                 k: v
@@ -184,6 +195,7 @@ class PeptideDataset:
             }
         )
 
+        # update the additional data in the config with the current object's class name
         self._config._additional_data.update({"cls": self.__class__.__name__})
 
     def _load_dataset(self):
