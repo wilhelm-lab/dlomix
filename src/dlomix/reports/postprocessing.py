@@ -86,7 +86,7 @@ def normalize_intensity_predictions(
 
     sequence_lengths = data[sequence_column_name].apply(lambda x: len(x))
     intensities = np.stack(data[predictions_column_name].to_numpy()).astype(np.float32)
-    precursor_charge_onehot = np.stack(data[predictions_column_name].to_numpy())
+    precursor_charge_onehot = np.stack(data[precursor_charge_column_name].to_numpy())
     charges = list(precursor_charge_onehot.argmax(axis=1) + 1)
 
     intensities[intensities < 0] = 0
