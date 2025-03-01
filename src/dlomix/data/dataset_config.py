@@ -36,7 +36,7 @@ class DatasetConfig:
     auto_cleanup_cache: bool
     num_proc: Optional[int]
     batch_processing_size: int
-    _additional_data: dict = field(default_factory=dict)
+    _additional_data: dict = field(default_factory=dict, compare=False)
 
     def save_config_json(self, path: str):
         """

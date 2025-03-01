@@ -1,4 +1,5 @@
 import logging
+import time
 import urllib.request
 import zipfile
 from os import makedirs
@@ -276,10 +277,24 @@ def test_load_dataset():
     save_path = "./test_dataset"
     rtdataset.save_to_disk(save_path)
     splits = rtdataset._data_files_available_splits
+    config = rtdataset._config
 
+    load_time_threshold = 0.05  # 50ms
+
+    start_time = time.time()
     loaded_dataset = load_processed_dataset(save_path)
+    load_duration = time.time() - start_time
+    logger.info("Loaded the dataset in {} seconds".format(load_duration))
+
+    # Assert the load time is below the threshold
+    assert (
+        load_duration < load_time_threshold
+    ), f"Load time exceeded: {load_duration:.3f}s"
+    assert loaded_dataset.processed is True
+
     assert loaded_dataset._data_files_available_splits == splits
     assert loaded_dataset.hf_dataset is not None
+    assert loaded_dataset._config == config, f"{loaded_dataset._config} != {config}"
     rmtree(save_path)
 
 
@@ -308,7 +323,5 @@ def test_no_split_datasetDict_hf_inmemory():
         )
         == 2
     )
-
-    # test saving and loading datasets with config
 
     # test learning alphabet for train/val and then using it for test with fallback
