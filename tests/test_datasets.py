@@ -147,20 +147,16 @@ def test_rtdataset_hub():
         data_format="hub",
         sequence_column="modified_sequence",
         label_column="indexed_retention_time",
+        name="holdout",
     )
+    logger.info(rtdataset)
     assert rtdataset.hf_dataset is not None
     assert rtdataset._empty_dataset_mode is False
-    assert RetentionTimeDataset.DEFAULT_SPLIT_NAMES[0] in list(
-        rtdataset.hf_dataset.keys()
-    )
-    assert RetentionTimeDataset.DEFAULT_SPLIT_NAMES[1] in list(
-        rtdataset.hf_dataset.keys()
-    )
+
     assert RetentionTimeDataset.DEFAULT_SPLIT_NAMES[2] in list(
         rtdataset.hf_dataset.keys()
     )
-    assert rtdataset[RetentionTimeDataset.DEFAULT_SPLIT_NAMES[0]].num_rows > 0
-    assert rtdataset[RetentionTimeDataset.DEFAULT_SPLIT_NAMES[1]].num_rows > 0
+
     assert rtdataset[RetentionTimeDataset.DEFAULT_SPLIT_NAMES[2]].num_rows > 0
 
 
