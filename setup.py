@@ -47,6 +47,13 @@ setuptools.setup(
         "wandb": [
             "wandb >= 0.15",
         ],
+        "torch": [
+            "torch",
+            "torchvision",
+        ],
+        "lightning": [
+            "lightning",
+        ],
     },
     classifiers=[
         "Programming Language :: Python :: 3",
