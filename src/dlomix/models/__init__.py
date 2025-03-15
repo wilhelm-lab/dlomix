@@ -17,5 +17,6 @@ __all__ = [
     "DetectabilityModel",
     "DetectabilityModelTorch",
     "Ionmob",
-    "PrositRetentionTimePredictorTorch" "ChargeStatePredictorTorch",
+    "PrositRetentionTimePredictorTorch",
+    "ChargeStatePredictorTorch",
 ]
