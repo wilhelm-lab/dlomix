@@ -1,11 +1,9 @@
-import pandas as pd
 import torch
 import torch.nn as nn
 import torch.optim as optim
 
 from dlomix.constants import PTMS_ALPHABET
 from dlomix.data import ChargeStateDataset
-from dlomix.eval import adjusted_mean_absolute_error
 from dlomix.models import ChargeStatePredictorTorch
 
 if torch.cuda.is_available():
@@ -122,8 +120,6 @@ for epoch in range(1, 2):
         f"Epoch {epoch} Summary: Train Loss: {avg_train_loss:.4f}, Validation Loss: {avg_val_loss:.4f}"
     )
 
-    # TODO continue adjustment here
-
     # Learning rate scheduler using the validation loss.
     scheduler.step(avg_val_loss)
     current_lr = scheduler.optimizer.param_groups[0]["lr"]
@@ -209,7 +205,12 @@ metrics_log.append(
 # print(f"Metrics logged to CSV file: {args.metrics_csv}")
 
 
-print(test_seq[:5])
-print(test_label[:5])
-print(test_pred_cs[:5])
-print(test_pred_cs.shape, len(test_label))
+print("first 5 test sequences:\n", test_seq[:5])
+print("first 5 test relative charge state vectors (label):\n", test_label[:5])
+print("first 5 relative charge state predictions for test:\n", test_pred_cs[:5])
+print(
+    "predictions.shape for test set:",
+    test_pred_cs.shape,
+    "number of test CS vectors (label):",
+    len(test_label),
+)

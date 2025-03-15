@@ -8,12 +8,12 @@ from ..layers.attention_torch import AttentionLayerTorch
 from ..layers.bi_gru_seq_encoder_torch import BiGRUSequentialEncoder
 
 """
-This module contains a model coming in three flavours of predicting precursor charge states for peptide sequences in mass spectrometry data.
-The three flavours are:
+This module contains a deep learning model for precursor charge state prediction, inspired by Prosit's architecture. 
+The model is provided in three flavours of predicting precursor charge states:
 
 1. Dominant Charge State Prediction:
    - Task: Predict the dominant charge state of a given peptide sequence.
-   - Model: Uses a deep learning model (RNN-based) inspired by Prosit's architecture to predict the most likely charge state.
+   - Model: Uses a multi-class classification approach to predict the most likely charge state.
 
 2. Observed Charge State Prediction:
    - Task: Predict the observed charge states for a given peptide sequence.
@@ -45,8 +45,7 @@ class ChargeStatePredictorTorch(nn.Module):
         regressor_layer_size (int): The size of the regressor layer. Defaults to 512.
         num_classes (int): The number of classes for the output corresponding to charge states available in the data. Defaults to 6.
         model_flavour (str): The type of precursor charge state prediction to be done.
-            Can be either "dominant" (using softmax activation), "observed" (using sigmoid activation) or "relative" (using linear activation).
-            Defaults to "relative".
+            Can be either "dominant", "observed" or "relative". Defaults to "relative".
     """
 
     def __init__(
@@ -76,13 +75,14 @@ class ChargeStatePredictorTorch(nn.Module):
             # regression problem
             self.final_activation = (
                 nn.Identity()
-            )  # this is how a "linear activation" is done in torch
+            )  # == "linear activation" in torch
         elif model_flavour == "observed":
             # multi-label multi-class classification problem
             self.final_activation = nn.Sigmoid()
         elif model_flavour == "dominant":
             # multi-class classification problem
-            self.final_activation = nn.Softmax()
+            self.final_activation = nn.Identity()  
+            # in contrast to tf, don't use Softmax here, cause already included in CrossEntropyLoss, which is to be used for dominant case
         else:
             warnings.warn(f"{model_flavour} not available")
             exit
@@ -90,7 +90,7 @@ class ChargeStatePredictorTorch(nn.Module):
         self.embedding = nn.Embedding(
             num_embeddings=self.embeddings_count,
             embedding_dim=embedding_output_dim,
-            padding_idx=0,  # TODO check this
+            padding_idx=0,
         )
 
         self.encoder = BiGRUSequentialEncoder(
