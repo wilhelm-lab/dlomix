@@ -1,10 +1,13 @@
+import glob
 import logging
+import time
 import urllib.request
 import zipfile
 from os import makedirs
 from os.path import exists, join
 from shutil import rmtree
 
+import pandas as pd
 import pytest
 from datasets import Dataset, DatasetDict, load_dataset
 
@@ -69,6 +72,24 @@ def download_assets():
     return True
 
 
+@pytest.fixture(scope="session", autouse=True)
+def subset_downloaded_files(download_assets):
+    # take a subset of the data in each downloaded file
+    # to speed up the tests
+    N = 100
+
+    files = glob.glob(join(DOWNLOAD_PATH_FOR_ASSETS, "*"))
+    logger.info("Subsetting {} files".format(files))
+    for i, file in enumerate(files):
+        logger.info("Subsetting file {} picking {} samples".format(file, N))
+        if ".parquet" in file:
+            pd.read_parquet(file).sample(N).to_parquet(file)
+        elif ".csv" in file:
+            pd.read_csv(file).sample(N).to_csv(file)
+        else:
+            continue
+
+
 def test_empty_rtdataset():
     rtdataset = RetentionTimeDataset()
     assert rtdataset.hf_dataset is None
@@ -98,8 +119,12 @@ def test_parquet_rtdataset():
 
 def test_rtdataset_inmemory():
     hf_dataset = load_dataset(
-        "parquet", data_files=join(DOWNLOAD_PATH_FOR_ASSETS, "file_1.parquet")
+        "parquet",
+        data_files=join(DOWNLOAD_PATH_FOR_ASSETS, "file_1.parquet"),
+        split="train",
     )
+
+    hf_dataset = hf_dataset.select(range(100))
 
     rtdataset = RetentionTimeDataset(
         data_source=hf_dataset,
@@ -122,20 +147,16 @@ def test_rtdataset_hub():
         data_format="hub",
         sequence_column="modified_sequence",
         label_column="indexed_retention_time",
+        name="holdout",
     )
+    logger.info(rtdataset)
     assert rtdataset.hf_dataset is not None
     assert rtdataset._empty_dataset_mode is False
-    assert RetentionTimeDataset.DEFAULT_SPLIT_NAMES[0] in list(
-        rtdataset.hf_dataset.keys()
-    )
-    assert RetentionTimeDataset.DEFAULT_SPLIT_NAMES[1] in list(
-        rtdataset.hf_dataset.keys()
-    )
+
     assert RetentionTimeDataset.DEFAULT_SPLIT_NAMES[2] in list(
         rtdataset.hf_dataset.keys()
     )
-    assert rtdataset[RetentionTimeDataset.DEFAULT_SPLIT_NAMES[0]].num_rows > 0
-    assert rtdataset[RetentionTimeDataset.DEFAULT_SPLIT_NAMES[1]].num_rows > 0
+
     assert rtdataset[RetentionTimeDataset.DEFAULT_SPLIT_NAMES[2]].num_rows > 0
 
 
@@ -276,10 +297,24 @@ def test_load_dataset():
     save_path = "./test_dataset"
     rtdataset.save_to_disk(save_path)
     splits = rtdataset._data_files_available_splits
+    config = rtdataset._config
 
+    load_time_threshold = 0.05  # 50ms
+
+    start_time = time.time()
     loaded_dataset = load_processed_dataset(save_path)
+    load_duration = time.time() - start_time
+    logger.info("Loaded the dataset in {} seconds".format(load_duration))
+
+    # Assert the load time is below the threshold
+    assert (
+        load_duration < load_time_threshold
+    ), f"Load time exceeded: {load_duration:.3f}s"
+    assert loaded_dataset.processed is True
+
     assert loaded_dataset._data_files_available_splits == splits
     assert loaded_dataset.hf_dataset is not None
+    assert loaded_dataset._config == config, f"{loaded_dataset._config} != {config}"
     rmtree(save_path)
 
 
@@ -308,7 +343,5 @@ def test_no_split_datasetDict_hf_inmemory():
         )
         == 2
     )
-
-    # test saving and loading datasets with config
 
     # test learning alphabet for train/val and then using it for test with fallback

@@ -106,17 +106,18 @@ class PeptideDataset:
     DEFAULT_SPLIT_NAMES = ["train", "val", "test"]
     CONFIG_JSON_NAME = "dlomix_peptide_dataset_config.json"
 
-    def __init__(self, config: DatasetConfig):
+    def __init__(self, dataset_config: DatasetConfig, **kwargs):
         super(PeptideDataset, self).__init__()
-        self.__dict__.update(**config.__dict__)
+        self.__dict__.update(**dataset_config.__dict__)
+        self._kwargs = kwargs
 
         # to be kept in the hf dataset, but not returned in the tensor dataset
-        if config.dataset_columns_to_keep is None:
+        if dataset_config.dataset_columns_to_keep is None:
             self.dataset_columns_to_keep = []
         else:
-            self.dataset_columns_to_keep = config.dataset_columns_to_keep
+            self.dataset_columns_to_keep = dataset_config.dataset_columns_to_keep
 
-        self.encoding_scheme = EncodingScheme(config.encoding_scheme)
+        self.encoding_scheme = EncodingScheme(dataset_config.encoding_scheme)
 
         self._set_hf_cache_management()
 
@@ -127,14 +128,14 @@ class PeptideDataset:
             self.extended_alphabet = self.alphabet.copy()
             self.learning_alphabet_mode = False
 
-        self._config = config
+        self._config = dataset_config
 
         if not self.processed:
             self.hf_dataset: Optional[Union[Dataset, DatasetDict]] = None
             self._empty_dataset_mode = False
             self._is_predefined_split = False
             self._test_set_only = False
-            self._num_proc = config.num_proc
+            self._num_proc = dataset_config.num_proc
             self._set_num_proc()
 
             self._data_files_available_splits = {}
@@ -174,8 +175,19 @@ class PeptideDataset:
             disable_caching()
 
     def _refresh_config(self):
+        # load original config
         self._config = DatasetConfig(**self._config.__dict__)
 
+        # update the config with the current object's attributes
+        self._config.__dict__.update(
+            {
+                k: self.__dict__[k]
+                for k in self._config.__dict__.keys()
+                if k not in ["_additional_data"]
+            }
+        )
+
+        # update the additional data in the config with the current object's attributes
         self._config._additional_data.update(
             {
                 k: v
@@ -184,6 +196,7 @@ class PeptideDataset:
             }
         )
 
+        # update the additional data in the config with the current object's class name
         self._config._additional_data.update({"cls": self.__class__.__name__})
 
     def _load_dataset(self):
@@ -214,7 +227,7 @@ class PeptideDataset:
             )
 
     def _load_from_hub(self):
-        self.hf_dataset = load_dataset(self.data_source)
+        self.hf_dataset = load_dataset(self.data_source, **self._kwargs)
         self._empty_dataset_mode = False
         self._is_predefined_split = True
         warnings.warn(
