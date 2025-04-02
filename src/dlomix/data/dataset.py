@@ -227,7 +227,6 @@ class PeptideDataset:
             )
 
     def _load_from_hub(self):
-        print(self._kwargs)
         self.hf_dataset = load_dataset(self.data_source, **self._kwargs)
         self._empty_dataset_mode = False
         self._is_predefined_split = True
