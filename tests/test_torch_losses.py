@@ -18,7 +18,6 @@ logger = logging.getLogger(__name__)
 
 
 def test_tf_torch_equivalence_masked_spectral_distance():
-
     y_true = [[0.1, 0.2, 0.3]]
     y_pred = [list(reversed(y_true[0]))]
 
@@ -42,7 +41,6 @@ def test_tf_torch_equivalence_masked_spectral_distance():
 
 
 def test_tf_torch_equivalence_masked_pearson_correlation_distance():
-
     y_true = [[0.1, 0.2, 0.3]]
     y_pred = [list(reversed(y_true[0]))]
 
@@ -60,3 +58,6 @@ def test_tf_torch_equivalence_masked_pearson_correlation_distance():
     assert np.allclose(
         pc_tf.numpy(), pc_torch.numpy()
     )  # alternatively try np.array_equiv(A,B)
+
+
+# add tests for IonMobLoss

@@ -5,7 +5,7 @@ from dlomix.data import ChargeStateDataset
 from dlomix.eval import adjusted_mean_absolute_error
 from dlomix.models import ChargeStatePredictor
 
-model = model = ChargeStatePredictor(
+model = ChargeStatePredictor(
     num_classes=6, seq_length=30, alphabet=PTMS_ALPHABET, model_flavour="relative"
 )
 print(model)

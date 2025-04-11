@@ -1,10 +1,11 @@
-import torch
 import torch.nn as nn
+
 from .attention_torch import DecoderAttentionLayerTorch
 
+
 class GRUSequentialDecoder(nn.Module):
-    """Encoder class needed to handle two GRU outputs in torch. 
-    
+    """Encoder class needed to handle two GRU outputs in torch.
+
     No implementation using nn.Sequential() possible.
 
     Args:
@@ -35,4 +36,3 @@ class GRUSequentialDecoder(nn.Module):
         x = self.encoder_dropout(x)
         x = self.attention(x)
         return x
-    

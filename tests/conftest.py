@@ -1,9 +1,11 @@
+import glob
 import logging
 import urllib.request
 import zipfile
 from os import makedirs
 from os.path import exists, join
 
+import pandas as pd
 import pytest
 
 logger = logging.getLogger(__name__)
@@ -69,3 +71,21 @@ def download_assets():
             )
             unzip_file(filepath, DOWNLOAD_PATH_FOR_ASSETS)
     return True
+
+
+@pytest.fixture(scope="session", autouse=True)
+def subset_downloaded_files(download_assets):
+    # take a subset of the data in each downloaded file
+    # to speed up the tests
+    N = 100
+
+    files = glob.glob(join(DOWNLOAD_PATH_FOR_ASSETS, "*"))
+    logger.info("Subsetting {} files".format(files))
+    for i, file in enumerate(files):
+        logger.info("Subsetting file {} picking {} samples".format(file, N))
+        if ".parquet" in file:
+            pd.read_parquet(file).sample(N).to_parquet(file)
+        elif ".csv" in file:
+            pd.read_csv(file).sample(N).to_csv(file)
+        else:
+            continue

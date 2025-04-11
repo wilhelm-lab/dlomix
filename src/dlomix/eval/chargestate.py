@@ -31,27 +31,3 @@ def adjusted_mean_squared_error(y_true: Tensor, y_pred: Tensor) -> Tensor:
     else:
         ret = torch_eval.chargestate.adjusted_mean_squared_error(y_true, y_pred)
     return ret
-
-
-if __name__ == "__main__":
-    import os
-
-    os.chdir("./..")
-    import numpy as np
-    import torch
-
-    y_true = [0, 1, 2, 2, 0, 0, 0, 0]
-    y_pred = [0, 3, 0, 4, 0, 0, 2, 0]
-
-    # y_true = K.constant(y_true, dtype="float32")
-    # y_pred = K.constant(y_pred, dtype="float32")
-
-    y_true = torch.tensor(data=y_true, dtype=torch.float32)
-    y_pred = torch.tensor([y_pred], dtype=torch.float32)
-
-    mae = adjusted_mean_absolute_error(y_true, y_pred)
-    mse = adjusted_mean_squared_error(y_true, y_pred)
-    assert np.isclose(mae, 2.0)
-    assert np.isclose(mse, 4.0)
-    print(f"Adjusted MAE: {mae:.4f}")
-    print(f"Adjusted MSE: {mse:.4f}")

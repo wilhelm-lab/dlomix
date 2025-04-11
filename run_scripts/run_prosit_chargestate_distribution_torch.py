@@ -42,7 +42,7 @@ test_d = ChargeStateDataset(
 )
 
 
-model = model = ChargeStatePredictorTorch(
+model = ChargeStatePredictorTorch(
     num_classes=6, seq_length=30, alphabet=PTMS_ALPHABET, model_flavour="relative"
 )
 print(model)

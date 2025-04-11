@@ -5,11 +5,10 @@ import importlib
 import logging
 import os
 import warnings
-from typing import Callable, Dict, List, Optional, Union
+from typing import Callable, Optional, Union
 
 from datasets import Dataset, DatasetDict, Sequence, Value, load_dataset, load_from_disk
 
-from ..constants import ALPHABET_UNMOD
 from .dataset_config import DatasetConfig
 from .dataset_utils import EncodingScheme, get_num_processors
 from .processing.feature_extractors import (
@@ -119,10 +118,10 @@ class PeptideDataset:
 
         self.encoding_scheme = EncodingScheme(dataset_config.encoding_scheme)
 
-        if isinstance(config.label_column, str):
-            self.label_column = [config.label_column]
-        elif isinstance(config.label_column, list):
-            self.label_column = config.label_column
+        if isinstance(dataset_config.label_column, str):
+            self.label_column = [dataset_config.label_column]
+        elif isinstance(dataset_config.label_column, list):
+            self.label_column = dataset_config.label_column
         else:
             raise ValueError(
                 "The label_column parameter should be a string or a list of strings."

@@ -35,9 +35,7 @@ for x in d.tensor_train_data:
     break
 
 
-model = model = PrositRetentionTimePredictorTorch(
-    seq_length=30
-)
+model = PrositRetentionTimePredictorTorch(seq_length=30)
 print(model)
 model.to(device)
 
