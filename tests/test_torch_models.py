@@ -1,11 +1,12 @@
 import logging
 
-import tensorflow as tf
 import torch
 
 from dlomix.models import (
     ChargeStatePredictor,
     ChargeStatePredictorTorch,
+    PrositIntensityPredictor,
+    PrositIntensityPredictorTorch,
     PrositRetentionTimePredictor,
     PrositRetentionTimePredictorTorch,
 )
@@ -83,6 +84,31 @@ def test_tf_torch_equivalence_RT_model_shapes():
 
     model_tf = PrositRetentionTimePredictor(seq_length=seq_len)
     model_torch = PrositRetentionTimePredictorTorch(seq_length=seq_len)
+
+    output_tf = model_tf(dummi_input_tf)
+    output_torch = model_torch(dummy_input_torch)
+
+    assert output_tf.shape == output_torch.detach().numpy().shape
+
+
+# -------------- Prosit Intensity | check for existence of model & its parameters -------
+def test_intensity_model_torch():
+    model = PrositIntensityPredictorTorch()
+    basic_model_existence_test_torch(model)
+
+
+# -------------- Prosit Intensity | comparison of tf & torch ----------------------
+def test_tf_torch_equivalence_intensity_model_shapes():
+    # to compare tf & torch: input & output shapes at beginnin & end of 1 forward
+
+    batch_size = 2
+    seq_len = 30
+
+    dummy_input_torch = torch.randint(low=0, high=15, size=(batch_size, seq_len))
+    dummi_input_tf = dummy_input_torch.numpy()
+
+    model_tf = PrositIntensityPredictor()
+    model_torch = PrositIntensityPredictorTorch()
 
     output_tf = model_tf(dummi_input_tf)
     output_torch = model_torch(dummy_input_torch)

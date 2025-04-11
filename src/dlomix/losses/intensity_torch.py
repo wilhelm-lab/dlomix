@@ -41,16 +41,18 @@ def masked_spectral_distance_torch(
 
     # L2 norm
     # along last axis / dimension of the tensor
-    pred_norm = F.normalize(true_masked, p=2, dim=-1)
-    true_norm = F.normalize(pred_masked, p=2, dim=-1)
+    true_norm = F.normalize(true_masked, p=2, dim=-1)
+    pred_norm = F.normalize(pred_masked, p=2, dim=-1)
 
     # Spectral Angle (SA) calculation
     # (from the definition below, it is clear that ions with higher intensities
     #  will always have a higher contribution)
-    product = (pred_norm * true_norm).sum()
+    product = (pred_norm * true_norm).sum(dim=-1)
+    product = torch.clamp(product, -1.0 + epsilon, 1.0 - epsilon)
     arccos = torch.arccos(product)
+    batch_losses = 2 * arccos / np.pi
 
-    return 2 * arccos / np.pi
+    return batch_losses.mean()
 
 
 def masked_pearson_correlation_distance_torch(

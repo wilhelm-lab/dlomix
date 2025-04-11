@@ -8,7 +8,7 @@ from ..layers.attention_torch import AttentionLayerTorch
 from ..layers.bi_gru_seq_encoder_torch import BiGRUSequentialEncoder
 
 """
-This module contains a deep learning model for precursor charge state prediction, inspired by Prosit's architecture. 
+This module contains a deep learning model for precursor charge state prediction, inspired by Prosit's architecture.
 The model is provided in three flavours of predicting precursor charge states:
 
 1. Dominant Charge State Prediction:
@@ -73,15 +73,13 @@ class ChargeStatePredictorTorch(nn.Module):
 
         if model_flavour == "relative":
             # regression problem
-            self.final_activation = (
-                nn.Identity()
-            )  # == "linear activation" in torch
+            self.final_activation = nn.Identity()  # == "linear activation" in torch
         elif model_flavour == "observed":
             # multi-label multi-class classification problem
             self.final_activation = nn.Sigmoid()
         elif model_flavour == "dominant":
             # multi-class classification problem
-            self.final_activation = nn.Identity()  
+            self.final_activation = nn.Identity()
             # in contrast to tf, don't use Softmax here, cause already included in CrossEntropyLoss, which is to be used for dominant case
         else:
             warnings.warn(f"{model_flavour} not available")

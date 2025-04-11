@@ -22,7 +22,7 @@ class DecoderAttentionLayerTorch(nn.Module):
         super(DecoderAttentionLayerTorch, self).__init__()
         self.time_steps = time_steps
         # This linear layer maps a vector of length time_steps to a vector of length time_steps.
-        self.linear = nn.Linear(time_steps, time_steps)
+        self.linear = nn.LazyLinear(time_steps)
 
     def forward(self, x):
         """
@@ -49,6 +49,7 @@ class DecoderAttentionLayerTorch(nn.Module):
         # Permute the attention tensor back to (batch, time_steps, features)
         attn = attn.transpose(1, 2)
         # Multiply the original input with the attention weights elementwise
+        
         out = x * attn
         return out
 

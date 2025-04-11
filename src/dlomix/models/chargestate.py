@@ -6,7 +6,7 @@ from ..constants import ALPHABET_UNMOD
 from ..layers.attention import AttentionLayer
 
 """
-This module contains a deep learning model for precursor charge state prediction, inspired by Prosit's architecture. 
+This module contains a deep learning model for precursor charge state prediction, inspired by Prosit's architecture.
 The model is provided in three flavours of predicting precursor charge states:
 
 1. Dominant Charge State Prediction:
