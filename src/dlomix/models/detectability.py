@@ -7,7 +7,7 @@ class DetectabilityModel(tf.keras.Model):
     def __init__(
         self,
         num_units,
-        num_clases=len(CLASSES_LABELS),
+        num_classes=len(CLASSES_LABELS),
         name="autoencoder",
         padding_char=padding_char,
         **kwargs
@@ -15,14 +15,14 @@ class DetectabilityModel(tf.keras.Model):
         super(DetectabilityModel, self).__init__(name=name, **kwargs)
 
         self.num_units = num_units
-        self.num_clases = num_clases
+        self.num_classes = num_classes
         self.padding_char = padding_char
         self.alphabet_size = len(padding_char)
         self.one_hot_encoder = tf.keras.layers.Lambda(
             lambda x: tf.one_hot(tf.cast(x, "int32"), depth=self.alphabet_size)
         )
         self.encoder = Encoder(self.num_units)
-        self.decoder = Decoder(self.num_units, self.num_clases)
+        self.decoder = Decoder(self.num_units, self.num_classes)
 
     def call(self, inputs):
         onehot_inputs = self.one_hot_encoder(inputs)
@@ -84,7 +84,8 @@ class BahdanauAttention(tf.keras.layers.Layer):
 
         query_with_time_axis = tf.expand_dims(query, axis=1)
 
-        scores = self.V(tf.nn.tanh(self.W1(query_with_time_axis) + self.W2(values)))
+        query_values = tf.nn.tanh(self.W1(query_with_time_axis) + self.W2(values))
+        scores = self.V(query_values)
 
         attention_weights = tf.nn.softmax(scores, axis=1)
 

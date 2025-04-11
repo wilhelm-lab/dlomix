@@ -24,7 +24,7 @@ model = PrositIntensityPredictor(
 
 optimizer = tf.keras.optimizers.Adam(learning_rate=0.0001)
 
-TRAIN_DATAPATH = "../example_dataset/intensity/third_pool_processed_sample.parquet"
+TRAIN_DATAPATH = "example_dataset/intensity/third_pool_processed_sample.parquet"
 
 d = FragmentIonIntensityDataset(
     data_source=TRAIN_DATAPATH,

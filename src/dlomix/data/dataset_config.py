@@ -17,7 +17,7 @@ class DatasetConfig:
     test_data_source: Union[str, List]
     data_format: str
     sequence_column: str
-    label_column: str
+    label_column: List[str]
     val_ratio: float
     max_seq_len: int
     dataset_type: str

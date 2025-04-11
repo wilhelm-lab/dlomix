@@ -1,4 +1,4 @@
 from .chargestate import adjusted_mean_absolute_error
-from .rt_eval import TimeDeltaMetric, TimeDeltaMetric2
+from .rt_eval import delta95_metric
 
-__all__ = ["TimeDeltaMetric", "TimeDeltaMetric2", "adjusted_mean_absolute_error"]
+__all__ = ["adjusted_mean_absolute_error", "delta95_metric"]

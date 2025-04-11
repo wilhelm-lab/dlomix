@@ -76,7 +76,9 @@ def masked_pearson_correlation_distance(y_true, y_pred):
     pred_masked = ((y_true + 1) * y_pred) / (y_true + 1 + epsilon)
     true_masked = ((y_true + 1) * y_true) / (y_true + 1 + epsilon)
 
-    mx = tf.math.reduce_mean(true_masked)
+    mx = tf.math.reduce_mean(
+        true_masked
+    )  # If axis is None all dimensions are reduced, and a tensor with a single element is returned
     my = tf.math.reduce_mean(pred_masked)
     xm, ym = true_masked - mx, pred_masked - my
     r_num = tf.math.reduce_mean(tf.multiply(xm, ym))

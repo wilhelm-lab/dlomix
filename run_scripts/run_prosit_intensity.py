@@ -14,17 +14,21 @@ from dlomix.models import PrositIntensityPredictor
 
 optimizer = tf.keras.optimizers.Adam(learning_rate=0.0001)
 
-TRAIN_DATAPATH = "../example_dataset/intensity/intensity_data.parquet"
+# TRAIN_DATAPATH = "../example_dataset/intensity/intensity_data.parquet"
+TRAIN_DATAPATH = "example_dataset/intensity/third_pool_processed_sample.parquet"
 
 d = FragmentIonIntensityDataset(
     data_format="parquet",
     data_source=TRAIN_DATAPATH,
-    sequence_column="sequence",
-    label_column="intensities",
-    model_features=["precursor_charge_onehot", "collision_energy_aligned_normed"],
+    # sequence_column="sequence",
+    sequence_column="modified_sequence",
+    # label_column="intensities",
+    label_column="intensities_raw",
+    # model_features=["precursor_charge_onehot", "collision_energy_aligned_normed"],
     max_seq_len=30,
     batch_size=128,
     val_ratio=0.2,
+    with_termini=False,
 )
 
 print(d)
@@ -32,10 +36,15 @@ print(d)
 model = PrositIntensityPredictor(
     seq_length=30,
     input_keys={
-        "SEQUENCE_KEY": "sequence",
-        "COLLISION_ENERGY_KEY": "collision_energy_aligned_normed",
-        "PRECURSOR_CHARGE_KEY": "precursor_charge_onehot",
+        "SEQUENCE_KEY": "modified_sequence",
+        # "COLLISION_ENERGY_KEY": "collision_energy_aligned_normed",
+        # "PRECURSOR_CHARGE_KEY": "precursor_charge_onehot",
     },
+    # meta_data_keys={
+    #     "COLLISION_ENERGY_KEY": "collision_energy_aligned_normed",
+    #     "PRECURSOR_CHARGE_KEY": "precursor_charge_onehot",
+    # },
+    with_termini=False,
 )
 
 model.compile(optimizer=optimizer, loss=masked_spectral_distance, metrics=["mse"])
@@ -53,7 +62,7 @@ callbacks = [checkpoint, early_stop, decay]
 
 history = model.fit(
     d.tensor_train_data,
-    epochs=5,
+    epochs=20,
     validation_data=d.tensor_val_data,
     callbacks=callbacks,
 )

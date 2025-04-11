@@ -260,7 +260,9 @@ class SequenceEncodingProcessor(PeptideDatasetBaseProcessor):
 
         self.extend_alphabet = extend_alphabet
 
-        self.alphabet = {}
+        #  TODO: consider not starting from 0 when learning the alphabet
+        #  TODO: consider adding the padding token to the alphabet
+        self.alphabet = {str(unknown_token): 1}
         self.set_alphabet(alphabet)
         self.set_fallback(fallback_unmodified)
 

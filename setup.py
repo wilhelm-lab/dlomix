@@ -32,6 +32,7 @@ setuptools.setup(
         "tensorflow_probability==0.22",  # fixed for compatibility with tensorflow < 2.16
         "pyarrow",
         "seaborn",
+        "typing-extensions>=4.8.0",
     ],
     extras_require={
         "dev": [
@@ -45,6 +46,13 @@ setuptools.setup(
         ],
         "wandb": [
             "wandb >= 0.15",
+        ],
+        "torch": [
+            "torch",
+            "torchvision",
+        ],
+        "lightning": [
+            "lightning",
         ],
     },
     classifiers=[
