@@ -61,6 +61,11 @@ class FragmentIonIntensityDataset(PeptideDataset):
         auto_cleanup_cache: bool = True,
         num_proc: Optional[int] = None,
         batch_processing_size: int = 1000,
+        **kwargs,
     ):
-        kwargs = {k: v for k, v in locals().items() if k not in ["self", "__class__"]}
-        super().__init__(DatasetConfig(**kwargs))
+        config_kwargs = {
+            k: v
+            for k, v in locals().items()
+            if k not in ["self", "__class__", "kwargs"]
+        }
+        super().__init__(DatasetConfig(**config_kwargs), **kwargs)
