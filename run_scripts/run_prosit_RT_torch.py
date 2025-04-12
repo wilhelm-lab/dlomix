@@ -61,7 +61,7 @@ metrics_log = (
     []
 )  # Each element will be a dict with keys: epoch, train_loss, val_loss, test_loss, learning_rate
 
-for epoch in range(1, 2):
+for epoch in range(1, 5):
     model.train()
     running_loss = 0.0
     local_step = 0

@@ -6,7 +6,7 @@ from dlomix.eval.chargestate import (
     adjusted_mean_absolute_error,
     adjusted_mean_squared_error,
 )
-from dlomix.eval.rt_eval import delta95_metric
+from dlomix.eval.rt_eval import timedelta
 from dlomix.eval.tf.rt_eval import TimeDeltaMetric
 
 Y_TRUE = [0, 1, 2, 2, 0, 0, 0, 0]
@@ -50,7 +50,7 @@ def test_rt_eval_rf():
     metric.update_state(y_true, y_pred)
     assert metric.delta == 4.0
     assert metric.result() == 4.0 / 1
-    assert delta95_metric(y_true, y_pred) == 4.0 / 4
+    assert timedelta(y_true, y_pred) == 2
 
 
 def test_rt_eval_torch():
@@ -58,4 +58,4 @@ def test_rt_eval_torch():
     y_pred = torch.tensor([1.5, 3.0, 4.5, 6.0, 7.5])
     # abs_error =         [0.5, 1.0, 1.5, 2.0, 2.5]
 
-    assert delta95_metric(y_true, y_pred) == 4.0 / 4
+    assert timedelta(y_true, y_pred) == 2

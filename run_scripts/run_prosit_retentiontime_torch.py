@@ -1,12 +1,4 @@
-import os
-import sys
-
-import pandas as pd
-import tensorflow as tf
-
 from dlomix.data import RetentionTimeDataset
-from dlomix.eval import TimeDeltaMetric
-from dlomix.models import PrositRetentionTimePredictor
 
 TRAIN_DATAPATH = "example_dataset/proteomTools_train_val.csv"
 TEST_DATAPATH = "example_dataset/proteomTools_test.csv"
