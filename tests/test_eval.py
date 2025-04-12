@@ -6,8 +6,7 @@ from dlomix.eval.chargestate import (
     adjusted_mean_absolute_error,
     adjusted_mean_squared_error,
 )
-from dlomix.eval.rt_eval import timedelta
-from dlomix.eval.tf.rt_eval import TimeDeltaMetric
+from dlomix.eval.rt_eval import TimeDeltaMetric, timedelta
 
 Y_TRUE = [0, 1, 2, 2, 0, 0, 0, 0]
 Y_PRED = [0, 3, 0, 4, 0, 0, 2, 0]

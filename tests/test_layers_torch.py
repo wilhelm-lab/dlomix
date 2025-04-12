@@ -1,9 +1,8 @@
 import logging
 
-import numpy as np
 import torch
 
-from dlomix.layers import AttentionLayerTorch, DecoderAttentionLayerTorch
+from dlomix.layers.attention_torch import AttentionLayer, DecoderAttentionLayer
 
 logger = logging.getLogger(__name__)
 
@@ -15,7 +14,7 @@ def test_attention_layer_shapes():
 
     dummy_input = torch.randn(batch_size, seq_len, feature_dim)
 
-    layer = AttentionLayerTorch(
+    layer = AttentionLayer(
         feature_dim=feature_dim, seq_len=seq_len, context=False, bias=True
     )
     output = layer(dummy_input)
@@ -35,7 +34,7 @@ def test_decoder_attention_layer_shapes():
     features = 5
 
     dummy_input = torch.randn(batch_size, time_steps, features)
-    layer = DecoderAttentionLayerTorch(time_steps=time_steps)
+    layer = DecoderAttentionLayer(time_steps=time_steps)
     output = layer(dummy_input)
 
     logger.info(

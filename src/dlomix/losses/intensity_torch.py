@@ -3,7 +3,7 @@ import torch
 import torch.nn.functional as F
 
 
-def masked_spectral_distance_torch(
+def masked_spectral_distance(
     y_true: torch.Tensor, y_pred: torch.Tensor
 ) -> torch.Tensor:
     """
@@ -55,7 +55,7 @@ def masked_spectral_distance_torch(
     return batch_losses.mean()
 
 
-def masked_pearson_correlation_distance_torch(
+def masked_pearson_correlation_distance(
     y_true: torch.Tensor, y_pred: torch.Tensor
 ) -> torch.Tensor:
     """

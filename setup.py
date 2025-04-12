@@ -3,19 +3,26 @@ import setuptools
 with open("README.md", "r") as fh:
     long_description = fh.read()
 
-from src.dlomix import META_DATA, __version__
 
-VERSION = __version__
+def get_metadata():
+    metadata = {}
+    with open("src/dlomix/_metadata.py") as f:
+        exec(f.read(), metadata)
+    return metadata
+
+
+# Load metadata
+META_DATA = get_metadata()
 
 setuptools.setup(
-    name=META_DATA["package_name"].lower(),
-    version=VERSION,
-    author=META_DATA["author"],
-    author_email=META_DATA["author_email"],
-    description=META_DATA["description"],
+    name=META_DATA["__package__"].lower(),
+    version=META_DATA["__version__"],
+    author=META_DATA["__author__"],
+    author_email=META_DATA["__author_email__"],
+    description=META_DATA["__description__"],
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url=META_DATA["github_url"],
+    url=META_DATA["__github_url__"],
     packages=setuptools.find_packages(where="src"),
     package_dir={"": "src"},
     include_package_data=True,

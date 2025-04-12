@@ -1,6 +1,6 @@
 import torch.nn as nn
 
-from .attention_torch import DecoderAttentionLayerTorch
+from .attention_torch import DecoderAttentionLayer
 
 
 class GRUSequentialDecoder(nn.Module):
@@ -29,7 +29,7 @@ class GRUSequentialDecoder(nn.Module):
         )
         self.encoder_dropout = nn.Dropout(dropout_rate)
 
-        self.attention = DecoderAttentionLayerTorch(max_ion)
+        self.attention = DecoderAttentionLayer(max_ion)
 
     def forward(self, inputs):
         x, _ = self.unidirectional_GRU(inputs)

@@ -4,12 +4,12 @@ import torch
 import torch.nn as nn
 
 from ..constants import ALPHABET_UNMOD
-from ..layers.attention_torch import AttentionLayerTorch
+from ..layers.attention_torch import AttentionLayer
 from ..layers.bi_gru_seq_encoder_torch import BiGRUSequentialEncoder
 from ..layers.gru_seq_decoder_torch import GRUSequentialDecoder
 
 
-class PrositRetentionTimePredictorTorch(nn.Module):
+class PrositRetentionTimePredictor(nn.Module):
     """
     Implementation of the Prosit model for retention time prediction.
 
@@ -43,7 +43,7 @@ class PrositRetentionTimePredictorTorch(nn.Module):
         recurrent_layers_sizes=(256, 512),
         regressor_layer_size=512,
     ):
-        super(PrositRetentionTimePredictorTorch, self).__init__()
+        super(PrositRetentionTimePredictor, self).__init__()
 
         # tie the count of embeddings to the size of the vocabulary (count of amino acids)
         self.embeddings_count = len(alphabet)
@@ -65,7 +65,7 @@ class PrositRetentionTimePredictorTorch(nn.Module):
             embedding_output_dim, self.recurrent_layers_sizes, self.dropout_rate
         )
 
-        self.attention = AttentionLayerTorch(
+        self.attention = AttentionLayer(
             feature_dim=self.recurrent_layers_sizes[1], seq_len=self.seq_length
         )
 
@@ -98,7 +98,7 @@ class PrositRetentionTimePredictorTorch(nn.Module):
         return x
 
 
-class PrositIntensityPredictorTorch(nn.Module):
+class PrositIntensityPredictor(nn.Module):
     def __init__(
         self,
         embedding_output_dim=16,
@@ -114,7 +114,7 @@ class PrositIntensityPredictorTorch(nn.Module):
         meta_data_keys=None,
         with_termini=True,
     ):
-        super(PrositIntensityPredictorTorch, self).__init__()
+        super(PrositIntensityPredictor, self).__init__()
 
         self.dropout_rate = dropout_rate
         self.latent_dropout_rate = latent_dropout_rate
@@ -150,7 +150,7 @@ class PrositIntensityPredictorTorch(nn.Module):
         self._build_encoders()
         self._build_decoder()
 
-        self.attention = AttentionLayerTorch(
+        self.attention = AttentionLayer(
             feature_dim=regressor_layer_size, seq_len=seq_length
         )
 

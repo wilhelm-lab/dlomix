@@ -4,7 +4,7 @@ from collections import OrderedDict
 import torch.nn as nn
 
 from ..constants import ALPHABET_UNMOD
-from ..layers.attention_torch import AttentionLayerTorch
+from ..layers.attention_torch import AttentionLayer
 from ..layers.bi_gru_seq_encoder_torch import BiGRUSequentialEncoder
 
 """
@@ -25,7 +25,7 @@ The model is provided in three flavours of predicting precursor charge states:
 """
 
 
-class ChargeStatePredictorTorch(nn.Module):
+class ChargeStatePredictor(nn.Module):
     """
     Precursor Charge State Prediction Model for predicting either:
     * the dominant charge state or
@@ -60,7 +60,7 @@ class ChargeStatePredictorTorch(nn.Module):
         num_classes=6,
         model_flavour="relative",
     ):
-        super(ChargeStatePredictorTorch, self).__init__()
+        super(ChargeStatePredictor, self).__init__()
 
         # tie the count of embeddings to the size of the vocabulary (count of amino acids)
         self.embeddings_count = len(alphabet)
@@ -95,7 +95,7 @@ class ChargeStatePredictorTorch(nn.Module):
             embedding_output_dim, self.recurrent_layers_sizes, self.dropout_rate
         )
 
-        self.attention = AttentionLayerTorch(
+        self.attention = AttentionLayer(
             feature_dim=self.recurrent_layers_sizes[1], seq_len=self.seq_length
         )
 

@@ -3,9 +3,9 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 
-class DetectabilityModelTorch(nn.Module):
+class DetectabilityModel(nn.Module):
     def __init__(self, num_units, num_classes, padding_idx, alphabet_size):
-        super(DetectabilityModelTorch, self).__init__()
+        super(DetectabilityModel, self).__init__()
 
         self.num_units = num_units
         self.num_classes = num_classes
