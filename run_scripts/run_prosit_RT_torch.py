@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.optim as optim
 
 from dlomix.data import RetentionTimeDataset
-from dlomix.models import PrositRetentionTimePredictorTorch
+from dlomix.models import PrositRetentionTimePredictor
 
 if torch.cuda.is_available():
     device = torch.device("cuda")
@@ -35,7 +35,7 @@ for x in d.tensor_train_data:
     break
 
 
-model = PrositRetentionTimePredictorTorch(seq_length=30)
+model = PrositRetentionTimePredictor(seq_length=30)
 print(model)
 model.to(device)
 

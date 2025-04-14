@@ -3,12 +3,12 @@ from tqdm import tqdm
 
 from dlomix.constants import ALPHABET_UNMOD
 from dlomix.data import FragmentIonIntensityDataset
-from dlomix.losses.intensity_torch import masked_spectral_distance_torch
-from dlomix.models import PrositIntensityPredictorTorch
+from dlomix.losses.intensity_torch import masked_spectral_distance
+from dlomix.models import PrositIntensityPredictor
 
 BATCH_SIZE = 128
 
-model = PrositIntensityPredictorTorch(
+model = PrositIntensityPredictor(
     seq_length=30,
     use_prosit_ptm_features=False,
     input_keys={
@@ -41,7 +41,7 @@ d = FragmentIonIntensityDataset(
 )
 
 
-loss_criterion = masked_spectral_distance_torch
+loss_criterion = masked_spectral_distance
 
 for epoch in tqdm(range(0, 100)):
     epoch_loss = 0

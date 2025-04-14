@@ -262,14 +262,14 @@ class PrositIntensityPredictor(nn.Module):
             # ToDo: ensure PTM features work as expected
             # read PTM features from the input dict # --> Still needs to be implemented
             # ptm_ac_features = self._collect_values_from_inputs_if_exists(
-            #     inputs, PrositIntensityPredictorTorch.PTM_INPUT_KEYS
+            #     inputs, PrositIntensityPredictor.PTM_INPUT_KEYS
             # )
 
             # if self.ptm_input_encoder and len(ptm_ac_features) > 0:
             #     encoded_ptm = self.ptm_input_encoder(ptm_ac_features)
             # elif self.use_prosit_ptm_features:
             #     warnings.warn(
-            #         f"PTM features enabled and following PTM features are expected in the model for Prosit Intesity: {PrositIntensityPredictorTorch.PTM_INPUT_KEYS}. The actual input passed to the model contains the following keys: {list(inputs.keys())}. Falling back to no PTM features."
+            #         f"PTM features enabled and following PTM features are expected in the model for Prosit Intesity: {PrositIntensityPredictor.PTM_INPUT_KEYS}. The actual input passed to the model contains the following keys: {list(inputs.keys())}. Falling back to no PTM features."
             #     )
 
         x = self.embedding(peptides_in)
