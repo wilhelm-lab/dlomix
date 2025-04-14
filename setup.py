@@ -14,6 +14,15 @@ def get_metadata():
 # Load metadata
 META_DATA = get_metadata()
 
+tensorflow_extra_install = [
+    "tensorflow>=2.13,<2.16",  # 2.16 introduces breaking changes and has Keras 3 as default
+]
+
+pytorch_extra_install = [
+    "torch",
+    "torchvision",
+]
+
 setuptools.setup(
     name=META_DATA["__package__"].lower(),
     version=META_DATA["__version__"],
@@ -35,7 +44,6 @@ setuptools.setup(
         "numpy",
         "matplotlib",
         "scikit-learn",
-        "tensorflow>=2.13,<2.16",  # 2.16 introduces breaking changes and has Keras 3 as default
         "pyarrow",
         "seaborn",
     ],
@@ -52,10 +60,10 @@ setuptools.setup(
         "wandb": [
             "wandb >= 0.15",
         ],
-        "torch": [
-            "torch",
-            "torchvision",
-        ],
+        "tensorflow": tensorflow_extra_install,
+        "tf": tensorflow_extra_install,
+        "torch": pytorch_extra_install,
+        "pytorch": pytorch_extra_install,
         "lightning": [
             "lightning",
         ],
