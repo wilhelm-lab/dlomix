@@ -1,6 +1,3 @@
-import os
-import sys
-
 import tensorflow as tf
 
 from dlomix.data import FragmentIonIntensityDataset
@@ -39,7 +36,7 @@ d = FragmentIonIntensityDataset(
 
 model.compile(optimizer=optimizer, loss=masked_spectral_distance, metrics=["mse"])
 
-weights_file = "./prosit_intensity_test"
+weights_file = "./run_scripts/output/prosit_intensity_test_ptms"
 checkpoint = tf.keras.callbacks.ModelCheckpoint(
     weights_file, save_best_only=True, save_weights_only=True
 )

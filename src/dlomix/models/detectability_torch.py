@@ -2,9 +2,17 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+from ..constants import CLASSES_LABELS, padding_char
+
 
 class DetectabilityModel(nn.Module):
-    def __init__(self, num_units, num_classes, padding_idx, alphabet_size):
+    def __init__(
+        self,
+        num_units,
+        alphabet_size,
+        num_classes=len(CLASSES_LABELS),
+        padding_idx=padding_char,
+    ):
         super(DetectabilityModel, self).__init__()
 
         self.num_units = num_units
