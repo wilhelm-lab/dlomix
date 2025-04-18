@@ -63,7 +63,7 @@ class ChargeStatePredictor(nn.Module):
         super(ChargeStatePredictor, self).__init__()
 
         # tie the count of embeddings to the size of the vocabulary (count of amino acids)
-        self.embeddings_count = len(alphabet)
+        self.embeddings_count = len(alphabet) + 1
         self.seq_length = seq_length
 
         self.dropout_rate = dropout_rate

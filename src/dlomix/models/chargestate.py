@@ -60,7 +60,7 @@ class ChargeStatePredictor(tf.keras.Model):
         super(ChargeStatePredictor, self).__init__()
 
         # tie the count of embeddings to the size of the vocabulary (count of amino acids)
-        self.embeddings_count = len(alphabet)
+        self.embeddings_count = len(alphabet) + 1
 
         self.dropout_rate = dropout_rate
         self.latent_dropout_rate = latent_dropout_rate
