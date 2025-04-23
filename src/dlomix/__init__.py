@@ -1,3 +1,4 @@
+from ._metadata import __version__
 from .config import _BACKEND, BACKEND_PRETTY_NAME, PYTORCH_BACKEND, TENSORFLOW_BACKEND
 
 BACKEND_IMPORT_ERROR_MESSAGE = f"""
@@ -20,4 +21,5 @@ if _BACKEND in TENSORFLOW_BACKEND:
 
 __all__ = [
     "_BACKEND",  # Also expose the current backend name
+    "__version__",  # Expose the version of the package
 ]
