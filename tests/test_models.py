@@ -2,11 +2,8 @@ import logging
 
 import pytest
 
-from dlomix.models import (
-    ChargeStatePredictor,
-    PrositIntensityPredictor,
-    PrositRetentionTimePredictor,
-)
+from dlomix.models.chargestate import ChargeStatePredictor
+from dlomix.models.prosit import PrositIntensityPredictor, PrositRetentionTimePredictor
 
 logger = logging.getLogger(__name__)
 

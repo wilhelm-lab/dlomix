@@ -1,10 +1,3 @@
-import os
-import sys
-
-import numpy as np
-import pandas as pd
-import torch
-
 from dlomix.constants import CLASSES_LABELS, aa_to_int_dict, alphabet
 from dlomix.data import DetectabilityDataset
 
@@ -29,13 +22,13 @@ detectability_data = DetectabilityDataset(
 )
 
 
-from dlomix.models import DetectabilityModelTorch
+from dlomix.models import DetectabilityModel
 
 total_num_classes = len(CLASSES_LABELS)
 input_dimension = len(alphabet)
 num_cells = 64
 
-model = DetectabilityModelTorch(
+model = DetectabilityModel(
     padding_idx=aa_to_int_dict["0"],
     num_units=num_cells,
     num_classes=total_num_classes,

@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 
-class DecoderAttentionLayerTorch(nn.Module):
+class DecoderAttentionLayer(nn.Module):
     """
     Decoder attention layer.
 
@@ -19,7 +19,7 @@ class DecoderAttentionLayerTorch(nn.Module):
     """
 
     def __init__(self, time_steps):
-        super(DecoderAttentionLayerTorch, self).__init__()
+        super(DecoderAttentionLayer, self).__init__()
         self.time_steps = time_steps
         # This linear layer maps a vector of length time_steps to a vector of length time_steps.
         self.linear = nn.LazyLinear(time_steps)
@@ -49,12 +49,12 @@ class DecoderAttentionLayerTorch(nn.Module):
         # Permute the attention tensor back to (batch, time_steps, features)
         attn = attn.transpose(1, 2)
         # Multiply the original input with the attention weights elementwise
-        
+
         out = x * attn
         return out
 
 
-class AttentionLayerTorch(nn.Module):
+class AttentionLayer(nn.Module):
     """
     Attention layer.
 
@@ -81,7 +81,7 @@ class AttentionLayerTorch(nn.Module):
     """
 
     def __init__(self, feature_dim, seq_len, context=False, bias=True, epsilon=1e-8):
-        super(AttentionLayerTorch, self).__init__()
+        super(AttentionLayer, self).__init__()
         self.feature_dim = feature_dim
         self.seq_len = seq_len
         self.context = context

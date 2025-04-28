@@ -1,14 +1,20 @@
+import logging
 import os
 import sys
 
 import tensorflow as tf
 
-sys.path.append(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
-
-
 from dlomix.data import FragmentIonIntensityDataset
 from dlomix.losses import masked_spectral_distance
 from dlomix.models import PrositIntensityPredictor
+
+sys.path.append(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
+
+logging.basicConfig(
+    # level=logging.INFO,
+    level=logging.DEBUG,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+)
 
 # consider the use-case for starting from a saved model
 
@@ -20,9 +26,7 @@ TRAIN_DATAPATH = "example_dataset/intensity/third_pool_processed_sample.parquet"
 d = FragmentIonIntensityDataset(
     data_format="parquet",
     data_source=TRAIN_DATAPATH,
-    # sequence_column="sequence",
     sequence_column="modified_sequence",
-    # label_column="intensities",
     label_column="intensities_raw",
     # model_features=["precursor_charge_onehot", "collision_energy_aligned_normed"],
     max_seq_len=30,
@@ -49,7 +53,7 @@ model = PrositIntensityPredictor(
 
 model.compile(optimizer=optimizer, loss=masked_spectral_distance, metrics=["mse"])
 
-weights_file = "./prosit_intensity_test"
+weights_file = "./run_scripts/output/prosit_intensity_test"
 checkpoint = tf.keras.callbacks.ModelCheckpoint(
     weights_file, save_best_only=True, save_weights_only=True
 )

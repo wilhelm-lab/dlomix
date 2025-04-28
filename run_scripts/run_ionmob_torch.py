@@ -16,7 +16,7 @@ def main():
     parser = argparse.ArgumentParser(description="Train Ionmob model with PyTorch")
     parser.add_argument("--batch_size", type=int, default=1024, help="Batch size")
     parser.add_argument(
-        "--epochs", type=int, default=50, help="Number of epochs to train"
+        "--epochs", type=int, default=1, help="Number of epochs to train"
     )
     parser.add_argument("--lr", type=float, default=0.01, help="Initial learning rate")
     parser.add_argument("--emb_dim", type=int, default=64, help="Embedding dimension")
@@ -58,7 +58,7 @@ def main():
     parser.add_argument(
         "--save_path",
         type=str,
-        default="best_model.pth",
+        default="./run_scripts/output/ionmob_best_model.pth",
         help="Path to save the best trained model",
     )
     parser.add_argument(
@@ -70,13 +70,13 @@ def main():
     parser.add_argument(
         "--metrics_csv",
         type=str,
-        default="metrics_log.csv",
+        default="./run_scripts/output/ionmob_metrics_log.csv",
         help="Path to save the CSV metrics log",
     )
     parser.add_argument(
         "--plot_path",
         type=str,
-        default="training_plots.png",
+        default="./run_scripts/output/ionmob_training_plots.png",
         help="Path to save the high resolution training plots image",
     )
     args = parser.parse_args()

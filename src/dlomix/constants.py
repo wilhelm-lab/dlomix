@@ -1,3 +1,5 @@
+import numpy as np
+
 DEFAULT_PARQUET_ENGINE = "pyarrow"
 
 retention_time_pipeline_parameters = {
@@ -127,7 +129,6 @@ aa_to_int_dict = dict((aa, i) for i, aa in enumerate(alphabet))
 
 int_to_aa_dict = dict((i, aa) for i, aa in enumerate(alphabet))
 
-import numpy as np
 
 padding_char = np.zeros(len(alphabet))
 padding_char[0] = 1

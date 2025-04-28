@@ -4,7 +4,7 @@ import torch.optim as optim
 
 from dlomix.constants import PTMS_ALPHABET
 from dlomix.data import ChargeStateDataset
-from dlomix.models import ChargeStatePredictorTorch
+from dlomix.models import ChargeStatePredictor
 
 if torch.cuda.is_available():
     device = torch.device("cuda")
@@ -42,7 +42,7 @@ test_d = ChargeStateDataset(
 )
 
 
-model = ChargeStatePredictorTorch(
+model = ChargeStatePredictor(
     num_classes=6, seq_length=30, alphabet=PTMS_ALPHABET, model_flavour="relative"
 )
 print(model)

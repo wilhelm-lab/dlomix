@@ -4,11 +4,15 @@ import numpy as np
 import tensorflow as tf
 import torch
 
-from dlomix.losses import (
+from dlomix.losses.intensity import (
     masked_pearson_correlation_distance,
-    masked_pearson_correlation_distance_torch,
     masked_spectral_distance,
-    masked_spectral_distance_torch,
+)
+from dlomix.losses.intensity_torch import (
+    masked_pearson_correlation_distance as masked_pearson_correlation_distance_torch,
+)
+from dlomix.losses.intensity_torch import (
+    masked_spectral_distance as masked_spectral_distance_torch,
 )
 
 logger = logging.getLogger(__name__)

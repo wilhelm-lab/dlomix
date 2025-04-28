@@ -1,6 +1,30 @@
 import torch
 
 
+class TimeDeltaMetric:
+    """Class to calculate the time delta metric."""
+
+    def __init__(self, percentage=0.95, normalize=False):
+        """
+        Parameters
+        ----------
+        percentage : float, optional
+            percentage of absolute error to consider, by default 0.95
+        normalize : bool, optional
+            whether to normalize the error by the range of y_true, by default False
+        """
+        self.percentage = percentage
+        self.normalize = normalize
+
+    def __call__(self, y_true: torch.Tensor, y_pred: torch.Tensor) -> torch.Tensor:
+        return timedelta(y_true, y_pred, self.percentage, self.normalize)
+
+    def __repr__(self) -> str:
+        return (
+            f"TimeDeltaMetric(percentage={self.percentage}, normalize={self.normalize})"
+        )
+
+
 def timedelta(
     y_true: torch.Tensor, y_pred: torch.Tensor, percentage=0.95, normalize=False
 ) -> torch.Tensor:
@@ -32,12 +56,3 @@ def timedelta(
         return delta / norm_range
 
     return delta
-
-
-if __name__ == "__main__":
-    # test case: absolute error is 2.0 is  below 95th percentile
-    y_true = torch.tensor([1.0, 2.0, 3.0, 4.0, 5.0])
-    y_pred = torch.tensor([1.5, 3.0, 4.5, 6.0, 7.5])
-    # abs_error =        [0.5, 1.0, 1.5, 2.0, 2.5]
-
-    print(timedelta(y_true, y_pred))  # 4 / 4

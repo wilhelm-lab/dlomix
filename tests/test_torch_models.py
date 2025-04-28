@@ -2,13 +2,16 @@ import logging
 
 import torch
 
-from dlomix.models import (
-    ChargeStatePredictor,
-    ChargeStatePredictorTorch,
-    PrositIntensityPredictor,
-    PrositIntensityPredictorTorch,
-    PrositRetentionTimePredictor,
-    PrositRetentionTimePredictorTorch,
+from dlomix.models.chargestate import ChargeStatePredictor
+from dlomix.models.chargestate_torch import (
+    ChargeStatePredictor as ChargeStatePredictorTorch,
+)
+from dlomix.models.prosit import PrositIntensityPredictor, PrositRetentionTimePredictor
+from dlomix.models.prosit_torch import (
+    PrositIntensityPredictor as PrositIntensityPredictorTorch,
+)
+from dlomix.models.prosit_torch import (
+    PrositRetentionTimePredictor as PrositRetentionTimePredictorTorch,
 )
 
 logger = logging.getLogger(__name__)

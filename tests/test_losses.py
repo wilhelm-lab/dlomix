@@ -1,9 +1,11 @@
 import logging
 
-import numpy as np
 import tensorflow as tf
 
-from dlomix.losses import masked_pearson_correlation_distance, masked_spectral_distance
+from dlomix.losses.intensity import (
+    masked_pearson_correlation_distance,
+    masked_spectral_distance,
+)
 
 logger = logging.getLogger(__name__)
 
