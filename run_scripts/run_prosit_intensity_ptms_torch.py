@@ -1,6 +1,6 @@
 """
     To run this script, use the following command:
-    DLOMIX_BACKEND=torch python run_scripts/run_prosit_intensity_torch.py
+    DLOMIX_BACKEND=torch python run_scripts/run_prosit_intensity_ptms_torch.py
 """
 
 import logging
@@ -18,20 +18,20 @@ logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
 )
 
-BATCH_SIZE = 128
+BATCH_SIZE = 8
+N_EPOCHS = 20
 
 model = PrositIntensityPredictor(
-    seq_length=30,
-    use_prosit_ptm_features=False,
+    seq_length=32,
+    use_prosit_ptm_features=True,
     input_keys={
         "SEQUENCE_KEY": "modified_sequence",
     },
-    # meta_data_keys={
-    #     "COLLISION_ENERGY_KEY": "collision_energy_aligned_normed",
-    #     "PRECURSOR_CHARGE_KEY": "precursor_charge_onehot",
-    # },
-    with_termini=False,
-    # alphabet=ALPHABET_UNMOD,
+    meta_data_keys={
+        "COLLISION_ENERGY_KEY": "collision_energy_aligned_normed",
+        "PRECURSOR_CHARGE_KEY": "precursor_charge_onehot",
+    },
+    with_termini=True,
 )
 
 optimizer = torch.optim.Adam(params=model.parameters(), lr=0.0001)
@@ -40,23 +40,21 @@ TRAIN_DATAPATH = "example_dataset/intensity/third_pool_processed_sample.parquet"
 
 d = FragmentIonIntensityDataset(
     data_source=TRAIN_DATAPATH,
-    max_seq_len=30,
+    max_seq_len=32,
     batch_size=BATCH_SIZE,
     val_ratio=0.2,
     model_features=["collision_energy_aligned_normed", "precursor_charge_onehot"],
     sequence_column="modified_sequence",
     label_column="intensities_raw",
-    # features_to_extract=["mod_loss", "delta_mass"],
+    features_to_extract=["mod_loss", "delta_mass"],
     dataset_type="pt",
-    # alphabet=ALPHABET_UNMOD,
-    with_termini=False,
+    with_termini=True,
 )
 
 print(d)
 
 loss_criterion = masked_spectral_distance
 
-N_EPOCHS = 20
 for epoch in tqdm(range(0, N_EPOCHS)):
     epoch_loss = 0
     model.train()
@@ -93,3 +91,6 @@ for epoch in tqdm(range(0, N_EPOCHS)):
 
         avg_val_loss = val_loss_total / val_data_size
     print(f"Epoch {epoch} Summary:  Validation Loss: {avg_val_loss:.4f}")
+
+print(val_pred_cs.shape)
+print(val_pred_cs[0])
