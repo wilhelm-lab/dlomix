@@ -9,7 +9,7 @@ elif _BACKEND in PYTORCH_BACKEND:
 
 __all__ = [
     "adjusted_mean_absolute_error",
-    "adjusted_mean_squared_error"
+    "adjusted_mean_squared_error",
     "timedelta",
     "TimeDeltaMetric",
 ]
