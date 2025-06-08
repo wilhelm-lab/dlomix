@@ -109,6 +109,7 @@ class SequenceParsingProcessor(PeptideDatasetBaseProcessor):
 
     def _parse_proforma_sequence(self, sequence_string):
         splitted = sequence_string.split("-")
+        seq = ""
 
         if len(splitted) == 1:
             n_term, seq, c_term = "[]-", splitted[0], "-[]"
@@ -121,6 +122,10 @@ class SequenceParsingProcessor(PeptideDatasetBaseProcessor):
             n_term, seq, c_term = splitted
             n_term += "-"
             c_term = "-" + c_term
+        else:
+            raise ValueError(
+                f"Invalid sequence format: {sequence_string}. Expected format: [N-term]-[sequence]-[C-term]."
+            )
 
         seq = re.findall(r"[A-Za-z](?:\[UNIMOD:\d+\])*|[^\[\]]", seq)
         return n_term, seq, c_term

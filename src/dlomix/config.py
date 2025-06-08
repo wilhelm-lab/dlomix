@@ -8,8 +8,8 @@ TENSORFLOW_BACKEND = ["tensorflow", "tf"]
 PYTORCH_BACKEND = ["pytorch", "torch", "pt"]
 
 
-def custom_show_warning(message, category, filename, lineno, file=None, line=None):
-    print(f"{message}")
+def custom_show_warning(msg, category, filename, lineno, file=None, line=None):
+    print(f"{msg}")
 
 
 # Allow setting backend via environment variable or default to tensorflow

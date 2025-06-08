@@ -1,5 +1,4 @@
 # adjust encoding schemes workflow --> check ppt for details
-# check if config can wrap all the parameters and be used to manage the attributes of the class, reduce the assignment of attributes in the init method
 
 import importlib
 import logging
@@ -139,6 +138,8 @@ class PeptideDataset:
 
         self._config = dataset_config
 
+        # explcit assignments of processed attribute
+        self.processed = dataset_config.processed
         if not self.processed:
             self.hf_dataset: Optional[Union[Dataset, DatasetDict]] = None
             self._empty_dataset_mode = False
@@ -464,13 +465,19 @@ If you prefer to encode the (amino-acids)+PTM combinations as tokens in the voca
         for processor in self._processors:
             for split in self.hf_dataset.keys():
                 logger.info(
-                    f"Applying step: {processor.__class__.__name__} on split {split}..."
+                    "Applying step: %s on split %s...",
+                    processor.__class__.__name__,
+                    split,
                 )
-                print(
-                    f"Applying step: {processor.__class__.__name__} on split {split}..."
+
+                logger.info(
+                    "Applying step: %s on split %s...",
+                    processor.__class__.__name__,
+                    split,
                 )
+
                 logger.debug(
-                    f"Applying step with arguments:\n\n{processor} on split {split}..."
+                    "Applying step with arguments:\n\n %s on split %s", processor, split
                 )
 
                 # split-specific logic for encoding
@@ -503,9 +510,7 @@ If you prefer to encode the (amino-acids)+PTM combinations as tokens in the voca
                 # split-specific logic for truncating train/val sequences only after padding
                 if isinstance(processor, SequencePaddingProcessor):
                     if split != PeptideDataset.DEFAULT_SPLIT_NAMES[2]:
-                        logger.info(
-                            f"Removing truncated sequences in the {split} split ..."
-                        )
+                        logger.info("Removing truncated sequences in the %s ", split)
 
                         self.hf_dataset[split] = self.hf_dataset[split].filter(
                             lambda batch: batch[processor.KEEP_COLUMN_NAME],
@@ -514,7 +519,7 @@ If you prefer to encode the (amino-acids)+PTM combinations as tokens in the voca
                             batch_size=self.batch_processing_size,
                         )
 
-                logger.info(f"Done with step: {processor.__class__.__name__}.\n")
+                logger.info("Done with step: %s \n", processor.__class__.__name__)
 
         self.hf_dataset = self.hf_dataset.remove_columns(
             SequencePaddingProcessor.KEEP_COLUMN_NAME
@@ -559,7 +564,7 @@ If you prefer to encode the (amino-acids)+PTM combinations as tokens in the voca
     def _cleanup_temp_dataset_cache_files(self):
         if self.auto_cleanup_cache:
             cleaned_up = self.hf_dataset.cleanup_cache_files()
-            logger.info(f"Cleaned up cache files: {cleaned_up}.")
+            logger.info("Cleaned up cache files: %s.", cleaned_up)
 
     def save_to_disk(self, path: str):
         """

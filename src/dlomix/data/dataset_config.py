@@ -47,8 +47,8 @@ class DatasetConfig:
         """
 
         os.makedirs(os.path.dirname(path), exist_ok=True)
-        with open(path, "w") as f:
-            json.dump(self.__dict__, f, default=lambda obj: repr(obj))
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(self.__dict__, f, default=repr)
 
     @staticmethod
     def load_config_json(path: str):
@@ -62,6 +62,6 @@ class DatasetConfig:
             DatasetConfig: The configuration object.
         """
 
-        with open(path, "r") as f:
+        with open(path, "r", encoding="utf-8") as f:
             config = json.load(f)
         return DatasetConfig(**config)

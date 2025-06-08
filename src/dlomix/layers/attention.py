@@ -14,8 +14,12 @@ class DecoderAttentionLayer(tf.keras.layers.Layer):
     """
 
     def __init__(self, time_steps):
-        super(DecoderAttentionLayer, self).__init__()
+        super().__init__()
         self.time_steps = time_steps
+        # Initialize attributes that will be set in build
+        self.permute = None
+        self.dense = None
+        self.multiply = None
 
     def build(self, input_shape):
         """
@@ -85,7 +89,7 @@ class AttentionLayer(tf.keras.layers.Layer):
         b_constraint=None,
         u_constraint=None,
         bias=True,
-        **kwargs
+        **kwargs,
     ):
         self.supports_masking = True
         self.init = initializers.get("glorot_uniform")
@@ -97,7 +101,14 @@ class AttentionLayer(tf.keras.layers.Layer):
         self.u_constraint = constraints.get(u_constraint)
         self.bias = bias
         self.context = context
-        super(AttentionLayer, self).__init__(**kwargs)
+
+        # Initialize attributes that will be set in build
+        self.W = None
+        self.b = None
+        self.u = None
+        self.built = False
+
+        super().__init__(**kwargs)
 
     def build(self, input_shape):
         """
@@ -112,7 +123,7 @@ class AttentionLayer(tf.keras.layers.Layer):
         self.W = self.add_weight(
             shape=(input_shape[-1],),
             initializer=self.init,
-            name="{}_W".format(self.name),
+            name=f"{self.name}_W",
             regularizer=self.W_regularizer,
             constraint=self.W_constraint,
         )
@@ -120,7 +131,7 @@ class AttentionLayer(tf.keras.layers.Layer):
             self.b = self.add_weight(
                 shape=(input_shape[1],),
                 initializer="zero",
-                name="{}_b".format(self.name),
+                name=f"{self.name}_b",
                 regularizer=self.b_regularizer,
                 constraint=self.b_constraint,
             )
@@ -130,7 +141,7 @@ class AttentionLayer(tf.keras.layers.Layer):
             self.u = self.add_weight(
                 shape=(input_shape[-1],),
                 initializer=self.init,
-                name="{}_u".format(self.name),
+                name=f"{self.name}_u",
                 regularizer=self.u_regularizer,
                 constraint=self.u_constraint,
             )
@@ -220,5 +231,5 @@ class AttentionLayer(tf.keras.layers.Layer):
             "b_constraint": constraints.serialize(self.b_constraint),
             "u_constraint": constraints.serialize(self.u_constraint),
         }
-        base_config = super(AttentionLayer, self).get_config()
+        base_config = super().get_config()
         return dict(list(base_config.items()) + list(config.items()))
