@@ -1,9 +1,9 @@
 import torch
-import torch.nn as nn
 import torch.optim as optim
 
 from dlomix.constants import PTMS_ALPHABET
 from dlomix.data import ChargeStateDataset
+from dlomix.eval import adjusted_mean_absolute_error
 from dlomix.models import ChargeStatePredictor
 
 if torch.cuda.is_available():
@@ -49,7 +49,9 @@ print(model)
 model.to(device)
 
 
-criterion = nn.MSELoss()
+# criterion = nn.MSELoss()
+criterion = adjusted_mean_absolute_error
+
 optimizer = optim.Adam(model.parameters(), lr=0.0001)
 
 # Learning rate scheduler.

@@ -56,6 +56,8 @@ setuptools.setup(
             "setuptools",
             "wheel",
             "pylint",
+            *tensorflow_extra_install,
+            *pytorch_extra_install,
         ],
         "wandb": [
             "wandb >= 0.15",
