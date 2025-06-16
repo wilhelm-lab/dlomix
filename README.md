@@ -4,7 +4,49 @@
 [![Build](https://github.com/wilhelm-lab/dlomix/actions/workflows/build.yaml/badge.svg)](https://github.com/wilhelm-lab/dlomix/actions/workflows/build.yaml)
 [![PyPI](https://github.com/wilhelm-lab/dlomix/actions/workflows/pypi.yaml/badge.svg)](https://github.com/wilhelm-lab/dlomix/actions/workflows/pypi.yaml)
 
-**DLOmix** is a Python framework for Deep Learning in Proteomics. Initially built on top of TensorFlow/Keras, support for PyTorch can however be integrated once the main API is established.
+**DLOmix** is a Python framework for Deep Learning in Proteomics. DLOmix provides multi-backend support for both **TensorFlow/Keras** and **PyTorch**, allowing researchers to choose their preferred deep learning framework while maintaining identical APIs and functionality. The dataset module is built upon HuggingFace `datasets` and can provide both TensorFlow and PyTorch tensors.
+
+**Note:Multi-backend support was introduced in `dlomix==0.2`. Earlier versions supported TensorFlow/Keras only. **
+
+The PyTorch implementation was largely introduced during a hackathon as part of the EuBIC Developer Meeting 2025. We appreciate the efforts and contributions of the team who joined the hackathon and the efforts of the EuBIC team and organizers.
+
+**
+
+## Backend Selection
+
+DLOmix automatically detects and uses the appropriate backend based on your environment setup. You can control which backend to use through the `DLOMIX_BACKEND` environment variable:
+
+### TensorFlow Backend (Default)
+```bash
+# Set TensorFlow as backend (default)
+export DLOMIX_BACKEND=tensorflow
+# or
+export DLOMIX_BACKEND=tf
+
+# Install DLOmix with TensorFlow
+pip install dlomix[tensorflow]
+
+# Or install tensorflow separately (existing installation), then only install dlomix
+pip install dlomix
+```
+
+### PyTorch Backend
+```bash
+# Set PyTorch as backend
+export DLOMIX_BACKEND=pytorch
+# or
+export DLOMIX_BACKEND=torch
+# or
+export DLOMIX_BACKEND=pt
+
+# Install DLOmix with PyTorch support
+pip install dlomix[pytorch]
+
+# Or install pytorch separately (existing installation), then only install dlomix
+pip install dlomix
+```
+
+**Note**: The backend must be set **before** importing DLOmix. If no backend is specified, DLOmix defaults to TensorFlow with a user warning.
 
 ## Usage
 Experiment a simple retention time prediction use-case using Google Colab &nbsp;&nbsp; [![Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/wilhelm-lab/dlomix/blob/develop/notebooks/Example_RTModel_Walkthrough_colab.ipynb)
@@ -17,26 +59,50 @@ More learning resources can be found in the [dlomix-resources](https://github.co
 
 ## Installation
 
-Run the following to install:
+### Quick Start
 ```bash
-$ pip install dlomix
+# Basic installation
+# TensorFlow and PyTorch not installed, please install separately
+pip install dlomix
+
+# Install DLOmix and additionally install specific backend
+pip install dlomix[tensorflow]  # TensorFlow backend
+pip install dlomix[pytorch]     # PyTorch backend
+
 ```
 
-If you would like to use [Weights & Biases](wandb.ai) for experiment tracking and use the available reports for Retention Time under `/notebooks`, please install the optional `wandb` python dependency with `dlomix` by running:
 
-```bash
-$ pip install dlomix[wandb]
-```
+**General Package Overview**
 
-**General Overview**
--  `data`: structures for modeling the input data, processing functions, and feature extractions based on Hugging Face datasets `Dataset` and `DatasetDict`
--  `eval`: classes for evaluating models and reporting results
--  `layers`: custom layers used for building models, based on `tf.keras.layers.Layer`
--  `losses`: custom losses to be used for training with `model.fit()`
-- `models`: common model architectures for the relevant use-cases based on `tf.keras.Model` to allow for using the Keras training API
--  `pipelines`: an exemplary high-level pipeline implementation
--  `reports`: classes for generating reports related to the different tasks
+DLOmix provides a unified API across both TensorFlow and PyTorch backends:
+
+-  `data`: structures for modeling input data, processing functions, and feature extractions based on Hugging Face datasets `Dataset` and `DatasetDict` (backend-agnostic)
+-  `eval`: classes for evaluating models and reporting results (backend-specific implementations)
+-  `layers`: custom layers for building models
+   - TensorFlow: based on `tf.keras.layers.Layer`
+   - PyTorch: based on `torch.nn.Module`
+-  `losses`: custom loss functions
+   - TensorFlow: compatible with `model.fit()`
+   - PyTorch: compatible with standard PyTorch training loops
+- `models`: common model architectures for relevant use-cases
+   - TensorFlow: based on `tf.keras.Model`
+   - PyTorch: based on `torch.nn.Module`
+-  `pipelines`: high-level pipeline implementations (backend-agnostic)
+-  `reports`: classes for generating reports (backend-agnostic)
 -  `constants.py`: constants and configuration values
+
+**Available Models by Backend**
+
+| Model | TensorFlow/Keras | PyTorch |
+|-------|------------|---------|
+| `PrositRetentionTimePredictor` [1] | ✅ | ✅ |
+| `PrositIntensityPredictor` [1] | ✅ | ✅ |
+| `ChargeStatePredictor` | ✅ | ✅ |
+| `DetectabilityModel` [4] | ✅ | ✅ |
+| `DeepLCRetentionTimePredictor` [2,3] | ✅ | ❌ |
+| `Ionmob` [5] | ❌ | ✅ |
+| `PIMMS-CF` [6] | ❌ | ⚠ (experimental) |
+
 
 
 **Use-cases**
@@ -51,32 +117,6 @@ $ pip install dlomix[wandb]
     - a multi-class classification problem where the detectability of a peptide is predicted given the peptide sequence.
 
 
-
-**To-Do**
-
-Functionality:
-- [X] integrate prosit
-- [X] integrate hugging face datasets
-- [X] extend data representation to include modifications
-- [X] add PTM features
-- [X] add residual plots to reporting, possibly other regression analysis tools
-- [X] output reporting results as PDF
-- [X] refactor reporting module to use W&B Report API (Retention Time)
-- [X] add additional detectability task
-- [ ] extend pipeline for different types of models and backbones
-- [ ] extend pipeline to allow for fine-tuning with custom datasets
-
-
-
-Package structure:
-
-- [X] integrate `deeplc.py` into `models.py`, preferably introduce a package structure (e.g. `models.retention_time`)
-- [X] add references for implemented models in the ReadMe
-- [X] introduce formatting and precommit hooks
-- [X] plan documentation (sphinx and readthedocs)
-- [X] refactor following best practices for cleaner install
-
-
 ## Developing DLOmix
 To install dlomix, along with the tools needed to develop and run tests, run the following command in your virtualenv:
 ```bash
@@ -84,7 +124,7 @@ $ pip install -e .[dev]
 ```
 
 
-**References:**
+## References
 
 [**Prosit**]
 
@@ -101,3 +141,24 @@ bioRxiv 2020.03.28.013003; doi: 10.1101/2020.03.28.013003
 [**Detectability - Pfly**]
 
 [4] Abdul-Khalek, N., Picciani, M., Wimmer, R., Overgaard, M. T., Wilhelm, M., & Gregersen Echers, S. (2024). To fly, or not to fly, that is the question: A deep learning model for peptide detectability prediction in mass spectrometry. bioRxiv, 2024-10.
+
+[**IonMob**]
+
+[5] Teschner, D., Gomez-Zepeda, D., Declercq, A., Łącki, M. K., Avci, S., Bob, K., ... & Hildebrandt, A. (2023). Ionmob: a Python package for prediction of peptide collisional cross-section values. Bioinformatics, 39(9), btad486.
+
+[**PIMMS**]
+
+[6] Webel, H., Niu, L., Nielsen, A.B. et al.
+Imputation of label-free quantitative mass spectrometry-based proteomics data using self-supervised deep learning.
+Nat Commun 15, 5405 (2024).
+https://doi.org/10.1038/s41467-024-48711-5
+
+
+### Credit
+
+**PyTorch Implementation Hackathon during EuBIC Developer Meeting 2025**
+
+- Ayla Schröder
+- Henry Webel
+- David Teschner
+- Stan Reinders

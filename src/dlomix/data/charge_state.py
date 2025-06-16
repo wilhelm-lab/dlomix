@@ -19,7 +19,7 @@ class ChargeStateDataset(PeptideDataset):
         label_column (str): The name of the column containing the charge state labels. Default is "most_abundant_charge_by_count".
         val_ratio (float): The ratio of validation data to split from the training data. Default is 0.2.
         max_seq_len (Union[int, str]): The maximum length of the peptide sequences. Default is 30.
-        dataset_type (str): The type of dataset to use. Default is "tf".
+        dataset_type (str): The type of dataset to use. Default is "tf". Fallback is to TensorFlow dataset tensors.
         batch_size (int): The batch size for training and evaluation. Default is 256.
         model_features (Optional[List[str]]): The list of features to use for the model. Default is None.
         dataset_columns_to_keep (Optional[List[str]]): The list of columns to keep in the dataset. Default is None.
@@ -60,6 +60,11 @@ class ChargeStateDataset(PeptideDataset):
         auto_cleanup_cache: bool = True,
         num_proc: Optional[int] = None,
         batch_processing_size: int = 1000,
+        **kwargs,
     ):
-        kwargs = {k: v for k, v in locals().items() if k not in ["self", "__class__"]}
-        super().__init__(DatasetConfig(**kwargs))
+        config_kwargs = {
+            k: v
+            for k, v in locals().items()
+            if k not in ["self", "__class__", "kwargs"]
+        }
+        super().__init__(DatasetConfig(**config_kwargs), **kwargs)

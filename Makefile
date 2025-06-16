@@ -37,6 +37,9 @@ format:
 lint:
 	pylint --disable=R,C ./src/dlomix/*
 
+lint-errors-only:
+	pylint --errors-only --disable=R,C ./src/dlomix/*
+
 build-docs:
 	sphinx-apidoc -M -f -E -l -o docs/ src/dlomix/
 	python docs/codify_package_titles.py

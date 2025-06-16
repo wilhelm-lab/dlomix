@@ -1,3 +1,4 @@
+import logging
 import warnings
 
 import tensorflow as tf
@@ -5,6 +6,8 @@ import tensorflow as tf
 from ..constants import ALPHABET_UNMOD
 from ..data.processing.feature_extractors import FEATURE_EXTRACTORS_PARAMETERS
 from ..layers.attention import AttentionLayer, DecoderAttentionLayer
+
+logger = logging.getLogger("dlomix.models.prosit")
 
 
 class PrositRetentionTimePredictor(tf.keras.Model):
@@ -194,7 +197,7 @@ class PrositIntensityPredictor(tf.keras.Model):
             self.alphabet = ALPHABET_UNMOD
 
         # tie the count of embeddings to the size of the vocabulary (count of amino acids)
-        self.embeddings_count = len(self.alphabet)
+        self.embeddings_count = len(self.alphabet) + 1
 
         self.embedding = tf.keras.layers.Embedding(
             input_dim=self.embeddings_count,
@@ -324,13 +327,22 @@ class PrositIntensityPredictor(tf.keras.Model):
 
         x = self.embedding(peptides_in)
 
+        logger.debug("embedding shape %s", x.shape)
+
         # fusion of PTMs (before going into the GRU sequence encoder)
         if self.ptm_aa_fusion and encoded_ptm is not None:
+            logger.debug("before ptm fusion shape %s", x.shape)
+            logger.debug("encoded ptm shape %s", encoded_ptm.shape)
             x = self.ptm_aa_fusion([x, encoded_ptm])
+            logger.debug("after ptm fusion shape %s", x.shape)
 
         x = self.sequence_encoder(x)
+        logger.debug("sequence encoder shape: %s", x.shape)
 
+        logger.debug("encoder shape: %s", x.shape)
         x = self.attention(x)
+
+        logger.debug("attention shape: %s", x.shape)
 
         if self.meta_data_fusion_layer and encoded_meta is not None:
             x = self.meta_data_fusion_layer([x, encoded_meta])
@@ -339,7 +351,10 @@ class PrositIntensityPredictor(tf.keras.Model):
             x = tf.expand_dims(x, axis=1)
 
         x = self.decoder(x)
+        logger.debug("decoder shape: %s", x.shape)
+
         x = self.regressor(x)
+        logger.debug("regressor shape: %s", x.shape)
 
         return x
 
