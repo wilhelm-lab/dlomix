@@ -9,13 +9,23 @@ Installation
   DLOmix is in its early stages, current release is a pre-release version.
   Changes to the API are highly probable. If you have feedback, ideas for improvements, or if you find a bug, please open an issue on GitHub.
 
-DLOmix can be installed via pip:
+DLOmix can be installed via pip, this install the package and the main dependencies only, excluding the backend framework to be used (TensorFlow/Keras or PyTorch).:
 
 .. code-block:: bash
 
   pip install dlomix
 
-To get the dev version, you can install directly from GitHub (develop branch):
+To use TensorFlow/Keras or PyTorch as a backend together with DLOmix, use the respective command:
+.. code-block:: bash
+
+  pip install dlomix[tensorflow]  # shorter alternatives: [tf]
+  pip install dlomix[pytorch]  # shorter alternatives: [torch], [pt]
+
+.. code-block:: bash
+
+  pip install dlomix
+
+To get the develop version, you can install directly from GitHub (develop branch):
 
 .. code-block:: bash
 
