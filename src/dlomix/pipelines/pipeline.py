@@ -1,6 +1,6 @@
 import zipfile
 from os import makedirs
-from os.path import dirname, join, splitext
+from os.path import dirname, splitext
 
 import numpy as np
 import requests
@@ -51,18 +51,20 @@ class RetentionTimePipeline:
 
     def _download_unzip_pretrained_model(self, model_url, save_path):
         makedirs(model_url)
-        r = requests.get(model_url)
+        # Add timeout to HTTP request to avoid hanging indefinitely
+        r = requests.get(model_url, timeout=30)
 
+        # Use context manager for file operations to ensure resources are properly closed
         with open(save_path, "wb") as f:
             f.write(r.content)
 
         self._unzip_model(save_path)
 
     def _unzip_model(self, model_zipfile_path):
-        zip_ref = zipfile.ZipFile(model_zipfile_path)
+        # Use context manager for zipfile operations
         model_folder = dirname(model_zipfile_path)
-        zip_ref.extractall(model_folder)
-        zip_ref.close()
+        with zipfile.ZipFile(model_zipfile_path) as zip_ref:
+            zip_ref.extractall(model_folder)
 
     """
 

@@ -1,15 +1,13 @@
 # adjust encoding schemes workflow --> check ppt for details
-# check if config can wrap all the parameters and be used to manage the attributes of the class, reduce the assignment of attributes in the init method
 
 import importlib
 import logging
 import os
 import warnings
-from typing import Callable, Dict, List, Optional, Union
+from typing import Callable, Optional, Union
 
 from datasets import Dataset, DatasetDict, Sequence, Value, load_dataset, load_from_disk
 
-from ..constants import ALPHABET_UNMOD
 from .dataset_config import DatasetConfig
 from .dataset_utils import EncodingScheme, get_num_processors
 from .processing.feature_extractors import (
@@ -47,14 +45,14 @@ class PeptideDataset:
         Format of the data source file(s). Example formats are 'csv', 'json', 'parquet', etc. Use 'hub' for datasets from the Hugging Face Hub and 'hf' for in-memory HF Dataset/DatasetDict objects.
     sequence_column : str
         Name of the column in the data source file that contains the peptide sequences.
-    label_column : str
-        Name of the column in the data source file that contains the labels.
+    label_column : Union[str, List]
+        Name of the column(s) in the data source file that contains the labels.
     val_ratio : float
         Ratio of the validation data to the training data. The value should be between 0 and 1.
     max_seq_len : int
         Maximum sequence length to pad the sequences to. If set to 0, the sequences will not be padded.
     dataset_type : str
-        Type of the tensor dataset to be generated afterwards. Possible values are "tf" and "pt" for TensorFlow and PyTorch respectively.
+        Type of the tensor dataset to be generated afterwards. Possible values are "tf" and "pt" for TensorFlow and PyTorch, respectively. Fallback is to TensorFlow dataset tensors.
     batch_size : int
         Batch size for the tensor dataset.
     model_features : List[str]
@@ -119,6 +117,15 @@ class PeptideDataset:
 
         self.encoding_scheme = EncodingScheme(dataset_config.encoding_scheme)
 
+        if isinstance(dataset_config.label_column, str):
+            self.label_column = [dataset_config.label_column]
+        elif isinstance(dataset_config.label_column, list):
+            self.label_column = dataset_config.label_column
+        else:
+            raise ValueError(
+                "The label_column parameter should be a string or a list of strings."
+            )
+
         self._set_hf_cache_management()
 
         self.extended_alphabet = None
@@ -126,10 +133,13 @@ class PeptideDataset:
 
         if self.alphabet:
             self.extended_alphabet = self.alphabet.copy()
+            self.extended_alphabet.update({str(self.padding_value): 0})
             self.learning_alphabet_mode = False
 
         self._config = dataset_config
 
+        # explcit assignments of processed attribute
+        self.processed = dataset_config.processed
         if not self.processed:
             self.hf_dataset: Optional[Union[Dataset, DatasetDict]] = None
             self._empty_dataset_mode = False
@@ -305,7 +315,7 @@ class PeptideDataset:
             )
 
     def _remove_unnecessary_columns(self):
-        self._relevant_columns = [self.sequence_column, self.label_column]
+        self._relevant_columns = [self.sequence_column, *self.label_column]
 
         if self.model_features is not None:
             self._relevant_columns.extend(self.model_features)
@@ -455,13 +465,19 @@ If you prefer to encode the (amino-acids)+PTM combinations as tokens in the voca
         for processor in self._processors:
             for split in self.hf_dataset.keys():
                 logger.info(
-                    f"Applying step: {processor.__class__.__name__} on split {split}..."
+                    "Applying step: %s on split %s...",
+                    processor.__class__.__name__,
+                    split,
                 )
-                print(
-                    f"Applying step: {processor.__class__.__name__} on split {split}..."
+
+                logger.info(
+                    "Applying step: %s on split %s...",
+                    processor.__class__.__name__,
+                    split,
                 )
+
                 logger.debug(
-                    f"Applying step with arguments:\n\n{processor} on split {split}..."
+                    "Applying step with arguments:\n\n %s on split %s", processor, split
                 )
 
                 # split-specific logic for encoding
@@ -494,9 +510,7 @@ If you prefer to encode the (amino-acids)+PTM combinations as tokens in the voca
                 # split-specific logic for truncating train/val sequences only after padding
                 if isinstance(processor, SequencePaddingProcessor):
                     if split != PeptideDataset.DEFAULT_SPLIT_NAMES[2]:
-                        logger.info(
-                            f"Removing truncated sequences in the {split} split ..."
-                        )
+                        logger.info("Removing truncated sequences in the %s ", split)
 
                         self.hf_dataset[split] = self.hf_dataset[split].filter(
                             lambda batch: batch[processor.KEEP_COLUMN_NAME],
@@ -505,7 +519,7 @@ If you prefer to encode the (amino-acids)+PTM combinations as tokens in the voca
                             batch_size=self.batch_processing_size,
                         )
 
-                logger.info(f"Done with step: {processor.__class__.__name__}.\n")
+                logger.info("Done with step: %s \n", processor.__class__.__name__)
 
         self.hf_dataset = self.hf_dataset.remove_columns(
             SequencePaddingProcessor.KEEP_COLUMN_NAME
@@ -550,7 +564,7 @@ If you prefer to encode the (amino-acids)+PTM combinations as tokens in the voca
     def _cleanup_temp_dataset_cache_files(self):
         if self.auto_cleanup_cache:
             cleaned_up = self.hf_dataset.cleanup_cache_files()
-            logger.info(f"Cleaned up cache files: {cleaned_up}.")
+            logger.info("Cleaned up cache files: %s.", cleaned_up)
 
     def save_to_disk(self, path: str):
         """
@@ -635,8 +649,9 @@ If you prefer to encode the (amino-acids)+PTM combinations as tokens in the voca
         # return a list of columns to be used as input tensors
         input_tensor_columns = self._relevant_columns.copy()
 
-        # remove the label column from the input tensor columns since the to_tf_dataset method has a separate label_cols argument
-        input_tensor_columns.remove(self.label_column)
+        # remove the label column(s) from the input tensor columns since the to_tf_dataset method has a separate label_cols argument
+        for label in self.label_column:
+            input_tensor_columns.remove(label)
 
         # remove the columns that are not needed in the tensor dataset
         input_tensor_columns = list(
@@ -650,40 +665,59 @@ If you prefer to encode the (amino-acids)+PTM combinations as tokens in the voca
 
     @property
     def tensor_train_data(self):
-        """TensorFlow Dataset object for the training data"""
-        tf_dataset = self._get_split_tf_dataset(PeptideDataset.DEFAULT_SPLIT_NAMES[0])
+        """TensorFlow or Torch Dataset object for the training data"""
+        if self.dataset_type == "pt":
+            return self._get_split_torch_dataset(PeptideDataset.DEFAULT_SPLIT_NAMES[0])
+        else:
+            tf_dataset = self._get_split_tf_dataset(
+                PeptideDataset.DEFAULT_SPLIT_NAMES[0]
+            )
 
-        if self.enable_tf_dataset_cache:
-            tf_dataset = tf_dataset.cache()
+            if self.enable_tf_dataset_cache:
+                tf_dataset = tf_dataset.cache()
 
-        return tf_dataset
+            return tf_dataset
 
     @property
     def tensor_val_data(self):
-        """TensorFlow Dataset object for the val data"""
-        tf_dataset = self._get_split_tf_dataset(PeptideDataset.DEFAULT_SPLIT_NAMES[1])
+        """TensorFlow or Torch Dataset object for the val data"""
+        if self.dataset_type == "pt":
+            return self._get_split_torch_dataset(PeptideDataset.DEFAULT_SPLIT_NAMES[1])
+        else:
+            tf_dataset = self._get_split_tf_dataset(
+                PeptideDataset.DEFAULT_SPLIT_NAMES[1]
+            )
 
-        if self.enable_tf_dataset_cache:
-            tf_dataset = tf_dataset.cache()
+            if self.enable_tf_dataset_cache:
+                tf_dataset = tf_dataset.cache()
 
-        return tf_dataset
+            return tf_dataset
 
     @property
     def tensor_test_data(self):
-        """TensorFlow Dataset object for the test data"""
-        tf_dataset = self._get_split_tf_dataset(PeptideDataset.DEFAULT_SPLIT_NAMES[2])
+        """TensorFlow or Torch Dataset object for the test data"""
+        if self.dataset_type == "pt":
+            return self._get_split_torch_dataset(PeptideDataset.DEFAULT_SPLIT_NAMES[2])
+        else:
+            tf_dataset = self._get_split_tf_dataset(
+                PeptideDataset.DEFAULT_SPLIT_NAMES[2]
+            )
 
-        if self.enable_tf_dataset_cache:
-            tf_dataset = tf_dataset.cache()
+            if self.enable_tf_dataset_cache:
+                tf_dataset = tf_dataset.cache()
 
-        return tf_dataset
+            return tf_dataset
 
-    def _get_split_tf_dataset(self, split_name: str):
+    def _check_if_split_exists(self, split_name: str):
         existing_splits = list(self.hf_dataset.keys())
         if split_name not in existing_splits:
             raise ValueError(
                 f"Split '{split_name}' does not exist in the dataset. Available splits are: {existing_splits}"
             )
+        return True
+
+    def _get_split_tf_dataset(self, split_name: str):
+        self._check_if_split_exists(split_name)
 
         return self.hf_dataset[split_name].to_tf_dataset(
             columns=self._get_input_tensor_column_names(),
@@ -691,6 +725,25 @@ If you prefer to encode the (amino-acids)+PTM combinations as tokens in the voca
             shuffle=False,
             batch_size=self.batch_size,
         )
+
+    def _get_split_torch_dataset(self, split_name: str):
+        self._check_if_split_exists(split_name)
+
+        from torch.utils.data import DataLoader
+
+        data_loader = DataLoader(
+            dataset=self.hf_dataset[split_name].with_format(
+                type="torch",
+                columns=[*self._get_input_tensor_column_names(), *self.label_column],
+            ),
+            batch_size=self.batch_size,
+            shuffle=False,
+        )
+
+        return data_loader
+
+
+# ------------------------------------------------------------------------------------------------
 
 
 def load_processed_dataset(path: str):
