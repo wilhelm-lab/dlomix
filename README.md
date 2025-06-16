@@ -6,7 +6,11 @@
 
 **DLOmix** is a Python framework for Deep Learning in Proteomics. DLOmix provides multi-backend support for both **TensorFlow/Keras** and **PyTorch**, allowing researchers to choose their preferred deep learning framework while maintaining identical APIs and functionality. The dataset module is built upon HuggingFace `datasets` and can provide both TensorFlow and PyTorch tensors.
 
-**Note:Multi-backend support was introduced in `dlomix==0.2`. Earlier versions supported TensorFlow/Keras only.**
+**Note:Multi-backend support was introduced in `dlomix==0.2`. Earlier versions supported TensorFlow/Keras only. **
+
+The PyTorch implementation was largely introduced during a hackathon as part of the EuBIC Developer Meeting 2025. We appreciate the efforts and contributions of the team who joined the hackathon and the efforts of the EuBIC team and organizers.
+
+**
 
 ## Backend Selection
 
@@ -148,3 +152,13 @@ bioRxiv 2020.03.28.013003; doi: 10.1101/2020.03.28.013003
 Imputation of label-free quantitative mass spectrometry-based proteomics data using self-supervised deep learning.
 Nat Commun 15, 5405 (2024).
 https://doi.org/10.1038/s41467-024-48711-5
+
+
+### Credit
+
+**PyTorch Implementation Hackathon during EuBIC Developer Meeting 2025**
+
+- Ayla Schröder
+- Henry Webel
+- David Teschner
+- Stan Reinders
