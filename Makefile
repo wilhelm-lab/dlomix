@@ -40,10 +40,21 @@ lint:
 lint-errors-only:
 	pylint --errors-only --disable=R,C ./src/dlomix/*
 
+# Documentation
+
+BACKEND ?= tensorflow
+DOCS_DIR := docs
+BUILD_DIR := $(DOCS_DIR)/_build/html/$(BACKEND)
+
+build-docs-framework:
+	sphinx-apidoc -M -f -E -l -o $(DOCS_DIR)/ src/dlomix/
+	python $(DOCS_DIR)/codify_package_titles.py
+	DLOMIX_BACKEND=$(BACKEND) sphinx-build -b html $(DOCS_DIR)/ $(BUILD_DIR)
+	open $(BUILD_DIR)/index.html
+
 build-docs:
-	sphinx-apidoc -M -f -E -l -o docs/ src/dlomix/
-	python docs/codify_package_titles.py
-	cd docs && make clean html
-	cd docs/_build/html/ && open index.html
+	$(MAKE) build-docs-framework BACKEND=tensorflow
+	$(MAKE) build-docs-framework BACKEND=pytorch
+
 
 all: install format test
