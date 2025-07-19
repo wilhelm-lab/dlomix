@@ -19,6 +19,12 @@ build:
     build:
       html:
         - make build-docs
+        - mkdir -p $READTHEDOCS_OUTPUT/html/tensorflow
+        - cp -r docs/_build/html/tensorflow/* $READTHEDOCS_OUTPUT/html/tensorflow/
+        - mkdir -p $READTHEDOCS_OUTPUT/html/pytorch
+        - cp -r docs/_build/html/pytorch/* $READTHEDOCS_OUTPUT/html/pytorch/
+        - sh -c 'echo "<html><head><meta http-equiv=\"refresh\" content=\"0; url=tensorflow/index.html\"></head></html>" > $READTHEDOCS_OUTPUT/html/index.html'
+
 # Build documentation in the docs/ directory with Sphinx
 sphinx:
    configuration: docs/conf.py

@@ -62,11 +62,5 @@ build-docs:
 	# Build PyTorch
 	$(MAKE) build-docs-framework BACKEND=pytorch
 
-	$(MAKE) create-root-index
-
-create-root-index:
-	sh -c 'echo "<html><head><meta http-equiv=\"refresh\" content=\"0; url=tensorflow/index.html\"></head></html>" > $(BUILD_ROOT)/html/index.html'
-
-
 
 all: install format test
