@@ -64,9 +64,6 @@ build-docs:
 
 	$(MAKE) create-root-index
 
-	# Optional: open main page
-	open $(BUILD_ROOT)/html/index.html
-
 create-root-index:
 	echo '<html><head><meta http-equiv="refresh" content="0; url=tensorflow/index.html"></head></html>' > $(BUILD_ROOT)/html/index.html
 
