@@ -7,7 +7,7 @@ version: 2
 
 # Set the version of Python and other tools you might need
 build:
-  os: ubuntu-20.04
+  os: ubuntu-22.04
   tools:
     python: "3.9"
   jobs:
@@ -16,7 +16,14 @@ build:
     # M Modules first, E no headers, f force overwrite, l links, o output directory
       - sphinx-apidoc -M -E -f -l -o docs/ src/dlomix/
       - python docs/codify_package_titles.py
-
+    build:
+      html:
+        - make build-docs
+        - echo '<html><head><meta http-equiv="refresh" content="0; url=tensorflow/index.html"></head></html>' > docs/_build/html/index.html
+      pdf:
+        - echo "Skipping PDF build"
+      epub:
+        - echo "Skipping EPUB build"
 
 # Build documentation in the docs/ directory with Sphinx
 sphinx:

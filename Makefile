@@ -44,17 +44,31 @@ lint-errors-only:
 
 BACKEND ?= tensorflow
 DOCS_DIR := docs
-BUILD_DIR := $(DOCS_DIR)/_build/html/$(BACKEND)
+BUILD_ROOT := $(DOCS_DIR)/_build
+BUILD_DIR := $(BUILD_ROOT)/html/$(BACKEND)
 
 build-docs-framework:
 	sphinx-apidoc -M -f -E -l -o $(DOCS_DIR)/ src/dlomix/
 	python $(DOCS_DIR)/codify_package_titles.py
 	DLOMIX_BACKEND=$(BACKEND) sphinx-build -b html $(DOCS_DIR)/ $(BUILD_DIR)
-	open $(BUILD_DIR)/index.html
 
 build-docs:
+	# Clean old builds
+	rm -rf $(BUILD_ROOT)/html
+
+	# Build TensorFlow
 	$(MAKE) build-docs-framework BACKEND=tensorflow
+
+	# Build PyTorch
 	$(MAKE) build-docs-framework BACKEND=pytorch
+
+	$(MAKE) create-root-index
+
+	# Optional: open main page
+	open $(BUILD_ROOT)/html/index.html
+
+create-root-index:
+	echo '<html><head><meta http-equiv="refresh" content="0; url=tensorflow/index.html"></head></html>' > $(BUILD_ROOT)/html/index.html
 
 
 all: install format test
