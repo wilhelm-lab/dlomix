@@ -20,10 +20,15 @@ build:
       html:
         - make build-docs
         - mkdir -p $READTHEDOCS_OUTPUT/html/tensorflow
+        - ls -l docs/_build/html/tensorflow/
         - cp -r docs/_build/html/tensorflow/* $READTHEDOCS_OUTPUT/html/tensorflow/
         - mkdir -p $READTHEDOCS_OUTPUT/html/pytorch
+        - ls -l docs/_build/html/pytorch/
         - cp -r docs/_build/html/pytorch/* $READTHEDOCS_OUTPUT/html/pytorch/
-        - sh -c 'echo "<html><head><meta http-equiv=\"refresh\" content=\"0; url=tensorflow/index.html\"></head></html>" > $READTHEDOCS_OUTPUT/html/index.html'
+        - REDIRECT_HTML='<html><head><meta http-equiv="refresh" content="0; url=tensorflow/index.html"></head></html>'
+        - echo "$REDIRECT_HTML" > $READTHEDOCS_OUTPUT/html/index.html
+        - ls -l $READTHEDOCS_OUTPUT/html/
+        - cat $READTHEDOCS_OUTPUT/html/index.html
 
 # Build documentation in the docs/ directory with Sphinx
 sphinx:
