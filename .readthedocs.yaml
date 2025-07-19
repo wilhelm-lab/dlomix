@@ -25,8 +25,7 @@ build:
         - mkdir -p $READTHEDOCS_OUTPUT/html/pytorch
         - ls -l docs/_build/html/pytorch/
         - cp -r docs/_build/html/pytorch/* $READTHEDOCS_OUTPUT/html/pytorch/
-        - REDIRECT_HTML='<html><head><meta http-equiv="refresh" content="0; url=tensorflow/index.html"></head></html>'
-        - echo "$REDIRECT_HTML" > $READTHEDOCS_OUTPUT/html/index.html
+        - sh -c 'echo "<html><head><meta http-equiv=\"refresh\" content=\"0; url=tensorflow/index.html\"></head></html>" > $READTHEDOCS_OUTPUT/html/index.html'
         - ls -l $READTHEDOCS_OUTPUT/html/
         - cat $READTHEDOCS_OUTPUT/html/index.html
 
