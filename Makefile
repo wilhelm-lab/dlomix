@@ -65,7 +65,8 @@ build-docs:
 	$(MAKE) create-root-index
 
 create-root-index:
-	echo '<html><head><meta http-equiv="refresh" content="0; url=tensorflow/index.html"></head></html>' > $(BUILD_ROOT)/html/index.html
+	sh -c 'echo "<html><head><meta http-equiv=\"refresh\" content=\"0; url=tensorflow/index.html\"></head></html>" > $(BUILD_ROOT)/html/index.html'
+
 
 
 all: install format test
