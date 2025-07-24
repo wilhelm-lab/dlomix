@@ -42,7 +42,19 @@ Submodules
    :show-inheritance:
 
 
+.. automodule:: dlomix.data.detectability
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+
 .. automodule:: dlomix.data.fragment_ion_intensity
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+
+.. automodule:: dlomix.data.ion_mobility
    :members:
    :undoc-members:
    :show-inheritance:

@@ -33,11 +33,13 @@ The goal of DLOmix is to be easy to use and flexible, while still providing the 
 
 .. toctree::
    :glob:
-   :reversed:
    :maxdepth: 2
    :caption: How To
 
-   notes/*
+   notes/quickstart
+   notes/installation
+   notes/backend_usage
+   notes/citation
 
 
 .. toctree::

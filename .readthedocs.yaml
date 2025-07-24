@@ -7,7 +7,7 @@ version: 2
 
 # Set the version of Python and other tools you might need
 build:
-  os: ubuntu-20.04
+  os: ubuntu-22.04
   tools:
     python: "3.9"
   jobs:
@@ -16,6 +16,17 @@ build:
     # M Modules first, E no headers, f force overwrite, l links, o output directory
       - sphinx-apidoc -M -E -f -l -o docs/ src/dlomix/
       - python docs/codify_package_titles.py
+    build:
+      html:
+        - make build-docs
+        - mkdir -p $READTHEDOCS_OUTPUT/html/tensorflow
+        - mkdir -p $READTHEDOCS_OUTPUT/html/pytorch
+        - cp -r docs/_build/html/tensorflow/* $READTHEDOCS_OUTPUT/html/tensorflow/
+        - cp -r docs/_build/html/pytorch/* $READTHEDOCS_OUTPUT/html/pytorch/
+        - chmod +x docs/create_root_index_redirect.sh
+        - bash docs/create_root_index_redirect.sh $READTHEDOCS_OUTPUT/html
+        - ls -l $READTHEDOCS_OUTPUT/html/
+        - cat $READTHEDOCS_OUTPUT/html/index.html
 
 
 # Build documentation in the docs/ directory with Sphinx

@@ -37,6 +37,24 @@ author = __author__
 release = __version__
 
 
+# -- Backend configuration ---------------------------------------------------
+
+from src.dlomix.config import (
+    _BACKEND,
+    BACKEND_PRETTY_NAME,
+    PYTORCH_BACKEND,
+    TENSORFLOW_BACKEND,
+)
+
+# Add to context for use in templates
+html_context = {
+    "backend": _BACKEND,
+    "other_backend": PYTORCH_BACKEND[0]
+    if _BACKEND in TENSORFLOW_BACKEND
+    else TENSORFLOW_BACKEND[0],
+    "backend_label": BACKEND_PRETTY_NAME,
+}
+
 # -- General configuration ---------------------------------------------------
 
 # Add any Sphinx extension module names here, as strings. They can be
