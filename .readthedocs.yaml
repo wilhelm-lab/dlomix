@@ -20,10 +20,8 @@ build:
       html:
         - make build-docs
         - mkdir -p $READTHEDOCS_OUTPUT/html/tensorflow
-        - ls -l docs/_build/html/tensorflow/
-        - cp -r docs/_build/html/tensorflow/* $READTHEDOCS_OUTPUT/html/tensorflow/
         - mkdir -p $READTHEDOCS_OUTPUT/html/pytorch
-        - ls -l docs/_build/html/pytorch/
+        - cp -r docs/_build/html/tensorflow/* $READTHEDOCS_OUTPUT/html/tensorflow/
         - cp -r docs/_build/html/pytorch/* $READTHEDOCS_OUTPUT/html/pytorch/
         - chmod +x docs/create_root_index_redirect.sh
         - bash docs/create_root_index_redirect.sh $READTHEDOCS_OUTPUT/html

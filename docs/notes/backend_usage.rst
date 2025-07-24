@@ -19,6 +19,13 @@ When importing classes from DLOmix, you should always use the top-level module:
 
 The class names in your code will always be the same (e.g., `ChargeStatePredictor`, `AttentionLayer`), regardless of which backend is being used. DLOmix handles the backend selection automatically.
 
+If you are interested in the implementation details, you can find them under the respective modules with the following naming convention:
+- src/dlomix/MODULE_NAME/SUBMODULE.py (for TensorFlow, always with no suffix)
+- src/dlomix/MODULE_NAME/SUBMODULE_torch.py (for PyTorch, always with a `_torch` suffix)
+
+Note that some modules are shared across both backends, hence they do not have any files with `_torch` suffix.
+
+
 How Backend Selection Works
 ****************************
 
@@ -30,6 +37,8 @@ How Backend Selection Works
 
    .. code-block:: bash
 
+      export DLOMIX_BACKEND=tensorflow # default behavior if env variable is not set
       export DLOMIX_BACKEND=pytorch
 
-   This must be set before importing DLOmix.
+
+   This must be set before importing DLOmix or any of its modules in the user code.
