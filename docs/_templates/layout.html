@@ -31,10 +31,10 @@
 
 {% block footer %}
   <div id="backend-switch">
-  {% if backend == "pytorch" %} <a href="#" onclick="switchBackend('tensorflow'); return false;">TensorFlow</a> | PyTorch
-  {% else %} TensorFlow |<a href="#" onclick="switchBackend('pytorch'); return false;">PyTorch</a>
-  {% endif %}
-</div>
+{% if backend == "pytorch" %} <a href="#" onclick="switchBackend('tensorflow'); return false;">TensorFlow</a> | PyTorch
+{% else %} TensorFlow |<a href="#" onclick="switchBackend('pytorch'); return false;">PyTorch</a>
+{% endif %}
+  </div>
 
 
 

@@ -28,7 +28,7 @@ DLOmix supports multiple deep learning backends. To use TensorFlow/Keras or PyTo
 
    While DLOmix supports both TensorFlow and PyTorch backends, you only need to install the backend you intend to use. The library will use the available backend automatically. If both backends are installed, TensorFlow will be used by default unless explicitly configured.
 
-.. include:: ./notes/backend_usage.rst
+.. include:: backend_usage.rst
 
 
 Development Installation

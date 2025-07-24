@@ -62,5 +62,18 @@ build-docs:
 	# Build PyTorch
 	$(MAKE) build-docs-framework BACKEND=pytorch
 
+build-docs-local:
+	# Clean old builds
+	rm -rf $(BUILD_ROOT)/html
+
+	# Build TensorFlow
+	$(MAKE) build-docs-framework BACKEND=tensorflow
+
+	# Build PyTorch
+	$(MAKE) build-docs-framework BACKEND=pytorch
+
+	bash $(DOCS_DIR)/create_root_index_redirect.sh $(BUILD_ROOT)/html
+	open $(BUILD_ROOT)/html/index.html
+
 
 all: install format test
