@@ -24,7 +24,25 @@ Submodules
 ----------
 
 
+.. automodule:: dlomix.config
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+
 .. automodule:: dlomix.constants
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+
+.. automodule:: dlomix.detectability_model_constants
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+
+.. automodule:: dlomix.types
    :members:
    :undoc-members:
    :show-inheritance:

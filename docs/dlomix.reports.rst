@@ -10,6 +10,12 @@ Submodules
 ----------
 
 
+.. automodule:: dlomix.reports.DetectabilityReport
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+
 .. automodule:: dlomix.reports.IntensityReport
    :members:
    :undoc-members:

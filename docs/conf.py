@@ -20,16 +20,40 @@ sys.path.insert(0, os.path.abspath("../src/dlomix/"))
 
 # -- Project information -----------------------------------------------------
 
-from src.dlomix import META_DATA, __version__
+from src.dlomix._metadata import (
+    __author__,
+    __copyright__,
+    __github_url__,
+    __package__,
+    __version__,
+)
 
-project = META_DATA["package_name"]
-copyright = META_DATA["copyright_text"]
-author = META_DATA["author"]
+project = __package__
+copyright = __copyright__
+author = __author__
 
 # The full version, including alpha/beta/rc tags
 
 release = __version__
 
+
+# -- Backend configuration ---------------------------------------------------
+
+from src.dlomix.config import (
+    _BACKEND,
+    BACKEND_PRETTY_NAME,
+    PYTORCH_BACKEND,
+    TENSORFLOW_BACKEND,
+)
+
+# Add to context for use in templates
+html_context = {
+    "backend": _BACKEND,
+    "other_backend": PYTORCH_BACKEND[0]
+    if _BACKEND in TENSORFLOW_BACKEND
+    else TENSORFLOW_BACKEND[0],
+    "backend_label": BACKEND_PRETTY_NAME,
+}
 
 # -- General configuration ---------------------------------------------------
 
@@ -62,7 +86,7 @@ html_theme = "sphinx_book_theme"
 
 # book theme
 html_theme_options = {
-    "repository_url": META_DATA["github_url"],
+    "repository_url": __github_url__,
     "use_repository_button": True,
     "logo": {
         "image_dark": "assets/logo_dark.jpg",

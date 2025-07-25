@@ -1,0 +1,80 @@
+{% extends "!layout.html" %}
+
+{% block extrahead %}
+  {{ super() }}
+  <style>
+    #backend-switch {
+      position: fixed;
+      top: 1rem;
+      right: 1rem;
+      z-index: 1000;
+      background: rgba(255, 255, 255, 0.1);
+      backdrop-filter: blur(8px);
+      color: #eee;
+      padding: 0.4rem 0.75rem;
+      border-radius: 0.5rem;
+      font-size: 0.9rem;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+    }
+
+    #backend-switch a {
+      color: #4eaaff;
+      text-decoration: none;
+      margin-left: 0.5rem;
+    }
+
+    #backend-switch a:hover {
+      text-decoration: underline;
+    }
+  </style>
+{% endblock %}
+
+{% block footer %}
+  <div id="backend-switch">
+{% if backend == "pytorch" %} <a href="#" onclick="switchBackend('tensorflow'); return false;">TensorFlow</a> | PyTorch
+{% else %} TensorFlow |<a href="#" onclick="switchBackend('pytorch'); return false;">PyTorch</a>
+{% endif %}
+  </div>
+
+
+
+  <script>
+  function switchBackend(targetBackend) {
+    const currentURL = window.location.href;
+    const backendMatch = currentURL.match(/(pytorch|tensorflow)/);
+
+    if (!backendMatch) {
+      // Fallback if backend not found
+      window.location.href = targetBackend + "/index.html";
+      return;
+    }
+
+    const currentBackend = backendMatch[1];
+    const newURL = currentURL.replace(currentBackend, targetBackend);
+
+    // If running from local file system, skip fetch check
+    if (window.location.protocol === "file:") {
+      window.location.href = newURL;
+      return;
+    }
+
+    // Hosted: test if page exists before redirecting
+    fetch(newURL, { method: 'HEAD' })
+      .then(res => {
+        if (res.ok) {
+          window.location.href = newURL;
+        } else {
+          const baseURL = currentURL.split(currentBackend)[0];
+          window.location.href = baseURL + targetBackend + "/index.html";
+        }
+      })
+      .catch(() => {
+        const baseURL = currentURL.split(currentBackend)[0];
+        window.location.href = baseURL + targetBackend + "/index.html";
+      });
+  }
+</script>
+
+
+  {{ super() }}
+{% endblock %}
