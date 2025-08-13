@@ -280,3 +280,64 @@ def test_no_split_datasetDict_hf_inmemory():
     )
 
     # test learning alphabet for train/val and then using it for test with fallback
+
+
+def test_shuffle_parameter():
+    """Test that shuffle parameter works for both TensorFlow and PyTorch datasets."""
+    hfdata = Dataset.from_dict(pytest.global_variables["RAW_GENERIC_NESTED_DATA"])
+
+    # Test with shuffle=True for TensorFlow
+    tf_dataset = FragmentIonIntensityDataset(
+        data_format="hf",
+        data_source=hfdata,
+        sequence_column="seq",
+        label_column="label",
+        dataset_type="tf",
+        shuffle=True,
+        batch_size=1,
+    )
+
+    # Test with shuffle=True for PyTorch
+    pt_dataset = FragmentIonIntensityDataset(
+        data_format="hf",
+        data_source=hfdata,
+        sequence_column="seq",
+        label_column="label",
+        dataset_type="pt",
+        shuffle=True,
+        batch_size=1,
+    )
+
+    # Verify datasets are created successfully
+    assert tf_dataset.shuffle is True
+    assert pt_dataset.shuffle is True
+    assert tf_dataset.tensor_train_data is not None
+    assert pt_dataset.tensor_train_data is not None
+
+
+def test_torch_dataloader_kwargs():
+    """Test that additional PyTorch DataLoader kwargs are properly passed through."""
+    hfdata = Dataset.from_dict(pytest.global_variables["RAW_GENERIC_NESTED_DATA"])
+
+    dataset = FragmentIonIntensityDataset(
+        data_format="hf",
+        data_source=hfdata,
+        sequence_column="seq",
+        label_column="label",
+        dataset_type="pt",
+        batch_size=1,
+        torch_dataloader_kwargs={
+            "drop_last": True,
+            "pin_memory": False,
+            "num_workers": 0,  # Use 0 to avoid multiprocessing issues in tests
+        },
+    )
+
+    # Get the DataLoader
+    dataloader = dataset.tensor_train_data
+
+    # Verify that torch_dataloader_kwargs were applied
+    assert dataloader.drop_last is True
+    assert dataloader.pin_memory is False
+    assert dataloader.num_workers == 0
+    assert dataset.torch_dataloader_kwargs is not None
