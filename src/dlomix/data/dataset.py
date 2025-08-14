@@ -722,7 +722,7 @@ If you prefer to encode the (amino-acids)+PTM combinations as tokens in the voca
         return self.hf_dataset[split_name].to_tf_dataset(
             columns=self._get_input_tensor_column_names(),
             label_cols=self.label_column,
-            shuffle=False,
+            shuffle=self.shuffle,
             batch_size=self.batch_size,
         )
 
@@ -731,14 +731,25 @@ If you prefer to encode the (amino-acids)+PTM combinations as tokens in the voca
 
         from torch.utils.data import DataLoader
 
-        data_loader = DataLoader(
-            dataset=self.hf_dataset[split_name].with_format(
+        # Prepare DataLoader kwargs, starting with defaults
+        dataloader_kwargs = {
+            "dataset": self.hf_dataset[split_name].with_format(
                 type="torch",
                 columns=[*self._get_input_tensor_column_names(), *self.label_column],
             ),
-            batch_size=self.batch_size,
-            shuffle=False,
-        )
+            "batch_size": self.batch_size,
+            "shuffle": self.shuffle,
+        }
+
+        # Update with user-provided torch_dataloader_kwargs if available
+        if hasattr(self, "torch_dataloader_kwargs") and self.torch_dataloader_kwargs:
+            # Don't override the dataset parameter
+            user_kwargs = {
+                k: v for k, v in self.torch_dataloader_kwargs.items() if k != "dataset"
+            }
+            dataloader_kwargs.update(user_kwargs)
+
+        data_loader = DataLoader(**dataloader_kwargs)
 
         return data_loader
 
