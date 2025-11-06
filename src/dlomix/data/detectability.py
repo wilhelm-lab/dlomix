@@ -26,7 +26,7 @@ class DetectabilityDataset(PeptideDataset):
         dataset_columns_to_keep (Optional[List[str]]): The list of columns to keep in the dataset. Default is ["Proteins"].
         features_to_extract (Optional[List[Union[Callable, str]]]): The list of features to extract from the dataset. Default is None.
         pad (bool): Whether to pad the sequences to the maximum length. Default is True.
-        padding_value (int): The value to use for padding. Default is 0.
+        padding_value (str): The value to use for padding. Default is '-'.
         alphabet (Dict): The mapping of characters to integers for encoding the sequences. Default is ALPHABET_UNMOD.
         with_termini (bool): Whether to add the N- and C-termini in the sequence column, even if they do not exist. Defaults to True.
         encoding_scheme (Union[str, EncodingScheme]): The encoding scheme to use for encoding the sequences. Default is EncodingScheme.UNMOD.
@@ -56,7 +56,7 @@ class DetectabilityDataset(PeptideDataset):
         dataset_columns_to_keep: Optional[List[str]] = ["Proteins"],
         features_to_extract: Optional[List[Union[Callable, str]]] = None,
         pad: bool = True,
-        padding_value: int = 0,
+        padding_value: str = "-",
         alphabet: Dict = ALPHABET_UNMOD,
         with_termini: bool = True,
         encoding_scheme: Union[str, EncodingScheme] = EncodingScheme.UNMOD,

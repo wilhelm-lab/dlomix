@@ -1,6 +1,6 @@
 import abc
 import re
-from typing import Optional
+import warnings
 
 
 class PeptideDatasetBaseProcessor(abc.ABC):
@@ -183,7 +183,7 @@ class SequencePaddingProcessor(PeptideDatasetBaseProcessor):
         Name of the column containing the peptide sequence.
     batched : bool (default=False)
         Whether to process data in batches.
-    padding_value : int (default=0)
+    padding_index : int (default=0)
         Value to use for padding the sequences.
     max_length : int (default=30)
         Maximum length of the sequences.
@@ -200,12 +200,12 @@ class SequencePaddingProcessor(PeptideDatasetBaseProcessor):
         self,
         sequence_column_name: str,
         batched: bool = False,
-        padding_value: int = 0,
+        padding_index: int = 0,
         max_length: int = 30,
     ):
         super().__init__(sequence_column_name, batched)
 
-        self.padding_value = padding_value
+        self.padding_index = padding_index
         self.max_length = max_length
 
     def batch_process(self, input_data, **kwargs):
@@ -233,7 +233,7 @@ class SequencePaddingProcessor(PeptideDatasetBaseProcessor):
     def _pad_sequence(self, sequence):
         length = len(sequence)
         if length <= self.max_length:
-            return sequence + [self.padding_value] * (self.max_length - length), True
+            return sequence + [self.padding_index] * (self.max_length - length), True
         else:
             return sequence[: self.max_length], False
 
@@ -246,39 +246,70 @@ class SequenceEncodingProcessor(PeptideDatasetBaseProcessor):
     ----------
     sequence_column_name : str
         Name of the column containing the peptide sequence.
-    alphabet : dict (default=None)
-        Dictionary mapping amino acids to integers. If None, the alphabet will be learned from the data.
+    alphabet : dict
+        Dictionary mapping amino acids to integers.
     batched : bool (default=False)
         Whether to process data in batches.
+    extend_alphabet : bool (default=False)
+        Whether to extend the provided alphabet with new amino acids found in the sequences.
+    unknown_token : str (default='X')
+        Token to use for unknown amino acids.
+    unknown_token_index : int (default=1)
+        Index to use for unknown amino acids.
+    fallback_unmodified : bool (default=False)
+        Whether to fallback to unmodified amino acid encoding for unseen modifications.
     """
 
     def __init__(
         self,
         sequence_column_name: str,
-        alphabet: Optional[dict] = None,
+        alphabet: dict,
         batched: bool = False,
         extend_alphabet: bool = False,
-        unknown_token: int = 0,
+        unknown_token: str = "X",
+        unknown_token_index: int = 1,
         fallback_unmodified: bool = False,
     ):
         super().__init__(sequence_column_name, batched)
 
         self.extend_alphabet = extend_alphabet
+        self.unknown_token = unknown_token
+        self.unknown_token_index = unknown_token_index
 
-        #  TODO: consider not starting from 0 when learning the alphabet
-        #  TODO: consider adding the padding token to the alphabet
-        self.alphabet = {str(unknown_token): 1}
         self.set_alphabet(alphabet)
+
+        # decide on mode, either encode with fixed vocab or learn new tokens
+        if self.extend_alphabet:
+            self._encode = self._encode_learn_vocab
+        else:
+            self._encode = self._encode_with_vocab
+
         self.set_fallback(fallback_unmodified)
 
-        self.unknown_token = unknown_token
-
     def set_alphabet(self, alphabet):
-        if alphabet and not self.extend_alphabet:
-            self.alphabet = alphabet
-            self._encode = self._encode_with_vocab
+        # get the passed alphabet from the dataset class, either with the padding only to learn the rest or the full vocabulary
+        self.alphabet = alphabet.copy()
+
+        # check if unknown token is already in the alphabet
+        unk_token_in_alphabet = self.alphabet.get(self.unknown_token, None)
+        if unk_token_in_alphabet:
+            warnings.warn(
+                f"The unknown token '{self.unknown_token}' is already present in the provided alphabet with index {unk_token_in_alphabet}. If you prefer the default behavior, consider removing it from the alphabet and it will have the default index of {self.unknown_token_index}."
+            )
+            self.unknown_token_index = unk_token_in_alphabet
         else:
-            self._encode = self._encode_learn_vocab
+            if self.unknown_token_index in self.alphabet.values():
+                new_index = max(self.alphabet.values()) + 1
+                warnings.warn(
+                    f"The unknown token index '{self.unknown_token_index}' is already used in the provided alphabet. It will be reassigned to index {new_index}."
+                )
+
+                self.unknown_token_index = new_index
+
+            warnings.warn(
+                f"The unknown token '{self.unknown_token}' is not present in the provided alphabet. It will be added with index {self.unknown_token_index}."
+            )
+            self.alphabet[self.unknown_token] = self.unknown_token_index
 
     def set_fallback(self, fallback_unmodified):
         self.fallback_unmodified = fallback_unmodified
@@ -307,14 +338,15 @@ class SequenceEncodingProcessor(PeptideDatasetBaseProcessor):
         encoded = []
         for amino_acid in sequence:
             if amino_acid not in self.alphabet:
-                self.alphabet[amino_acid] = len(self.alphabet)
+                self.alphabet[amino_acid] = max(self.alphabet.values()) + 1
             encoded.append(self.alphabet.get(amino_acid))
 
         return encoded
 
     def _encode_with_vocab(self, sequence):
         encoded = [
-            self.alphabet.get(amino_acid, self.unknown_token) for amino_acid in sequence
+            self.alphabet.get(amino_acid, self.unknown_token_index)
+            for amino_acid in sequence
         ]
         return encoded
 
@@ -329,7 +361,7 @@ class SequenceEncodingProcessor(PeptideDatasetBaseProcessor):
                 else:
                     amino_acid = amino_acid[0]
 
-            encoded.append(self.alphabet.get(amino_acid, self.unknown_token))
+            encoded.append(self.alphabet.get(amino_acid, self.unknown_token_index))
 
         return encoded
 

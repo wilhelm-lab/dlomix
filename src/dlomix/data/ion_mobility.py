@@ -3,7 +3,6 @@ from typing import Callable, Dict, List, Optional, Tuple, Union
 import numpy as np
 from numpy.typing import NDArray
 
-from ..constants import ALPHABET_UNMOD
 from .dataset import PeptideDataset
 from .dataset_config import DatasetConfig
 from .dataset_utils import EncodingScheme
@@ -28,7 +27,7 @@ class IonMobilityDataset(PeptideDataset):
         dataset_columns_to_keep (Optional[List[str]]): The columns to keep in the dataset. Defaults to None.
         features_to_extract (Optional[List[Union[Callable, str]]]): The features to extract from the dataset. Defaults to None.
         pad (bool): Whether to pad sequences to the maximum length. Defaults to True.
-        padding_value (int): The value to use for padding sequences. Defaults to 0.
+        padding_value (str): The value to use for padding sequences. Defaults to '-'.
         alphabet (Dict): The alphabet used for encoding sequences. Defaults to ALPHABET_UNMOD.
         with_termini (bool): Whether to add the N- and C-termini in the sequence column, even if they do not exist. Defaults to True.
         encoding_scheme (Union[str, EncodingScheme]): The encoding scheme to use for sequences. Defaults to EncodingScheme.UNMOD.
@@ -53,7 +52,7 @@ class IonMobilityDataset(PeptideDataset):
         dataset_columns_to_keep: Optional[List[str]] = None,
         features_to_extract: Optional[List[Union[Callable, str]]] = None,
         pad: bool = True,
-        padding_value: int = 0,
+        padding_value: str = "-",
         alphabet: Optional[Dict] = None,
         with_termini: bool = True,
         encoding_scheme: Union[str, EncodingScheme] = EncodingScheme.NAIVE_MODS,

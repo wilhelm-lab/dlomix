@@ -27,7 +27,7 @@ class DatasetConfig:
     dataset_columns_to_keep: Optional[List[str]]
     features_to_extract: Optional[List[Union[Callable, str]]]
     pad: bool
-    padding_value: int
+    padding_value: str
     alphabet: Dict
     with_termini: bool
     encoding_scheme: Union[str, EncodingScheme]

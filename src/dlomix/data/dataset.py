@@ -63,7 +63,7 @@ class PeptideDataset:
         List of feature extractors to be applied to the sequences. The feature extractors can be either a function or a string that corresponds to a predefined feature extractor.
     pad : bool
         Flag to indicate whether to pad the sequences to the maximum sequence length.
-    padding_value : int
+    padding_value : str
         Value to use for padding the sequences.
     alphabet : Dict
         Alphabet to use for encoding the amino acids in the sequences.
@@ -103,6 +103,7 @@ class PeptideDataset:
 
     DEFAULT_SPLIT_NAMES = ["train", "val", "test"]
     CONFIG_JSON_NAME = "dlomix_peptide_dataset_config.json"
+    PADDING_VALUE_DEFAULT_INDEX = 0
 
     def __init__(self, dataset_config: DatasetConfig, **kwargs):
         super(PeptideDataset, self).__init__()
@@ -128,13 +129,18 @@ class PeptideDataset:
 
         self._set_hf_cache_management()
 
-        self.extended_alphabet = None
+        self.extended_alphabet = {}
         self.learning_alphabet_mode = True
 
         if self.alphabet:
             self.extended_alphabet = self.alphabet.copy()
-            self.extended_alphabet.update({str(self.padding_value): 0})
             self.learning_alphabet_mode = False
+
+        # add padding value to the alphabet if not present
+        if self.extended_alphabet.get(self.padding_value) is None:
+            self.extended_alphabet[
+                self.padding_value
+            ] = PeptideDataset.PADDING_VALUE_DEFAULT_INDEX
 
         self._config = dataset_config
 
@@ -412,7 +418,7 @@ If you prefer to encode the (amino-acids)+PTM combinations as tokens in the voca
         padding_processor = SequencePaddingProcessor(
             sequence_column_name=self.sequence_column,
             batched=True,
-            padding_value=self.padding_value,
+            padding_index=self.extended_alphabet[self.padding_value],
             max_length=seq_len,
         )
 
@@ -491,9 +497,13 @@ If you prefer to encode the (amino-acids)+PTM combinations as tokens in the voca
                     elif split == PeptideDataset.DEFAULT_SPLIT_NAMES[2]:
                         # test split -> use the learned alphabet from the train/val split
                         # and enable fallback to encoding unseen (AA, PTM) as unmodified Amino acids
-                        processor.extend_alphabet = False
-                        processor.set_alphabet(self.extended_alphabet)
-                        processor.set_fallback(True)
+                        processor = SequenceEncodingProcessor(
+                            sequence_column_name=self.sequence_column,
+                            alphabet=self.extended_alphabet,
+                            batched=True,
+                            extend_alphabet=False,
+                            fallback_unmodified=True,
+                        )
 
                         self._apply_processor_to_split(processor, split)
 
