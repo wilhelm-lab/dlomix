@@ -74,7 +74,7 @@ class PeptideDataset:
     processed : bool
         Flag to indicate whether the dataset has been processed or not.
     enable_tf_dataset_cache : bool
-        Flag to indicate whether to enable TensorFlow Dataset caching (call `.cahce()` on the generate TF Datasets).
+        Flag to indicate whether to enable TensorFlow Dataset caching (call `.cache()` on the generated TF Datasets).
     disable_cache : bool
         Flag to indicate whether to disable Hugging Face Datasets caching. Default is False.
     auto_cleanup_cache : bool

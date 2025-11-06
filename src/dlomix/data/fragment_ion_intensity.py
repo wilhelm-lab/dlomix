@@ -35,7 +35,7 @@ class FragmentIonIntensityDataset(PeptideDataset):
         with_termini (bool): Whether to add the N- and C-termini in the sequence column, even if they do not exist. Defaults to True.
         encoding_scheme (Union[str, EncodingScheme]): The encoding scheme to use for encoding the sequences. Default is EncodingScheme.UNMOD.
         processed (bool): Whether the data has been preprocessed before or not. Default is False.
-        enable_tf_dataset_cache (bool): Flag to indicate whether to enable TensorFlow Dataset caching (call `.cahce()` on the generate TF Datasets). Default is False.
+        enable_tf_dataset_cache (bool): Flag to indicate whether to enable TensorFlow Dataset caching (call `.cache()` on the generated TF Datasets). Default is False.
         disable_cache (bool): Whether to disable Hugging Face datasets caching. Default is False.
         auto_cleanup_cache (bool): Whether to automatically clean up the cache. Default is True.
         num_proc (Optional[int]): Number of processes to use for dataset processing. Default is None.
