@@ -22,6 +22,7 @@ class DatasetConfig:
     max_seq_len: int
     dataset_type: str
     batch_size: int
+    shuffle: bool
     model_features: List[str]
     dataset_columns_to_keep: Optional[List[str]]
     features_to_extract: Optional[List[Union[Callable, str]]]
@@ -36,6 +37,7 @@ class DatasetConfig:
     auto_cleanup_cache: bool
     num_proc: Optional[int]
     batch_processing_size: int
+    torch_dataloader_kwargs: Optional[Dict] = field(default_factory=dict)
     _additional_data: dict = field(default_factory=dict, compare=False)
 
     def save_config_json(self, path: str):
