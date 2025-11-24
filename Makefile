@@ -37,10 +37,43 @@ format:
 lint:
 	pylint --disable=R,C ./src/dlomix/*
 
+lint-errors-only:
+	pylint --errors-only --disable=R,C ./src/dlomix/*
+
+# Documentation
+
+BACKEND ?= tensorflow
+DOCS_DIR := docs
+BUILD_ROOT := $(DOCS_DIR)/_build
+BUILD_DIR := $(BUILD_ROOT)/html/$(BACKEND)
+
+build-docs-framework:
+	sphinx-apidoc -M -f -E -l -o $(DOCS_DIR)/ src/dlomix/
+	python $(DOCS_DIR)/codify_package_titles.py
+	DLOMIX_BACKEND=$(BACKEND) sphinx-build -b html $(DOCS_DIR)/ $(BUILD_DIR)
+
 build-docs:
-	sphinx-apidoc -M -f -E -l -o docs/ src/dlomix/
-	python docs/codify_package_titles.py
-	cd docs && make clean html
-	cd docs/_build/html/ && open index.html
+	# Clean old builds
+	rm -rf $(BUILD_ROOT)/html
+
+	# Build TensorFlow
+	$(MAKE) build-docs-framework BACKEND=tensorflow
+
+	# Build PyTorch
+	$(MAKE) build-docs-framework BACKEND=pytorch
+
+build-docs-local:
+	# Clean old builds
+	rm -rf $(BUILD_ROOT)/html
+
+	# Build TensorFlow
+	$(MAKE) build-docs-framework BACKEND=tensorflow
+
+	# Build PyTorch
+	$(MAKE) build-docs-framework BACKEND=pytorch
+
+	bash $(DOCS_DIR)/create_root_index_redirect.sh $(BUILD_ROOT)/html
+	open $(BUILD_ROOT)/html/index.html
+
 
 all: install format test

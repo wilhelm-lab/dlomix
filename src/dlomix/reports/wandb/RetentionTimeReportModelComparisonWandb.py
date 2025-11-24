@@ -215,6 +215,7 @@ class RetentionTimeReportModelComparisonWandb:
         if isinstance(self.test_dataset.data_source, str):
             # read corresponding file
             file_extension = os.path.splitext(self.test_dataset.data_source)[-1].lower()
+            data = pd.DataFrame()
 
             if file_extension == ".csv":
                 data = pd.read_csv(self.test_dataset.data_source)

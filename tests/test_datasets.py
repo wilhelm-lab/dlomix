@@ -1,8 +1,6 @@
 import logging
-import urllib.request
-import zipfile
-from os import makedirs
-from os.path import exists, join
+import time
+from os.path import join
 from shutil import rmtree
 
 import pytest
@@ -16,57 +14,7 @@ from dlomix.data import (
 
 logger = logging.getLogger(__name__)
 
-RT_PARQUET_EXAMPLE_URL = "https://zenodo.org/record/6602020/files/TUM_missing_first_meta_data.parquet?download=1"
-RT_CSV_EXAMPLE_URL = "https://raw.githubusercontent.com/wilhelm-lab/dlomix/develop/example_dataset/proteomTools_train_val.csv"
-INTENSITY_PARQUET_EXAMPLE_URL = "https://raw.githubusercontent.com/wilhelm-lab/dlomix/develop/example_dataset/intensity/intensity_data.parquet"
-INTENSITY_CSV_EXAMPLE_URL = "https://raw.githubusercontent.com/wilhelm-lab/dlomix/develop/example_dataset/intensity/intensity_data.csv"
 RT_HUB_DATASET_NAME = "Wilhelmlab/prospect-ptms-irt"
-
-RAW_GENERIC_NESTED_DATA = {
-    "seq": ["[UNIMOD:737]-DASAQTTSHELTIPN-[]", "[UNIMOD:737]-DLHTGRLC[UNIMOD:4]-[]"],
-    "nested_feature": [[[30, 64]], [[25, 35]]],
-    "label": [0.1, 0.2],
-}
-
-TEST_ASSETS_TO_DOWNLOAD = [
-    RT_PARQUET_EXAMPLE_URL,
-    RT_CSV_EXAMPLE_URL,
-    INTENSITY_PARQUET_EXAMPLE_URL,
-    INTENSITY_CSV_EXAMPLE_URL,
-]
-DOWNLOAD_PATH_FOR_ASSETS = join("tests", "assets")
-
-
-def unzip_file(zip_file_path, dest_dir):
-    with zipfile.ZipFile(zip_file_path, "r") as f:
-        f.extractall(dest_dir)
-
-
-@pytest.fixture(scope="session", autouse=True)
-def download_assets():
-    makedirs(DOWNLOAD_PATH_FOR_ASSETS, exist_ok=True)
-    for i, http_address in enumerate(TEST_ASSETS_TO_DOWNLOAD, start=1):
-        filename = f"file_{i}"
-        filepath = join(DOWNLOAD_PATH_FOR_ASSETS, filename)
-        if ".parquet" in http_address:
-            filepath += ".parquet"
-        if ".csv" in http_address:
-            filepath += ".csv"
-        if ".zip" in http_address:
-            filepath += ".zip"
-        if exists(filepath):
-            logger.info(
-                "Skipping {} since it exists at {}".format(http_address, filepath)
-            )
-            continue
-        logger.info("Downloading: {}, to: {}".format(http_address, filepath))
-        urllib.request.urlretrieve(http_address, filepath)
-        if ".zip" in filepath:
-            logger.info(
-                "Unzipping: {}, to: {}".format(filepath, DOWNLOAD_PATH_FOR_ASSETS)
-            )
-            unzip_file(filepath, DOWNLOAD_PATH_FOR_ASSETS)
-    return True
 
 
 def test_empty_rtdataset():
@@ -77,7 +25,9 @@ def test_empty_rtdataset():
 
 def test_parquet_rtdataset():
     rtdataset = RetentionTimeDataset(
-        data_source=join(DOWNLOAD_PATH_FOR_ASSETS, "file_1.parquet"),
+        data_source=join(
+            pytest.global_variables["DOWNLOAD_PATH_FOR_ASSETS"], "file_1.parquet"
+        ),
         sequence_column="modified_sequence",
         label_column="indexed_retention_time",
     )
@@ -98,7 +48,11 @@ def test_parquet_rtdataset():
 
 def test_rtdataset_inmemory():
     hf_dataset = load_dataset(
-        "parquet", data_files=join(DOWNLOAD_PATH_FOR_ASSETS, "file_1.parquet")
+        "parquet",
+        data_files=join(
+            pytest.global_variables["DOWNLOAD_PATH_FOR_ASSETS"], "file_1.parquet"
+        ),
+        split="train",
     )
 
     rtdataset = RetentionTimeDataset(
@@ -122,26 +76,24 @@ def test_rtdataset_hub():
         data_format="hub",
         sequence_column="modified_sequence",
         label_column="indexed_retention_time",
+        name="holdout",
     )
+    logger.info(rtdataset)
     assert rtdataset.hf_dataset is not None
     assert rtdataset._empty_dataset_mode is False
-    assert RetentionTimeDataset.DEFAULT_SPLIT_NAMES[0] in list(
-        rtdataset.hf_dataset.keys()
-    )
-    assert RetentionTimeDataset.DEFAULT_SPLIT_NAMES[1] in list(
-        rtdataset.hf_dataset.keys()
-    )
+
     assert RetentionTimeDataset.DEFAULT_SPLIT_NAMES[2] in list(
         rtdataset.hf_dataset.keys()
     )
-    assert rtdataset[RetentionTimeDataset.DEFAULT_SPLIT_NAMES[0]].num_rows > 0
-    assert rtdataset[RetentionTimeDataset.DEFAULT_SPLIT_NAMES[1]].num_rows > 0
+
     assert rtdataset[RetentionTimeDataset.DEFAULT_SPLIT_NAMES[2]].num_rows > 0
 
 
 def test_csv_rtdataset():
     rtdataset = RetentionTimeDataset(
-        data_source=join(DOWNLOAD_PATH_FOR_ASSETS, "file_2.csv"),
+        data_source=join(
+            pytest.global_variables["DOWNLOAD_PATH_FOR_ASSETS"], "file_2.csv"
+        ),
         data_format="csv",
         sequence_column="sequence",
         label_column="irt",
@@ -170,7 +122,9 @@ def test_empty_intensitydataset():
 
 
 def test_parquet_intensitydataset():
-    filepath = join(DOWNLOAD_PATH_FOR_ASSETS, "file_3.parquet")
+    filepath = join(
+        pytest.global_variables["DOWNLOAD_PATH_FOR_ASSETS"], "file_3.parquet"
+    )
     intensity_dataset = FragmentIonIntensityDataset(
         data_format="parquet",
         data_source=filepath,
@@ -201,7 +155,7 @@ def test_parquet_intensitydataset():
 
 
 def test_csv_intensitydataset():
-    filepath = join(DOWNLOAD_PATH_FOR_ASSETS, "file_4.csv")
+    filepath = join(pytest.global_variables["DOWNLOAD_PATH_FOR_ASSETS"], "file_4.csv")
     intensity_dataset = FragmentIonIntensityDataset(
         data_format="csv",
         data_source=filepath,
@@ -231,7 +185,7 @@ def test_csv_intensitydataset():
 
 
 def test_nested_model_features():
-    hfdata = Dataset.from_dict(RAW_GENERIC_NESTED_DATA)
+    hfdata = Dataset.from_dict(pytest.global_variables["RAW_GENERIC_NESTED_DATA"])
 
     intensity_dataset = FragmentIonIntensityDataset(
         data_format="hf",
@@ -249,7 +203,7 @@ def test_nested_model_features():
 
 
 def test_save_dataset():
-    hfdata = Dataset.from_dict(RAW_GENERIC_NESTED_DATA)
+    hfdata = Dataset.from_dict(pytest.global_variables["RAW_GENERIC_NESTED_DATA"])
 
     intensity_dataset = FragmentIonIntensityDataset(
         data_format="hf",
@@ -266,7 +220,9 @@ def test_save_dataset():
 
 def test_load_dataset():
     rtdataset = RetentionTimeDataset(
-        data_source=join(DOWNLOAD_PATH_FOR_ASSETS, "file_2.csv"),
+        data_source=join(
+            pytest.global_variables["DOWNLOAD_PATH_FOR_ASSETS"], "file_2.csv"
+        ),
         data_format="csv",
         sequence_column="sequence",
         label_column="irt",
@@ -276,15 +232,29 @@ def test_load_dataset():
     save_path = "./test_dataset"
     rtdataset.save_to_disk(save_path)
     splits = rtdataset._data_files_available_splits
+    config = rtdataset._config
 
+    load_time_threshold = 0.05  # 50ms
+
+    start_time = time.time()
     loaded_dataset = load_processed_dataset(save_path)
+    load_duration = time.time() - start_time
+    logger.info("Loaded the dataset in {} seconds".format(load_duration))
+
+    # Assert the load time is below the threshold
+    assert (
+        load_duration < load_time_threshold
+    ), f"Load time exceeded: {load_duration:.3f}s"
+    assert loaded_dataset.processed is True
+
     assert loaded_dataset._data_files_available_splits == splits
     assert loaded_dataset.hf_dataset is not None
+    assert loaded_dataset._config == config, f"{loaded_dataset._config} != {config}"
     rmtree(save_path)
 
 
 def test_no_split_datasetDict_hf_inmemory():
-    hfdata = Dataset.from_dict(RAW_GENERIC_NESTED_DATA)
+    hfdata = Dataset.from_dict(pytest.global_variables["RAW_GENERIC_NESTED_DATA"])
     hf_dataset = DatasetDict({"train": hfdata})
 
     intensity_dataset = FragmentIonIntensityDataset(
@@ -309,6 +279,65 @@ def test_no_split_datasetDict_hf_inmemory():
         == 2
     )
 
-    # test saving and loading datasets with config
-
     # test learning alphabet for train/val and then using it for test with fallback
+
+
+def test_shuffle_parameter():
+    """Test that shuffle parameter works for both TensorFlow and PyTorch datasets."""
+    hfdata = Dataset.from_dict(pytest.global_variables["RAW_GENERIC_NESTED_DATA"])
+
+    # Test with shuffle=True for TensorFlow
+    tf_dataset = FragmentIonIntensityDataset(
+        data_format="hf",
+        data_source=hfdata,
+        sequence_column="seq",
+        label_column="label",
+        dataset_type="tf",
+        shuffle=True,
+        batch_size=1,
+    )
+
+    # Test with shuffle=True for PyTorch
+    pt_dataset = FragmentIonIntensityDataset(
+        data_format="hf",
+        data_source=hfdata,
+        sequence_column="seq",
+        label_column="label",
+        dataset_type="pt",
+        shuffle=True,
+        batch_size=1,
+    )
+
+    # Verify datasets are created successfully
+    assert tf_dataset.shuffle is True
+    assert pt_dataset.shuffle is True
+    assert tf_dataset.tensor_train_data is not None
+    assert pt_dataset.tensor_train_data is not None
+
+
+def test_torch_dataloader_kwargs():
+    """Test that additional PyTorch DataLoader kwargs are properly passed through."""
+    hfdata = Dataset.from_dict(pytest.global_variables["RAW_GENERIC_NESTED_DATA"])
+
+    dataset = FragmentIonIntensityDataset(
+        data_format="hf",
+        data_source=hfdata,
+        sequence_column="seq",
+        label_column="label",
+        dataset_type="pt",
+        batch_size=1,
+        torch_dataloader_kwargs={
+            "drop_last": True,
+            "pin_memory": False,
+            "num_workers": 0,  # Use 0 to avoid multiprocessing issues in tests
+        },
+    )
+
+    # Get the DataLoader
+    dataloader = dataset.tensor_train_data
+
+    # Verify that torch_dataloader_kwargs were applied
+    assert dataloader.drop_last is True
+    assert dataloader.pin_memory is False
+    assert dataloader.num_workers == 0
+    assert dataset.torch_dataloader_kwargs is not None

@@ -14,3 +14,15 @@ Submodules
    :members:
    :undoc-members:
    :show-inheritance:
+
+
+.. automodule:: dlomix.losses.intensity_torch
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+
+.. automodule:: dlomix.losses.ionmob_torch
+   :members:
+   :undoc-members:
+   :show-inheritance:

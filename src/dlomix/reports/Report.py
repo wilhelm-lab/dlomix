@@ -44,9 +44,8 @@ class Report(abc.ABC):
             self._history_dict = history
         elif not isinstance(history, tf.keras.callbacks.History):
             raise ValueError(
-                "Reporting requires a History object (tf.keras.callbacks.History) or its history dict attribute (History.history), which is returned from a call to "
-                "model.fit(). Passed history argument is of type {} ",
-                type(history),
+                f"Reporting requires a History object (tf.keras.callbacks.History) or its history dict attribute (History.history), which is returned from a call to "
+                f"model.fit(). Passed history argument is of type {type(history)}"
             )
         elif not hasattr(history, "history"):
             raise ValueError(
@@ -66,7 +65,7 @@ class Report(abc.ABC):
             figures_ext = figures_ext[1:]
         if figures_ext not in Report.VALID_FIGURE_FORMATS:
             raise ValueError(
-                "Allowed figure formats are: {}", Report.VALID_FIGURE_FORMATS
+                f"Allowed figure formats are: {Report.VALID_FIGURE_FORMATS}"
             )
         self._figures_ext = "." + figures_ext
 
@@ -79,6 +78,7 @@ class Report(abc.ABC):
 
     def _init_report_resources(self):
         self._report_resources = {}
+        self.pdf_file = PDFFile("")
 
     def _compile_report_resources_add_pdf_pages(self):
         for key, resource in self._report_resources.items():
@@ -106,14 +106,12 @@ class Report(abc.ABC):
 
         if metric_name.lower() not in self._history_dict.keys():
             raise ValueError(
-                "Metric name to plot is not available in the history dict. Available metrics to plot are {}",
-                self._history_dict.keys(),
+                f"Metric name to plot is not available in the history dict. Available metrics to plot are {self._history_dict.keys()}"
             )
 
         if "val_" + metric_name.lower() not in self._history_dict.keys():
             raise ValueError(
-                "No validation epochs were run during training, the metric name to plot is not available in the history dict. Available metrics to plot are {}",
-                self._history_dict.keys(),
+                f"No validation epochs were run during training, the metric name to plot is not available in the history dict. Available metrics to plot are {self._history_dict.keys()}"
             )
         plt.plot(self._history_dict[metric_name])
         plt.plot(self._history_dict["val_" + metric_name])
@@ -152,7 +150,6 @@ class Report(abc.ABC):
             targets: Array with target values.
             predictions: Array with prediction values.
         """
-        pass
 
 
 class PDFFile(FPDF):

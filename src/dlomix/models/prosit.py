@@ -1,3 +1,4 @@
+import logging
 import warnings
 
 import tensorflow as tf
@@ -5,6 +6,8 @@ import tensorflow as tf
 from ..constants import ALPHABET_UNMOD
 from ..data.processing.feature_extractors import FEATURE_EXTRACTORS_PARAMETERS
 from ..layers.attention import AttentionLayer, DecoderAttentionLayer
+
+logger = logging.getLogger("dlomix.models.prosit")
 
 
 class PrositRetentionTimePredictor(tf.keras.Model):
@@ -123,6 +126,13 @@ class PrositIntensityPredictor(tf.keras.Model):
         List of string values corresponding to fixed keys in the inputs dict that are considered meta data. Defaults to None, which corresponds then to the default meta data keys `META_DATA_KEYS`.
     with_termini : boolean, optional
         Whether to consider the termini in the sequence. Defaults to True.
+    use_instrument_embedding : bool, optional
+        Whether to include an additional embedding layer for instrument type information. 
+        When enabled, the model expects an `instrument_type` input key and embeds it as an additional meta feature. Defaults to False.
+    instrument_input_dim : int, optional
+        The number of distinct instrument types (vocabulary size) used as input to the instrument embedding. Defaults to 3.
+    instrument_output_dim : int, optional
+        The dimensionality of the instrument embedding vector. Defaults to 2.
 
     Attributes
     ----------
@@ -141,6 +151,7 @@ class PrositIntensityPredictor(tf.keras.Model):
         "COLLISION_ENERGY_KEY": "collision_energy",
         "PRECURSOR_CHARGE_KEY": "precursor_charge",
         "FRAGMENTATION_TYPE_KEY": "fragmentation_type",
+        "INSTRUMENT_TYPE_KEY": "instrument_type", 
     }
 
     # can be extended to include all possible meta data
@@ -167,6 +178,9 @@ class PrositIntensityPredictor(tf.keras.Model):
         input_keys=None,
         meta_data_keys=None,
         with_termini=True,
+        use_instrument_embedding=False,
+        instrument_input_dim=3,
+        instrument_output_dim=2,
     ):
         super(PrositIntensityPredictor, self).__init__()
 
@@ -180,6 +194,9 @@ class PrositIntensityPredictor(tf.keras.Model):
         self.use_prosit_ptm_features = use_prosit_ptm_features
         self.input_keys = input_keys
         self.meta_data_keys = meta_data_keys
+        self.use_instrument_embedding = use_instrument_embedding
+        self.instrument_input_dim = instrument_input_dim
+        self.instrument_output_dim = instrument_output_dim
 
         # maximum number of fragment ions
         self.max_ion = self.seq_length - 1
@@ -194,12 +211,19 @@ class PrositIntensityPredictor(tf.keras.Model):
             self.alphabet = ALPHABET_UNMOD
 
         # tie the count of embeddings to the size of the vocabulary (count of amino acids)
-        self.embeddings_count = len(self.alphabet)
+        self.embeddings_count = len(self.alphabet) + 1
 
         self.embedding = tf.keras.layers.Embedding(
             input_dim=self.embeddings_count,
             output_dim=self.embedding_output_dim,
             input_length=seq_length,
+        )
+
+        if self.use_instrument_embedding:
+            self.instrument_embedding = tf.keras.layers.Embedding(
+                input_dim=self.instrument_input_dim,  
+                output_dim=self.instrument_output_dim,
+                name="instrument_embedding",
         )
 
         self._build_encoders()
@@ -303,6 +327,12 @@ class PrositIntensityPredictor(tf.keras.Model):
                 inputs, self.meta_data_keys
             )
 
+            if self.use_instrument_embedding:
+                instrument_type = inputs.get(self.input_keys["INSTRUMENT_TYPE_KEY"])
+                if instrument_type is not None:
+                    instrument_embedded = self.instrument_embedding(instrument_type)
+                    meta_data.append(instrument_embedded)
+
             if self.meta_encoder and len(meta_data) > 0:
                 encoded_meta = self.meta_encoder(meta_data)
             else:
@@ -324,13 +354,22 @@ class PrositIntensityPredictor(tf.keras.Model):
 
         x = self.embedding(peptides_in)
 
+        logger.debug("embedding shape %s", x.shape)
+
         # fusion of PTMs (before going into the GRU sequence encoder)
         if self.ptm_aa_fusion and encoded_ptm is not None:
+            logger.debug("before ptm fusion shape %s", x.shape)
+            logger.debug("encoded ptm shape %s", encoded_ptm.shape)
             x = self.ptm_aa_fusion([x, encoded_ptm])
+            logger.debug("after ptm fusion shape %s", x.shape)
 
         x = self.sequence_encoder(x)
+        logger.debug("sequence encoder shape: %s", x.shape)
 
+        logger.debug("encoder shape: %s", x.shape)
         x = self.attention(x)
+
+        logger.debug("attention shape: %s", x.shape)
 
         if self.meta_data_fusion_layer and encoded_meta is not None:
             x = self.meta_data_fusion_layer([x, encoded_meta])
@@ -339,7 +378,10 @@ class PrositIntensityPredictor(tf.keras.Model):
             x = tf.expand_dims(x, axis=1)
 
         x = self.decoder(x)
+        logger.debug("decoder shape: %s", x.shape)
+
         x = self.regressor(x)
+        logger.debug("regressor shape: %s", x.shape)
 
         return x
 
