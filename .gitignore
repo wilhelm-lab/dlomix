@@ -56,6 +56,7 @@ coverage.xml
 
 # put all test results and coverage in one place
 .test_results/
+.test_dataset*/
 
 # Translations
 *.mo

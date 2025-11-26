@@ -1,12 +1,12 @@
-# adjust encoding schemes workflow --> check ppt for details
-
 import importlib
+import json
 import logging
 import os
 import warnings
-from typing import Callable, Optional, Union
+from pathlib import Path
+from typing import Any, Callable, Dict, Optional, Union
 
-from datasets import Dataset, DatasetDict, Sequence, Value, load_dataset, load_from_disk
+from datasets import Dataset, DatasetDict, Sequence, Value, load_dataset
 
 from .dataset_config import DatasetConfig
 from .dataset_utils import EncodingScheme, get_num_processors
@@ -103,6 +103,8 @@ class PeptideDataset:
 
     DEFAULT_SPLIT_NAMES = ["train", "val", "test"]
     CONFIG_JSON_NAME = "dlomix_peptide_dataset_config.json"
+    METADATA_JSON_NAME = "dlomix_peptide_dataset_metadata.json"
+    SERIALIZATION_VERSION = "0.1"
     PADDING_VALUE_DEFAULT_INDEX = 0
 
     def __init__(self, dataset_config: DatasetConfig, **kwargs):
@@ -173,7 +175,6 @@ class PeptideDataset:
                     self._cast_model_feature_types_to_float()
                 self._cleanup_temp_dataset_cache_files()
                 self.processed = True
-                self._refresh_config()
 
     def _set_num_proc(self):
         if self._num_proc:
@@ -189,31 +190,6 @@ class PeptideDataset:
             from datasets import disable_caching
 
             disable_caching()
-
-    def _refresh_config(self):
-        # load original config
-        self._config = DatasetConfig(**self._config.__dict__)
-
-        # update the config with the current object's attributes
-        self._config.__dict__.update(
-            {
-                k: self.__dict__[k]
-                for k in self._config.__dict__.keys()
-                if k not in ["_additional_data"]
-            }
-        )
-
-        # update the additional data in the config with the current object's attributes
-        self._config._additional_data.update(
-            {
-                k: v
-                for k, v in self.__dict__.items()
-                if k.startswith("_") and k not in ["_config", "_additional_data"]
-            }
-        )
-
-        # update the additional data in the config with the current object's class name
-        self._config._additional_data.update({"cls": self.__class__.__name__})
 
     def _load_dataset(self):
         if self.data_format == "hub":
@@ -576,7 +552,40 @@ If you prefer to encode the (amino-acids)+PTM combinations as tokens in the voca
             cleaned_up = self.hf_dataset.cleanup_cache_files()
             logger.info("Cleaned up cache files: %s.", cleaned_up)
 
-    def save_to_disk(self, path: str):
+    def _get_serializable_state(self) -> Dict[str, Any]:
+        """
+        Extract all state needed to reconstruct the object.
+
+        Returns
+        -------
+        Dict[str, Any]
+            Complete object state.
+        """
+        # Start with original config parameters
+        state = {}
+
+        # Add all runtime attributes (computed during processing)
+        exclude = {"hf_dataset", "_config", "data_source", "_processors"}
+
+        for key, value in self.__dict__.items():
+            if key in exclude:
+                continue
+            # Only serialize JSON-compatible types
+            try:
+                json.dumps(value)
+                state[key] = value
+            except:
+                # For complex objects, store just the type
+                if isinstance(value, dict):
+                    state[key] = value
+                elif isinstance(value, (list, tuple, set)):
+                    state[key] = list(value)
+                else:
+                    state[key] = str(type(value))
+
+        return state
+
+    def save_to_disk(self, path: str, overwrite: bool = False):
         """
         Save the dataset to disk.
 
@@ -584,55 +593,75 @@ If you prefer to encode the (amino-acids)+PTM combinations as tokens in the voca
         ----------
         path : str
             Path to save the dataset to.
+        overwrite : bool, optional
+            Whether to overwrite existing directory, by default False.
 
         """
 
-        self._config.save_config_json(
-            os.path.join(path, PeptideDataset.CONFIG_JSON_NAME)
-        )
+        path_obj = Path(path)
 
-        self.hf_dataset.save_to_disk(path)
+        # Check if path exists
+        if path_obj.exists() and not overwrite:
+            raise FileExistsError(
+                f"Directory {path} already exists. Set overwrite=True to overwrite and replace the saved dataset."
+            )
 
-    @classmethod
-    def load_from_disk(cls, path: str):
+        # Create directory
+        path_obj.mkdir(parents=True, exist_ok=True)
+
+        # 1. Save the ORIGINAL config (input parameters only)
+        # No refresh needed - config represents what user provided
+        self._config.save_config_json(os.path.join(path, self.CONFIG_JSON_NAME))
+
+        # 2. Save the complete object state (metadata)
+        state = self._get_serializable_state()
+        metadata = {
+            "class_name": self.__class__.__name__,
+            "module_name": self.__class__.__module__,
+            "state": state,
+            "version": PeptideDataset.SERIALIZATION_VERSION,  # Version for serialization format
+        }
+
+        with open(path_obj / self.METADATA_JSON_NAME, "w") as f:
+            json.dump(metadata, f, indent=2)
+
+        # 3. Save the HuggingFace dataset
+        if self.hf_dataset is not None:
+            self.hf_dataset.save_to_disk(str(path_obj / "hf_dataset"))
+
+        return True
+
+    def _validate_loaded_state(self):
         """
-        Load the dataset from disk.
+        Validate that the loaded state is consistent.
 
-        Parameters
-        ----------
-        path : str
-            Path to load the dataset from.
-
-        Returns
-        -------
-        PeptideDataset
-            PeptideDataset object loaded from disk.
+        Raises
+        ------
+        ValueError
+            If the state is inconsistent.
         """
+        # Check that essential attributes exist
+        if not hasattr(self, "hf_dataset") or self.hf_dataset is None:
+            raise ValueError("HuggingFace dataset not loaded properly.")
 
-        config = DatasetConfig.load_config_json(
-            os.path.join(path, PeptideDataset.CONFIG_JSON_NAME)
-        )
+        if not self.processed:
+            raise ValueError("Dataset should be marked as processed after loading.")
 
-        hf_dataset = load_from_disk(path)
+        # Validate that dataset columns match expected columns
+        if hasattr(self, "_relevant_columns"):
+            for split in self.hf_dataset.keys():
+                dataset_columns = set(self.hf_dataset[split].column_names)
+                expected_columns = set(self._relevant_columns)
 
-        dataset = cls.from_dataset_config(config)
-        dataset.hf_dataset = hf_dataset
-        return dataset
+                if not expected_columns.issubset(dataset_columns):
+                    missing = expected_columns - dataset_columns
+                    raise ValueError(
+                        f"Split '{split}' is missing expected columns: {missing}"
+                    )
 
     @classmethod
     def from_dataset_config(cls, config: DatasetConfig):
-        config_dict = config.__dict__.copy()
-
-        # remove the additional data from the config dict
-        config_dict.pop("_additional_data")
-
-        d = cls(**config_dict)
-
-        for k, v in config._additional_data.items():
-            setattr(d, k, v)
-
-        d._refresh_config()
-        return d
+        return cls(**config.__dict__)
 
     def __getitem__(self, index):
         return self.hf_dataset[index]
@@ -767,7 +796,7 @@ If you prefer to encode the (amino-acids)+PTM combinations as tokens in the voca
 # ------------------------------------------------------------------------------------------------
 
 
-def load_processed_dataset(path: str):
+def load_processed_dataset(path: str, validate: bool = True):
     """
     Load a processed peptide dataset from a given path.
 
@@ -775,6 +804,8 @@ def load_processed_dataset(path: str):
     ----------
     path : str
         Path to the peptide dataset.
+    validate : bool, optional
+        Whether to validate the loaded dataset state, by default True.
 
     Returns
     -------
@@ -782,14 +813,52 @@ def load_processed_dataset(path: str):
         Peptide dataset.
     """
 
-    module = importlib.import_module("dlomix.data")
+    path_obj = Path(path)
 
+    if not path_obj.exists():
+        raise FileNotFoundError(
+            f"Provided directory for loading the dataset: {path} does not exist."
+        )
+
+    # 1. Load the config
     config = DatasetConfig.load_config_json(
-        os.path.join(path, PeptideDataset.CONFIG_JSON_NAME)
+        str(path_obj / PeptideDataset.CONFIG_JSON_NAME)
     )
-    class_obj = getattr(module, config._additional_data.get("cls", "PeptideDataset"))
-    hf_dataset = load_from_disk(path)
 
-    dataset = class_obj.from_dataset_config(config)
-    dataset.hf_dataset = hf_dataset
-    return dataset
+    # 2. Load metadata
+    metadata_path = path_obj / PeptideDataset.METADATA_JSON_NAME
+    if metadata_path.exists():
+        with open(metadata_path, "r") as f:
+            metadata = json.load(f)
+    else:
+        # Fallback for datasets saved without metadata
+        metadata = None
+
+    # 3. Create instance with processed=True to skip initialization processing
+    module = importlib.import_module("dlomix.data")
+    cls = getattr(module, metadata.get("class_name"))
+
+    # ensure processed flag is set in config to avoid re-processing
+    config.processed = True
+
+    instance = cls.from_dataset_config(config)
+    instance._config.processed = False  # Reset config processed flag
+    instance.processed = True  # Ensure processed flag is set
+
+    # 4. Restore state from metadata
+    if metadata:
+        for key, value in metadata["state"].items():
+            setattr(instance, key, value)
+
+    # 5. Load the HuggingFace dataset
+    hf_dataset_path = path_obj / "hf_dataset"
+    if hf_dataset_path.exists():
+        from datasets import load_from_disk
+
+        instance.hf_dataset = load_from_disk(str(hf_dataset_path))
+
+    # 6. Validate if requested
+    if validate:
+        instance._validate_loaded_state()
+
+    return instance

@@ -38,7 +38,6 @@ class DatasetConfig:
     num_proc: Optional[int]
     batch_processing_size: int
     torch_dataloader_kwargs: Optional[Dict] = field(default_factory=dict)
-    _additional_data: dict = field(default_factory=dict, compare=False)
 
     def save_config_json(self, path: str):
         """
