@@ -49,7 +49,7 @@ setuptools.setup(
     ],
     extras_require={
         "dev": [
-            "pytest >= 8.0.0",
+            "pytest >= 7.0.0",
             "pytest-cov",
             "black",
             "twine",
