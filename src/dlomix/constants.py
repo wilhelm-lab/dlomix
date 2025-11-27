@@ -132,3 +132,4 @@ int_to_aa_dict = dict((i, aa) for i, aa in enumerate(alphabet))
 
 padding_char = np.zeros(len(alphabet))
 padding_char[0] = 1
+# ------- detectability_model_constants ------

@@ -1,5 +1,6 @@
 import logging
 import warnings
+from collections.abc import Sequence
 
 import tensorflow as tf
 
@@ -10,6 +11,7 @@ from ..layers.attention import AttentionLayer, DecoderAttentionLayer
 logger = logging.getLogger("dlomix.models.prosit")
 
 
+@tf.keras.utils.register_keras_serializable(package="dlomix")
 class PrositRetentionTimePredictor(tf.keras.Model):
     """
     Implementation of the Prosit model for retention time prediction.
@@ -98,6 +100,7 @@ class PrositRetentionTimePredictor(tf.keras.Model):
         return x
 
 
+@tf.keras.utils.register_keras_serializable(package="dlomix")
 class PrositIntensityPredictor(tf.keras.Model):
     """
     Prosit model for intensity prediction.
@@ -127,7 +130,7 @@ class PrositIntensityPredictor(tf.keras.Model):
     with_termini : boolean, optional
         Whether to consider the termini in the sequence. Defaults to True.
     use_instrument_embedding : bool, optional
-        Whether to include an additional embedding layer for instrument type information. 
+        Whether to include an additional embedding layer for instrument type information.
         When enabled, the model expects an `instrument_type` input key and embeds it as an additional meta feature. Defaults to False.
     instrument_input_dim : int, optional
         The number of distinct instrument types (vocabulary size) used as input to the instrument embedding. Defaults to 3.
@@ -151,7 +154,7 @@ class PrositIntensityPredictor(tf.keras.Model):
         "COLLISION_ENERGY_KEY": "collision_energy",
         "PRECURSOR_CHARGE_KEY": "precursor_charge",
         "FRAGMENTATION_TYPE_KEY": "fragmentation_type",
-        "INSTRUMENT_TYPE_KEY": "instrument_type", 
+        "INSTRUMENT_TYPE_KEY": "instrument_type",
     }
 
     # can be extended to include all possible meta data
@@ -159,6 +162,7 @@ class PrositIntensityPredictor(tf.keras.Model):
         "COLLISION_ENERGY_KEY",
         "PRECURSOR_CHARGE_KEY",
         "FRAGMENTATION_TYPE_KEY",
+        "INSTRUMENT_TYPE_KEY",
     ]
 
     # retrieve the Lookup PTM feature keys
@@ -181,38 +185,59 @@ class PrositIntensityPredictor(tf.keras.Model):
         use_instrument_embedding=False,
         instrument_input_dim=3,
         instrument_output_dim=2,
+        **kwargs,
     ):
-        super(PrositIntensityPredictor, self).__init__()
+        super(PrositIntensityPredictor, self).__init__(**kwargs)
 
+        # Store all configuration parameters
         self.dropout_rate = dropout_rate
         self.latent_dropout_rate = latent_dropout_rate
         self.regressor_layer_size = regressor_layer_size
-        self.recurrent_layers_sizes = recurrent_layers_sizes
+        self.recurrent_layers_sizes = tuple(
+            recurrent_layers_sizes
+        )  # Ensure it's a tuple
         self.embedding_output_dim = embedding_output_dim
         self.seq_length = seq_length
         self.len_fion = len_fion
         self.use_prosit_ptm_features = use_prosit_ptm_features
-        self.input_keys = input_keys
-        self.meta_data_keys = meta_data_keys
+        self.with_termini = with_termini  # Store this for serialization
         self.use_instrument_embedding = use_instrument_embedding
         self.instrument_input_dim = instrument_input_dim
         self.instrument_output_dim = instrument_output_dim
 
-        # maximum number of fragment ions
-        self.max_ion = self.seq_length - 1
-
-        # account for encoded termini
-        if with_termini:
-            self.max_ion = self.max_ion - 2
-
-        if alphabet:
-            self.alphabet = alphabet
+        # Handle alphabet - store the actual alphabet used
+        if alphabet is not None:
+            self.alphabet = dict(alphabet)  # Make a copy
         else:
-            self.alphabet = ALPHABET_UNMOD
+            self.alphabet = dict(ALPHABET_UNMOD)  # Make a copy of default
+
+        # Handle input_keys - store the actual keys used
+        if input_keys is not None:
+            self.input_keys = dict(input_keys)  # Make a copy
+        else:
+            self.input_keys = dict(self.DEFAULT_INPUT_KEYS)  # Use default
+
+        # Handle meta_data_keys - store the actual keys used
+        if meta_data_keys is not None:
+            # handle dict in case user passed a mapping, take the values in a list to use for lookup
+            if isinstance(meta_data_keys, dict):
+                self.meta_data_keys = list(meta_data_keys.values())
+            else:
+                self.meta_data_keys = list(meta_data_keys)  # Make a copy
+        else:
+            self.meta_data_keys = list(
+                [self.input_keys.get(k) for k in self.META_DATA_KEYS]
+            )  # Use default
+
+        # Compute derived attributes (will be recomputed during deserialization)
+        self.max_ion = self.seq_length - 1
+        if self.with_termini:
+            self.max_ion = self.max_ion - 2
 
         # tie the count of embeddings to the size of the vocabulary (count of amino acids)
         self.embeddings_count = len(self.alphabet) + 1
 
+        # Build layers
         self.embedding = tf.keras.layers.Embedding(
             input_dim=self.embeddings_count,
             output_dim=self.embedding_output_dim,
@@ -221,10 +246,12 @@ class PrositIntensityPredictor(tf.keras.Model):
 
         if self.use_instrument_embedding:
             self.instrument_embedding = tf.keras.layers.Embedding(
-                input_dim=self.instrument_input_dim,  
+                input_dim=self.instrument_input_dim,
                 output_dim=self.instrument_output_dim,
                 name="instrument_embedding",
-        )
+            )
+        else:
+            self.instrument_embedding = None
 
         self._build_encoders()
         self._build_decoder()
@@ -354,22 +381,13 @@ class PrositIntensityPredictor(tf.keras.Model):
 
         x = self.embedding(peptides_in)
 
-        logger.debug("embedding shape %s", x.shape)
-
         # fusion of PTMs (before going into the GRU sequence encoder)
         if self.ptm_aa_fusion and encoded_ptm is not None:
-            logger.debug("before ptm fusion shape %s", x.shape)
-            logger.debug("encoded ptm shape %s", encoded_ptm.shape)
             x = self.ptm_aa_fusion([x, encoded_ptm])
-            logger.debug("after ptm fusion shape %s", x.shape)
 
         x = self.sequence_encoder(x)
-        logger.debug("sequence encoder shape: %s", x.shape)
 
-        logger.debug("encoder shape: %s", x.shape)
         x = self.attention(x)
-
-        logger.debug("attention shape: %s", x.shape)
 
         if self.meta_data_fusion_layer and encoded_meta is not None:
             x = self.meta_data_fusion_layer([x, encoded_meta])
@@ -378,10 +396,8 @@ class PrositIntensityPredictor(tf.keras.Model):
             x = tf.expand_dims(x, axis=1)
 
         x = self.decoder(x)
-        logger.debug("decoder shape: %s", x.shape)
 
         x = self.regressor(x)
-        logger.debug("regressor shape: %s", x.shape)
 
         return x
 
@@ -390,10 +406,10 @@ class PrositIntensityPredictor(tf.keras.Model):
 
         keys = []
         if isinstance(keys_mapping, dict):
-            keys = keys_mapping.values()
+            keys = list(keys_mapping.values())
 
-        elif isinstance(keys_mapping, list):
-            keys = keys_mapping
+        elif isinstance(keys_mapping, Sequence):
+            keys = list(keys_mapping)
 
         for key_in_inputs in keys:
             # get the input under the specified key if exists
@@ -403,3 +419,59 @@ class PrositIntensityPredictor(tf.keras.Model):
                     single_input = tf.expand_dims(single_input, axis=-1)
                 collected_values.append(single_input)
         return collected_values
+
+    def get_config(self):
+        """
+        Get the configuration of the model for serialization.
+
+        Returns
+        -------
+        dict
+            Configuration dictionary containing all parameters needed to reconstruct the model.
+        """
+        config = super().get_config()
+        config.update(
+            {
+                "embedding_output_dim": self.embedding_output_dim,
+                "seq_length": self.seq_length,
+                "len_fion": self.len_fion,
+                "alphabet": self.alphabet,  # Store the actual alphabet dict used
+                "dropout_rate": self.dropout_rate,
+                "latent_dropout_rate": self.latent_dropout_rate,
+                "recurrent_layers_sizes": list(
+                    self.recurrent_layers_sizes
+                ),  # Convert to list for JSON
+                "regressor_layer_size": self.regressor_layer_size,
+                "use_prosit_ptm_features": self.use_prosit_ptm_features,
+                "input_keys": self.input_keys,  # Store the actual input keys used
+                "meta_data_keys": self.meta_data_keys,  # Store the actual meta data keys used
+                "with_termini": self.with_termini,
+                "use_instrument_embedding": self.use_instrument_embedding,
+                "instrument_input_dim": self.instrument_input_dim,
+                "instrument_output_dim": self.instrument_output_dim,
+            }
+        )
+        return config
+
+    @classmethod
+    def from_config(cls, config):
+        """
+        Recreate model from configuration.
+
+        Parameters
+        ----------
+        config : dict
+            Configuration dictionary.
+
+        Returns
+        -------
+        PrositIntensityPredictor
+            Reconstructed model instance.
+        """
+        # Convert recurrent_layers_sizes back to tuple if needed
+        if "recurrent_layers_sizes" in config and isinstance(
+            config["recurrent_layers_sizes"], list
+        ):
+            config["recurrent_layers_sizes"] = tuple(config["recurrent_layers_sizes"])
+
+        return cls(**config)

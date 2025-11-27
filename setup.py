@@ -37,7 +37,7 @@ setuptools.setup(
     include_package_data=True,
     package_data={"": ["data/processing/pickled_feature_dicts/*"]},
     install_requires=[
-        "datasets",
+        "datasets>=4.0.0",
         "huggingface_hub",
         "fpdf",
         "pandas",
@@ -49,7 +49,7 @@ setuptools.setup(
     ],
     extras_require={
         "dev": [
-            "pytest >= 3.9",
+            "pytest >= 7.0.0",
             "pytest-cov",
             "black",
             "twine",
@@ -60,7 +60,7 @@ setuptools.setup(
             *pytorch_extra_install,
         ],
         "wandb": [
-            "wandb >= 0.15",
+            "wandb>=0.20.0",
         ],
         "tensorflow": tensorflow_extra_install,
         "tf": tensorflow_extra_install,
@@ -73,6 +73,9 @@ setuptools.setup(
     classifiers=[
         "Programming Language :: Python :: 3",
         "Programming Language :: Python :: 3.9",
+        "Programming Language :: Python :: 3.10",
+        "Programming Language :: Python :: 3.11",
+        "Programming Language :: Python :: 3.12",
         "License :: OSI Approved :: MIT License",
         "Operating System :: OS Independent",
         "Topic :: Scientific/Engineering :: Bio-Informatics",

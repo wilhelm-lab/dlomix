@@ -3,6 +3,7 @@ import tensorflow as tf
 from ..constants import ALPHABET_UNMOD
 
 
+@tf.keras.utils.register_keras_serializable(package="dlomix")
 class DeepLCRetentionTimePredictor(tf.keras.Model):
     def __init__(
         self, seq_length=60, alphabet=ALPHABET_UNMOD, use_global_features=False

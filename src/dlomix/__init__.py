@@ -19,6 +19,8 @@ if _BACKEND in TENSORFLOW_BACKEND:
     except ImportError:
         raise ImportError(BACKEND_IMPORT_ERROR_MESSAGE)
 
+    from ._register_keras import *  # Register Keras custom objects
+
 __all__ = [
     "_BACKEND",  # Also expose the current backend name
     "__version__",  # Expose the version of the package

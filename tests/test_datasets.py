@@ -213,8 +213,11 @@ def test_save_dataset():
         model_features=["nested_feature"],
     )
 
-    save_path = "./test_dataset"
-    intensity_dataset.save_to_disk(save_path)
+    save_path = "./.test_dataset_2"
+    attributes = intensity_dataset.__dict__
+    logger.info("Dataset attributes before saving: {}".format(attributes))
+
+    intensity_dataset.save_to_disk(save_path, overwrite=True)
     rmtree(save_path)
 
 
@@ -229,8 +232,8 @@ def test_load_dataset():
         val_ratio=0.2,
     )
 
-    save_path = "./test_dataset"
-    rtdataset.save_to_disk(save_path)
+    save_path = "./.test_dataset_1"
+    rtdataset.save_to_disk(save_path, overwrite=True)
     splits = rtdataset._data_files_available_splits
     config = rtdataset._config
 
@@ -240,6 +243,9 @@ def test_load_dataset():
     loaded_dataset = load_processed_dataset(save_path)
     load_duration = time.time() - start_time
     logger.info("Loaded the dataset in {} seconds".format(load_duration))
+
+    logger.info("Original datasets config: {}".format(rtdataset._config))
+    logger.info("Loaded datasets config: {}".format(loaded_dataset._config))
 
     # Assert the load time is below the threshold
     assert (

@@ -1,11 +1,6 @@
 from os.path import join
 
-import numpy as np
-import pandas as pd
 import seaborn as sns
-from matplotlib import pyplot as plt
-from matplotlib.colors import LogNorm
-from matplotlib.ticker import LogLocator
 
 from ..data.processing.processors import SequenceParsingProcessor
 from .postprocessing import normalize_intensity_predictions
@@ -62,13 +57,24 @@ class IntensityReport(Report):
         precursor_charge_column_name:  str
         """
 
+        label_column = (
+            dataset.label_column
+            if isinstance(dataset.label_column, str)
+            else dataset.label_column[0]
+        )
+        model_features = (
+            list(dataset.model_features)
+            if isinstance(dataset.model_features, list)
+            else [dataset.model_features]
+        )
+
         predictions_df = (
             dataset[split]
             .select_columns(
                 [
                     SequenceParsingProcessor.PARSED_COL_NAMES["seq"],
-                    dataset.label_column,
-                    *dataset.model_features,
+                    label_column,
+                    *model_features,
                 ]
             )
             .to_pandas()
@@ -79,7 +85,7 @@ class IntensityReport(Report):
         predictions_acc = normalize_intensity_predictions(
             predictions_df,
             sequence_column_name=SequenceParsingProcessor.PARSED_COL_NAMES["seq"],
-            labels_column_name=dataset.label_column,
+            labels_column_name=label_column,
             predictions_column_name=IntensityReport.PREDICTIONS_COL_NAME,
             precursor_charge_column_name=precursor_charge_column_name,
             batch_size=self.batch_size,

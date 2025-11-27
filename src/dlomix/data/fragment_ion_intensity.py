@@ -30,12 +30,12 @@ class FragmentIonIntensityDataset(PeptideDataset):
         dataset_columns_to_keep (Optional[List[str]]): The list of columns to keep in the dataset. Default is None.
         features_to_extract (Optional[List[Union[Callable, str]]]): The list of features to extract from the dataset. Default is None.
         pad (bool): Whether to pad the sequences to the maximum length. Default is True.
-        padding_value (int): The value to use for padding. Default is 0.
+        padding_value (str): The value to use for padding. Default is '-'.
         alphabet (Dict): The mapping of characters to integers for encoding the sequences. Default is ALPHABET_UNMOD.
         with_termini (bool): Whether to add the N- and C-termini in the sequence column, even if they do not exist. Defaults to True.
         encoding_scheme (Union[str, EncodingScheme]): The encoding scheme to use for encoding the sequences. Default is EncodingScheme.UNMOD.
         processed (bool): Whether the data has been preprocessed before or not. Default is False.
-        enable_tf_dataset_cache (bool): Flag to indicate whether to enable TensorFlow Dataset caching (call `.cahce()` on the generate TF Datasets). Default is False.
+        enable_tf_dataset_cache (bool): Flag to indicate whether to enable TensorFlow Dataset caching (call `.cache()` on the generated TF Datasets). Default is False.
         disable_cache (bool): Whether to disable Hugging Face datasets caching. Default is False.
         auto_cleanup_cache (bool): Whether to automatically clean up the cache. Default is True.
         num_proc (Optional[int]): Number of processes to use for dataset processing. Default is None.
@@ -61,7 +61,7 @@ class FragmentIonIntensityDataset(PeptideDataset):
         dataset_columns_to_keep: Optional[List[str]] = None,
         features_to_extract: Optional[List[Union[Callable, str]]] = None,
         pad: bool = True,
-        padding_value: int = 0,
+        padding_value: str = "-",
         alphabet: Dict = ALPHABET_UNMOD,
         with_termini: bool = True,
         encoding_scheme: Union[str, EncodingScheme] = EncodingScheme.UNMOD,

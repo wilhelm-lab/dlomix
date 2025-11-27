@@ -63,7 +63,7 @@ source venv/bin/activate
 
 1b. Create and activate a conda environment:
 ```bash
-conda create -n dlomix python=3.9
+conda create -n dlomix python=3.11
 conda activate dlomix
 ```
 
