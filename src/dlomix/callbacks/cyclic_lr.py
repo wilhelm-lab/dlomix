@@ -2,6 +2,7 @@ import numpy as np
 import tensorflow as tf
 
 
+@tf.keras.utils.register_keras_serializable("dlomix")
 class CyclicLR(tf.keras.callbacks.Callback):
     """This callback implements a cyclical learning rate policy (CLR).
     The method cycles the learning rate between two boundaries with
@@ -93,3 +94,13 @@ class CyclicLR(tf.keras.callbacks.Callback):
             self.history.setdefault(k, []).append(v)
 
         tf.keras.backend.set_value(self.model.optimizer.lr, self.clr())
+
+    def get_config(self):
+        return {
+            "base_lr": self.base_lr,
+            "max_lr": self.max_lr,
+            "step_size": self.step_size,
+            "mode": self.mode,
+            "gamma": self.gamma,
+            "scale_mode": self.scale_mode,
+        }
