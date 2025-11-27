@@ -836,7 +836,8 @@ def load_processed_dataset(path: str, validate: bool = True):
 
     # 3. Create instance with processed=True to skip initialization processing
     module = importlib.import_module("dlomix.data")
-    cls = getattr(module, metadata.get("class_name"))
+    class_name = metadata.get("class_name") if metadata else "PeptideDataset"
+    cls = getattr(module, class_name)
 
     # ensure processed flag is set in config to avoid re-processing
     config.processed = True
