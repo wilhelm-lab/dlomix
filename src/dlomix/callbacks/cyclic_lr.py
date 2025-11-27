@@ -72,7 +72,7 @@ class CyclicLR(tf.keras.callbacks.Callback):
                 0, (1 - x)
             ) * self.scale_fn(self.clr_iterations)
 
-    def on_train_begin(self, logs={}):
+    def on_train_begin(self, logs=None):
         logs = logs or {}
 
         if self.clr_iterations == 0:
