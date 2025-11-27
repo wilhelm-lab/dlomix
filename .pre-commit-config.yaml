@@ -9,6 +9,7 @@ repos:
     hooks:
     -   id: autoflake
         args: [--remove-all-unused-imports, --ignore-init-module-imports, --in-place]
+        exclude: src/dlomix/_register_keras.py
 -   repo: https://github.com/pycqa/isort
     rev: 5.12.0
     hooks:

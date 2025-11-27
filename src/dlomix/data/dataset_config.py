@@ -27,7 +27,7 @@ class DatasetConfig:
     dataset_columns_to_keep: Optional[List[str]]
     features_to_extract: Optional[List[Union[Callable, str]]]
     pad: bool
-    padding_value: int
+    padding_value: str
     alphabet: Dict
     with_termini: bool
     encoding_scheme: Union[str, EncodingScheme]
@@ -38,7 +38,6 @@ class DatasetConfig:
     num_proc: Optional[int]
     batch_processing_size: int
     torch_dataloader_kwargs: Optional[Dict] = field(default_factory=dict)
-    _additional_data: dict = field(default_factory=dict, compare=False)
 
     def save_config_json(self, path: str):
         """

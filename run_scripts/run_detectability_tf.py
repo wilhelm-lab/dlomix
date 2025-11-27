@@ -20,6 +20,7 @@ detectability_data = DetectabilityDataset(
     batch_size=BATCH_SIZE,
     with_termini=False,
     alphabet=aa_to_int_dict,
+    padding_value="0",
 )
 
 

@@ -8,6 +8,9 @@ BATCH_SIZE = 128
 # If the data is already split with a specific logic (which is generally recommended) -> val_data_source and test_data_source are available as well
 
 hf_data = "Wilhelmlab/detectability-proteometools"
+
+print("Alphabet ....")
+print(aa_to_int_dict)
 detectability_data = DetectabilityDataset(
     data_source=hf_data,
     data_format="hub",
@@ -19,8 +22,11 @@ detectability_data = DetectabilityDataset(
     with_termini=False,
     alphabet=aa_to_int_dict,
     dataset_type="pt",
+    padding_value="0",
 )
 
+print("Final Alphabet ....")
+print(detectability_data.extended_alphabet)
 
 from dlomix.models import DetectabilityModel
 

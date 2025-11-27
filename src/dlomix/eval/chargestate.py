@@ -2,6 +2,7 @@ import tensorflow as tf
 from keras import backend as K
 
 
+@tf.keras.utils.register_keras_serializable("dlomix")
 def adjusted_mean_absolute_error(y_true: tf.Tensor, y_pred: tf.Tensor) -> tf.Tensor:
     """
     Used as an evaluation metric for charge state prediction.
@@ -33,6 +34,7 @@ def adjusted_mean_absolute_error(y_true: tf.Tensor, y_pred: tf.Tensor) -> tf.Ten
     return mean_absolute_error
 
 
+@tf.keras.utils.register_keras_serializable("dlomix")
 def adjusted_mean_squared_error(y_true: tf.Tensor, y_pred: tf.Tensor) -> tf.Tensor:
     """
     For two vectors, discard those components that

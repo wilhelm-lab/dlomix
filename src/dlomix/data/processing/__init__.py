@@ -37,7 +37,7 @@ d = dict(
 
 print(
     f"""
-Avaliable feature extractors are (use the key of the following dict and pass it to features_to_extract in the Dataset Class):
+Available feature extractors are (use the key of the following dict and pass it to features_to_extract in the Dataset Class):
 {json.dumps(d, indent=3, sort_keys=True)}.
 When writing your own feature extractor, you can either
     (1) use the FeatureExtractor class or

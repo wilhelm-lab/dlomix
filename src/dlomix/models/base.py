@@ -3,6 +3,7 @@ import tensorflow as tf
 from ..constants import ALPHABET_UNMOD
 
 
+@tf.keras.utils.register_keras_serializable(package="dlomix")
 class RetentionTimePredictor(tf.keras.Model):
     """
     A simple class for Retention Time prediction models.
