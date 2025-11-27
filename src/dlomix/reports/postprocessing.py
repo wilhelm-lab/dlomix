@@ -41,7 +41,73 @@ def mask_outofcharge(array, charges, mask=-1.0):
     return array
 
 
+def calculate_spectral_angle(true, pred, batch_size=600):
+    """
+
+    Calculates masked spectral distance normalized to [0, 1] range.
+    Values of -1 in true are treated as masked (missing peaks).
+
+    Args:
+        true: Ground truth array of shape (n, num_values) or array of arrays
+        pred: Predicted array of shape (n, num_values) or array of arrays
+        batch_size: Kept for API compatibility with old tensorflow 1 version (not used)
+
+    Returns:
+        Array of shape (n,) with spectral angles in range [0, 1]
+    """
+    # Handle pandas Series with array values (common case)
+    if hasattr(true, "values"):
+        true = true.values
+    if hasattr(pred, "values"):
+        pred = pred.values
+
+    # Convert array of arrays to 2D array if needed
+    if true.dtype == object:
+        true = np.stack(true)
+    if pred.dtype == object:
+        pred = np.stack(pred)
+
+    # Ensure proper float dtype
+    true = np.asarray(true, dtype=np.float64)
+    pred = np.asarray(pred, dtype=np.float64)
+
+    n = true.shape[0]
+    epsilon = 1e-7  # Matches K.epsilon() default
+
+    # Masking: multiply by (true + 1) to mask out -1 values
+    pred_masked = ((true + 1) * pred) / (true + 1 + epsilon)
+    true_masked = ((true + 1) * true) / (true + 1 + epsilon)
+
+    # L2 normalization (note: original has swapped variables, reproducing exactly)
+    # Original: pred_norm = K.l2_normalize(true_masked, axis=-1)
+    #           true_norm = K.l2_normalize(pred_masked, axis=-1)
+    pred_norm = true_masked / (
+        np.linalg.norm(true_masked, axis=-1, keepdims=True) + epsilon
+    )
+    true_norm = pred_masked / (
+        np.linalg.norm(pred_masked, axis=-1, keepdims=True) + epsilon
+    )
+
+    # Spectral angle calculation
+    product = np.sum(pred_norm * true_norm, axis=1)
+    product = np.clip(product, -1.0, 1.0)  # Numerical stability
+    arccos = np.arccos(product)
+
+    # Normalize to [0, 1] range
+    spectral_distance = 2 * arccos / np.pi
+
+    # Original code does: sa = 1 - s.run(sa_graph)
+    # So we invert it here to match exactly
+    sa = 1 - spectral_distance
+
+    # Handle NaN values
+    sa = np.nan_to_num(sa)
+
+    return sa
+
+
 def get_spectral_angle(true, pred, batch_size=600):
+    """Legacy sepctral angle calculation using TensorFlow 1.x session"""
     n = true.shape[0]
     sa = np.zeros([n])
 
@@ -74,6 +140,7 @@ def normalize_intensity_predictions(
     precursor_charge_column_name="precursor_charge_onehot",
     batch_size=600,
     compute_spectral_angle=True,
+    use_legacy_tf_sa_fn=False,
 ):
     assert (
         sequence_column_name in data
@@ -101,9 +168,16 @@ def normalize_intensity_predictions(
     data[predictions_column_name] = intensities.tolist()
 
     if labels_column_name in data and compute_spectral_angle:
-        data["spectral_angle"] = get_spectral_angle(
-            np.stack(data[labels_column_name].to_numpy()).astype(np.float32),
-            intensities,
-            batch_size=batch_size,
-        )
+        if use_legacy_tf_sa_fn:
+            data["spectral_angle"] = get_spectral_angle(
+                np.stack(data[labels_column_name].to_numpy()).astype(np.float32),
+                intensities,
+                batch_size=batch_size,
+            )
+        else:
+            data["spectral_angle"] = calculate_spectral_angle(
+                np.stack(data[labels_column_name].to_numpy()).astype(np.float32),
+                intensities,
+                batch_size=batch_size,
+            )
     return data
