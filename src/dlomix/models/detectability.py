@@ -3,6 +3,7 @@ import tensorflow as tf
 from ..constants import CLASSES_LABELS, padding_char
 
 
+@tf.keras.utils.register_keras_serializable(package="dlomix")
 class DetectabilityModel(tf.keras.Model):
     def __init__(
         self,
@@ -41,7 +42,19 @@ class DetectabilityModel(tf.keras.Model):
 
         return decoder_output
 
+    def get_config(self):
+        config = super().get_config()
+        config.update(
+            {
+                "num_units": self.num_units,
+                "num_classes": self.num_classes,
+                "padding_char": self.padding_char,
+            }
+        )
+        return config
 
+
+@tf.keras.utils.register_keras_serializable(package="dlomix")
 class Encoder(tf.keras.layers.Layer):
     def __init__(self, units, name="encoder", **kwargs):
         super(Encoder, self).__init__(name=name, **kwargs)
@@ -70,10 +83,21 @@ class Encoder(tf.keras.layers.Layer):
 
         return encoder_outputs, encoder_state_f, encoder_state_b
 
+    def get_config(self):
+        config = super().get_config()
+        config.update(
+            {
+                "units": self.units,
+            }
+        )
+        return config
 
+
+@tf.keras.utils.register_keras_serializable(package="dlomix")
 class BahdanauAttention(tf.keras.layers.Layer):
     def __init__(self, units, name="attention_layer", **kwargs):
         super(BahdanauAttention, self).__init__(name=name, **kwargs)
+        self.units = units
         self.W1 = tf.keras.layers.Dense(units)
         self.W2 = tf.keras.layers.Dense(units)
         self.V = tf.keras.layers.Dense(1)
@@ -95,7 +119,17 @@ class BahdanauAttention(tf.keras.layers.Layer):
 
         return context_vector
 
+    def get_config(self):
+        config = super().get_config()
+        config.update(
+            {
+                "units": self.units,
+            }
+        )
+        return config
 
+
+@tf.keras.utils.register_keras_serializable(package="dlomix")
 class Decoder(tf.keras.layers.Layer):
     def __init__(self, units, num_classes, name="decoder", **kwargs):
         super(Decoder, self).__init__(name=name, **kwargs)
@@ -137,5 +171,15 @@ class Decoder(tf.keras.layers.Layer):
         ) = self.decoder_bi(x, initial_state=states)
 
         x = self.decoder_dense(decoder_outputs)
-        # x = tf.expand_dims(x, axis = 1)
+
         return x
+
+    def get_config(self):
+        config = super().get_config()
+        config.update(
+            {
+                "units": self.units,
+                "num_classes": self.num_classes,
+            }
+        )
+        return config

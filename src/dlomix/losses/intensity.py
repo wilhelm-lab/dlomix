@@ -3,6 +3,7 @@ import tensorflow as tf
 import tensorflow.keras.backend as K
 
 
+@tf.keras.utils.register_keras_serializable("dlomix")
 def masked_spectral_distance(y_true, y_pred):
     """
     Calculates the masked spectral distance between true and predicted intensity vectors.
@@ -49,6 +50,7 @@ def masked_spectral_distance(y_true, y_pred):
     return 2 * arccos / np.pi
 
 
+@tf.keras.utils.register_keras_serializable("dlomix")
 def masked_pearson_correlation_distance(y_true, y_pred):
     """
     Calculates the masked Pearson correlation distance between true and predicted intensity vectors.

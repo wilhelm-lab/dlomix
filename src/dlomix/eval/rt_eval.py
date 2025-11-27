@@ -5,6 +5,7 @@ import tensorflow.keras.backend as K
 # https://github.com/horsepurve/DeepRTplus/blob/cde829ef4bd8b38a216d668cf79757c07133b34b/RTdata_emb.py
 
 
+@tf.keras.utils.register_keras_serializable(package="dlomix")
 class TimeDeltaMetric(tf.keras.metrics.Metric):
     """
     Implementation of the time delta metric as a Keras Metric using subclassing.
@@ -87,7 +88,15 @@ class TimeDeltaMetric(tf.keras.metrics.Metric):
         self.delta.assign(0.0)
         self.batch_count.assign(0.0)
 
+    def get_config(self):
+        return {
+            "percentage": self.percentage,
+            "double_delta": self.double_delta,
+            "name": self.name,
+        }
 
+
+@tf.keras.utils.register_keras_serializable("dlomix")
 def timedelta(y_true, y_pred, normalize=False, percentage=0.95):
     """
     A functional implementation to compute the 95th percentile of the absolute error between true and predicted values.

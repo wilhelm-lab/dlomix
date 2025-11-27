@@ -19,10 +19,7 @@ def test_prosit_intensity_model():
         input_keys={
             "SEQUENCE_KEY": "sequence",
         },
-        meta_data_keys={
-            "COLLISION_ENERGY_KEY": "collision_energy",
-            "PRECURSOR_CHARGE_KEY": "precursor_charge",
-        },
+        meta_data_keys=["collision_energy", "precursor_charge"],
     )
 
     seq_len = model.seq_length
@@ -46,11 +43,7 @@ def test_prosit_intensity_model_ptm_on_input():
         input_keys={
             "SEQUENCE_KEY": "sequence",
         },
-        meta_data_keys={
-            "COLLISION_ENERGY_KEY": "collision_energy",
-            "PRECURSOR_CHARGE_KEY": "precursor_charge",
-            "FRAGMENTATION_TYPE_KEY": "fragmentation_type",
-        },
+        meta_data_keys=["collision_energy", "precursor_charge", "fragmentation_type"],
         use_prosit_ptm_features=True,
     )
 
@@ -90,7 +83,7 @@ def test_prosit_intensity_model_ptm_on_input():
 def test_prosit_intensity_model_ptm_on_missing():
     model = PrositIntensityPredictor(use_prosit_ptm_features=True)
     seq_len = model.seq_length
-    with pytest.raises(ValueError):
+    with pytest.warns(UserWarning, match="PTM"):
         model.build(
             {
                 "sequence": (
