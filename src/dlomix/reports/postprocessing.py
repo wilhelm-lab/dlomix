@@ -73,6 +73,7 @@ def normalize_intensity_predictions(
     predictions_column_name="intensities_pred",
     precursor_charge_column_name="precursor_charge_onehot",
     batch_size=600,
+    compute_spectral_angle=True,
 ):
     assert (
         sequence_column_name in data
@@ -99,7 +100,7 @@ def normalize_intensity_predictions(
     intensities[m_idx] = -1
     data[predictions_column_name] = intensities.tolist()
 
-    if labels_column_name in data:
+    if labels_column_name in data and compute_spectral_angle:
         data["spectral_angle"] = get_spectral_angle(
             np.stack(data[labels_column_name].to_numpy()).astype(np.float32),
             intensities,
