@@ -84,7 +84,6 @@ class ChargeStatePredictor(tf.keras.Model):
         self.embedding = tf.keras.layers.Embedding(
             input_dim=self.embeddings_count,
             output_dim=embedding_output_dim,
-            input_length=seq_length,
         )
         self._build_encoder()
 

@@ -53,9 +53,10 @@ model = PrositIntensityPredictor(
 
 model.compile(optimizer=optimizer, loss=masked_spectral_distance, metrics=["mse"])
 
-weights_file = "./run_scripts/output/prosit_intensity_test"
+model_save_path = "./run_scripts/output/prosit_intensity_test.keras"
 checkpoint = tf.keras.callbacks.ModelCheckpoint(
-    weights_file, save_best_only=True, save_weights_only=True
+    model_save_path,
+    save_best_only=True,
 )
 decay = tf.keras.callbacks.ReduceLROnPlateau(
     monitor="val_loss", factor=0.1, patience=10, verbose=1, min_lr=0

@@ -15,7 +15,8 @@ def get_metadata():
 META_DATA = get_metadata()
 
 tensorflow_extra_install = [
-    "tensorflow>=2.13,<2.16",  # 2.16 introduces breaking changes and has Keras 3 as default
+    "tensorflow>=2.16",
+    "keras>=3.0",
 ]
 
 pytorch_extra_install = [

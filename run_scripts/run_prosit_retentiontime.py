@@ -36,7 +36,8 @@ model.compile(
 
 weights_file = "./run_scripts/output/prosit_rt_test"
 checkpoint = tf.keras.callbacks.ModelCheckpoint(
-    weights_file, save_best_only=True, save_weights_only=True
+    weights_file,
+    save_best_only=True,
 )
 decay = tf.keras.callbacks.ReduceLROnPlateau(
     monitor="val_loss", factor=0.1, patience=10, verbose=1, min_lr=0

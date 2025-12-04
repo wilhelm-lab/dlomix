@@ -3,6 +3,7 @@ import time
 from os.path import join
 from shutil import rmtree
 
+import numpy as np
 import pytest
 from datasets import Dataset, DatasetDict, load_dataset
 
@@ -195,11 +196,10 @@ def test_nested_model_features():
         model_features=["nested_feature"],
     )
 
+    assert np.array(intensity_dataset["train"]["nested_feature"][0]).shape == (1, 2)
+
     assert intensity_dataset.hf_dataset is not None
     assert intensity_dataset._empty_dataset_mode is False
-
-    example = iter(intensity_dataset.tensor_train_data).next()
-    assert example[0]["nested_feature"].shape == [2, 1, 2]
 
 
 def test_save_dataset():

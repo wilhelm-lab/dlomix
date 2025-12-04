@@ -33,7 +33,7 @@ num_cells = 64
 model = DetectabilityModel(num_units=num_cells, num_classes=total_num_classes)
 
 
-model_save_path = "run_scripts/output/base_model_weights_detectability"
+model_save_path = "run_scripts/output/base_model_weights_detectability.keras"
 
 model_checkpoint = tf.keras.callbacks.ModelCheckpoint(
     filepath=model_save_path,
@@ -41,13 +41,12 @@ model_checkpoint = tf.keras.callbacks.ModelCheckpoint(
     mode="max",
     verbose=1,
     save_best_only=True,
-    save_weights_only=True,
 )
 
 model.compile(
     optimizer="adam",
     loss="SparseCategoricalCrossentropy",
-    metrics="sparse_categorical_accuracy",
+    metrics=["sparse_categorical_accuracy"],
 )
 
 history = model.fit(

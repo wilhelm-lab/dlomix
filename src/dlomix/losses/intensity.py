@@ -1,6 +1,6 @@
+import keras.ops as ops
 import numpy as np
 import tensorflow as tf
-import tensorflow.keras.backend as K
 
 
 @tf.keras.utils.register_keras_serializable("dlomix")
@@ -31,7 +31,7 @@ def masked_spectral_distance(y_true, y_pred):
 
     # To avoid numerical instability during training on GPUs,
     # we add a fuzzing constant epsilon of 1×10−7 to all vectors
-    epsilon = K.epsilon()
+    epsilon = tf.keras.backend.epsilon()
 
     # Masking: we multiply values by (true + 1) because then the peaks that cannot
     # be there (and have value of -1 as explained above) won't be considered
@@ -39,13 +39,13 @@ def masked_spectral_distance(y_true, y_pred):
     true_masked = ((y_true + 1) * y_true) / (y_true + 1 + epsilon)
 
     # L2 norm
-    pred_norm = K.l2_normalize(true_masked, axis=-1)
-    true_norm = K.l2_normalize(pred_masked, axis=-1)
+    pred_norm = ops.normalize(true_masked, axis=-1)
+    true_norm = ops.normalize(pred_masked, axis=-1)
 
     # Spectral Angle (SA) calculation
     # (from the definition below, it is clear that ions with higher intensities
     #  will always have a higher contribution)
-    product = K.sum(pred_norm * true_norm, axis=1)
+    product = ops.sum(pred_norm * true_norm, axis=1)
     arccos = tf.math.acos(product)
     return 2 * arccos / np.pi
 
@@ -71,7 +71,7 @@ def masked_pearson_correlation_distance(y_true, y_pred):
 
     """
 
-    epsilon = K.epsilon()
+    epsilon = tf.keras.backend.epsilon()
 
     # Masking: we multiply values by (true + 1) because then the peaks that cannot
     # be there (and have value of -1 as explained above) won't be considered

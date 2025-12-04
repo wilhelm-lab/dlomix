@@ -43,7 +43,8 @@ test_sequences = test_d["test"]["modified_sequence"]
 # callbacks
 weights_file = "./run_scripts/output/prosit_charge_observed_test"
 checkpoint = tf.keras.callbacks.ModelCheckpoint(
-    weights_file, save_best_only=True, save_weights_only=True
+    weights_file,
+    save_best_only=True,
 )
 early_stop = tf.keras.callbacks.EarlyStopping(patience=20)
 decay = tf.keras.callbacks.ReduceLROnPlateau(

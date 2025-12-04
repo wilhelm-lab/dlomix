@@ -1,5 +1,6 @@
+import keras
+import keras.ops as ops
 import tensorflow as tf
-import tensorflow.keras.backend as K
 from tensorflow.keras import constraints, initializers, regularizers
 
 
@@ -12,11 +13,10 @@ class DecoderAttentionLayer(tf.keras.layers.Layer):
         self.dense = None
         self.multiply = None
 
-    def build(self, input_shape):
+        # Create sublayers in __init__
         self.permute = tf.keras.layers.Permute((2, 1))
-        self.dense = tf.keras.layers.Dense(self.time_steps, activation="softmax")
+        self.dense = tf.keras.layers.Dense(time_steps, activation="softmax")
         self.multiply = tf.keras.layers.Multiply()
-        super().build(input_shape)
 
     def call(self, inputs):
         x = self.permute(inputs)
@@ -29,8 +29,6 @@ class DecoderAttentionLayer(tf.keras.layers.Layer):
         config = super().get_config()
         config.update({"time_steps": self.time_steps})
         return config
-
-    # No from_config needed! Default works fine.
 
 
 @tf.keras.utils.register_keras_serializable(package="dlomix")
@@ -93,19 +91,22 @@ class AttentionLayer(tf.keras.layers.Layer):
         return None
 
     def call(self, x, mask=None):
-        a = K.squeeze(K.dot(x, K.expand_dims(self.W)), axis=-1)
+        a = ops.squeeze(ops.dot(x, ops.expand_dims(self.W, axis=-1)), axis=-1)
         if self.bias:
             a += self.b
-        a = K.tanh(a)
+        a = ops.tanh(a)
         if self.context:
-            a = K.squeeze(K.dot(x, K.expand_dims(self.u)), axis=-1)
-        a = K.exp(a)
+            a = ops.squeeze(ops.dot(x, ops.expand_dims(self.u, axis=-1)), axis=-1)
+        a = ops.exp(a)
         if mask is not None:
-            a *= K.cast(mask, K.floatx())
-        a /= K.cast(K.sum(a, axis=1, keepdims=True) + K.epsilon(), K.floatx())
-        a = K.expand_dims(a)
+            a *= ops.cast(mask, keras.config.floatx())
+        a /= ops.cast(
+            ops.sum(a, axis=1, keepdims=True) + tf.keras.backend.epsilon(),
+            keras.config.floatx(),
+        )
+        a = ops.expand_dims(a, axis=-1)
         weighted_input = x * a
-        return K.sum(weighted_input, axis=1)
+        return ops.sum(weighted_input, axis=1)
 
     def compute_output_shape(self, input_shape):
         return (input_shape[0], input_shape[-1])

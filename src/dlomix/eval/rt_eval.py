@@ -1,5 +1,5 @@
+import keras.ops as ops
 import tensorflow as tf
-import tensorflow.keras.backend as K
 
 # Parts of the code adopted and modified based on:
 # https://github.com/horsepurve/DeepRTplus/blob/cde829ef4bd8b38a216d668cf79757c07133b34b/RTdata_emb.py
@@ -120,10 +120,10 @@ def timedelta(y_true, y_pred, normalize=False, percentage=0.95):
         tf.cast(tf.shape(y_true)[0], dtype=tf.float32) * percentage, dtype=tf.int32
     )
 
-    abs_error = K.abs(y_true - y_pred)
+    abs_error = ops.abs(y_true - y_pred)
     delta = tf.sort(abs_error)[mark_percentile - 1]
 
     if normalize:
-        norm_range = K.max(y_true) - K.min(y_true)
+        norm_range = ops.max(y_true) - ops.min(y_true)
         return (delta) / (norm_range)
     return delta

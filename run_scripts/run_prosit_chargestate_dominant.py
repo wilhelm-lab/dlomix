@@ -11,7 +11,7 @@ model = ChargeStatePredictor(
 print(model)
 
 
-optimizer = tf.keras.optimizers.Adam(lr=0.0001)
+optimizer = tf.keras.optimizers.Adam(learning_rate=0.0001)
 
 
 TESTING_DATA = "example_dataset/chargestate/chargestate_data.parquet"
@@ -37,14 +37,15 @@ test_d = ChargeStateDataset(
     max_seq_len=30,
     batch_size=8,
 )
-test_targets = test_d["test"]["most_abundant_charge_state"]
-test_sequences = test_d["test"]["modified_sequence"]
+test_targets = list(test_d["test"]["most_abundant_charge_state"])
+test_sequences = list(test_d["test"]["modified_sequence"])
 
 
 # callbacks
-weights_file = "./run_scripts/output/prosit_charge_major_test"
+model_save_path = "./run_scripts/output/prosit_charge_major_test.keras"
 checkpoint = tf.keras.callbacks.ModelCheckpoint(
-    weights_file, save_best_only=True, save_weights_only=True
+    model_save_path,
+    save_best_only=True,
 )
 early_stop = tf.keras.callbacks.EarlyStopping(patience=20)
 decay = tf.keras.callbacks.ReduceLROnPlateau(

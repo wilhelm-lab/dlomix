@@ -14,17 +14,6 @@ from .processors import (
     SequencePTMRemovalProcessor,
 )
 
-__all__ = [
-    "AVAILABLE_FEATURE_EXTRACTORS",
-    "LookupFeatureExtractor",
-    "FeatureExtractor",
-    "FunctionProcessor",
-    "SequenceParsingProcessor",
-    "SequenceEncodingProcessor",
-    "SequencePaddingProcessor",
-    "SequencePTMRemovalProcessor",
-]
-
 d = dict(
     zip(
         AVAILABLE_FEATURE_EXTRACTORS,
@@ -35,8 +24,11 @@ d = dict(
     )
 )
 
-print(
-    f"""
+
+def show_available_features():
+    """Display information about available feature extractors."""
+    print(
+        f"""
 Available feature extractors are (use the key of the following dict and pass it to features_to_extract in the Dataset Class):
 {json.dumps(d, indent=3, sort_keys=True)}.
 When writing your own feature extractor, you can either
@@ -47,4 +39,17 @@ In both cases, you can access the parsed sequence information from the dataset u
     - {SequenceParsingProcessor.PARSED_COL_NAMES["n_term"]}: N-terminal modifications
     - {SequenceParsingProcessor.PARSED_COL_NAMES["c_term"]}: C-terminal modifications
 """
-)
+    )
+
+
+__all__ = [
+    "AVAILABLE_FEATURE_EXTRACTORS",
+    "LookupFeatureExtractor",
+    "FeatureExtractor",
+    "FunctionProcessor",
+    "SequenceParsingProcessor",
+    "SequenceEncodingProcessor",
+    "SequencePaddingProcessor",
+    "SequencePTMRemovalProcessor",
+    "show_available_features",
+]
