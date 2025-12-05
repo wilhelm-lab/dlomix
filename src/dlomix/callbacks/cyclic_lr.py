@@ -73,11 +73,10 @@ class CyclicLR(tf.keras.callbacks.Callback):
             ) * self.scale_fn(self.clr_iterations)
 
     def on_train_begin(self, logs=None):
-
         if self.clr_iterations == 0:
-            tf.keras.backend.set_value(self.model.optimizer.lr, self.base_lr)
+            self.model.optimizer.learning_rate = self.base_lr
         else:
-            tf.keras.backend.set_value(self.model.optimizer.lr, self.clr())
+            self.model.optimizer.learning_rate = self.clr()
 
     def on_batch_end(self, epoch, logs=None):
         logs = logs or {}
@@ -85,14 +84,14 @@ class CyclicLR(tf.keras.callbacks.Callback):
         self.clr_iterations += 1
 
         self.history.setdefault("lr", []).append(
-            tf.keras.backend.get_value(self.model.optimizer.lr)
+            tf.keras.backend.get_value(self.model.optimizer.learning_rate)
         )
         self.history.setdefault("iterations", []).append(self.trn_iterations)
 
         for k, v in logs.items():
             self.history.setdefault(k, []).append(v)
 
-        tf.keras.backend.set_value(self.model.optimizer.lr, self.clr())
+        self.model.optimizer.learning_rate = self.clr()
 
     def get_config(self):
         return {
