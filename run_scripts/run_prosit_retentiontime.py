@@ -34,7 +34,7 @@ model.compile(
     optimizer=optimizer, loss="mse", metrics=["mean_absolute_error", timedelta]
 )
 
-weights_file = "./run_scripts/output/prosit_rt_test"
+weights_file = "./run_scripts/output/prosit_rt_test.keras"
 checkpoint = tf.keras.callbacks.ModelCheckpoint(
     weights_file,
     save_best_only=True,

@@ -44,7 +44,7 @@ d = FragmentIonIntensityDataset(
 
 model.compile(optimizer=optimizer, loss=masked_spectral_distance, metrics=["mse"])
 
-weights_file = "./run_scripts/output/prosit_intensity_test_ptms"
+weights_file = "./run_scripts/output/prosit_intensity_test_ptms.keras"
 checkpoint = tf.keras.callbacks.ModelCheckpoint(
     weights_file,
     save_best_only=True,
