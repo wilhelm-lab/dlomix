@@ -173,7 +173,8 @@ class PeptideDataset:
                 self._configure_processing_pipeline()
                 self._apply_processing_pipeline()
                 if self.model_features is not None:
-                    self._cast_model_feature_types_to_float()
+                    # self._cast_model_feature_types_to_float()
+                    pass
                 self._cleanup_temp_dataset_cache_files()
                 self.processed = True
 
@@ -714,21 +715,12 @@ If you prefer to encode the (amino-acids)+PTM combinations as tokens in the voca
                 PeptideDataset.DEFAULT_SPLIT_NAMES[0]
             )
 
-            if self.enable_tf_dataset_cache:
-                tf_dataset = tf_dataset.cache()
-
-            if self.shuffle:
-                tf_dataset = tf_dataset.shuffle(
-                    buffer_size=min(10000, dataset_len),
-                    reshuffle_each_iteration=True,
-                )
-
-            # Batch the data
-            tf_dataset = tf_dataset.batch(self.batch_size)
-
-            tf_dataset = tf_dataset.prefetch(tf.data.AUTOTUNE)
-
-            return tf_dataset
+            return self._apply_tf_dataset_pipeline(
+                tf_dataset,
+                enable_cache=self.enable_tf_dataset_cache,
+                shuffle=self.shuffle,
+                dataset_len=dataset_len,
+            )
 
     @property
     def tensor_val_data(self):
@@ -736,17 +728,18 @@ If you prefer to encode the (amino-acids)+PTM combinations as tokens in the voca
         if self.dataset_type == "pt":
             return self._get_split_torch_dataset(PeptideDataset.DEFAULT_SPLIT_NAMES[1])
         else:
+            dataset_len = len(self.hf_dataset[PeptideDataset.DEFAULT_SPLIT_NAMES[1]])
+
             tf_dataset = self._get_split_tf_dataset(
                 PeptideDataset.DEFAULT_SPLIT_NAMES[1]
             )
 
-            if self.enable_tf_dataset_cache:
-                tf_dataset = tf_dataset.cache()
-
-            tf_dataset = tf_dataset.batch(self.batch_size)
-            tf_dataset = tf_dataset.prefetch(tf.data.AUTOTUNE)
-
-            return tf_dataset
+            return self._apply_tf_dataset_pipeline(
+                tf_dataset,
+                enable_cache=self.enable_tf_dataset_cache,
+                shuffle=False,
+                dataset_len=dataset_len,
+            )
 
     @property
     def tensor_test_data(self):
@@ -758,10 +751,11 @@ If you prefer to encode the (amino-acids)+PTM combinations as tokens in the voca
                 PeptideDataset.DEFAULT_SPLIT_NAMES[2]
             )
 
-            if self.enable_tf_dataset_cache:
-                tf_dataset = tf_dataset.cache()
-
-            return tf_dataset
+            return self._apply_tf_dataset_pipeline(
+                tf_dataset,
+                enable_cache=self.enable_tf_dataset_cache,
+                shuffle=False,
+            )
 
     def _check_if_split_exists(self, split_name: str):
         existing_splits = list(self.hf_dataset.keys())
@@ -774,11 +768,37 @@ If you prefer to encode the (amino-acids)+PTM combinations as tokens in the voca
     def _get_split_tf_dataset(self, split_name: str):
         self._check_if_split_exists(split_name)
 
-        return self.hf_dataset[split_name].to_tf_dataset(
+        def cast_fn(x, y):
+            for k in self.model_features:
+                x[k] = tf.cast(x[k], tf.float32)
+            return x, y
+
+        ds = self.hf_dataset[split_name].to_tf_dataset(
             columns=self._get_input_tensor_column_names(),
             label_cols=self.label_column,
             shuffle=False,
         )
+
+        ds = ds.map(cast_fn, num_parallel_calls=tf.data.AUTOTUNE, deterministic=False)
+
+        return ds
+
+    def _apply_tf_dataset_pipeline(
+        self, ds, enable_cache=True, shuffle=False, dataset_len=None
+    ):
+        if enable_cache:
+            ds = (
+                ds.cache()
+            )  # consider enabling caching to a file in the future for very large datasets
+
+        if shuffle:
+            buffer = dataset_len if dataset_len and dataset_len < 50_000 else 10_000
+            ds = ds.shuffle(buffer_size=buffer, reshuffle_each_iteration=True)
+
+        ds = ds.batch(self.batch_size, drop_remainder=False)
+
+        ds = ds.prefetch(tf.data.AUTOTUNE)
+        return ds
 
     def _get_split_torch_dataset(self, split_name: str):
         self._check_if_split_exists(split_name)
