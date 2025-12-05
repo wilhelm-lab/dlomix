@@ -40,6 +40,7 @@ d = FragmentIonIntensityDataset(
     label_column="intensities_raw",
     features_to_extract=["mod_loss", "delta_mass"],
     with_termini=True,
+    enable_tf_dataset_cache=True,
 )
 
 model.compile(optimizer=optimizer, loss=masked_spectral_distance, metrics=["mse"])

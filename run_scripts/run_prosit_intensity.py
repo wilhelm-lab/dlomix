@@ -28,7 +28,7 @@ d = FragmentIonIntensityDataset(
     data_source=TRAIN_DATAPATH,
     sequence_column="modified_sequence",
     label_column="intensities_raw",
-    # model_features=["precursor_charge_onehot", "collision_energy_aligned_normed"],
+    model_features=["precursor_charge_onehot", "collision_energy_aligned_normed"],
     max_seq_len=30,
     batch_size=128,
     val_ratio=0.2,
@@ -44,10 +44,10 @@ model = PrositIntensityPredictor(
         # "COLLISION_ENERGY_KEY": "collision_energy_aligned_normed",
         # "PRECURSOR_CHARGE_KEY": "precursor_charge_onehot",
     },
-    # meta_data_keys={
-    #     "COLLISION_ENERGY_KEY": "collision_energy_aligned_normed",
-    #     "PRECURSOR_CHARGE_KEY": "precursor_charge_onehot",
-    # },
+    meta_data_keys={
+        "COLLISION_ENERGY_KEY": "collision_energy_aligned_normed",
+        "PRECURSOR_CHARGE_KEY": "precursor_charge_onehot",
+    },
     with_termini=False,
 )
 

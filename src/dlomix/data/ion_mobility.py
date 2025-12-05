@@ -57,7 +57,7 @@ class IonMobilityDataset(PeptideDataset):
         with_termini: bool = True,
         encoding_scheme: Union[str, EncodingScheme] = EncodingScheme.NAIVE_MODS,
         processed: bool = False,
-        enable_tf_dataset_cache: bool = False,
+        enable_tf_dataset_cache: bool = True,
         disable_cache: bool = False,
         auto_cleanup_cache: bool = True,
         num_proc: Optional[int] = None,
