@@ -28,7 +28,7 @@ class IonMobilityDataset(PeptideDataset):
         features_to_extract (Optional[List[Union[Callable, str]]]): The features to extract from the dataset. Defaults to None.
         pad (bool): Whether to pad sequences to the maximum length. Defaults to True.
         padding_value (str): The value to use for padding sequences. Defaults to '-'.
-        alphabet (Dict): The alphabet used for encoding sequences. Defaults to ALPHABET_UNMOD.
+        alphabet (Optional[Dict]): The alphabet used for encoding sequences. Defaults to None to trigger learning the alphabet.
         with_termini (bool): Whether to add the N- and C-termini in the sequence column, even if they do not exist. Defaults to True.
         encoding_scheme (Union[str, EncodingScheme]): The encoding scheme to use for sequences. Defaults to EncodingScheme.UNMOD.
         processed (bool): Whether the dataset has been preprocessed. Defaults to False.
