@@ -26,7 +26,7 @@ class DetectabilityDataset(PeptideDataset):
         features_to_extract (Optional[List[Union[Callable, str]]]): The list of features to extract from the dataset. Default is None.
         pad (bool): Whether to pad the sequences to the maximum length. Default is True.
         padding_value (str): The value to use for padding. Default is '-'.
-        alphabet (Dict): The mapping of characters to integers for encoding the sequences. Default is None to trigger learning the alphabet.
+        alphabet (Optional[Dict]): The mapping of characters to integers for encoding the sequences. Default is None to trigger learning the alphabet.
         with_termini (bool): Whether to add the N- and C-termini in the sequence column, even if they do not exist. Defaults to True.
         encoding_scheme (Union[str, EncodingScheme]): The encoding scheme to use for encoding the sequences. Default is EncodingScheme.UNMOD.
         processed (bool): Whether the data has been preprocessed. Default is False.

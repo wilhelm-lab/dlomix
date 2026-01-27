@@ -23,7 +23,7 @@ Introduction to PeptideDataset
 * Automatic conversion to TensorFlow or PyTorch tensors
 * Efficient batch processing with caching support (relies on Hugging Face datasets cache)
 * Custom saving and loading the processed dataset object for faster experimentation and re-runs
-* Improved reprodicubility via logging saving/loading configurations and meta-data of the processed dataset class
+* Improved reproducibility via logging saving/loading configurations and meta-data of the processed dataset class
 
 Available Task-Specific Datasets
 ---------------------------------
@@ -37,7 +37,7 @@ DLOmix provides task-specific dataset classes that inherit from ``PeptideDataset
 * **DetectabilityDataset** - Predicts peptide detectability with default label ``Classes``
 * **FragmentIonIntensityDataset** - Predicts fragment ion intensities with default label ``intensities_raw``
 
-All classes share the same API but differ in their default parameters for common use cases. The dataset configuration
+All classes share the same API but differ in their default parameters for common use cases, which are sensible for the PROSPECT datasets to provide a working example when used with the datasets hosted on the Hugging Face Hub.
 
 
 Basic Usage
@@ -120,14 +120,14 @@ DLOmix supports three splitting strategies:
 
 1. **Single source with auto-split**: Set ``val_ratio`` to automatically split training data into train/val randomly
 2. **Multiple sources**: Provide separate files for train/val/test
-3. **Pre-split datasets**: Use HuggingFace Hub or `DatasetDict` with existing splits
+3. **Pre-split datasets**: Use HuggingFace Hub or ``DatasetDict`` with existing splits
 
 .. code-block:: python
 
    # Strategy 1: Auto-split
    dataset = RetentionTimeDataset(
        data_source="train.csv",
-       val_ratio=0.2  # 20% for validation
+       val_ratio=0.2,  # 20% for validation
        data_format="csv"
    )
 
@@ -186,9 +186,9 @@ Available features in the framework as lookup python dicts are:
 * ``atom_count``
 * ``red_smiles``
 
-Custom feature extractos can either:
+Custom feature extractors can either:
     (1) use the `FeatureExtractor` class or
-    (2) write a function that can be mapped (`dataset.map()`)to the Hugging Face dataset.
+    (2) write a function that can be mapped (`dataset.map()`) to the Hugging Face dataset.
 
 In both cases, you can access the parsed sequence information from the dataset using the following keys, which all provide python lists:
     - `_parsed_sequence`: parsed sequence
@@ -294,7 +294,7 @@ The tensor datasets can be accessed via the ``train_data``, ``val_data``, and ``
    # Load and process dataset
    dataset = RetentionTimeDataset(...)
 
-   # model initializtaion, compilation, etc..
+   # model initialization, compilation, etc..
 
    # pass to model.fit() in Keras
    model.fit(dataset.train_data,
@@ -315,10 +315,10 @@ Provide custom feature extraction functions:
 
    # define the custom feature extraction function
    def hydrophobicity_score(input_data):
-       """Calculate hydrophobicity score"""
+   """Calculate hydrophobicity score"""
 
-       # lookup table for hydrophobicity values
-       hydro_values = {'A': 1.8, 'R': -4.5, 'N': -3.5, ...}
+        # lookup table for hydrophobicity values
+        hydro_values = {'A': 1.8, 'R': -4.5, 'N': -3.5, ...}
 
         # access the parsed sequence or any other column in the dataset
         sequence = input_data["_parsed_sequence"]
@@ -326,8 +326,8 @@ Provide custom feature extraction functions:
         # add the new column with the feature name
         input_data["hydrophobicity_score"] = sum(hydro_values.get(aa, 0) for aa in sequence)
 
-       # return the whole row with the new feature added
-       return input_data
+        # return the whole row with the new feature added
+        return input_data
 
    dataset = RetentionTimeDataset(
        data_source="data.csv",
@@ -498,7 +498,7 @@ Best Practices
 **Validation Splits**
 
 * Prefer explicit ``val_data_source`` for consistent evaluation
-* Always use a separate test dataset for final evaluation, can also be created independently using another Dataset instance with `test_data_source`` only.
+* Always use a separate test dataset for final evaluation, can also be created independently using another Dataset instance with ``test_data_source`` only.
 
 **Feature Engineering**
 
