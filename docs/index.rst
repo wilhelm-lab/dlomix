@@ -29,6 +29,8 @@ The goal of DLOmix is to be easy to use and flexible, while still providing the 
 
 .. include:: notes/installation.rst
 .. include:: notes/quickstart.rst
+.. include:: notes/dataset_guide.rst
+
 
 
 .. toctree::
@@ -36,10 +38,17 @@ The goal of DLOmix is to be easy to use and flexible, while still providing the 
    :maxdepth: 2
    :caption: How To
 
-   notes/quickstart
    notes/installation
-   notes/backend_usage
+   notes/quickstart
    notes/citation
+
+.. toctree::
+   :glob:
+   :maxdepth: 2
+   :caption: Guides
+
+   notes/dataset_guide
+   notes/backend_usage
 
 
 .. toctree::
