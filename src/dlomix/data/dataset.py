@@ -6,6 +6,7 @@ import warnings
 from pathlib import Path
 from typing import Any, Callable, Dict, Optional, Union
 
+import tensorflow as tf
 from datasets import Dataset, DatasetDict, Sequence, Value, load_dataset
 
 from .dataset_config import DatasetConfig
@@ -708,12 +709,24 @@ If you prefer to encode the (amino-acids)+PTM combinations as tokens in the voca
         if self.dataset_type == "pt":
             return self._get_split_torch_dataset(PeptideDataset.DEFAULT_SPLIT_NAMES[0])
         else:
+            dataset_len = len(self.hf_dataset[PeptideDataset.DEFAULT_SPLIT_NAMES[0]])
             tf_dataset = self._get_split_tf_dataset(
                 PeptideDataset.DEFAULT_SPLIT_NAMES[0]
             )
 
             if self.enable_tf_dataset_cache:
                 tf_dataset = tf_dataset.cache()
+
+            if self.shuffle:
+                tf_dataset = tf_dataset.shuffle(
+                    buffer_size=min(10000, dataset_len),
+                    reshuffle_each_iteration=True,
+                )
+
+            # Batch the data
+            tf_dataset = tf_dataset.batch(self.batch_size)
+
+            tf_dataset = tf_dataset.prefetch(tf.data.AUTOTUNE)
 
             return tf_dataset
 
@@ -730,6 +743,9 @@ If you prefer to encode the (amino-acids)+PTM combinations as tokens in the voca
             if self.enable_tf_dataset_cache:
                 tf_dataset = tf_dataset.cache()
 
+            tf_dataset = tf_dataset.batch(self.batch_size)
+            tf_dataset = tf_dataset.prefetch(tf.data.AUTOTUNE)
+
             return tf_dataset
 
     @property
@@ -744,6 +760,9 @@ If you prefer to encode the (amino-acids)+PTM combinations as tokens in the voca
 
             if self.enable_tf_dataset_cache:
                 tf_dataset = tf_dataset.cache()
+
+            tf_dataset = tf_dataset.batch(self.batch_size)
+            tf_dataset = tf_dataset.prefetch(tf.data.AUTOTUNE)
 
             return tf_dataset
 
@@ -761,8 +780,7 @@ If you prefer to encode the (amino-acids)+PTM combinations as tokens in the voca
         return self.hf_dataset[split_name].to_tf_dataset(
             columns=self._get_input_tensor_column_names(),
             label_cols=self.label_column,
-            shuffle=self.shuffle,
-            batch_size=self.batch_size,
+            shuffle=False,
         )
 
     def _get_split_torch_dataset(self, split_name: str):
