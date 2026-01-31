@@ -763,7 +763,10 @@ If you prefer to encode the (amino-acids)+PTM combinations as tokens in the voca
     def _get_split_tf_dataset(self, split_name: str):
         self._check_if_split_exists(split_name)
 
-        # to return a tuple if it is a single label column and be compitable with HF Datasets API updates
+        # to return a tuple if it is a single label column and be compatible with HF Datasets API updates
+
+        label_cols = self.label_column
+
         if isinstance(self.label_column, list) and len(self.label_column) == 1:
             label_cols = self.label_column[0]
 

@@ -21,6 +21,7 @@ RAW_GENERIC_NESTED_DATA = {
     "seq": ["[UNIMOD:737]-DASAQTTSHELTIPN-[]", "[UNIMOD:737]-DLHTGRLC[UNIMOD:4]-[]"],
     "nested_feature": [[[30, 64]], [[25, 35]]],
     "label": [0.1, 0.2],
+    "label2": [1.0, 2.0],
 }
 
 TEST_ASSETS_TO_DOWNLOAD = [

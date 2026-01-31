@@ -347,3 +347,75 @@ def test_torch_dataloader_kwargs():
     assert dataloader.pin_memory is False
     assert dataloader.num_workers == 0
     assert dataset.torch_dataloader_kwargs is not None
+
+
+def test_tf_tensor_dataset_string_label():
+    """Test that TensorFlow TensorDataset is created properly."""
+    hfdata = Dataset.from_dict(pytest.global_variables["RAW_GENERIC_NESTED_DATA"])
+
+    dataset = FragmentIonIntensityDataset(
+        data_format="hf",
+        data_source=hfdata,
+        sequence_column="seq",
+        label_column="label",
+        dataset_type="tf",
+        batch_size=1,
+    )
+
+    # Get the TensorFlow dataset
+    tf_dataset = dataset.tensor_train_data
+
+    # Verify that the TensorFlow dataset is created successfully
+    assert tf_dataset is not None
+    for batch in tf_dataset.take(1):
+        features, labels = batch
+        assert features is not None
+        assert labels is not None
+
+
+def test_tf_tensor_dataset_singelton_list_label():
+    """Test that TensorFlow TensorDataset is created properly."""
+    hfdata = Dataset.from_dict(pytest.global_variables["RAW_GENERIC_NESTED_DATA"])
+
+    dataset = FragmentIonIntensityDataset(
+        data_format="hf",
+        data_source=hfdata,
+        sequence_column="seq",
+        label_column=["label"],
+        dataset_type="tf",
+        batch_size=1,
+    )
+
+    # Get the TensorFlow dataset
+    tf_dataset = dataset.tensor_train_data
+
+    # Verify that the TensorFlow dataset is created successfully
+    assert tf_dataset is not None
+    for batch in tf_dataset.take(1):
+        features, labels = batch
+        assert features is not None
+        assert labels is not None
+
+
+def test_tf_tensor_dataset_list_multi_label():
+    """Test that TensorFlow TensorDataset is created properly."""
+    hfdata = Dataset.from_dict(pytest.global_variables["RAW_GENERIC_NESTED_DATA"])
+
+    dataset = FragmentIonIntensityDataset(
+        data_format="hf",
+        data_source=hfdata,
+        sequence_column="seq",
+        label_column=["label", "label2"],
+        dataset_type="tf",
+        batch_size=1,
+    )
+
+    # Get the TensorFlow dataset
+    tf_dataset = dataset.tensor_train_data
+
+    # Verify that the TensorFlow dataset is created successfully
+    assert tf_dataset is not None
+    for batch in tf_dataset.take(1):
+        features, labels = batch
+        assert features is not None
+        assert labels is not None
