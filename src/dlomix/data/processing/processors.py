@@ -79,7 +79,7 @@ class SequenceParsingProcessor(PeptideDatasetBaseProcessor):
     >>> processor = SequenceParsingProcessor("sequence")
     >>> data = {"sequence": "[]-IGGPC[UNIMOD:4]AHC[UNIMOD:4]AAWEGVR-[]"}
     >>> processor(data)
-    {'sequence': ['[]', 'I', 'G', 'G', 'P', 'C', 'A', 'H', 'C', 'A', 'A', 'W', 'E', 'G', 'V', 'R', '-[]'],
+    {'sequence': ['[]-', 'I', 'G', 'G', 'P', 'C', 'A', 'H', 'C', 'A', 'A', 'W', 'E', 'G', 'V', 'R', '-[]'],
      '_parsed_sequence': ['I', 'G', 'G', 'P', 'C', 'A', 'H', 'C', 'A', 'A', 'W', 'E', 'G', 'V', 'R'],
      '_n_term_mods': '[]-',
      '_c_term_mods': '-[]'}

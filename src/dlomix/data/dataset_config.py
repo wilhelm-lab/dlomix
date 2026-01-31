@@ -39,6 +39,26 @@ class DatasetConfig:
     batch_processing_size: int
     torch_dataloader_kwargs: Optional[Dict] = field(default_factory=dict)
 
+    # validate input parameters
+    def __post_init__(self):
+        # sequence length validation
+        if self.max_seq_len > 0:
+            seq_len = self.max_seq_len
+        else:
+            raise ValueError(
+                f"Max sequence length provided is an integer but not a valid value: {self.max_seq_len}, only positive non-zero values are allowed."
+            )
+
+        # label column validation, either a string or a list of strings
+        if isinstance(self.label_column, str):
+            self.label_column = [self.label_column]
+        elif isinstance(self.label_column, list):
+            self.label_column = self.label_column
+        else:
+            raise ValueError(
+                "The label_column parameter should be a string or a list of strings."
+            )
+
     def save_config_json(self, path: str):
         """
         Save the configuration to a json file.

@@ -121,15 +121,6 @@ class PeptideDataset:
 
         self.encoding_scheme = EncodingScheme(dataset_config.encoding_scheme)
 
-        if isinstance(dataset_config.label_column, str):
-            self.label_column = [dataset_config.label_column]
-        elif isinstance(dataset_config.label_column, list):
-            self.label_column = dataset_config.label_column
-        else:
-            raise ValueError(
-                "The label_column parameter should be a string or a list of strings."
-            )
-
         self._set_hf_cache_management()
 
         self.extended_alphabet = {}
@@ -385,18 +376,11 @@ If you prefer to encode the (amino-acids)+PTM combinations as tokens in the voca
             )
             return
 
-        if self.max_seq_len > 0:
-            seq_len = self.max_seq_len
-        else:
-            raise ValueError(
-                f"Max sequence length provided is an integer but not a valid value: {self.max_seq_len}, only positive non-zero values are allowed."
-            )
-
         padding_processor = SequencePaddingProcessor(
             sequence_column_name=self.sequence_column,
             batched=True,
             padding_index=self.extended_alphabet[self.padding_value],
-            max_length=seq_len,
+            max_length=self.max_seq_len + 2 if self.with_termini else self.max_seq_len,
         )
 
         self._processors.append(padding_processor)
@@ -422,7 +406,9 @@ If you prefer to encode the (amino-acids)+PTM combinations as tokens in the voca
                     ],
                     feature_column_name=feature_name,
                     **FEATURE_EXTRACTORS_PARAMETERS[feature_name],
-                    max_length=self.max_seq_len,
+                    max_length=self.max_seq_len + 2
+                    if self.with_termini
+                    else self.max_seq_len,
                     batched=True,
                 )
             elif isinstance(feature, Callable):
@@ -777,9 +763,13 @@ If you prefer to encode the (amino-acids)+PTM combinations as tokens in the voca
     def _get_split_tf_dataset(self, split_name: str):
         self._check_if_split_exists(split_name)
 
+        # to return a tuple if it is a single label column and be compitable with HF Datasets API updates
+        if isinstance(self.label_column, list) and len(self.label_column) == 1:
+            label_cols = self.label_column[0]
+
         return self.hf_dataset[split_name].to_tf_dataset(
             columns=self._get_input_tensor_column_names(),
-            label_cols=self.label_column,
+            label_cols=label_cols,
             shuffle=False,
         )
 
