@@ -1,6 +1,5 @@
 import logging
 
-import pytest
 import torch
 from datasets import Dataset
 
@@ -9,8 +8,8 @@ from dlomix.data import FragmentIonIntensityDataset
 logger = logging.getLogger(__name__)
 
 
-def test_dataset_torch():
-    hfdata = Dataset.from_dict(pytest.global_variables["RAW_GENERIC_NESTED_DATA"])
+def test_dataset_torch(raw_generic_nested_data):
+    hfdata = Dataset.from_dict(raw_generic_nested_data)
 
     intensity_dataset = FragmentIonIntensityDataset(
         data_format="hf",

@@ -16,8 +16,6 @@ logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
 )
 
-# consider the use-case for starting from a saved model
-
 optimizer = tf.keras.optimizers.Adam(learning_rate=0.0001)
 
 # TRAIN_DATAPATH = "../example_dataset/intensity/intensity_data.parquet"
@@ -28,14 +26,18 @@ d = FragmentIonIntensityDataset(
     data_source=TRAIN_DATAPATH,
     sequence_column="modified_sequence",
     label_column="intensities_raw",
-    # model_features=["precursor_charge_onehot", "collision_energy_aligned_normed"],
+    model_features=["precursor_charge_onehot", "collision_energy_aligned_normed"],
     max_seq_len=30,
     batch_size=128,
     val_ratio=0.2,
-    with_termini=False,
+    with_termini=True,
+    alphabet=None,
 )
 
 print(d)
+print(d["train"][0])
+print(d.extended_alphabet)
+
 
 model = PrositIntensityPredictor(
     seq_length=30,
@@ -44,18 +46,23 @@ model = PrositIntensityPredictor(
         # "COLLISION_ENERGY_KEY": "collision_energy_aligned_normed",
         # "PRECURSOR_CHARGE_KEY": "precursor_charge_onehot",
     },
-    # meta_data_keys={
-    #     "COLLISION_ENERGY_KEY": "collision_energy_aligned_normed",
-    #     "PRECURSOR_CHARGE_KEY": "precursor_charge_onehot",
-    # },
-    with_termini=False,
+    meta_data_keys={
+        "COLLISION_ENERGY_KEY": "collision_energy_aligned_normed",
+        "PRECURSOR_CHARGE_KEY": "precursor_charge_onehot",
+    },
+    with_termini=True,
+    alphabet=d.extended_alphabet,
+    use_meta_data=True,
 )
 
 model.compile(optimizer=optimizer, loss=masked_spectral_distance, metrics=["mse"])
 
-weights_file = "./run_scripts/output/prosit_intensity_test"
+print(model)
+
+weights_file = "./run_scripts/output/prosit_intensity_test.keras"
 checkpoint = tf.keras.callbacks.ModelCheckpoint(
-    weights_file, save_best_only=True, save_weights_only=True
+    weights_file,
+    save_best_only=True,
 )
 decay = tf.keras.callbacks.ReduceLROnPlateau(
     monitor="val_loss", factor=0.1, patience=10, verbose=1, min_lr=0

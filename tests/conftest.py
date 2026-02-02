@@ -14,15 +14,6 @@ RT_PARQUET_EXAMPLE_URL = "https://zenodo.org/record/6602020/files/TUM_missing_fi
 RT_CSV_EXAMPLE_URL = "https://raw.githubusercontent.com/wilhelm-lab/dlomix/develop/example_dataset/proteomTools_train_val.csv"
 INTENSITY_PARQUET_EXAMPLE_URL = "https://raw.githubusercontent.com/wilhelm-lab/dlomix/develop/example_dataset/intensity/intensity_data.parquet"
 INTENSITY_CSV_EXAMPLE_URL = "https://raw.githubusercontent.com/wilhelm-lab/dlomix/develop/example_dataset/intensity/intensity_data.csv"
-RT_HUB_DATASET_NAME = "Wilhelmlab/prospect-ptms-irt"
-
-
-RAW_GENERIC_NESTED_DATA = {
-    "seq": ["[UNIMOD:737]-DASAQTTSHELTIPN-[]", "[UNIMOD:737]-DLHTGRLC[UNIMOD:4]-[]"],
-    "nested_feature": [[[30, 64]], [[25, 35]]],
-    "label": [0.1, 0.2],
-    "label2": [1.0, 2.0],
-}
 
 TEST_ASSETS_TO_DOWNLOAD = [
     RT_PARQUET_EXAMPLE_URL,
@@ -39,12 +30,22 @@ def unzip_file(zip_file_path, dest_dir):
         f.extractall(dest_dir)
 
 
-@pytest.fixture(scope="session", autouse=True)
-def global_variables():
-    pytest.global_variables = {
-        "RAW_GENERIC_NESTED_DATA": RAW_GENERIC_NESTED_DATA,
-        "DOWNLOAD_PATH_FOR_ASSETS": DOWNLOAD_PATH_FOR_ASSETS,
+@pytest.fixture(scope="session")
+def raw_generic_nested_data():
+    return {
+        "seq": [
+            "[UNIMOD:737]-DASAQTTSHELTIPN-[]",
+            "[UNIMOD:737]-DLHTGRLC[UNIMOD:4]-[]",
+        ],
+        "nested_feature": [[[30, 64]], [[25, 35]]],
+        "label": [0.1, 0.2],
+        "label2": [1.0, 2.0],
     }
+
+
+@pytest.fixture(scope="session")
+def download_path_for_assets():
+    return DOWNLOAD_PATH_FOR_ASSETS
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -90,3 +91,151 @@ def subset_downloaded_files(download_assets):
             pd.read_csv(file).sample(N).to_csv(file)
         else:
             continue
+
+
+@pytest.fixture
+def basic_alphabet():
+    """Basic amino acid alphabet without modifications."""
+    return {
+        "A": 1,
+        "C": 2,
+        "D": 3,
+        "E": 4,
+        "F": 5,
+        "G": 6,
+        "H": 7,
+        "I": 8,
+        "K": 9,
+        "L": 10,
+        "M": 11,
+        "N": 12,
+        "P": 13,
+        "Q": 14,
+        "R": 15,
+        "S": 16,
+        "T": 17,
+        "V": 18,
+        "W": 19,
+        "Y": 20,
+        "[]-": 21,
+        "-[]": 22,
+    }
+
+
+@pytest.fixture
+def ptm_alphabet():
+    """Alphabet with PTM modifications included."""
+    base = {
+        "A": 1,
+        "C": 2,
+        "D": 3,
+        "E": 4,
+        "F": 5,
+        "G": 6,
+        "H": 7,
+        "I": 8,
+        "K": 9,
+        "L": 10,
+        "M": 11,
+        "N": 12,
+        "P": 13,
+        "Q": 14,
+        "R": 15,
+        "S": 16,
+        "T": 17,
+        "V": 18,
+        "W": 19,
+        "Y": 20,
+        "[]-": 21,
+        "-[]": 22,
+        "C[UNIMOD:4]": 23,  # Carbamidomethylation of C
+        "K[UNIMOD:737]": 24,  # TMT6plex of K
+        "[UNIMOD:737]-": 25,  # TMT6plex of N-terminus
+    }
+    return base
+
+
+@pytest.fixture
+def sample_parsed_sequence():
+    """Sample parsed sequence data (output of SequenceParsingProcessor)."""
+    return {
+        "sequence": ["[]-", "D", "E", "L", "-[]"],
+        "_parsed_sequence": ["D", "E", "L"],
+        "_n_term_mods": "[]-",
+        "_c_term_mods": "-[]",
+    }
+
+
+@pytest.fixture
+def sample_parsed_sequence_with_ptm():
+    """Sample parsed sequence with PTM modifications."""
+    return {
+        "sequence": ["[]-", "H", "C[UNIMOD:4]", "V", "D", "-[]"],
+        "_parsed_sequence": ["H", "C[UNIMOD:4]", "V", "D"],
+        "_n_term_mods": "[]-",
+        "_c_term_mods": "-[]",
+    }
+
+
+@pytest.fixture
+def sample_parsed_sequence_with_nterm_mod():
+    """Sample parsed sequence with N-terminal modification."""
+    return {
+        "sequence": ["[UNIMOD:737]-", "I", "L", "C[UNIMOD:4]", "S", "-[]"],
+        "_parsed_sequence": ["I", "L", "C[UNIMOD:4]", "S"],
+        "_n_term_mods": "[UNIMOD:737]-",
+        "_c_term_mods": "-[]",
+    }
+
+
+@pytest.fixture
+def mock_lookup_table():
+    """Mock PTM feature lookup table."""
+    return {
+        "C[UNIMOD:4]": [1, 2, 3, 4, 5, 6],  # 6D feature vector
+        "K[UNIMOD:737]": [7, 8, 9, 10, 11, 12],
+        "[UNIMOD:737]-": [0, 0, 0, 0, 0, 0],
+        "[]-": [0, 0, 0, 0, 0, 0],
+        "-[]": [0, 0, 0, 0, 0, 0],
+        "A": [0, 0, 0, 0, 0, 0],
+        "D": [0, 1, 0, 0, 0, 0],
+        "E": [0, 1, 0, 0, 0, 0],
+        "L": [0, 0, 0, 0, 0, 0],
+        "H": [1, 0, 0, 0, 0, 1],
+        "V": [0, 0, 0, 0, 0, 0],
+        "I": [0, 0, 0, 0, 0, 0],
+        "S": [0, 0, 0, 1, 0, 0],
+    }
+
+
+@pytest.fixture
+def sample_batched_sequences():
+    """Sample batch of sequences for batched processor tests."""
+    return [
+        "[]-DEL-[]",
+        "[]-HHDELIF-[]",
+        "[]-C[UNIMOD:4]VD-[]",
+    ]
+
+
+@pytest.fixture
+def sample_custom_function():
+    """Custom function for FunctionProcessor testing."""
+
+    def double_sequence_length(data, **kwargs):
+        if isinstance(data.get("sequence"), list):
+            return {"sequence": data["sequence"] * 2}
+        return data
+
+    return double_sequence_length
+
+
+@pytest.fixture
+def sample_custom_function_with_kwargs():
+    """Custom function that accepts kwargs."""
+
+    def scale_feature(data, scale_factor=1.0, **kwargs):
+        feature = data.get("feature", 0.0)
+        return {"feature": feature * scale_factor}
+
+    return scale_feature

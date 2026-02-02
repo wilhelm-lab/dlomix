@@ -110,8 +110,13 @@ def test_tf_torch_equivalence_intensity_model_shapes():
     dummy_input_torch = torch.randint(low=0, high=15, size=(batch_size, seq_len))
     dummi_input_tf = dummy_input_torch.numpy()
 
-    model_tf = PrositIntensityPredictor()
-    model_torch = PrositIntensityPredictorTorch()
+    model_tf = PrositIntensityPredictor(
+        seq_length=seq_len,
+    )
+
+    model_torch = PrositIntensityPredictorTorch(
+        seq_length=seq_len,
+    )
 
     output_tf = model_tf(dummi_input_tf)
     output_torch = model_torch(dummy_input_torch)

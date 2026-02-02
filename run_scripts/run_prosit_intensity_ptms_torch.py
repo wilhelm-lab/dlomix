@@ -21,8 +21,26 @@ logging.basicConfig(
 BATCH_SIZE = 8
 N_EPOCHS = 20
 
+
+TRAIN_DATAPATH = "example_dataset/intensity/third_pool_processed_sample.parquet"
+
+d = FragmentIonIntensityDataset(
+    data_source=TRAIN_DATAPATH,
+    max_seq_len=30,
+    batch_size=BATCH_SIZE,
+    val_ratio=0.2,
+    model_features=["collision_energy_aligned_normed", "precursor_charge_onehot"],
+    sequence_column="modified_sequence",
+    label_column="intensities_raw",
+    features_to_extract=["delta_mass"],
+    dataset_type="pt",
+    with_termini=False,
+)
+
+print(d)
+
 model = PrositIntensityPredictor(
-    seq_length=32,
+    seq_length=30,
     use_prosit_ptm_features=True,
     input_keys={
         "SEQUENCE_KEY": "modified_sequence",
@@ -31,27 +49,11 @@ model = PrositIntensityPredictor(
         "COLLISION_ENERGY_KEY": "collision_energy_aligned_normed",
         "PRECURSOR_CHARGE_KEY": "precursor_charge_onehot",
     },
-    with_termini=True,
+    with_termini=False,
+    alphabet=d.extended_alphabet,
 )
 
 optimizer = torch.optim.Adam(params=model.parameters(), lr=0.0001)
-
-TRAIN_DATAPATH = "example_dataset/intensity/third_pool_processed_sample.parquet"
-
-d = FragmentIonIntensityDataset(
-    data_source=TRAIN_DATAPATH,
-    max_seq_len=32,
-    batch_size=BATCH_SIZE,
-    val_ratio=0.2,
-    model_features=["collision_energy_aligned_normed", "precursor_charge_onehot"],
-    sequence_column="modified_sequence",
-    label_column="intensities_raw",
-    features_to_extract=["mod_loss", "delta_mass"],
-    dataset_type="pt",
-    with_termini=True,
-)
-
-print(d)
 
 loss_criterion = masked_spectral_distance
 
