@@ -83,7 +83,7 @@ def test_prosit_intensity_model_ptm_on_input():
 def test_prosit_intensity_model_ptm_on_missing():
     model = PrositIntensityPredictor(use_prosit_ptm_features=True)
     seq_len = model.seq_length
-    with pytest.warns(UserWarning, match="PTM"):
+    with pytest.raises(ValueError, match="PTM"):
         model.build(
             {
                 "sequence": (
@@ -99,10 +99,12 @@ def test_prosit_intensity_model_ptm_on_missing():
 
 
 def test_prosit_intensity_model_encoding_metadata_missing():
-    model = PrositIntensityPredictor()
+    model = PrositIntensityPredictor(
+        meta_data_keys=["meta_data_1", "meta_data_2"], use_meta_data=True
+    )
     seq_len = model.seq_length
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="metadata"):
         model.build(
             {
                 "sequence": (
@@ -112,6 +114,31 @@ def test_prosit_intensity_model_encoding_metadata_missing():
                 # no meta-data while expected
             }
         )
+
+
+def test_prosit_intensity_model_no_metadata():
+    model = PrositIntensityPredictor(
+        input_keys={
+            "SEQUENCE_KEY": "sequence",
+        },
+        meta_data_keys=None,
+    )
+
+    seq_len = model.seq_length
+
+    assert model.meta_data_keys == []
+
+    model.build(
+        {
+            "sequence": (
+                None,
+                seq_len,
+            ),
+        }
+    )
+
+    assert model is not None
+    assert model.meta_encoder is None
 
 
 def basic_model_existence_test(model):
