@@ -3,7 +3,6 @@ import time
 from os.path import join
 from shutil import rmtree
 
-import pytest
 from datasets import Dataset, DatasetDict, load_dataset
 
 from dlomix.data import (
@@ -23,11 +22,9 @@ def test_empty_rtdataset():
     assert rtdataset._empty_dataset_mode is True
 
 
-def test_parquet_rtdataset():
+def test_parquet_rtdataset(download_path_for_assets):
     rtdataset = RetentionTimeDataset(
-        data_source=join(
-            pytest.global_variables["DOWNLOAD_PATH_FOR_ASSETS"], "file_1.parquet"
-        ),
+        data_source=join(download_path_for_assets, "file_1.parquet"),
         sequence_column="modified_sequence",
         label_column="indexed_retention_time",
     )
@@ -46,12 +43,10 @@ def test_parquet_rtdataset():
     assert rtdataset[RetentionTimeDataset.DEFAULT_SPLIT_NAMES[1]].num_rows > 0
 
 
-def test_rtdataset_inmemory():
+def test_rtdataset_inmemory(download_path_for_assets):
     hf_dataset = load_dataset(
         "parquet",
-        data_files=join(
-            pytest.global_variables["DOWNLOAD_PATH_FOR_ASSETS"], "file_1.parquet"
-        ),
+        data_files=join(download_path_for_assets, "file_1.parquet"),
         split="train",
     )
 
@@ -89,11 +84,9 @@ def test_rtdataset_hub():
     assert rtdataset[RetentionTimeDataset.DEFAULT_SPLIT_NAMES[2]].num_rows > 0
 
 
-def test_csv_rtdataset():
+def test_csv_rtdataset(download_path_for_assets):
     rtdataset = RetentionTimeDataset(
-        data_source=join(
-            pytest.global_variables["DOWNLOAD_PATH_FOR_ASSETS"], "file_2.csv"
-        ),
+        data_source=join(download_path_for_assets, "file_2.csv"),
         data_format="csv",
         sequence_column="sequence",
         label_column="irt",
@@ -121,10 +114,8 @@ def test_empty_intensitydataset():
     assert intensity_dataset._empty_dataset_mode is True
 
 
-def test_parquet_intensitydataset():
-    filepath = join(
-        pytest.global_variables["DOWNLOAD_PATH_FOR_ASSETS"], "file_3.parquet"
-    )
+def test_parquet_intensitydataset(download_path_for_assets):
+    filepath = join(download_path_for_assets, "file_3.parquet")
     intensity_dataset = FragmentIonIntensityDataset(
         data_format="parquet",
         data_source=filepath,
@@ -154,8 +145,8 @@ def test_parquet_intensitydataset():
     )
 
 
-def test_csv_intensitydataset():
-    filepath = join(pytest.global_variables["DOWNLOAD_PATH_FOR_ASSETS"], "file_4.csv")
+def test_csv_intensitydataset(download_path_for_assets):
+    filepath = join(download_path_for_assets, "file_4.csv")
     intensity_dataset = FragmentIonIntensityDataset(
         data_format="csv",
         data_source=filepath,
@@ -184,8 +175,8 @@ def test_csv_intensitydataset():
     )
 
 
-def test_nested_model_features():
-    hfdata = Dataset.from_dict(pytest.global_variables["RAW_GENERIC_NESTED_DATA"])
+def test_nested_model_features(raw_generic_nested_data):
+    hfdata = Dataset.from_dict(raw_generic_nested_data)
 
     intensity_dataset = FragmentIonIntensityDataset(
         data_format="hf",
@@ -202,8 +193,8 @@ def test_nested_model_features():
     assert example[0]["nested_feature"].shape == [2, 1, 2]
 
 
-def test_save_dataset():
-    hfdata = Dataset.from_dict(pytest.global_variables["RAW_GENERIC_NESTED_DATA"])
+def test_save_dataset(raw_generic_nested_data):
+    hfdata = Dataset.from_dict(raw_generic_nested_data)
 
     intensity_dataset = FragmentIonIntensityDataset(
         data_format="hf",
@@ -221,11 +212,9 @@ def test_save_dataset():
     rmtree(save_path)
 
 
-def test_load_dataset():
+def test_load_dataset(download_path_for_assets):
     rtdataset = RetentionTimeDataset(
-        data_source=join(
-            pytest.global_variables["DOWNLOAD_PATH_FOR_ASSETS"], "file_2.csv"
-        ),
+        data_source=join(download_path_for_assets, "file_2.csv"),
         data_format="csv",
         sequence_column="sequence",
         label_column="irt",
@@ -259,8 +248,8 @@ def test_load_dataset():
     rmtree(save_path)
 
 
-def test_no_split_datasetDict_hf_inmemory():
-    hfdata = Dataset.from_dict(pytest.global_variables["RAW_GENERIC_NESTED_DATA"])
+def test_no_split_datasetDict_hf_inmemory(raw_generic_nested_data):
+    hfdata = Dataset.from_dict(raw_generic_nested_data)
     hf_dataset = DatasetDict({"train": hfdata})
 
     intensity_dataset = FragmentIonIntensityDataset(
@@ -288,9 +277,9 @@ def test_no_split_datasetDict_hf_inmemory():
     # test learning alphabet for train/val and then using it for test with fallback
 
 
-def test_shuffle_parameter():
+def test_shuffle_parameter(raw_generic_nested_data):
     """Test that shuffle parameter works for both TensorFlow and PyTorch datasets."""
-    hfdata = Dataset.from_dict(pytest.global_variables["RAW_GENERIC_NESTED_DATA"])
+    hfdata = Dataset.from_dict(raw_generic_nested_data)
 
     # Test with shuffle=True for TensorFlow
     tf_dataset = FragmentIonIntensityDataset(
@@ -321,9 +310,9 @@ def test_shuffle_parameter():
     assert pt_dataset.tensor_train_data is not None
 
 
-def test_torch_dataloader_kwargs():
+def test_torch_dataloader_kwargs(raw_generic_nested_data):
     """Test that additional PyTorch DataLoader kwargs are properly passed through."""
-    hfdata = Dataset.from_dict(pytest.global_variables["RAW_GENERIC_NESTED_DATA"])
+    hfdata = Dataset.from_dict(raw_generic_nested_data)
 
     dataset = FragmentIonIntensityDataset(
         data_format="hf",
@@ -349,9 +338,9 @@ def test_torch_dataloader_kwargs():
     assert dataset.torch_dataloader_kwargs is not None
 
 
-def test_tf_tensor_dataset_string_label():
+def test_tf_tensor_dataset_string_label(raw_generic_nested_data):
     """Test that TensorFlow TensorDataset is created properly."""
-    hfdata = Dataset.from_dict(pytest.global_variables["RAW_GENERIC_NESTED_DATA"])
+    hfdata = Dataset.from_dict(raw_generic_nested_data)
 
     dataset = FragmentIonIntensityDataset(
         data_format="hf",
@@ -373,9 +362,9 @@ def test_tf_tensor_dataset_string_label():
         assert labels is not None
 
 
-def test_tf_tensor_dataset_singelton_list_label():
+def test_tf_tensor_dataset_singelton_list_label(raw_generic_nested_data):
     """Test that TensorFlow TensorDataset is created properly."""
-    hfdata = Dataset.from_dict(pytest.global_variables["RAW_GENERIC_NESTED_DATA"])
+    hfdata = Dataset.from_dict(raw_generic_nested_data)
 
     dataset = FragmentIonIntensityDataset(
         data_format="hf",
@@ -397,9 +386,9 @@ def test_tf_tensor_dataset_singelton_list_label():
         assert labels is not None
 
 
-def test_tf_tensor_dataset_list_multi_label():
+def test_tf_tensor_dataset_list_multi_label(raw_generic_nested_data):
     """Test that TensorFlow TensorDataset is created properly."""
-    hfdata = Dataset.from_dict(pytest.global_variables["RAW_GENERIC_NESTED_DATA"])
+    hfdata = Dataset.from_dict(raw_generic_nested_data)
 
     dataset = FragmentIonIntensityDataset(
         data_format="hf",
