@@ -6,7 +6,6 @@ import warnings
 from pathlib import Path
 from typing import Any, Callable, Dict, Optional, Union
 
-import tensorflow as tf
 from datasets import Dataset, DatasetDict, Sequence, Value, load_dataset
 
 from .dataset_config import DatasetConfig
@@ -26,6 +25,27 @@ from .processing.processors import (
 )
 
 logger = logging.getLogger(__name__)
+
+# TensorFlow import for tf.data is deferred until needed to avoid unnecessary imports for users who only want to use PyTorch datasets or other functionalities of the PeptideDataset class.
+# This also helps to reduce the initial loading time and memory footprint for users who do not need TensorFlow.
+
+_tf = None
+
+
+def _get_tensorflow():
+    """Lazy import of TensorFlow. Only imports when needed."""
+    global _tf
+    if _tf is None:
+        try:
+            import tensorflow as tf
+
+            _tf = tf
+        except ImportError:
+            raise ImportError(
+                "TensorFlow backend requires tensorflow to be installed. "
+                "Install with: pip install tensorflow"
+            )
+    return _tf
 
 
 class PeptideDataset:
@@ -695,6 +715,7 @@ If you prefer to encode the (amino-acids)+PTM combinations as tokens in the voca
         if self.dataset_type == "pt":
             return self._get_split_torch_dataset(PeptideDataset.DEFAULT_SPLIT_NAMES[0])
         else:
+            tf = _get_tensorflow()
             dataset_len = len(self.hf_dataset[PeptideDataset.DEFAULT_SPLIT_NAMES[0]])
             tf_dataset = self._get_split_tf_dataset(
                 PeptideDataset.DEFAULT_SPLIT_NAMES[0]
@@ -722,6 +743,7 @@ If you prefer to encode the (amino-acids)+PTM combinations as tokens in the voca
         if self.dataset_type == "pt":
             return self._get_split_torch_dataset(PeptideDataset.DEFAULT_SPLIT_NAMES[1])
         else:
+            tf = _get_tensorflow()
             tf_dataset = self._get_split_tf_dataset(
                 PeptideDataset.DEFAULT_SPLIT_NAMES[1]
             )
@@ -740,6 +762,7 @@ If you prefer to encode the (amino-acids)+PTM combinations as tokens in the voca
         if self.dataset_type == "pt":
             return self._get_split_torch_dataset(PeptideDataset.DEFAULT_SPLIT_NAMES[2])
         else:
+            tf = _get_tensorflow()
             tf_dataset = self._get_split_tf_dataset(
                 PeptideDataset.DEFAULT_SPLIT_NAMES[2]
             )
