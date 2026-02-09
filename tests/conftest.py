@@ -148,9 +148,9 @@ def ptm_alphabet():
         "Y": 20,
         "[]-": 21,
         "-[]": 22,
-        "C[UNIMOD:4]": 23,  # Carbamidomethylation of C
-        "K[UNIMOD:737]": 24,  # TMT6plex of K
-        "[UNIMOD:737]-": 25,  # TMT6plex of N-terminus
+        "C[UNIMOD:4]": 23,
+        "K[UNIMOD:737]": 24,
+        "[UNIMOD:737]-": 25,
     }
     return base
 
@@ -189,22 +189,13 @@ def sample_parsed_sequence_with_nterm_mod():
 
 
 @pytest.fixture
-def mock_lookup_table():
-    """Mock PTM feature lookup table."""
+def lookup_table():
+    # Create a lookup table
     return {
-        "C[UNIMOD:4]": [1, 2, 3, 4, 5, 6],  # 6D feature vector
-        "K[UNIMOD:737]": [7, 8, 9, 10, 11, 12],
-        "[UNIMOD:737]-": [0, 0, 0, 0, 0, 0],
-        "[]-": [0, 0, 0, 0, 0, 0],
-        "-[]": [0, 0, 0, 0, 0, 0],
-        "A": [0, 0, 0, 0, 0, 0],
-        "D": [0, 1, 0, 0, 0, 0],
-        "E": [0, 1, 0, 0, 0, 0],
-        "L": [0, 0, 0, 0, 0, 0],
-        "H": [1, 0, 0, 0, 0, 1],
-        "V": [0, 0, 0, 0, 0, 0],
-        "I": [0, 0, 0, 0, 0, 0],
-        "S": [0, 0, 0, 1, 0, 0],
+        0: [1.0, 2.0],
+        1: [3.0, 4.0],
+        2: [5.0, 6.0],
+        3: [7.0, 8.0],
     }
 
 

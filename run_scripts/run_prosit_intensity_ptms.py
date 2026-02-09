@@ -23,16 +23,16 @@ d = FragmentIonIntensityDataset(
     model_features=["collision_energy_aligned_normed", "precursor_charge_onehot"],
     sequence_column="modified_sequence",
     label_column="intensities_raw",
-    # features_to_extract=["mod_loss", "delta_mass"],
-    features_to_extract=["delta_mass"],
-    with_termini=False,
+    features_to_extract=["mod_loss", "delta_mass"],
+    # features_to_extract=["delta_mass"],
+    with_termini=True,
     alphabet=None,
     encoding_scheme="naive-mods",
 )
-
 model = PrositIntensityPredictor(
     seq_length=30,
     use_prosit_ptm_features=True,
+    use_meta_data=True,
     input_keys={
         "SEQUENCE_KEY": "modified_sequence",
     },
@@ -40,7 +40,7 @@ model = PrositIntensityPredictor(
         "COLLISION_ENERGY_KEY": "collision_energy_aligned_normed",
         "PRECURSOR_CHARGE_KEY": "precursor_charge_onehot",
     },
-    with_termini=False,
+    with_termini=True,
     alphabet=d.extended_alphabet,
 )
 
