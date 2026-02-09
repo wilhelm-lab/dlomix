@@ -196,6 +196,8 @@ class LookupFeatureExtractor(FeatureExtractor):
 
         feature[:lookup_length] = itemgetter(*sequence_for_lookup)(self.lookup_table)
 
-        feature = self.pad_feature_to_seq_length(feature, self.max_length)
+        # pad from lookup_length to max_length if needed and expand dims if one-dimensional
+        # technically, complementing the previous step with a call feature[lookup_length:] = self.feature_default_value
+        feature = self.pad_feature_to_seq_length(feature, lookup_length)
 
         return feature
