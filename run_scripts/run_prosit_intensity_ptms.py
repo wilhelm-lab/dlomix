@@ -13,9 +13,26 @@ logging.basicConfig(
 )
 
 
+TRAIN_DATAPATH = "example_dataset/intensity/third_pool_processed_sample.parquet"
+
+d = FragmentIonIntensityDataset(
+    data_source=TRAIN_DATAPATH,
+    max_seq_len=30,
+    batch_size=128,
+    val_ratio=0.2,
+    model_features=["collision_energy_aligned_normed", "precursor_charge_onehot"],
+    sequence_column="modified_sequence",
+    label_column="intensities_raw",
+    features_to_extract=["mod_loss", "delta_mass"],
+    # features_to_extract=["delta_mass"],
+    with_termini=True,
+    alphabet=None,
+    encoding_scheme="naive-mods",
+)
 model = PrositIntensityPredictor(
-    seq_length=32,
+    seq_length=30,
     use_prosit_ptm_features=True,
+    use_meta_data=True,
     input_keys={
         "SEQUENCE_KEY": "modified_sequence",
     },
@@ -24,23 +41,10 @@ model = PrositIntensityPredictor(
         "PRECURSOR_CHARGE_KEY": "precursor_charge_onehot",
     },
     with_termini=True,
+    alphabet=d.extended_alphabet,
 )
 
 optimizer = tf.keras.optimizers.Adam(learning_rate=0.0001)
-
-TRAIN_DATAPATH = "example_dataset/intensity/third_pool_processed_sample.parquet"
-
-d = FragmentIonIntensityDataset(
-    data_source=TRAIN_DATAPATH,
-    max_seq_len=32,
-    batch_size=128,
-    val_ratio=0.2,
-    model_features=["collision_energy_aligned_normed", "precursor_charge_onehot"],
-    sequence_column="modified_sequence",
-    label_column="intensities_raw",
-    features_to_extract=["mod_loss", "delta_mass"],
-    with_termini=True,
-)
 
 model.compile(optimizer=optimizer, loss=masked_spectral_distance, metrics=["mse"])
 

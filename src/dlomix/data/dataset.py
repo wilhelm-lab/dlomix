@@ -26,6 +26,27 @@ from .processing.processors import (
 
 logger = logging.getLogger(__name__)
 
+# TensorFlow import for tf.data is deferred until needed to avoid unnecessary imports for users who only want to use PyTorch datasets or other functionalities of the PeptideDataset class.
+# This also helps to reduce the initial loading time and memory footprint for users who do not need TensorFlow.
+
+_tf = None
+
+
+def _get_tensorflow():
+    """Lazy import of TensorFlow. Only imports when needed."""
+    global _tf
+    if _tf is None:
+        try:
+            import tensorflow as tf
+
+            _tf = tf
+        except ImportError:
+            raise ImportError(
+                "TensorFlow backend requires tensorflow to be installed. "
+                "Install with: pip install tensorflow"
+            )
+    return _tf
+
 
 class PeptideDataset:
     """
@@ -119,15 +140,6 @@ class PeptideDataset:
             self.dataset_columns_to_keep = dataset_config.dataset_columns_to_keep
 
         self.encoding_scheme = EncodingScheme(dataset_config.encoding_scheme)
-
-        if isinstance(dataset_config.label_column, str):
-            self.label_column = [dataset_config.label_column]
-        elif isinstance(dataset_config.label_column, list):
-            self.label_column = dataset_config.label_column
-        else:
-            raise ValueError(
-                "The label_column parameter should be a string or a list of strings."
-            )
 
         self._set_hf_cache_management()
 
@@ -384,18 +396,11 @@ If you prefer to encode the (amino-acids)+PTM combinations as tokens in the voca
             )
             return
 
-        if self.max_seq_len > 0:
-            seq_len = self.max_seq_len
-        else:
-            raise ValueError(
-                f"Max sequence length provided is an integer but not a valid value: {self.max_seq_len}, only positive non-zero values are allowed."
-            )
-
         padding_processor = SequencePaddingProcessor(
             sequence_column_name=self.sequence_column,
             batched=True,
             padding_index=self.extended_alphabet[self.padding_value],
-            max_length=seq_len,
+            max_length=self.max_seq_len + 2 if self.with_termini else self.max_seq_len,
         )
 
         self._processors.append(padding_processor)
@@ -421,7 +426,9 @@ If you prefer to encode the (amino-acids)+PTM combinations as tokens in the voca
                     ],
                     feature_column_name=feature_name,
                     **FEATURE_EXTRACTORS_PARAMETERS[feature_name],
-                    max_length=self.max_seq_len,
+                    max_length=self.max_seq_len + 2
+                    if self.with_termini
+                    else self.max_seq_len,
                     batched=True,
                 )
             elif isinstance(feature, Callable):
@@ -708,12 +715,25 @@ If you prefer to encode the (amino-acids)+PTM combinations as tokens in the voca
         if self.dataset_type == "pt":
             return self._get_split_torch_dataset(PeptideDataset.DEFAULT_SPLIT_NAMES[0])
         else:
+            tf = _get_tensorflow()
+            dataset_len = len(self.hf_dataset[PeptideDataset.DEFAULT_SPLIT_NAMES[0]])
             tf_dataset = self._get_split_tf_dataset(
                 PeptideDataset.DEFAULT_SPLIT_NAMES[0]
             )
 
             if self.enable_tf_dataset_cache:
                 tf_dataset = tf_dataset.cache()
+
+            if self.shuffle:
+                tf_dataset = tf_dataset.shuffle(
+                    buffer_size=min(10000, dataset_len),
+                    reshuffle_each_iteration=True,
+                )
+
+            # Batch the data
+            tf_dataset = tf_dataset.batch(self.batch_size)
+
+            tf_dataset = tf_dataset.prefetch(tf.data.AUTOTUNE)
 
             return tf_dataset
 
@@ -723,12 +743,16 @@ If you prefer to encode the (amino-acids)+PTM combinations as tokens in the voca
         if self.dataset_type == "pt":
             return self._get_split_torch_dataset(PeptideDataset.DEFAULT_SPLIT_NAMES[1])
         else:
+            tf = _get_tensorflow()
             tf_dataset = self._get_split_tf_dataset(
                 PeptideDataset.DEFAULT_SPLIT_NAMES[1]
             )
 
             if self.enable_tf_dataset_cache:
                 tf_dataset = tf_dataset.cache()
+
+            tf_dataset = tf_dataset.batch(self.batch_size)
+            tf_dataset = tf_dataset.prefetch(tf.data.AUTOTUNE)
 
             return tf_dataset
 
@@ -738,12 +762,16 @@ If you prefer to encode the (amino-acids)+PTM combinations as tokens in the voca
         if self.dataset_type == "pt":
             return self._get_split_torch_dataset(PeptideDataset.DEFAULT_SPLIT_NAMES[2])
         else:
+            tf = _get_tensorflow()
             tf_dataset = self._get_split_tf_dataset(
                 PeptideDataset.DEFAULT_SPLIT_NAMES[2]
             )
 
             if self.enable_tf_dataset_cache:
                 tf_dataset = tf_dataset.cache()
+
+            tf_dataset = tf_dataset.batch(self.batch_size)
+            tf_dataset = tf_dataset.prefetch(tf.data.AUTOTUNE)
 
             return tf_dataset
 
@@ -758,11 +786,17 @@ If you prefer to encode the (amino-acids)+PTM combinations as tokens in the voca
     def _get_split_tf_dataset(self, split_name: str):
         self._check_if_split_exists(split_name)
 
+        # to return a tuple if it is a single label column and be compatible with HF Datasets API updates
+
+        label_cols = self.label_column
+
+        if isinstance(self.label_column, list) and len(self.label_column) == 1:
+            label_cols = self.label_column[0]
+
         return self.hf_dataset[split_name].to_tf_dataset(
             columns=self._get_input_tensor_column_names(),
-            label_cols=self.label_column,
-            shuffle=self.shuffle,
-            batch_size=self.batch_size,
+            label_cols=label_cols,
+            shuffle=False,
         )
 
     def _get_split_torch_dataset(self, split_name: str):

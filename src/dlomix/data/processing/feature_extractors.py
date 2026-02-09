@@ -188,9 +188,16 @@ class LookupFeatureExtractor(FeatureExtractor):
         return {self.feature_column_name: feature}
 
     def _extract_feature(self, sequence):
-        feature = np.empty((self.max_length, *self._feature_shape), dtype=np.float32)
-        feature[: len(sequence)] = itemgetter(*sequence)(self.lookup_table)
+        # we lookup unttil the max length only because some sequences in train/val can be longer
+        lookup_length = min(self.max_length, len(sequence))
+        sequence_for_lookup = sequence[:lookup_length]
 
-        feature = self.pad_feature_to_seq_length(feature, len(sequence))
+        feature = np.empty((self.max_length, *self._feature_shape), dtype=np.float32)
+
+        feature[:lookup_length] = itemgetter(*sequence_for_lookup)(self.lookup_table)
+
+        # pad from lookup_length to max_length if needed and expand dims if one-dimensional
+        # technically, complementing the previous step with a call feature[lookup_length:] = self.feature_default_value
+        feature = self.pad_feature_to_seq_length(feature, lookup_length)
 
         return feature

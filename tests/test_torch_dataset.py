@@ -1,6 +1,5 @@
 import logging
 
-import pytest
 import torch
 from datasets import Dataset
 
@@ -9,8 +8,8 @@ from dlomix.data import FragmentIonIntensityDataset
 logger = logging.getLogger(__name__)
 
 
-def test_dataset_torch():
-    hfdata = Dataset.from_dict(pytest.global_variables["RAW_GENERIC_NESTED_DATA"])
+def test_dataset_torch(raw_generic_nested_data):
+    hfdata = Dataset.from_dict(raw_generic_nested_data)
 
     intensity_dataset = FragmentIonIntensityDataset(
         data_format="hf",
@@ -21,6 +20,7 @@ def test_dataset_torch():
         dataset_type="pt",
         batch_size=2,
         max_seq_len=15,
+        with_termini=False,
     )
 
     logger.info(intensity_dataset)
@@ -31,10 +31,10 @@ def test_dataset_torch():
 
     logger.info(batch)
 
-    assert list(batch["nested_feature"].shape) == [1, 1, 2]
-    assert list(batch["seq"].shape) == [1, 15]
+    assert list(batch["nested_feature"].shape) == [2, 1, 2]
+    assert list(batch["seq"].shape) == [2, 15]
     assert list(batch["label"].shape) == [
-        1,
+        2,
     ]
 
     assert batch["seq"].dtype == torch.int64
