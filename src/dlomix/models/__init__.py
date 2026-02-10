@@ -7,6 +7,7 @@ if _BACKEND in TENSORFLOW_BACKEND:
     from .chargestate import ChargeStatePredictor
     from .detectability import DetectabilityModel
     from .prosit import PrositIntensityPredictor, PrositRetentionTimePredictor
+    from .prosit_transformer import PrositTransformerIntensityPredictor
 
     __all__.append("RetentionTimePredictor")
 
@@ -26,5 +27,6 @@ __all__.extend(
         "PrositIntensityPredictor",
         "DetectabilityModel",
         "ChargeStatePredictor",
+        "PrositTransformerIntensityPredictor",
     ]
 )
