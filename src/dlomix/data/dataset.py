@@ -762,6 +762,7 @@ If you prefer to encode the (amino-acids)+PTM combinations as tokens in the voca
             if split_name == PeptideDataset.DEFAULT_SPLIT_NAMES[0]
             else False,
             batch_size=self.batch_size,
+            num_workers=self._num_proc if platform.system() == "Linux" else 0,
         )
 
     def _get_split_torch_dataset(self, split_name: str):
