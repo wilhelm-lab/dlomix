@@ -12,8 +12,10 @@ from pathlib import Path
 import numpy as np
 import pytest
 import tensorflow as tf
+from datasets import Dataset
 
 from dlomix.constants import ALPHABET_UNMOD
+from dlomix.losses import masked_spectral_distance
 from dlomix.models import PrositIntensityPredictor, PrositRetentionTimePredictor
 from dlomix.models.model_utils import (
     expand_embedding_vocabulary,
@@ -62,6 +64,34 @@ def intensity_model(base_alphabet):
     }
     _ = model(dummy_input)
     return model
+
+
+@pytest.fixture
+def hf_dataset_with_mods():
+    """Fixture to provide a Hugging Face dataset with modified sequences."""
+
+    data = {
+        "sequence": ["AM[UNIMOD:1]CDEF", "ES[UNIMOD:2]CDEF", "CT[UNIMOD:3]CDEF"],
+        "collision_energy": [
+            np.zeros((2, 1), dtype=np.float32),
+            np.ones((2, 1), dtype=np.float32),
+            np.full((2, 1), 2, dtype=np.float32),
+        ],
+        "precursor_charge": [
+            np.zeros((2, 1), dtype=np.float32),
+            np.ones((2, 1), dtype=np.float32),
+            np.full((2, 1), 3, dtype=np.float32),
+        ],
+        "label": [
+            [0.1, 0.2, 0.3] * 9 * 2,  # (sequence length - 1) * 2 ions
+            [0.4, 0.5, 0.6] * 9 * 2,
+            [0.7, 0.8, 0.9] * 9 * 2,
+        ],
+    }
+
+    # Create dataset
+    ds = Dataset.from_dict(data)
+    return ds
 
 
 class TestExpandEmbeddingVocabulary:
@@ -320,7 +350,7 @@ class TestLoadAndAdaptPretrainedModel:
             adapted_model = load_and_adapt_pretrained_model(
                 model_path=str(model_path),
                 new_alphabet=expanded_alphabet,
-                old_alphabet=None,  # Auto-extract
+                old_alphabet=None,
                 initialization_strategy="mean",
                 random_seed=42,
             )
@@ -404,6 +434,57 @@ class TestLoadAndAdaptPretrainedModel:
             }
             output = adapted_model(dummy_input)
             assert output is not None
+
+    def test_intensity_model_best_fit_initialization_workflow(
+        self, intensity_model, base_alphabet, expanded_alphabet, hf_dataset_with_mods
+    ):
+        """Test full workflow with PrositIntensityPredictor."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            model_path = Path(tmpdir) / "intensity_model.keras"
+            intensity_model.save(model_path)
+
+            adapted_model, fit_info = load_and_adapt_pretrained_model(
+                model_path=str(model_path),
+                new_alphabet=expanded_alphabet,
+                old_alphabet=base_alphabet,
+                initialization_strategy="best-fit",
+                best_fit_kwargs={
+                    "new_hf_data": hf_dataset_with_mods,  # Use the dataset fixture with modified sequences
+                    "sequence_column": "sequence",
+                    "label_column": "label",
+                    "n_examples_for_eval": 1,
+                    "eval_metric": masked_spectral_distance,
+                    "return_fit_info": True,
+                    "dataset_kwargs": {
+                        "encoding_scheme": "naive-mods",
+                        "max_seq_len": 10,
+                        "with_termini": False,
+                        "model_features": ["collision_energy", "precursor_charge"],
+                    },
+                },
+            )
+
+            # Verify model still works
+            dummy_input = {
+                "sequence": tf.zeros((2, 10), dtype=tf.int32),
+                "collision_energy": tf.ones((2, 1)),
+                "precursor_charge": tf.ones((2, 1)),
+            }
+            output = adapted_model(dummy_input)
+            assert output is not None
+
+            logger.info(fit_info)
+
+            assert fit_info is not None
+
+            old_weights = intensity_model.get_layer("embedding").get_weights()[0]
+            new_weights = adapted_model.get_layer("embedding").get_weights()[0]
+
+            for new_token, fit_info in fit_info.items():
+                new_idx = expanded_alphabet[new_token]
+                assert np.allclose(
+                    old_weights[fit_info["old_token_idx"]], new_weights[new_idx]
+                ), f"Best-fit initialization failed for token '{new_token}'"
 
 
 class TestIntegrationWithRealAlphabet:

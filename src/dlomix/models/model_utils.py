@@ -51,6 +51,23 @@ def load_and_adapt_pretrained_model(
     custom_objects : Dict, optional
         Custom objects needed for loading the model (e.g., custom layers, losses).
         Defaults to None.
+    best_fit_kwargs : Dict, optional
+        Additional arguments for best-fit initialization strategy. Required if initialization_strategy is 'best-fit'. Should include:
+        - new_hf_data: Hugging Face
+            Dataset containing sequences with new tokens for evaluation.
+        - sequence_column: str
+            Name of the column in new_hf_data containing the sequences.
+        - label_column: str
+            Name of the column in new_hf_data containing the labels for evaluation.
+        - n_examples_for_eval: int
+            Number of examples to use for evaluating each old token fit.
+        - eval_metric: Callable
+            Evaluation metric function that takes (labels, predictions) and returns a score.
+        - return_fit_info: bool
+            Whether to return detailed fit information for each new token (default: False).
+        - dataset_kwargs: Dict
+            Additional keyword arguments to pass when creating the FragmentIonIntensityDataset for evaluation.
+
 
     Returns
     -------
@@ -147,10 +164,8 @@ def load_and_adapt_pretrained_model(
         # set the embedding weights one final time to apply all updates
         model.get_layer(embedding_layer_name).set_weights([new_weights])
 
-    logger.info(
-        "Model successfully loaded and adapted to new vocabulary. "
-        "Ready for compilation and fine-tuning."
-    )
+        if best_fit_kwargs.get("return_fit_info", False):
+            return model, best_fit_dict
 
     return model
 
@@ -427,7 +442,6 @@ def _find_best_fit_tokens_for_new_tokens(
         raise ValueError("new_hf_data must be a Hugging Face Dataset object.")
 
     for new in new_tokens:
-        print("New token is: ", new)
         best_fit_dict[new] = {}
         best_sa = 0
 
@@ -441,7 +455,6 @@ def _find_best_fit_tokens_for_new_tokens(
             example_data = filtered_data.take(n_examples_for_eval)
 
         for current_old_token, current_old_token_idx in alphabet_old.items():
-            print("Trying token: ", current_old_token)
             temp_alphabet = alphabet_old.copy()
             temp_alphabet.update({new: current_old_token_idx})
             test_data_current_token = FragmentIonIntensityDataset(
@@ -459,13 +472,11 @@ def _find_best_fit_tokens_for_new_tokens(
                 current_sa = 1 - eval_metric(labels, preds)
                 sa.extend(current_sa)
             sa = np.median(sa)
-            print("median eval value: ", sa)
             if sa > best_sa:
                 best_sa = sa
                 best_fit_dict[new]["eval"] = sa
                 best_fit_dict[new]["old_token"] = current_old_token
                 best_fit_dict[new]["old_token_idx"] = current_old_token_idx
-                print("updated: ", best_fit_dict)
 
     datasets.enable_progress_bar()
 
