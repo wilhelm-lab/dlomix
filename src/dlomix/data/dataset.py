@@ -133,9 +133,9 @@ class PeptideDataset:
 
         # add padding value to the alphabet if not present
         if self.extended_alphabet.get(self.padding_value) is None:
-            self.extended_alphabet[
-                self.padding_value
-            ] = PeptideDataset.PADDING_VALUE_DEFAULT_INDEX
+            self.extended_alphabet[self.padding_value] = (
+                PeptideDataset.PADDING_VALUE_DEFAULT_INDEX
+            )
 
         self._config = dataset_config
 
@@ -282,12 +282,10 @@ class PeptideDataset:
             self._is_predefined_split = True
 
         if self._is_predefined_split:
-            warnings.warn(
-                f"""
+            warnings.warn(f"""
                 Multiple data sources or a single non-train data source provided {self._data_files_available_splits}, please ensure that the data sources are already split into train, val and test sets
                 since no splitting will happen. If not, please provide only one data_source and set the val_ratio to split the data into train and val sets."
-                """
-            )
+                """)
 
     def _remove_unnecessary_columns(self):
         self._relevant_columns = [self.sequence_column, *self.label_column]
@@ -407,9 +405,9 @@ If you prefer to encode the (amino-acids)+PTM combinations as tokens in the voca
                     ],
                     feature_column_name=feature_name,
                     **FEATURE_EXTRACTORS_PARAMETERS[feature_name],
-                    max_length=self.max_seq_len + 2
-                    if self.with_termini
-                    else self.max_seq_len,
+                    max_length=(
+                        self.max_seq_len + 2 if self.with_termini else self.max_seq_len
+                    ),
                     batched=True,
                 )
             elif isinstance(feature, Callable):
@@ -779,9 +777,11 @@ If you prefer to encode the (amino-acids)+PTM combinations as tokens in the voca
         return self.hf_dataset[split_name].to_tf_dataset(
             columns=self._get_input_tensor_column_names(),
             label_cols=label_cols,
-            shuffle=self.shuffle
-            if split_name == PeptideDataset.DEFAULT_SPLIT_NAMES[0]
-            else False,
+            shuffle=(
+                self.shuffle
+                if split_name == PeptideDataset.DEFAULT_SPLIT_NAMES[0]
+                else False
+            ),
             batch_size=self.batch_size,
         )
 
@@ -797,9 +797,11 @@ If you prefer to encode the (amino-acids)+PTM combinations as tokens in the voca
                 columns=[*self._get_input_tensor_column_names(), *self.label_column],
             ),
             "batch_size": self.batch_size,
-            "shuffle": self.shuffle
-            if split_name == PeptideDataset.DEFAULT_SPLIT_NAMES[0]
-            else False,
+            "shuffle": (
+                self.shuffle
+                if split_name == PeptideDataset.DEFAULT_SPLIT_NAMES[0]
+                else False
+            ),
         }
 
         # Update with user-provided torch_dataloader_kwargs if available
