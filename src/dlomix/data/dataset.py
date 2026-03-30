@@ -9,7 +9,7 @@ from typing import Any, Callable, Dict, Optional, Union
 from datasets import Dataset, DatasetDict, Sequence, Value, load_dataset
 
 from .dataset_config import DatasetConfig
-from .dataset_utils import EncodingScheme, get_num_processors
+from .dataset_utils import EncodingScheme, get_num_processors, resolve_num_proc
 from .processing.feature_extractors import (
     AVAILABLE_FEATURE_EXTRACTORS,
     FEATURE_EXTRACTORS_PARAMETERS,
@@ -80,7 +80,9 @@ class PeptideDataset:
     auto_cleanup_cache : bool
         Flag to indicate whether to automatically clean up the temporary Hugging Face Datasets cache files. Default is True.
     num_proc : Optional[int]
-        Number of processes to use for processing the dataset. Default is None, no multi-processing.
+        Number of processes to use for processing the dataset.
+        Set to ``-1`` to use all available processors, ``None`` to force single-process execution,
+        or a positive integer to use an explicit number of processors.
     batch_processing_size : Optional[int]
         Batch size for processing the dataset, passed to the HuggingFace `Dataset.map()` function calls. Default is 1000.
 
@@ -131,9 +133,9 @@ class PeptideDataset:
 
         # add padding value to the alphabet if not present
         if self.extended_alphabet.get(self.padding_value) is None:
-            self.extended_alphabet[
-                self.padding_value
-            ] = PeptideDataset.PADDING_VALUE_DEFAULT_INDEX
+            self.extended_alphabet[self.padding_value] = (
+                PeptideDataset.PADDING_VALUE_DEFAULT_INDEX
+            )
 
         self._config = dataset_config
 
@@ -169,19 +171,12 @@ class PeptideDataset:
 
     def _set_num_proc(self):
         n_processors = get_num_processors()
-        if self._num_proc:
-            if self._num_proc > n_processors:
-                warnings.warn(
-                    f"Number of processors provided is greater than the available processors. Using the maximum number of processors available: {n_processors}."
-                )
-                self._num_proc = n_processors
-        else:
+        self._num_proc, was_capped = resolve_num_proc(self._num_proc, n_processors)
+
+        if was_capped:
             warnings.warn(
-                f"Number of processors not provided. Using the maximum number of processors available: {n_processors}.\n"
-                f"If you want to specify a different number of processors, please provide num_proc=<desired_number> parameter in the dataset configuration.\n"
-                f"If you face issues with memory usage, please consider providing a smaller number of processors or setting num_proc=1 to disable multi-processing."
+                f"Number of processors provided is greater than the available processors. Using the maximum number of processors available: {n_processors}."
             )
-            self._num_proc = n_processors
 
     def _set_hf_cache_management(self):
         if self.disable_cache:
@@ -287,12 +282,10 @@ class PeptideDataset:
             self._is_predefined_split = True
 
         if self._is_predefined_split:
-            warnings.warn(
-                f"""
+            warnings.warn(f"""
                 Multiple data sources or a single non-train data source provided {self._data_files_available_splits}, please ensure that the data sources are already split into train, val and test sets
                 since no splitting will happen. If not, please provide only one data_source and set the val_ratio to split the data into train and val sets."
-                """
-            )
+                """)
 
     def _remove_unnecessary_columns(self):
         self._relevant_columns = [self.sequence_column, *self.label_column]
@@ -412,9 +405,9 @@ If you prefer to encode the (amino-acids)+PTM combinations as tokens in the voca
                     ],
                     feature_column_name=feature_name,
                     **FEATURE_EXTRACTORS_PARAMETERS[feature_name],
-                    max_length=self.max_seq_len + 2
-                    if self.with_termini
-                    else self.max_seq_len,
+                    max_length=(
+                        self.max_seq_len + 2 if self.with_termini else self.max_seq_len
+                    ),
                     batched=True,
                 )
             elif isinstance(feature, Callable):
@@ -438,13 +431,8 @@ If you prefer to encode the (amino-acids)+PTM combinations as tokens in the voca
 
     def _apply_processing_pipeline(self):
         for processor in self._processors:
-            for split in self.hf_dataset.keys():
-                logger.info(
-                    "Applying step: %s on split %s...",
-                    processor.__class__.__name__,
-                    split,
-                )
-
+            split_order = self._get_split_processing_order(processor)
+            for split in split_order:
                 logger.info(
                     "Applying step: %s on split %s...",
                     processor.__class__.__name__,
@@ -459,14 +447,25 @@ If you prefer to encode the (amino-acids)+PTM combinations as tokens in the voca
                 if isinstance(processor, SequenceEncodingProcessor):
                     if split in PeptideDataset.DEFAULT_SPLIT_NAMES[0:2]:
                         # train/val split -> learn the alphabet unless otherwise specified
-                        self._apply_processor_to_split(processor, split)
+                        # force single processor to ensure that the alphabet is learned on the entire split and not just on a subset of the data when using multi-processing
+
+                        strictly_single_process = bool(
+                            getattr(processor, "extend_alphabet", False)
+                            or getattr(processor, "learning_alphabet_mode", False)
+                        )
+
+                        self._apply_processor_to_split(
+                            processor,
+                            split,
+                            force_single_processor=strictly_single_process,
+                        )
 
                         self.extended_alphabet = processor.alphabet.copy()
 
                     elif split == PeptideDataset.DEFAULT_SPLIT_NAMES[2]:
                         # test split -> use the learned alphabet from the train/val split
                         # and enable fallback to encoding unseen (AA, PTM) as unmodified Amino acids
-                        processor = SequenceEncodingProcessor(
+                        temp_test_processor = SequenceEncodingProcessor(
                             sequence_column_name=self.sequence_column,
                             alphabet=self.extended_alphabet,
                             batched=True,
@@ -474,7 +473,7 @@ If you prefer to encode the (amino-acids)+PTM combinations as tokens in the voca
                             fallback_unmodified=True,
                         )
 
-                        self._apply_processor_to_split(processor, split)
+                        self._apply_processor_to_split(temp_test_processor, split)
 
                     else:
                         raise Warning(
@@ -504,15 +503,35 @@ If you prefer to encode the (amino-acids)+PTM combinations as tokens in the voca
             SequencePaddingProcessor.KEEP_COLUMN_NAME
         )
 
+    def _get_split_processing_order(self, processor: PeptideDatasetBaseProcessor):
+        split_order = list(self.hf_dataset.keys())
+
+        # Ensure encoding sees train/val before test so test uses full learned vocab.
+        if isinstance(processor, SequenceEncodingProcessor):
+            ordered_default = [
+                split
+                for split in PeptideDataset.DEFAULT_SPLIT_NAMES
+                if split in self.hf_dataset
+            ]
+            non_default = [
+                split for split in split_order if split not in ordered_default
+            ]
+            return ordered_default + non_default
+
+        return split_order
+
     def _apply_processor_to_split(
-        self, processor: PeptideDatasetBaseProcessor, split: str
+        self,
+        processor: PeptideDatasetBaseProcessor,
+        split: str,
+        force_single_processor: bool = False,
     ):
         self.hf_dataset[split] = self.hf_dataset[split].map(
             processor,
             desc=f"Mapping {processor.__class__.__name__}",
             batched=processor.batched,
             batch_size=self.batch_processing_size,
-            num_proc=self._num_proc,
+            num_proc=None if force_single_processor else self._num_proc,
         )
 
     def _cast_model_feature_types_to_float(self):
@@ -758,9 +777,11 @@ If you prefer to encode the (amino-acids)+PTM combinations as tokens in the voca
         return self.hf_dataset[split_name].to_tf_dataset(
             columns=self._get_input_tensor_column_names(),
             label_cols=label_cols,
-            shuffle=self.shuffle
-            if split_name == PeptideDataset.DEFAULT_SPLIT_NAMES[0]
-            else False,
+            shuffle=(
+                self.shuffle
+                if split_name == PeptideDataset.DEFAULT_SPLIT_NAMES[0]
+                else False
+            ),
             batch_size=self.batch_size,
         )
 
@@ -776,9 +797,11 @@ If you prefer to encode the (amino-acids)+PTM combinations as tokens in the voca
                 columns=[*self._get_input_tensor_column_names(), *self.label_column],
             ),
             "batch_size": self.batch_size,
-            "shuffle": self.shuffle
-            if split_name == PeptideDataset.DEFAULT_SPLIT_NAMES[0]
-            else False,
+            "shuffle": (
+                self.shuffle
+                if split_name == PeptideDataset.DEFAULT_SPLIT_NAMES[0]
+                else False
+            ),
         }
 
         # Update with user-provided torch_dataloader_kwargs if available

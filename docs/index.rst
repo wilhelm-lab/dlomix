@@ -29,7 +29,6 @@ The goal of DLOmix is to be easy to use and flexible, while still providing the 
 
 .. include:: notes/installation.rst
 .. include:: notes/quickstart.rst
-.. include:: notes/dataset_guide.rst
 
 
 
