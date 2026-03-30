@@ -179,7 +179,7 @@ class PeptideDataset:
             warnings.warn(
                 f"Number of processors not provided. Using the maximum number of processors available: {n_processors}.\n"
                 f"If you want to specify a different number of processors, please provide num_proc=<desired_number> parameter in the dataset configuration.\n"
-                f"If you face issues with memory usage, please consider providing a smaller number of processors or setting num_proc=1 to disable multi-processing."
+                f"If you face issues with memory usage, please consider providing a smaller number of processors or setting num_proc=None to disable multi-processing."
             )
             self._num_proc = n_processors
 
@@ -438,13 +438,8 @@ If you prefer to encode the (amino-acids)+PTM combinations as tokens in the voca
 
     def _apply_processing_pipeline(self):
         for processor in self._processors:
-            for split in self.hf_dataset.keys():
-                logger.info(
-                    "Applying step: %s on split %s...",
-                    processor.__class__.__name__,
-                    split,
-                )
-
+            split_order = self._get_split_processing_order(processor)
+            for split in split_order:
                 logger.info(
                     "Applying step: %s on split %s...",
                     processor.__class__.__name__,
@@ -459,14 +454,17 @@ If you prefer to encode the (amino-acids)+PTM combinations as tokens in the voca
                 if isinstance(processor, SequenceEncodingProcessor):
                     if split in PeptideDataset.DEFAULT_SPLIT_NAMES[0:2]:
                         # train/val split -> learn the alphabet unless otherwise specified
-                        self._apply_processor_to_split(processor, split)
+                        # force single processor to ensure that the alphabet is learned on the entire split and not just on a subset of the data when using multi-processing
+                        self._apply_processor_to_split(
+                            processor, split, force_single_processor=True
+                        )
 
                         self.extended_alphabet = processor.alphabet.copy()
 
                     elif split == PeptideDataset.DEFAULT_SPLIT_NAMES[2]:
                         # test split -> use the learned alphabet from the train/val split
                         # and enable fallback to encoding unseen (AA, PTM) as unmodified Amino acids
-                        processor = SequenceEncodingProcessor(
+                        temp_test_processor = SequenceEncodingProcessor(
                             sequence_column_name=self.sequence_column,
                             alphabet=self.extended_alphabet,
                             batched=True,
@@ -474,7 +472,7 @@ If you prefer to encode the (amino-acids)+PTM combinations as tokens in the voca
                             fallback_unmodified=True,
                         )
 
-                        self._apply_processor_to_split(processor, split)
+                        self._apply_processor_to_split(temp_test_processor, split)
 
                     else:
                         raise Warning(
@@ -504,15 +502,35 @@ If you prefer to encode the (amino-acids)+PTM combinations as tokens in the voca
             SequencePaddingProcessor.KEEP_COLUMN_NAME
         )
 
+    def _get_split_processing_order(self, processor: PeptideDatasetBaseProcessor):
+        split_order = list(self.hf_dataset.keys())
+
+        # Ensure encoding sees train/val before test so test uses full learned vocab.
+        if isinstance(processor, SequenceEncodingProcessor):
+            ordered_default = [
+                split
+                for split in PeptideDataset.DEFAULT_SPLIT_NAMES
+                if split in self.hf_dataset
+            ]
+            non_default = [
+                split for split in split_order if split not in ordered_default
+            ]
+            return ordered_default + non_default
+
+        return split_order
+
     def _apply_processor_to_split(
-        self, processor: PeptideDatasetBaseProcessor, split: str
+        self,
+        processor: PeptideDatasetBaseProcessor,
+        split: str,
+        force_single_processor: bool = False,
     ):
         self.hf_dataset[split] = self.hf_dataset[split].map(
             processor,
             desc=f"Mapping {processor.__class__.__name__}",
             batched=processor.batched,
             batch_size=self.batch_processing_size,
-            num_proc=self._num_proc,
+            num_proc=None if force_single_processor else self._num_proc,
         )
 
     def _cast_model_feature_types_to_float(self):

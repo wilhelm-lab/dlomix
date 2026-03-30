@@ -10,6 +10,7 @@ from dlomix.data import (
     RetentionTimeDataset,
     load_processed_dataset,
 )
+from dlomix.data.dataset_utils import EncodingScheme
 
 logger = logging.getLogger(__name__)
 
@@ -275,6 +276,86 @@ def test_no_split_datasetDict_hf_inmemory(raw_generic_nested_data):
     )
 
     # test learning alphabet for train/val and then using it for test with fallback
+
+
+def _make_rt_split_data(seqs):
+    return Dataset.from_dict(
+        {
+            "modified_sequence": seqs,
+            "indexed_retention_time": [0.1 + i for i in range(len(seqs))],
+        }
+    )
+
+
+def test_encoding_learning_forces_single_process(monkeypatch):
+    # Keep split insertion order as train -> test -> val to capture ordering assumptions.
+    hf_dataset = DatasetDict(
+        {
+            "train": _make_rt_split_data(["[]-AC-[]"]),
+            "test": _make_rt_split_data(["[]-C[UNIMOD:4]A-[]"]),
+            "val": _make_rt_split_data(["[]-C[UNIMOD:4]A-[]"]),
+        }
+    )
+
+    calls = []
+    original_map = Dataset.map
+
+    def map_spy(self, function, *args, **kwargs):
+        calls.append((kwargs.get("desc"), kwargs.get("num_proc")))
+        return original_map(self, function, *args, **kwargs)
+
+    monkeypatch.setattr(Dataset, "map", map_spy)
+
+    RetentionTimeDataset(
+        data_format="hf",
+        data_source=hf_dataset,
+        sequence_column="modified_sequence",
+        label_column="indexed_retention_time",
+        encoding_scheme=EncodingScheme.NAIVE_MODS,
+        alphabet=None,
+        num_proc=2,
+        max_seq_len=8,
+    )
+
+    encoding_calls = [c for c in calls if c[0] == "Mapping SequenceEncodingProcessor"]
+    assert len(encoding_calls) == 3
+
+    # Encoding is deterministic train -> val -> test.
+    # train/val must force single-process learning, test keeps configured num_proc.
+    assert encoding_calls[0][1] is None
+    assert encoding_calls[1][1] is None
+    assert encoding_calls[2][1] == 2
+
+
+def test_val_tokens_available_to_test_even_with_nonstandard_split_order():
+    # Token appears in val and test, but not train. If test is encoded before val,
+    # fallback may be used incorrectly instead of learned token encoding.
+    hf_dataset = DatasetDict(
+        {
+            "train": _make_rt_split_data(["[]-AC-[]"]),
+            "test": _make_rt_split_data(["[]-C[UNIMOD:4]A-[]"]),
+            "val": _make_rt_split_data(["[]-C[UNIMOD:4]A-[]"]),
+        }
+    )
+
+    dataset = RetentionTimeDataset(
+        data_format="hf",
+        data_source=hf_dataset,
+        sequence_column="modified_sequence",
+        label_column="indexed_retention_time",
+        encoding_scheme=EncodingScheme.NAIVE_MODS,
+        alphabet=None,
+        num_proc=2,
+        max_seq_len=8,
+    )
+
+    assert "C[UNIMOD:4]" in dataset.extended_alphabet
+
+    test_encoded = dataset.hf_dataset["test"][0]["modified_sequence"]
+    learned_token_index = dataset.extended_alphabet["C[UNIMOD:4]"]
+
+    # with_termini=True means sequence starts with []- at index 0.
+    assert test_encoded[1] == learned_token_index
 
 
 def test_shuffle_parameter(raw_generic_nested_data):
