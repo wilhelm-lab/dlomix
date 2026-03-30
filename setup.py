@@ -36,6 +36,7 @@ setuptools.setup(
     package_dir={"": "src"},
     include_package_data=True,
     package_data={"": ["data/processing/pickled_feature_dicts/*"]},
+    python_requires=">=3.10",
     install_requires=[
         "datasets>=4.0.0",
         "huggingface_hub",
