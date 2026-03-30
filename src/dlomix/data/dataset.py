@@ -9,7 +9,7 @@ from typing import Any, Callable, Dict, Optional, Union
 from datasets import Dataset, DatasetDict, Sequence, Value, load_dataset
 
 from .dataset_config import DatasetConfig
-from .dataset_utils import EncodingScheme, get_num_processors
+from .dataset_utils import EncodingScheme, get_num_processors, resolve_num_proc
 from .processing.feature_extractors import (
     AVAILABLE_FEATURE_EXTRACTORS,
     FEATURE_EXTRACTORS_PARAMETERS,
@@ -80,7 +80,9 @@ class PeptideDataset:
     auto_cleanup_cache : bool
         Flag to indicate whether to automatically clean up the temporary Hugging Face Datasets cache files. Default is True.
     num_proc : Optional[int]
-        Number of processes to use for processing the dataset. Default is None, no multi-processing.
+        Number of processes to use for processing the dataset.
+        Set to ``-1`` to use all available processors, ``None`` to force single-process execution,
+        or a positive integer to use an explicit number of processors.
     batch_processing_size : Optional[int]
         Batch size for processing the dataset, passed to the HuggingFace `Dataset.map()` function calls. Default is 1000.
 
@@ -169,19 +171,12 @@ class PeptideDataset:
 
     def _set_num_proc(self):
         n_processors = get_num_processors()
-        if self._num_proc:
-            if self._num_proc > n_processors:
-                warnings.warn(
-                    f"Number of processors provided is greater than the available processors. Using the maximum number of processors available: {n_processors}."
-                )
-                self._num_proc = n_processors
-        else:
+        self._num_proc, was_capped = resolve_num_proc(self._num_proc, n_processors)
+
+        if was_capped:
             warnings.warn(
-                f"Number of processors not provided. Using the maximum number of processors available: {n_processors}.\n"
-                f"If you want to specify a different number of processors, please provide num_proc=<desired_number> parameter in the dataset configuration.\n"
-                f"If you face issues with memory usage, please consider providing a smaller number of processors or setting num_proc=None to disable multi-processing."
+                f"Number of processors provided is greater than the available processors. Using the maximum number of processors available: {n_processors}."
             )
-            self._num_proc = n_processors
 
     def _set_hf_cache_management(self):
         if self.disable_cache:
@@ -455,8 +450,16 @@ If you prefer to encode the (amino-acids)+PTM combinations as tokens in the voca
                     if split in PeptideDataset.DEFAULT_SPLIT_NAMES[0:2]:
                         # train/val split -> learn the alphabet unless otherwise specified
                         # force single processor to ensure that the alphabet is learned on the entire split and not just on a subset of the data when using multi-processing
+
+                        strictly_single_process = bool(
+                            getattr(processor, "extend_alphabet", False)
+                            or getattr(processor, "learning_alphabet_mode", False)
+                        )
+
                         self._apply_processor_to_split(
-                            processor, split, force_single_processor=True
+                            processor,
+                            split,
+                            force_single_processor=strictly_single_process,
                         )
 
                         self.extended_alphabet = processor.alphabet.copy()

@@ -23,6 +23,30 @@ def test_empty_rtdataset():
     assert rtdataset._empty_dataset_mode is True
 
 
+def test_num_proc_minus_one_uses_available_processors(monkeypatch):
+    monkeypatch.setattr("dlomix.data.dataset.get_num_processors", lambda: 6)
+
+    dataset = RetentionTimeDataset(num_proc=-1)
+
+    assert dataset._num_proc == 6
+
+
+def test_num_proc_none_forces_single_process(monkeypatch):
+    monkeypatch.setattr("dlomix.data.dataset.get_num_processors", lambda: 6)
+
+    dataset = RetentionTimeDataset(num_proc=None)
+
+    assert dataset._num_proc is None
+
+
+def test_num_proc_user_value_is_capped_to_available(monkeypatch):
+    monkeypatch.setattr("dlomix.data.dataset.get_num_processors", lambda: 6)
+
+    dataset = RetentionTimeDataset(num_proc=10)
+
+    assert dataset._num_proc == 6
+
+
 def test_parquet_rtdataset(download_path_for_assets):
     rtdataset = RetentionTimeDataset(
         data_source=join(download_path_for_assets, "file_1.parquet"),
