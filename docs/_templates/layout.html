@@ -3,6 +3,26 @@
 {% block extrahead %}
   {{ super() }}
   <style>
+    .navbar-brand .logo__title .backend-subtitle {
+      display: block;
+      margin-top: 0.35rem;
+      padding-left: 0.55rem;
+      font-size: 0.78em;
+      font-weight: 600;
+      letter-spacing: 0.01em;
+      opacity: 0.92;
+      color: inherit;
+      border-left: 2px solid transparent;
+    }
+
+    .navbar-brand .logo__title .backend-subtitle.backend-pytorch {
+      border-left-color: #ee4c2c;
+    }
+
+    .navbar-brand .logo__title .backend-subtitle.backend-tensorflow {
+      border-left-color: #f59e0b;
+    }
+
     #backend-switch {
       position: fixed;
       top: 1rem;
@@ -39,6 +59,29 @@
 
 
   <script>
+  (function injectBackendUnderTitle() {
+    const templateBackend = "{{ backend }}";
+    const inferredBackend = (window.location.pathname.match(/(pytorch|tensorflow)/) || [])[1] || "";
+    const currentBackend = (templateBackend || inferredBackend || "tensorflow").toLowerCase();
+
+    const titleNode = document.querySelector(".navbar-brand .logo__title");
+    if (!titleNode) return;
+
+    const titleText = (titleNode.textContent || "").toLowerCase();
+    if (titleText.includes("tensorflow backend") || titleText.includes("pytorch backend")) {
+      return;
+    }
+
+    if (titleNode.querySelector(".backend-subtitle")) {
+      return;
+    }
+
+    const subtitle = document.createElement("span");
+    subtitle.className = `backend-subtitle backend-${currentBackend}`;
+    subtitle.textContent = currentBackend === "pytorch" ? "PyTorch Backend" : "TensorFlow Backend";
+    titleNode.appendChild(subtitle);
+  })();
+
   function switchBackend(targetBackend) {
     const currentURL = window.location.href;
     const backendMatch = currentURL.match(/(pytorch|tensorflow)/);
