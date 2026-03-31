@@ -164,7 +164,10 @@ class PeptideDataset:
 
                 self._configure_processing_pipeline()
                 self._apply_processing_pipeline()
-                if self.model_features is not None:
+                if (
+                    self.model_features is not None
+                    or len(self._extracted_features_columns) > 0
+                ):
                     self._cast_model_feature_types_to_float()
                 self._cleanup_temp_dataset_cache_files()
                 self.processed = True
@@ -526,9 +529,13 @@ If you prefer to encode the (amino-acids)+PTM combinations as tokens in the voca
         split: str,
         force_single_processor: bool = False,
     ):
+        extra_meta_data = ""
+        if isinstance(processor, FunctionProcessor):
+            extra_meta_data = f" (function name: {processor.function.__name__})"
+
         self.hf_dataset[split] = self.hf_dataset[split].map(
             processor,
-            desc=f"Mapping {processor.__class__.__name__}",
+            desc=f"Mapping {processor.__class__.__name__}-{extra_meta_data} on split {split}",
             batched=processor.batched,
             batch_size=self.batch_processing_size,
             num_proc=None if force_single_processor else self._num_proc,
@@ -544,12 +551,17 @@ If you prefer to encode the (amino-acids)+PTM combinations as tokens in the voca
                 return Value("float32")
             return feature  # Return as is for unsupported feature types
 
+        features_to_cast = set().union(
+            self.model_features or [],
+            self._extracted_features_columns or [],
+        )
+
         for split in self.hf_dataset.keys():
             new_features = self.hf_dataset[split].features.copy()
 
             for feature_name, feature_type in self.hf_dataset[split].features.items():
                 # Ensure model features are casted to float for concatenation later
-                if feature_name not in self.model_features:
+                if feature_name not in features_to_cast:
                     continue
                 new_features[feature_name] = cast_to_float(feature_type)
 
