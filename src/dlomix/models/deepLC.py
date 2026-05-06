@@ -185,15 +185,19 @@ class DeepLCRetentionTimePredictor(tf.keras.Model):
         return self.output_layer(x)
 
     def get_config(self):
-        return {
-            "seq_length": self.seq_length,
-            "use_global_features": self.use_global_features,
-            "alphabet": self.alphabet,
-            "sequence_input_key": self.sequence_input_key,
-            "counts_input_key": self.counts_input_key,
-            "di_counts_input_key": self.di_counts_input_key,
-            "global_features_input_key": self.global_features_input_key,
-        }
+        config = super().get_config()
+        config.update(
+            {
+                "seq_length": self.seq_length,
+                "use_global_features": self.use_global_features,
+                "alphabet": self.alphabet,
+                "sequence_input_key": self.sequence_input_key,
+                "counts_input_key": self.counts_input_key,
+                "di_counts_input_key": self.di_counts_input_key,
+                "global_features_input_key": self.global_features_input_key,
+            }
+        )
+        return config
 
 
 def _build_conv_pool_block(

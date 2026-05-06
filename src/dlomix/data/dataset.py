@@ -535,7 +535,7 @@ If you prefer to encode the (amino-acids)+PTM combinations as tokens in the voca
 
         self.hf_dataset[split] = self.hf_dataset[split].map(
             processor,
-            desc=f"Mapping {processor.__class__.__name__}-{extra_meta_data} on split {split}",
+            desc=f"Mapping {processor.__class__.__name__} {extra_meta_data} on split {split}",
             batched=processor.batched,
             batch_size=self.batch_processing_size,
             num_proc=None if force_single_processor else self._num_proc,
