@@ -7,6 +7,9 @@ on:
     types: [completed]
     branches: [main]
 
+# Permissions are required to create a release and publish to PyPI
+permissions:
+    id-token: write
 jobs:
   release:
     runs-on: ubuntu-latest
@@ -14,9 +17,9 @@ jobs:
       github.event.workflow_run.conclusion == 'success' &&
       github.event.workflow_run.head_branch == 'main'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: '3.11'
       - name: Install dependencies
@@ -27,10 +30,7 @@ jobs:
         run: python -m build
       - name: Publish to PyPI
         id: publishpypi
-        uses: pypa/gh-action-pypi-publish@release/v1
-        with:
-          user: __token__
-          password: ${{ secrets.SECRET_PYPI }}
+        uses: pypa/gh-action-pypi-publish@v1.13.0
       - name: Create Github release
         if: steps.publishpypi.outcome == 'success'
         env:

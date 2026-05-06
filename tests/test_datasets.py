@@ -341,7 +341,9 @@ def test_encoding_learning_forces_single_process(monkeypatch):
         max_seq_len=8,
     )
 
-    encoding_calls = [c for c in calls if c[0] == "Mapping SequenceEncodingProcessor"]
+    encoding_calls = [
+        c for c in calls if c[0].startswith("Mapping SequenceEncodingProcessor")
+    ]
     assert len(encoding_calls) == 3
 
     # Encoding is deterministic train -> val -> test.

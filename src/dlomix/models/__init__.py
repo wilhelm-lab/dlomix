@@ -5,10 +5,12 @@ __all__ = []
 if _BACKEND in TENSORFLOW_BACKEND:
     from .base import RetentionTimePredictor
     from .chargestate import ChargeStatePredictor
+    from .deepLC import DeepLCRetentionTimePredictor
     from .detectability import DetectabilityModel
     from .prosit import PrositIntensityPredictor, PrositRetentionTimePredictor
 
     __all__.append("RetentionTimePredictor")
+    __all__.append("DeepLCRetentionTimePredictor")
 
 
 elif _BACKEND in PYTORCH_BACKEND:
