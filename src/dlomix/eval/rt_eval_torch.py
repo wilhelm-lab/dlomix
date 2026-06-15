@@ -29,7 +29,6 @@ def timedelta(
     y_true: torch.Tensor, y_pred: torch.Tensor, percentage=0.95, normalize=False
 ) -> torch.Tensor:
     """Find error value that is below 95th percentile of absolute error.
-    Scale this by the range of the true values (max-min)
 
     Parameters
     ----------
@@ -45,14 +44,21 @@ def timedelta(
     Returns
     -------
     torch.Tensor
-        Percentage percentile of absolute error normalized by range of y_true, if normalize is True
+        Nth percentile of absolute error, optionally normalized by range of y_true.
     """
-    mark_percentile = int(y_true.shape[0] * percentage)
-    abs_error = torch.abs(y_true - y_pred)
+    # Note: Flatten before computing abs error.
+    # For (batch, 1) tensors, this undercounts total elements, and torch.sort operates along the last dim
+    # by default — so on a 2D tensor it sorts within rows, not across all values.
+    abs_error = torch.abs(y_true.reshape(-1) - y_pred.reshape(-1))
+
+    # Use .numel() to count total elements after flattening.
+    mark_percentile = int(abs_error.numel() * percentage)
+
     delta = torch.sort(abs_error)[0][mark_percentile - 1]
 
     if normalize:
-        norm_range = torch.max(y_true) - torch.min(y_true)
+        # NOTE: normalize over the flattened y_true for consistency with abs_error.
+        norm_range = y_true.reshape(-1).max() - y_true.reshape(-1).min()
         return delta / norm_range
 
     return delta

@@ -12,20 +12,18 @@ class TimeDeltaMetric(tf.keras.metrics.Metric):
 
     Parameters
     ----------
-    mean : int, optional
-        Mean value of the targets in case normalization was performed. Defaults to 0.
-    std : int, optional
-        Standard deviation value of the targets in case normalization was performed. Defaults to 1.
     percentage : float, optional
-        What percentage of the data points to consider, this is specific to the computation of the metric. Defaults to 0.95 which corresponds to 95% of the data points and is the mostly used value in papers.
+        What percentage of the data points to consider. Defaults to 0.95.
     name : str, optional
-        Name of the metric so that it can be reported and used later in Keras History objects. Defaults to 'timedelta'.
-    rescale_targets : bool, optional
-        Whether to rescale (denormalize) targets or not. Defaults to False.
-    rescale_predictions : bool, optional
-        Whether to rescale (denormalize) predictions or not. Defaults to False.
+        Name of the metric. Defaults to 'timedelta'.
     double_delta : bool, optional
-        Whether to multiply the computed delta by 2 in order to make it two-sided or not. Defaults to False.
+        Whether to multiply the computed delta by 2 to make it two-sided. Defaults to False.
+
+    Notes
+    -----
+    The reported value is the mean of per-batch percentiles, which is an approximation
+    of the true dataset-level percentile. This is a known trade-off in streaming metrics.
+    For an exact result, compute offline with numpy over the full dataset.
     """
 
     def __init__(self, percentage=0.95, name="timedelta", double_delta=False, **kwargs):
@@ -38,53 +36,32 @@ class TimeDeltaMetric(tf.keras.metrics.Metric):
     def update_state(
         self, y_true: tf.Tensor, y_pred: tf.Tensor, sample_weight=None
     ) -> None:
-        """
-        Update the metric state.
+        # Note: Flatten both tensors before computing abs error.
+        # Previously, tensors with shape (batch, 1) — common with Dense(1) output —
+        # caused tf.sort to operate row-wise instead of across all values, and
+        # tf.shape(...)[0] only captured the batch dimension, not total elements.
+        y_true_flat = tf.reshape(y_true, [-1])
+        y_pred_flat = tf.reshape(y_pred, [-1])
 
-        Parameters
-        ----------
-        y_true : tf.Tensor
-            True values of the target.
-        y_pred : tf.Tensor
-            Predicted values of the target.
-        sample_weight : tf.Tensor, optional
-            Sample weights. Defaults to None.
-        """
+        abs_error = tf.abs(y_true_flat - y_pred_flat)
 
-        # Compute absolute errors
-        abs_error = tf.abs(y_true - y_pred)
-
-        # Sort the errors in ascending order
         sorted_error = tf.sort(abs_error)
 
-        # Find the index corresponding to the 95th percentile
-        # First, cast the shape to float, then multiply by 0.95, and finally cast back to int32 for indexing
-        percentile_index = tf.cast(
-            tf.cast(tf.shape(sorted_error)[0], tf.float32) * self.percentage,
-            dtype=tf.int32,
-        )
+        n = tf.cast(tf.size(sorted_error), tf.float32)
+        percentile_index = tf.cast(n * self.percentage, dtype=tf.int32)
 
-        # Select the 95th percentile value
-        delta_value = sorted_error[
-            percentile_index - 1
-        ]  # tf.shape gives a 0-based index
+        delta_value = sorted_error[percentile_index - 1]
 
-        # two-sided delta
         if self.double_delta:
             delta_value = delta_value * 2
 
-        # Update the count of batches
         self.batch_count.assign_add(1.0)
-
-        # Update delta (to track sum of deltas over batches)
         self.delta.assign_add(delta_value)
 
     def result(self):
-        # Return the average of deltas over batches
         return self.delta / self.batch_count
 
     def reset_states(self):
-        # Reset the state at the beginning of each epoch
         self.delta.assign(0.0)
         self.batch_count.assign(0.0)
 
@@ -99,7 +76,10 @@ class TimeDeltaMetric(tf.keras.metrics.Metric):
 @tf.keras.utils.register_keras_serializable("dlomix")
 def timedelta(y_true, y_pred, normalize=False, percentage=0.95):
     """
-    A functional implementation to compute the 95th percentile of the absolute error between true and predicted values.
+    Functional implementation of the time delta metric.
+
+    Computes the Nth percentile of the absolute error between true and predicted values.
+
     Parameters
     ----------
     y_true : tf.Tensor
@@ -109,21 +89,25 @@ def timedelta(y_true, y_pred, normalize=False, percentage=0.95):
     normalize : bool, optional
         Whether to normalize the delta by the range of the true values. Defaults to False.
     percentage : float, optional
-        What percentage of the data points to consider, this is specific to the computation of the metric. Defaults to 0.95 which corresponds to 95% of the data points and is the mostly used value in papers.
+        Percentile threshold. Defaults to 0.95.
+
     Returns
     -------
     tf.Tensor
-        The 95th percentile of the absolute error.
+        The Nth percentile of the absolute error, as a scalar.
     """
+    # Note: Flatten both inputs before computing abs error (see TimeDeltaMetric note).
+    y_true_flat = tf.reshape(y_true, [-1])
+    y_pred_flat = tf.reshape(y_pred, [-1])
 
-    mark_percentile = tf.cast(
-        tf.cast(tf.shape(y_true)[0], dtype=tf.float32) * percentage, dtype=tf.int32
-    )
+    abs_error = K.abs(y_true_flat - y_pred_flat)
 
-    abs_error = K.abs(y_true - y_pred)
+    n = tf.cast(tf.size(abs_error), dtype=tf.float32)
+    mark_percentile = tf.cast(n * percentage, dtype=tf.int32)
+
     delta = tf.sort(abs_error)[mark_percentile - 1]
 
     if normalize:
-        norm_range = K.max(y_true) - K.min(y_true)
-        return (delta) / (norm_range)
+        norm_range = K.max(y_true_flat) - K.min(y_true_flat)
+        return delta / norm_range
     return delta

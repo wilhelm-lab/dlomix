@@ -34,6 +34,7 @@ class IonMobilityDataset(PeptideDataset):
         processed (bool): Whether the dataset has been preprocessed. Defaults to False.
         enable_tf_dataset_cache (bool): Flag to indicate whether to enable TensorFlow Dataset caching (call `.cache()` on the generated TF Datasets).
         disable_cache (bool): Whether to disable Hugging Face datasets caching. Default is False.
+        num_proc (Optional[int]): Number of processes to use for dataset processing. Use -1 for all available processors, None for single-process mode, or a positive integer. Default is -1.
     """
 
     def __init__(
@@ -60,7 +61,7 @@ class IonMobilityDataset(PeptideDataset):
         enable_tf_dataset_cache: bool = False,
         disable_cache: bool = False,
         auto_cleanup_cache: bool = True,
-        num_proc: Optional[int] = None,
+        num_proc: Optional[int] = -1,
         batch_processing_size: int = 1000,
     ):
         kwargs = {k: v for k, v in locals().items() if k not in ["self", "__class__"]}

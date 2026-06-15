@@ -5,12 +5,14 @@ __all__ = []
 if _BACKEND in TENSORFLOW_BACKEND:
     from .base import RetentionTimePredictor
     from .chargestate import ChargeStatePredictor
+    from .deepLC import DeepLCRetentionTimePredictor
     from .detectability import DetectabilityModel
     from .model_utils import load_and_adapt_pretrained_model
     from .prosit import PrositIntensityPredictor, PrositRetentionTimePredictor
 
     # TensorFlow models only
     __all__.append("RetentionTimePredictor")
+    __all__.append("DeepLCRetentionTimePredictor")
 
     # TensorFlow utility functions
     __all__.append("load_and_adapt_pretrained_model")

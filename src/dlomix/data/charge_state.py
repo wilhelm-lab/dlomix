@@ -33,7 +33,7 @@ class ChargeStateDataset(PeptideDataset):
         enable_tf_dataset_cache (bool): Flag to indicate whether to enable TensorFlow Dataset caching (call `.cache()` on the generated TF Datasets).
         disable_cache (bool): Whether to disable Hugging Face datasets caching. Default is False.
         auto_cleanup_cache (bool): Whether to automatically clean up the cache. Default is True.
-        num_proc (Optional[int]): Number of processes to use for dataset processing. Default is None.
+        num_proc (Optional[int]): Number of processes to use for dataset processing. Use -1 for all available processors, None for single-process mode, or a positive integer. Default is -1.
         batch_processing_size (int): Size of batches for processing. Default is 1000.
         torch_dataloader_kwargs (Optional[Dict]): Additional keyword arguments to pass to PyTorch DataLoader. Default is None.
     """
@@ -63,7 +63,7 @@ class ChargeStateDataset(PeptideDataset):
         enable_tf_dataset_cache: bool = False,
         disable_cache: bool = False,
         auto_cleanup_cache: bool = True,
-        num_proc: Optional[int] = None,
+        num_proc: Optional[int] = -1,
         batch_processing_size: int = 1000,
         torch_dataloader_kwargs: Optional[Dict] = None,
         **kwargs,

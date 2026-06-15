@@ -3,7 +3,7 @@ import os
 from dataclasses import dataclass, field
 from typing import Callable, Dict, List, Optional, Union
 
-from .dataset_utils import EncodingScheme
+from .dataset_utils import EncodingScheme, validate_num_proc_value
 
 
 @dataclass
@@ -54,6 +54,8 @@ class DatasetConfig:
             )
         elif isinstance(self.label_column, str):
             self.label_column = [self.label_column]
+
+        validate_num_proc_value(self.num_proc)
 
     def save_config_json(self, path: str):
         """

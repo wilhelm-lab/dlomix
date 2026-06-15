@@ -39,8 +39,8 @@ def masked_spectral_distance(y_true, y_pred):
     true_masked = ((y_true + 1) * y_true) / (y_true + 1 + epsilon)
 
     # L2 norm
-    pred_norm = K.l2_normalize(true_masked, axis=-1)
-    true_norm = K.l2_normalize(pred_masked, axis=-1)
+    pred_norm = K.l2_normalize(pred_masked, axis=-1)
+    true_norm = K.l2_normalize(true_masked, axis=-1)
 
     # Spectral Angle (SA) calculation
     # (from the definition below, it is clear that ions with higher intensities

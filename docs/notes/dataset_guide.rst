@@ -346,7 +346,7 @@ Optimize dataset processing with these parameters:
 
    dataset = RetentionTimeDataset(
        data_source="large_dataset.parquet",
-       num_proc=4,                    # Use 4 CPU cores for processing
+       num_proc=-1,                   # Use all available CPU cores
        batch_processing_size=5000,    # Process 5000 rows at a time
        disable_cache=False,           # Enable HF datasets caching
        auto_cleanup_cache=True,       # Clean temp files after processing
@@ -355,7 +355,7 @@ Optimize dataset processing with these parameters:
 
 **Performance tips:**
 
-* ``num_proc``: Set to number of CPU cores for large datasets
+* ``num_proc``: Use ``-1`` for all available processors, ``None`` for single-process mode, or a positive integer for an explicit processor count
 * ``batch_processing_size``: Increase for better throughput (default: 1000)
 * ``enable_tf_dataset_cache``: Speeds up repeated iterations but uses more memory
 * ``disable_cache=False``: Reuses processed datasets across runs. This is the hugging face datasets caching mechanism.
@@ -507,6 +507,6 @@ Best Practices
 
 **Performance**
 
-* Set ``num_proc`` to match available CPU cores
+* Use ``num_proc=-1`` to use all available CPU cores, or set a smaller explicit value to reduce memory pressure
 * Use Parquet format for large datasets
 * Process data once and save with ``save_to_disk()``
