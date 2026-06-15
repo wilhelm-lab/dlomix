@@ -7,7 +7,10 @@ if _BACKEND in TENSORFLOW_BACKEND:
     from .chargestate import ChargeStatePredictor
     from .deepLC import DeepLCRetentionTimePredictor
     from .detectability import DetectabilityModel
-    from .model_utils import load_and_adapt_pretrained_model
+    from .model_utils import (
+        download_remote_model_weights,
+        load_and_adapt_pretrained_model,
+    )
     from .prosit import PrositIntensityPredictor, PrositRetentionTimePredictor
 
     # TensorFlow models only
@@ -16,6 +19,7 @@ if _BACKEND in TENSORFLOW_BACKEND:
 
     # TensorFlow utility functions
     __all__.append("load_and_adapt_pretrained_model")
+    __all__.append("download_remote_model_weights")
 
 
 elif _BACKEND in PYTORCH_BACKEND:

@@ -481,3 +481,8 @@ def _find_best_fit_tokens_for_new_tokens(
     datasets.enable_progress_bar()
 
     return best_fit_dict
+
+
+def download_remote_model_weights(model_name):
+    # Download the model weights from a remote source (e.g., Hugging Face Hub, PRIDE, etc.)
+    pass
