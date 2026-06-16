@@ -3,6 +3,7 @@ import time
 from os.path import join
 from shutil import rmtree
 
+import pytest
 from datasets import Dataset, DatasetDict, load_dataset
 
 from dlomix.data import (
@@ -209,13 +210,14 @@ def test_nested_model_features(raw_generic_nested_data):
         sequence_column="seq",
         label_column="label",
         model_features=["nested_feature"],
+        val_ratio=0.5,
     )
 
     assert intensity_dataset.hf_dataset is not None
     assert intensity_dataset._empty_dataset_mode is False
 
     example = iter(intensity_dataset.tensor_train_data).next()
-    assert example[0]["nested_feature"].shape == [2, 1, 2]
+    assert example[0]["nested_feature"].shape == [1, 1, 2]
 
 
 def test_save_dataset(raw_generic_nested_data):
@@ -515,3 +517,108 @@ def test_tf_tensor_dataset_list_multi_label(raw_generic_nested_data):
         features, labels = batch
         assert features is not None
         assert labels is not None
+
+
+# Integration tests for dataset splitter
+def test_rtdataset_with_random_splitter(download_path_for_assets):
+    """Test RetentionTimeDataset with random splitting strategy."""
+    rtdataset = RetentionTimeDataset(
+        data_source=join(download_path_for_assets, "file_2.csv"),
+        data_format="csv",
+        sequence_column="sequence",
+        label_column="irt",
+        val_ratio=0.2,
+        split_strategy="random",
+        split_seed=42,
+    )
+
+    assert rtdataset.hf_dataset is not None
+    assert "train" in rtdataset.hf_dataset
+    assert "val" in rtdataset.hf_dataset
+    assert rtdataset["train"].num_rows > 0
+    assert rtdataset["val"].num_rows > 0
+
+
+def test_rtdataset_with_three_way_split(download_path_for_assets):
+    """Test RetentionTimeDataset with three-way split (train/val/test)."""
+    rtdataset = RetentionTimeDataset(
+        data_source=join(download_path_for_assets, "file_2.csv"),
+        data_format="csv",
+        sequence_column="sequence",
+        label_column="irt",
+        val_ratio=0.15,
+        test_ratio=0.15,  # Fixed: was split_test_ratio
+        split_strategy="random",
+        split_seed=42,
+    )
+
+    assert rtdataset.hf_dataset is not None
+    assert "train" in rtdataset.hf_dataset
+    assert "val" in rtdataset.hf_dataset
+    assert "test" in rtdataset.hf_dataset
+    assert rtdataset["train"].num_rows > 0
+    assert rtdataset["val"].num_rows > 0
+    assert rtdataset["test"].num_rows > 0
+
+
+def test_rtdataset_with_sequence_unique_splitter(download_path_for_assets):
+    """Test RetentionTimeDataset with sequence-unique splitting."""
+    # Use a dataset from HF directly to avoid the processing step modifying sequences
+    from datasets import load_dataset as hf_load_dataset
+
+    hf_data = hf_load_dataset(
+        "csv",
+        data_files=join(download_path_for_assets, "file_2.csv"),
+        split="train",
+    )
+
+    rtdataset = RetentionTimeDataset(
+        data_source=hf_data,
+        data_format="hf",
+        sequence_column="sequence",
+        label_column="irt",
+        val_ratio=0.2,
+        split_strategy="sequence_unique",
+        split_seed=42,
+    )
+
+    assert rtdataset.hf_dataset is not None
+
+    # Note: After processing, sequence column is still present but may be modified
+    # We verify the split happened correctly by checking dataset existence
+    assert "train" in rtdataset.hf_dataset
+    assert "val" in rtdataset.hf_dataset
+    assert rtdataset["train"].num_rows > 0
+    assert rtdataset["val"].num_rows > 0
+
+
+def test_rtdataset_backward_compatibility(download_path_for_assets):
+    """Test that existing code without split parameters still works (backward compatibility)."""
+    # This is the old way of creating a dataset - should still work
+    rtdataset = RetentionTimeDataset(
+        data_source=join(download_path_for_assets, "file_2.csv"),
+        data_format="csv",
+        sequence_column="sequence",
+        label_column="irt",
+        val_ratio=0.2,  # Only val_ratio, no other split parameters
+    )
+
+    assert rtdataset.hf_dataset is not None
+    assert "train" in rtdataset.hf_dataset
+    assert "val" in rtdataset.hf_dataset
+    assert rtdataset["train"].num_rows > 0
+    assert rtdataset["val"].num_rows > 0
+
+
+def test_rtdataset_split_config_conflict(download_path_for_assets):
+    """Test that providing both predefined splits and split config raises error."""
+    with pytest.raises(ValueError, match="Cannot use split configuration parameters"):
+        RetentionTimeDataset(
+            data_source=join(download_path_for_assets, "file_2.csv"),
+            val_data_source=join(download_path_for_assets, "file_2.csv"),
+            data_format="csv",
+            sequence_column="sequence",
+            label_column="irt",
+            split_strategy="sequence_unique",  # Conflict: predefined val_data_source + split_strategy
+            split_seed=42,
+        )

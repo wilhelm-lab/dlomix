@@ -10,6 +10,26 @@ from .dataset_utils import EncodingScheme, validate_num_proc_value
 class DatasetConfig:
     """
     Configuration class for the dataset.
+
+    Splitting Parameters
+    --------------------
+    val_ratio : float
+        Ratio of validation data (0 < val_ratio < 1). Default is 0.2.
+        Used for automatic splitting when val_data_source is not provided.
+    split_strategy : Optional[str]
+        Strategy for splitting the dataset. Options: 'random', 'sequence_unique', 'stratified'.
+        Default is 'random'. Only used when automatic splitting is performed.
+    split_seed : Optional[int]
+        Random seed for reproducible splits. Default is None.
+    test_ratio : Optional[float]
+        Ratio of test data for three-way splits (0 < test_ratio < 1).
+        If None, only train/val split is performed. Default is None.
+    stratify_by_column : Optional[str]
+        Column name for stratified splitting. Can be a label column or any feature column.
+        Only used when split_strategy='stratified'. Default is None.
+    test_uniqueness : bool
+        When using split_strategy='sequence_unique', ensures test sequences are unique from
+        train/val. Default is True.
     """
 
     data_source: Union[str, List]
@@ -38,6 +58,12 @@ class DatasetConfig:
     num_proc: Optional[int]
     batch_processing_size: int
     torch_dataloader_kwargs: Optional[Dict] = field(default_factory=dict)
+    # New splitting parameters
+    split_strategy: Optional[str] = "random"
+    split_seed: Optional[int] = None
+    test_ratio: Optional[float] = None
+    stratify_by_column: Optional[str] = None
+    test_uniqueness: bool = True
 
     # validate input parameters
     def __post_init__(self):

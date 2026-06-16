@@ -3,12 +3,14 @@ import json
 import logging
 import os
 import warnings
+from enum import Enum
 from pathlib import Path
 from typing import Any, Callable, Dict, Optional, Union
 
 from datasets import Dataset, DatasetDict, Sequence, Value, load_dataset
 
 from .dataset_config import DatasetConfig
+from .dataset_splitter import SplitConfig, create_splitter
 from .dataset_utils import EncodingScheme, get_num_processors, resolve_num_proc
 from .processing.feature_extractors import (
     AVAILABLE_FEATURE_EXTRACTORS,
@@ -25,6 +27,12 @@ from .processing.processors import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+class _DatasetSplitMode(Enum):
+    AUTO = "auto"  # Single train source; run the configured splitter
+    PREDEFINED = "predefined"  # Splits defined externally; pass through as-is
+    TEST_ONLY = "test_only"  # Only a test set provided; no splitting needed
 
 
 class PeptideDataset:
@@ -144,8 +152,7 @@ class PeptideDataset:
         if not self.processed:
             self.hf_dataset: Optional[Union[Dataset, DatasetDict]] = None
             self._empty_dataset_mode = False
-            self._is_predefined_split = False
-            self._test_set_only = False
+            self._split_mode: Optional[_DatasetSplitMode] = None
             self._num_proc = dataset_config.num_proc
             self._set_num_proc()
 
@@ -217,7 +224,6 @@ class PeptideDataset:
     def _load_from_hub(self):
         self.hf_dataset = load_dataset(self.data_source, **self._kwargs)
         self._empty_dataset_mode = False
-        self._is_predefined_split = True
         warnings.warn(
             'The provided data is assumed to be hosted on the Hugging Face Hub since data_format is set to "hub". Validation and test data sources will be ignored.'
         )
@@ -241,14 +247,13 @@ class PeptideDataset:
 
     def _load_from_inmemory_hf_dataset(self):
         self._empty_dataset_mode = False
-        self._is_predefined_split = True
+
         warnings.warn(
-            f'The provided data is assumed to be an in-memory Hugging Face Dataset or DatasetDict object since data_format is set to "hf". Validation and test data sources will be ignored and the split names of the DatasetDict has to follow the default namings {PeptideDataset.DEFAULT_SPLIT_NAMES}.'
+            f'The provided data is assumed to be an in-memory Hugging Face Dataset or DatasetDict object since data_format is set to "hf". Validation and test data sources will be ignored and the split names of the DatasetDict has to follow the default namings {PeptideDataset.DEFAULT_SPLIT_NAMES}. If a Dataset is provided it will be split according to the split configuration provided by the user.'
         )
 
         if isinstance(self.data_source, DatasetDict):
             self.hf_dataset = self.data_source
-            self._data_files_available_splits = dict.fromkeys(self.hf_dataset)
             self._data_files_available_splits = {
                 split: f"in-memory Dataset object - {split}"
                 for split in self.hf_dataset
@@ -265,30 +270,54 @@ class PeptideDataset:
                 "The provided data source is not a valid Hugging Face Dataset/DatasetDict object. The data_format value should be set to 'hf' if you plan to use an in-memory Hugging Face Dataset/DatasetDict object."
             )
 
+    def _has_explicit_split_params(self) -> bool:
+        return (
+            self.test_ratio is not None
+            or (self.split_strategy and self.split_strategy.lower() != "random")
+            or self.split_seed is not None
+            or self.stratify_by_column is not None
+        )
+
+    def _determine_split_mode(self) -> _DatasetSplitMode:
+        """Determine how splitting should be handled based on loaded data and format."""
+        # Hub datasets are always predefined: trust the hub's split structure
+        if self.data_format == "hub":
+            return _DatasetSplitMode.PREDEFINED
+
+        # In-memory DatasetDict is predefined by definition
+        if self.data_format == "hf" and isinstance(self.data_source, DatasetDict):
+            return _DatasetSplitMode.PREDEFINED
+
+        available = self._data_files_available_splits
+
+        # Multiple sources provided → all splits are already defined externally
+        if len(available) >= 2:
+            return _DatasetSplitMode.PREDEFINED
+
+        # Single source: determine which split it represents
+        if PeptideDataset.DEFAULT_SPLIT_NAMES[2] in available:  # "test" only
+            return _DatasetSplitMode.TEST_ONLY
+
+        if PeptideDataset.DEFAULT_SPLIT_NAMES[1] in available:  # "val" only, no train
+            return _DatasetSplitMode.PREDEFINED
+
+        # Single "train" source (file or in-memory Dataset) → auto-split
+        return _DatasetSplitMode.AUTO
+
     def _decide_on_splitting(self):
-        count_loaded_data_sources = len(self._data_files_available_splits)
+        self._split_mode = self._determine_split_mode()
 
-        # one data source provided -> if test, then test only, if val, then do not split
-        if count_loaded_data_sources == 1:
-            if (
-                self.test_data_source is not None
-                or PeptideDataset.DEFAULT_SPLIT_NAMES[2]
-                in self._data_files_available_splits
-            ):
-                # test data source provided OR hugging face dataset with test split only
-                self._test_set_only = True
-            if self.val_data_source is not None:
-                self._is_predefined_split = True
-
-        # two or more data sources provided -> no splitting in all cases
-        if count_loaded_data_sources >= 2:
-            self._is_predefined_split = True
-
-        if self._is_predefined_split:
-            warnings.warn(f"""
-                Multiple data sources or a single non-train data source provided {self._data_files_available_splits}, please ensure that the data sources are already split into train, val and test sets
-                since no splitting will happen. If not, please provide only one data_source and set the val_ratio to split the data into train and val sets."
-                """)
+        if (
+            self._split_mode == _DatasetSplitMode.PREDEFINED
+            and self._has_explicit_split_params()
+        ):
+            raise ValueError(
+                f"Cannot use split configuration parameters (split_strategy, split_seed, "
+                f"test_ratio, stratify_by_column) when providing predefined data sources. "
+                f"Found predefined splits: {self._data_files_available_splits}. "
+                f"Either provide only data_source for automatic splitting or provide predefined "
+                f"splits without split configuration parameters."
+            )
 
     def _remove_unnecessary_columns(self):
         self._relevant_columns = [self.sequence_column, *self.label_column]
@@ -304,21 +333,46 @@ class PeptideDataset:
         self.hf_dataset = self.hf_dataset.select_columns(self._relevant_columns)
 
     def _split_dataset(self):
-        if self._is_predefined_split or self._test_set_only:
+        if self._split_mode != _DatasetSplitMode.AUTO:
             return
 
-        # only a train dataset or a train and a test but no val -> split train into train/val
+        assert isinstance(self.hf_dataset, DatasetDict)
 
-        splitted_dataset = self.hf_dataset[
-            PeptideDataset.DEFAULT_SPLIT_NAMES[0]
-        ].train_test_split(test_size=self.val_ratio)
+        # Validate stratify_by_column if provided
+        stratify_column = self.stratify_by_column
+        if stratify_column is not None:
+            train_columns = self.hf_dataset[
+                PeptideDataset.DEFAULT_SPLIT_NAMES[0]
+            ].column_names
+            if (
+                stratify_column not in self.label_column
+                and stratify_column not in train_columns
+            ):
+                raise ValueError(
+                    f"Stratification column '{stratify_column}' not found in dataset. "
+                    f"Available columns: {train_columns}"
+                )
 
-        self.hf_dataset["train"] = splitted_dataset["train"]
-        self.hf_dataset["val"] = splitted_dataset["test"]
+        split_config = SplitConfig(
+            val_ratio=self.val_ratio,
+            test_ratio=self.test_ratio,
+            strategy=self.split_strategy if self.split_strategy else "random",
+            seed=self.split_seed,
+            stratify_column=stratify_column,
+            sequence_column=self.sequence_column,
+            test_uniqueness=self.test_uniqueness,
+        )
 
-        del splitted_dataset["train"]
-        del splitted_dataset["test"]
-        del splitted_dataset
+        splitter = create_splitter(split_config)
+        logger.info(
+            "Splitting dataset using %s strategy with config: %s",
+            split_config.strategy.value,
+            split_config,
+        )
+
+        self.hf_dataset = splitter.split(
+            self.hf_dataset[PeptideDataset.DEFAULT_SPLIT_NAMES[0]]
+        )
 
     def _parse_sequences(self):
         # parse sequence in all encoding schemes

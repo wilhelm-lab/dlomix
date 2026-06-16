@@ -36,6 +36,12 @@ Submodules
    :show-inheritance:
 
 
+.. automodule:: dlomix.data.dataset_splitter
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+
 .. automodule:: dlomix.data.dataset_utils
    :members:
    :undoc-members:
