@@ -147,8 +147,12 @@ def load_and_adapt_pretrained_model(
         # best fit dict has the format
         # {'M[UNIMOD:35]': {'eval': 0.9156792, 'old_token': 'V', 'old_token_idx': 6}, 'C[UNIMOD:4]': {'eval': 0.9577802, 'old_token': '-', 'old_token_idx': 0}}
 
-        old_weights = old_model.get_layer(embedding_layer_name).get_weights()[0]
-        new_weights = model.get_layer(embedding_layer_name).get_weights()[0].copy()
+        old_weights = _get_embedding_layer(
+            old_model, embedding_layer_name
+        ).get_weights()[0]
+        new_weights = (
+            _get_embedding_layer(model, embedding_layer_name).get_weights()[0].copy()
+        )
 
         for new_token, fit_info in best_fit_dict.items():
             new_idx = new_alphabet[new_token]
@@ -162,7 +166,7 @@ def load_and_adapt_pretrained_model(
             )
 
         # set the embedding weights one final time to apply all updates
-        model.get_layer(embedding_layer_name).set_weights([new_weights])
+        _get_embedding_layer(model, embedding_layer_name).set_weights([new_weights])
 
         if best_fit_kwargs.get("return_fit_info", False):
             return model, best_fit_dict
@@ -206,6 +210,8 @@ def expand_embedding_vocabulary(
     -------
     tf.keras.Model
         Model with expanded embedding vocabulary.
+    dict
+        If initialization_strategy is 'best-fit' and return_fit_info is True, also returns a dictionary with best fit information for each new token.
 
     Raises
     ------
@@ -294,17 +300,21 @@ def expand_embedding_vocabulary(
     # Set the new weights
     new_embedding_layer.set_weights([new_embedding_weights])
 
-    # Replace the embedding layer
+    # Replace the embedding layer.
+    # Subclassed models (all dlomix models) expose the layer as a direct Python
+    # attribute, so setattr rewires the forward pass immediately.
+    # Keras functional/sequential models do not support in-place layer replacement
+    # without a full graph rebuild, so we raise rather than silently do nothing.
     if hasattr(model, embedding_layer_name):
         setattr(model, embedding_layer_name, new_embedding_layer)
     else:
-        # For functional models, we need to rebuild - this is complex so we use fallback
-        logger.warning("Functional model detected - using in-place replacement")
-        # Find and replace in model.layers
-        for i, layer in enumerate(model.layers):
-            if layer.name == embedding_layer_name:
-                model.layers[i] = new_embedding_layer
-                break
+        raise ValueError(
+            f"Cannot replace embedding layer '{embedding_layer_name}' on this model. "
+            "Vocabulary expansion requires a subclassed model that exposes the embedding "
+            f"as a direct attribute (self.{embedding_layer_name}). All dlomix models "
+            "(PrositIntensityPredictor, PrositRetentionTimePredictor, etc.) are subclassed "
+            "and are supported. Keras functional/sequential models are not."
+        )
 
     # Update model attributes if they exist
     if hasattr(model, "alphabet"):
@@ -402,6 +412,27 @@ def get_alphabet_from_model(model: tf.keras.Model) -> Optional[Dict[str, int]]:
     return None
 
 
+def _get_embedding_layer(
+    model: tf.keras.Model, embedding_layer_name: str
+) -> tf.keras.layers.Layer:
+    """Get an embedding layer via Python attribute first, then Keras name registry.
+
+    Using the attribute path (getattr) works even for models whose Keras layer
+    name string differs from the attribute name (e.g. models saved before a
+    layer rename).  Falling back to get_layer() handles functional models where
+    no matching attribute exists.
+    """
+    if hasattr(model, embedding_layer_name):
+        return getattr(model, embedding_layer_name)
+    try:
+        return model.get_layer(embedding_layer_name)
+    except ValueError as e:
+        raise AttributeError(
+            f"Embedding layer '{embedding_layer_name}' not found in model. "
+            f"Available layers: {[layer.name for layer in model.layers]}"
+        ) from e
+
+
 def _load_model_with_custom_objects(
     model_path: str, custom_objects: Optional[Dict]
 ) -> tf.keras.Model:
@@ -485,4 +516,6 @@ def _find_best_fit_tokens_for_new_tokens(
 
 def download_remote_model_weights(model_name):
     # Download the model weights from a remote source (e.g., Hugging Face Hub, PRIDE, etc.)
-    pass
+    raise NotImplementedError(
+        "Downloading remote model weights is not implemented yet."
+    )

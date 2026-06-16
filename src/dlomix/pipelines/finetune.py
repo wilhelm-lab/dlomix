@@ -59,6 +59,12 @@ class FineTunePipeline:
     initialization_strategy:
         Strategy for initialising weights that are new after a vocabulary
         expansion (e.g. ``"random"``, ``"zeros"``, ``"mean"``, ``"best-fit"``).
+    best_fit_kwargs:
+        Required when ``initialization_strategy="best-fit"``.  Forwarded
+        verbatim to :func:`load_and_adapt_pretrained_model`.  Must contain at
+        minimum: ``new_hf_data`` (a Hugging Face ``Dataset``), ``sequence_column``,
+        ``label_column``, ``n_examples_for_eval``, and ``eval_metric``.
+        Optionally ``return_fit_info`` (bool) and ``dataset_kwargs`` (dict).
     seed:
         Random seed for reproducibility.
     output_model_path:
@@ -82,6 +88,7 @@ class FineTunePipeline:
         old_model_vocab: dict | None = None,
         new_model_vocab: dict | None = None,
         initialization_strategy: str = "random",
+        best_fit_kwargs: dict | None = None,
         seed: int = 42,
         output_model_path: str = "./finetuned_model",
         epochs: int = 10,
@@ -102,6 +109,7 @@ class FineTunePipeline:
         self.old_model_vocab = old_model_vocab
         self.new_model_vocab = new_model_vocab
         self.initialization_strategy = initialization_strategy
+        self.best_fit_kwargs = best_fit_kwargs
         self.seed = seed
 
         self.output_model_path = output_model_path
@@ -114,6 +122,7 @@ class FineTunePipeline:
         # populated by setup()
         self.dataset: PeptideDataset | None = None
         self.model: Any | None = None
+        self.best_fit_info: dict | None = None
 
     # ------------------------------------------------------------------
     # Alternative constructors
@@ -218,13 +227,20 @@ class FineTunePipeline:
         logger.info(
             "Loading and adapting model from '%s' …", self.base_model_weights_filepath
         )
-        self.model = load_and_adapt_pretrained_model(
+        result = load_and_adapt_pretrained_model(
             model_path=self.base_model_weights_filepath,
             new_alphabet=self.new_model_vocab,
             old_alphabet=self.old_model_vocab,
             initialization_strategy=self.initialization_strategy,
             random_seed=self.seed,
+            best_fit_kwargs=self.best_fit_kwargs,
         )
+        # When best_fit_kwargs contains return_fit_info=True the function returns
+        # (model, fit_info); otherwise it returns just the model.
+        if isinstance(result, tuple):
+            self.model, self.best_fit_info = result
+        else:
+            self.model = result
 
     # ------------------------------------------------------------------
     # Training
