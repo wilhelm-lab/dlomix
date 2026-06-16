@@ -643,7 +643,7 @@ If you prefer to encode the (amino-acids)+PTM combinations as tokens in the voca
         state = {}
 
         # Add all runtime attributes (computed during processing)
-        exclude = {"hf_dataset", "_config", "data_source", "_processors"}
+        exclude = {"hf_dataset", "_config", "data_source", "_processors", "_split_mode"}
 
         for key, value in self.__dict__.items():
             if key in exclude:
