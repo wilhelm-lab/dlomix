@@ -81,7 +81,6 @@ class TestSplitConfig:
         assert config.test_ratio is None
         assert config.strategy == SplitStrategy.RANDOM
         assert config.seed is None
-        assert config.test_uniqueness is True
 
     def test_invalid_val_ratio(self):
         """Test validation of val_ratio."""
@@ -310,7 +309,6 @@ class TestSequenceUniqueSplitter:
             test_ratio=0.2,
             strategy="sequence_unique",
             sequence_column="sequence",
-            test_uniqueness=True,
             seed=42,
         )
         splitter = create_splitter(config)

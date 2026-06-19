@@ -67,7 +67,6 @@ class IonMobilityDataset(PeptideDataset):
         split_seed: Optional[int] = None,
         test_ratio: Optional[float] = None,
         stratify_by_column: Optional[str] = None,
-        test_uniqueness: bool = True,
     ):
         kwargs = {k: v for k, v in locals().items() if k not in ["self", "__class__"]}
         super().__init__(DatasetConfig(**kwargs))

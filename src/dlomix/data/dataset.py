@@ -329,6 +329,15 @@ class PeptideDataset:
             # additional columns to keep in the hugging face dataset only and not return as tensors
             self._relevant_columns.extend(self.dataset_columns_to_keep)
 
+        # Preserve stratify_by_column through splitting; track if it needs removal afterward
+        self._temp_stratify_column: Optional[str] = None
+        if (
+            self.stratify_by_column is not None
+            and self.stratify_by_column not in self._relevant_columns
+        ):
+            self._relevant_columns.append(self.stratify_by_column)
+            self._temp_stratify_column = self.stratify_by_column
+
         # select only relevant columns from the Hugging Face Dataset (includes label column)
         self.hf_dataset = self.hf_dataset.select_columns(self._relevant_columns)
 
@@ -360,7 +369,6 @@ class PeptideDataset:
             seed=self.split_seed,
             stratify_column=stratify_column,
             sequence_column=self.sequence_column,
-            test_uniqueness=self.test_uniqueness,
         )
 
         splitter = create_splitter(split_config)
@@ -373,6 +381,12 @@ class PeptideDataset:
         self.hf_dataset = splitter.split(
             self.hf_dataset[PeptideDataset.DEFAULT_SPLIT_NAMES[0]]
         )
+
+        # Drop the stratify column from all splits if it was only kept temporarily
+        if self._temp_stratify_column is not None:
+            self.hf_dataset = self.hf_dataset.remove_columns(self._temp_stratify_column)
+            self._relevant_columns.remove(self._temp_stratify_column)
+            self._temp_stratify_column = None
 
     def _parse_sequences(self):
         # parse sequence in all encoding schemes
@@ -643,7 +657,14 @@ If you prefer to encode the (amino-acids)+PTM combinations as tokens in the voca
         state = {}
 
         # Add all runtime attributes (computed during processing)
-        exclude = {"hf_dataset", "_config", "data_source", "_processors", "_split_mode"}
+        exclude = {
+            "hf_dataset",
+            "_config",
+            "data_source",
+            "_processors",
+            "_split_mode",
+            "_temp_stratify_column",
+        }
 
         for key, value in self.__dict__.items():
             if key in exclude:
@@ -926,7 +947,9 @@ def load_processed_dataset(path: str, validate: bool = True):
 
     # 3. Create instance with processed=True to skip initialization processing
     module = importlib.import_module("dlomix.data")
-    class_name = metadata.get("class_name") if metadata else "PeptideDataset"
+    class_name = (
+        metadata.get("class_name", "PeptideDataset") if metadata else "PeptideDataset"
+    )
     cls = getattr(module, class_name)
 
     # ensure processed flag is set in config to avoid re-processing

@@ -222,7 +222,6 @@ set in a single pass, producing train/val/test from a single source file.
        val_ratio=0.15,
        test_ratio=0.15,
        split_strategy="sequence_unique",
-       test_uniqueness=True,     # default; sequences are unique across all three splits
        split_seed=42
    )
 
@@ -566,7 +565,6 @@ DatasetConfig Parameters
 * ``split_seed``: Integer seed for reproducible splits (default: ``None``)
 * ``test_ratio``: Fraction of data to hold out as a test set for three-way splits (default: ``None``, train/val only)
 * ``stratify_by_column``: Column name to stratify by; required when ``split_strategy="stratified"`` (default: ``None``)
-* ``test_uniqueness``: When ``split_strategy="sequence_unique"``, ensures test sequences are also unique from train/val (default: ``True``)
 
 
 Best Practices

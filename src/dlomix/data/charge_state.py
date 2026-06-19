@@ -40,7 +40,6 @@ class ChargeStateDataset(PeptideDataset):
         split_seed (Optional[int]): Random seed for reproducible splits. Default is None.
         test_ratio (Optional[float]): Ratio of test data for three-way splits. If None, only train/val split is performed. Default is None.
         stratify_by_column (Optional[str]): Column name for stratified splitting. Default is None.
-        test_uniqueness (bool): When using split_strategy='sequence_unique', ensures test sequences are unique from train/val. Default is True.
     """
 
     def __init__(
@@ -75,7 +74,6 @@ class ChargeStateDataset(PeptideDataset):
         split_seed: Optional[int] = None,
         test_ratio: Optional[float] = None,
         stratify_by_column: Optional[str] = None,
-        test_uniqueness: bool = True,
         **kwargs,
     ):
         config_kwargs = {

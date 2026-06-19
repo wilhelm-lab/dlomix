@@ -49,10 +49,6 @@ class SplitConfig:
     sequence_column : str
         Column name containing sequences. Used for 'sequence_unique' strategy.
         Default is 'sequence'.
-    test_uniqueness : bool
-        If True, ensures test sequences are also unique from train/val when using
-        'sequence_unique' strategy. Default is True.
-
     Raises
     ------
     ValueError
@@ -68,7 +64,6 @@ class SplitConfig:
     seed: Optional[int] = None
     stratify_column: Optional[str] = None
     sequence_column: str = "sequence"
-    test_uniqueness: bool = True
 
     def __post_init__(self):
         """Validate configuration parameters."""
@@ -361,10 +356,9 @@ class SequenceUniqueSplitter(DatasetSplitter):
             )
 
         logger.info(
-            "Performing sequence-unique split with val_ratio=%.2f, test_ratio=%s, test_uniqueness=%s, seed=%s",
+            "Performing sequence-unique split with val_ratio=%.2f, test_ratio=%s, seed=%s",
             self.config.val_ratio,
             self.config.test_ratio,
-            self.config.test_uniqueness,
             self.config.seed,
         )
 
@@ -444,24 +438,16 @@ class SequenceUniqueSplitter(DatasetSplitter):
 
         # Handle test split
         if test_sequences is not None:
-            if self.config.test_uniqueness:
-                # Ensure test sequences are unique from train/val
-                test_mask = df[self.config.sequence_column].isin(test_sequences)
-            else:
-                # Allow test sequences to overlap with train/val
-                # Include all sequences not in train or val
-                test_mask = ~(train_mask | val_mask)
-
-            test_df = df[test_mask]
+            test_df = df[df[self.config.sequence_column].isin(test_sequences)]
             logger.info("Test split: %d samples", len(test_df))
             result["test"] = Dataset.from_pandas(test_df, preserve_index=False)
 
         # Verify uniqueness
-        if self.config.test_ratio is not None and self.config.test_uniqueness:
-            train_seqs = set(result["train"][self.config.sequence_column])
-            val_seqs = set(result["val"][self.config.sequence_column])
-            test_seqs = set(result["test"][self.config.sequence_column])
+        train_seqs = set(result["train"][self.config.sequence_column])
+        val_seqs = set(result["val"][self.config.sequence_column])
 
+        if "test" in result:
+            test_seqs = set(result["test"][self.config.sequence_column])
             train_val_overlap = train_seqs & val_seqs
             train_test_overlap = train_seqs & test_seqs
             val_test_overlap = val_seqs & test_seqs
@@ -474,11 +460,7 @@ class SequenceUniqueSplitter(DatasetSplitter):
                     f"val-test: {len(val_test_overlap)}"
                 )
         else:
-            # Verify train/val uniqueness for two-way split
-            train_seqs = set(result["train"][self.config.sequence_column])
-            val_seqs = set(result["val"][self.config.sequence_column])
             overlap = train_seqs & val_seqs
-
             if overlap:
                 warnings.warn(
                     f"Sequence overlap detected between train and val: {len(overlap)} sequences"
@@ -524,7 +506,6 @@ def create_splitter(config: SplitConfig) -> DatasetSplitter:
     ...     test_ratio=0.15,
     ...     strategy='sequence_unique',
     ...     sequence_column='sequence',
-    ...     test_uniqueness=True,
     ...     seed=42
     ... )
     >>> splitter = create_splitter(config)

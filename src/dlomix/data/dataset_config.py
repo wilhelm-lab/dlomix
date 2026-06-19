@@ -27,9 +27,6 @@ class DatasetConfig:
     stratify_by_column : Optional[str]
         Column name for stratified splitting. Can be a label column or any feature column.
         Only used when split_strategy='stratified'. Default is None.
-    test_uniqueness : bool
-        When using split_strategy='sequence_unique', ensures test sequences are unique from
-        train/val. Default is True.
     """
 
     data_source: Union[str, List]
@@ -63,7 +60,6 @@ class DatasetConfig:
     split_seed: Optional[int] = None
     test_ratio: Optional[float] = None
     stratify_by_column: Optional[str] = None
-    test_uniqueness: bool = True
 
     # validate input parameters
     def __post_init__(self):
