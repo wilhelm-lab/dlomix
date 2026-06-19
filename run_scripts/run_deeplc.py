@@ -28,7 +28,7 @@ history = model.fit(
     d.tf_dataset["train"], epochs=3, validation_data=d.tf_dataset["val"]
 )
 
-model.save_weights("./output/deeplc_test")
+model.save_weights("./output/deeplc_test.weights.h5")
 
 with open("./history_deeplc.pkl", "wb") as f:
     pickle.dump(history.history, f)

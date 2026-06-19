@@ -20,7 +20,7 @@ DLOmix - Deep Learning for Proteomics
 
 DLOmix is a deep learning framework for proteomics. It is designed to provide proteomics researchers with high-level functionality for building and training deep learning models for proteomics data.
 
-The goal of DLOmix is to be easy to use and flexible, while still providing the ability to build complex models. DLOmix is built on top of TensorFlow/Keras and maintains compitability with many Keras features.
+The goal of DLOmix is to be easy to use and flexible, while still providing the ability to build complex models. The TensorFlow backend is built on top of TensorFlow 2.16+ with Keras 3, and maintains compatibility with many Keras features.
 
 
 

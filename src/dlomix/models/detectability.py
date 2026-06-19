@@ -19,14 +19,11 @@ class DetectabilityModel(tf.keras.Model):
         self.num_classes = num_classes
         self.padding_char = padding_char
         self.alphabet_size = len(padding_char)
-        self.one_hot_encoder = tf.keras.layers.Lambda(
-            lambda x: tf.one_hot(tf.cast(x, "int32"), depth=self.alphabet_size)
-        )
         self.encoder = Encoder(self.num_units)
         self.decoder = Decoder(self.num_units, self.num_classes)
 
     def call(self, inputs):
-        onehot_inputs = self.one_hot_encoder(inputs)
+        onehot_inputs = tf.one_hot(tf.cast(inputs, "int32"), depth=self.alphabet_size)
         enc_outputs, enc_state_f, enc_state_b = self.encoder(onehot_inputs)
 
         dec_outputs = tf.concat([enc_state_f, enc_state_b], axis=-1)

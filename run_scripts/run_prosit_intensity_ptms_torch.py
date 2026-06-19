@@ -1,6 +1,6 @@
 """
-    To run this script, use the following command:
-    DLOMIX_BACKEND=torch python run_scripts/run_prosit_intensity_ptms_torch.py
+To run this script, use the following command:
+DLOMIX_BACKEND=torch python run_scripts/run_prosit_intensity_ptms_torch.py
 """
 
 import logging

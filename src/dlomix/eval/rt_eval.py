@@ -1,5 +1,4 @@
 import tensorflow as tf
-import tensorflow.keras.backend as K
 
 # Parts of the code adopted and modified based on:
 # https://github.com/horsepurve/DeepRTplus/blob/cde829ef4bd8b38a216d668cf79757c07133b34b/RTdata_emb.py
@@ -61,7 +60,7 @@ class TimeDeltaMetric(tf.keras.metrics.Metric):
     def result(self):
         return self.delta / self.batch_count
 
-    def reset_states(self):
+    def reset_state(self):
         self.delta.assign(0.0)
         self.batch_count.assign(0.0)
 
@@ -100,7 +99,7 @@ def timedelta(y_true, y_pred, normalize=False, percentage=0.95):
     y_true_flat = tf.reshape(y_true, [-1])
     y_pred_flat = tf.reshape(y_pred, [-1])
 
-    abs_error = K.abs(y_true_flat - y_pred_flat)
+    abs_error = tf.abs(y_true_flat - y_pred_flat)
 
     n = tf.cast(tf.size(abs_error), dtype=tf.float32)
     mark_percentile = tf.cast(n * percentage, dtype=tf.int32)
@@ -108,6 +107,6 @@ def timedelta(y_true, y_pred, normalize=False, percentage=0.95):
     delta = tf.sort(abs_error)[mark_percentile - 1]
 
     if normalize:
-        norm_range = K.max(y_true_flat) - K.min(y_true_flat)
+        norm_range = tf.reduce_max(y_true_flat) - tf.reduce_min(y_true_flat)
         return delta / norm_range
     return delta

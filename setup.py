@@ -15,7 +15,8 @@ def get_metadata():
 META_DATA = get_metadata()
 
 tensorflow_extra_install = [
-    "tensorflow>=2.13,<2.16",  # 2.16 introduces breaking changes and has Keras 3 as default
+    "tensorflow>=2.16",  # TF 2.16+ ships Keras 3 as default; dlomix targets Keras 3
+    "keras>=3.0.0",  # explicit: the TF backend requires Keras 3 (pulled transitively by TF 2.16+)
 ]
 
 pytorch_extra_install = [
@@ -75,6 +76,7 @@ setuptools.setup(
         "Programming Language :: Python :: 3",
         "Programming Language :: Python :: 3.10",
         "Programming Language :: Python :: 3.11",
+        "Programming Language :: Python :: 3.12",
         "License :: OSI Approved :: MIT License",
         "Operating System :: OS Independent",
         "Topic :: Scientific/Engineering :: Bio-Informatics",

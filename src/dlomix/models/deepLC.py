@@ -48,8 +48,9 @@ class DeepLCRetentionTimePredictor(tf.keras.Model):
         counts_input_key: str = "counts",
         di_counts_input_key: str = "di_counts",
         global_features_input_key: str = "global_features",
+        **kwargs,
     ):
-        super().__init__()
+        super().__init__(**kwargs)
         self.seq_length = seq_length
         self.use_global_features = use_global_features
         self.alphabet = alphabet

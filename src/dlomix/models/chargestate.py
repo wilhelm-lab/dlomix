@@ -57,8 +57,9 @@ class ChargeStatePredictor(tf.keras.Model):
         regressor_layer_size=512,
         num_classes=6,
         model_flavour="relative",
+        **kwargs,
     ):
-        super(ChargeStatePredictor, self).__init__()
+        super(ChargeStatePredictor, self).__init__(**kwargs)
 
         # tie the count of embeddings to the size of the vocabulary (count of amino acids)
         self.embeddings_count = len(alphabet) + 1
@@ -66,7 +67,12 @@ class ChargeStatePredictor(tf.keras.Model):
         self.dropout_rate = dropout_rate
         self.latent_dropout_rate = latent_dropout_rate
         self.regressor_layer_size = regressor_layer_size
-        self.recurrent_layers_sizes = recurrent_layers_sizes
+        self.recurrent_layers_sizes = tuple(recurrent_layers_sizes)
+        self.embedding_output_dim = embedding_output_dim
+        self.seq_length = seq_length
+        self.alphabet = dict(alphabet)
+        self.num_classes = num_classes
+        self.model_flavour = model_flavour
 
         if model_flavour == "relative":
             # regression problem
@@ -84,7 +90,6 @@ class ChargeStatePredictor(tf.keras.Model):
         self.embedding = tf.keras.layers.Embedding(
             input_dim=self.embeddings_count,
             output_dim=embedding_output_dim,
-            input_length=seq_length,
         )
         self._build_encoder()
 
@@ -117,6 +122,16 @@ class ChargeStatePredictor(tf.keras.Model):
             ]
         )
 
+    def build(self, input_shape):
+        # Keras 3 does not build the sublayers of a subclassed model from an
+        # input shape alone; run one forward pass on a dummy input to
+        # instantiate the weights. self.call is used (rather than self(...))
+        # to avoid re-triggering build via __call__.
+        if not self.built:
+            seq_len = input_shape[-1] if input_shape[-1] is not None else 1
+            self.call(tf.zeros((1, seq_len)))
+        super().build(input_shape)
+
     def call(self, inputs):
         x = self.embedding(inputs)
         x = self.encoder(x)
@@ -124,3 +139,28 @@ class ChargeStatePredictor(tf.keras.Model):
         x = self.regressor(x)
         x = self.output_layer(x)
         return x
+
+    def get_config(self):
+        config = super().get_config()
+        config.update(
+            {
+                "embedding_output_dim": self.embedding_output_dim,
+                "seq_length": self.seq_length,
+                "alphabet": self.alphabet,
+                "dropout_rate": self.dropout_rate,
+                "latent_dropout_rate": self.latent_dropout_rate,
+                "recurrent_layers_sizes": list(self.recurrent_layers_sizes),
+                "regressor_layer_size": self.regressor_layer_size,
+                "num_classes": self.num_classes,
+                "model_flavour": self.model_flavour,
+            }
+        )
+        return config
+
+    @classmethod
+    def from_config(cls, config):
+        if "recurrent_layers_sizes" in config and isinstance(
+            config["recurrent_layers_sizes"], list
+        ):
+            config["recurrent_layers_sizes"] = tuple(config["recurrent_layers_sizes"])
+        return cls(**config)

@@ -17,6 +17,7 @@ The PyTorch implementation was largely introduced during a hackathon as part of 
 DLOmix automatically detects and uses the appropriate backend based on your environment setup. You can control which backend to use through the `DLOMIX_BACKEND` environment variable:
 
 ### TensorFlow Backend (Default)
+The TensorFlow backend requires **TensorFlow 2.16+ (Keras 3)**.
 ```bash
 # Set TensorFlow as backend (default)
 export DLOMIX_BACKEND=tensorflow

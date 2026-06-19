@@ -29,12 +29,12 @@ model = PrositRetentionTimePredictor(seq_length=30, alphabet=d.extended_alphabet
 print(d)
 print(model)
 
-optimizer = tf.keras.optimizers.Adam(lr=0.0001)
+optimizer = tf.keras.optimizers.Adam(learning_rate=0.0001)
 model.compile(
     optimizer=optimizer, loss="mse", metrics=["mean_absolute_error", timedelta]
 )
 
-weights_file = "./run_scripts/output/prosit_rt_test"
+weights_file = "./run_scripts/output/prosit_rt_test.weights.h5"
 checkpoint = tf.keras.callbacks.ModelCheckpoint(
     weights_file, save_best_only=True, save_weights_only=True
 )

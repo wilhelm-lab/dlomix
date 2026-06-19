@@ -27,8 +27,15 @@ class RetentionTimePredictor(tf.keras.Model):
         seq_length=30,
         encoder="conv1d",
         alphabet=ALPHABET_UNMOD,
+        **kwargs,
     ):
-        super(RetentionTimePredictor, self).__init__()
+        super(RetentionTimePredictor, self).__init__(**kwargs)
+
+        # store config for serialization
+        self.embedding_dim = embedding_dim
+        self.seq_length = seq_length
+        self.encoder_type = encoder
+        self.alphabet = dict(alphabet)
 
         # tie the count of embeddings to the size of the vocabulary (count of amino acids)
         self.embeddings_count = len(alphabet) + 2
@@ -36,7 +43,6 @@ class RetentionTimePredictor(tf.keras.Model):
         self.embedding = tf.keras.layers.Embedding(
             input_dim=self.embeddings_count,
             output_dim=embedding_dim,
-            input_length=seq_length,
         )
 
         self._build_encoder(encoder)
@@ -72,6 +78,16 @@ class RetentionTimePredictor(tf.keras.Model):
                 ]
             )
 
+    def build(self, input_shape):
+        # Keras 3 does not build the sublayers of a subclassed model from an
+        # input shape alone; run one forward pass on a dummy input to
+        # instantiate the weights. self.call is used (rather than self(...))
+        # to avoid re-triggering build via __call__.
+        if not self.built:
+            seq_len = input_shape[-1] if input_shape[-1] is not None else 1
+            self.call(tf.zeros((1, seq_len)))
+        super().build(input_shape)
+
     def call(self, inputs, **kwargs):
         x = self.embedding(inputs)
         x = self.encoder(x)
@@ -80,3 +96,19 @@ class RetentionTimePredictor(tf.keras.Model):
         x = self.output_layer(x)
 
         return x
+
+    def get_config(self):
+        config = super().get_config()
+        config.update(
+            {
+                "embedding_dim": self.embedding_dim,
+                "seq_length": self.seq_length,
+                "encoder": self.encoder_type,
+                "alphabet": self.alphabet,
+            }
+        )
+        return config
+
+    @classmethod
+    def from_config(cls, config):
+        return cls(**config)

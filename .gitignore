@@ -170,3 +170,5 @@ run_scripts/output/
 assets/
 
 src/dlomix/reports/quarto/.local_quarto_plots
+
+CLAUDE.md

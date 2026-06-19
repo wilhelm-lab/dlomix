@@ -3,8 +3,8 @@
 
 .. automodule:: dlomix.eval
    :members:
-   :undoc-members:
    :show-inheritance:
+   :undoc-members:
 
 Submodules
 ----------
@@ -12,23 +12,23 @@ Submodules
 
 .. automodule:: dlomix.eval.chargestate
    :members:
-   :undoc-members:
    :show-inheritance:
+   :undoc-members:
 
 
 .. automodule:: dlomix.eval.chargestate_torch
    :members:
-   :undoc-members:
    :show-inheritance:
+   :undoc-members:
 
 
 .. automodule:: dlomix.eval.rt_eval
    :members:
-   :undoc-members:
    :show-inheritance:
+   :undoc-members:
 
 
 .. automodule:: dlomix.eval.rt_eval_torch
    :members:
-   :undoc-members:
    :show-inheritance:
+   :undoc-members:

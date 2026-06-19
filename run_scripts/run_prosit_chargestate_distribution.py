@@ -11,7 +11,7 @@ model = ChargeStatePredictor(
 print(model)
 
 
-optimizer = tf.keras.optimizers.Adam(lr=0.0001)
+optimizer = tf.keras.optimizers.Adam(learning_rate=0.0001)
 
 
 TESTING_DATA = "example_dataset/chargestate/chargestate_data.parquet"
@@ -42,7 +42,7 @@ test_sequences = test_d["test"]["modified_sequence"]
 
 
 # callbacks
-weights_file = "./run_scripts/output/prosit_charge_dist_test"
+weights_file = "./run_scripts/output/prosit_charge_dist_test.weights.h5"
 checkpoint = tf.keras.callbacks.ModelCheckpoint(
     weights_file, save_best_only=True, save_weights_only=True
 )
@@ -64,7 +64,7 @@ history = model.fit(
     callbacks=callbacks,
 )
 
-predictions = model.predict(test_sequences)
+predictions = model.predict(test_d.tensor_test_data)
 predictions = predictions
 
 print("first 5 test sequences:\n", test_sequences[:5])

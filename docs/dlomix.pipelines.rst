@@ -3,8 +3,8 @@
 
 .. automodule:: dlomix.pipelines
    :members:
-   :undoc-members:
    :show-inheritance:
+   :undoc-members:
 
 Submodules
 ----------
@@ -12,5 +12,5 @@ Submodules
 
 .. automodule:: dlomix.pipelines.pipeline
    :members:
-   :undoc-members:
    :show-inheritance:
+   :undoc-members:
