@@ -76,11 +76,28 @@ class TestSplitConfig:
 
     def test_default_config(self):
         """Test default configuration."""
-        config = SplitConfig()
+        config = SplitConfig(val_ratio=0.2)
         assert config.val_ratio == 0.2
         assert config.test_ratio is None
         assert config.strategy == SplitStrategy.RANDOM
         assert config.seed is None
+
+    def test_both_none_raises(self):
+        """Test that omitting both ratios raises an error."""
+        with pytest.raises(ValueError, match="At least one of val_ratio or test_ratio"):
+            SplitConfig()
+
+    def test_zero_treated_as_none(self):
+        """Test that 0 is normalized to None (skip that split)."""
+        config = SplitConfig(val_ratio=0, test_ratio=0.2)
+        assert config.val_ratio is None
+        assert config.test_ratio == 0.2
+
+    def test_test_ratio_only(self):
+        """Test that providing only test_ratio is valid (train/test split, no val)."""
+        config = SplitConfig(test_ratio=0.2)
+        assert config.val_ratio is None
+        assert config.test_ratio == 0.2
 
     def test_invalid_val_ratio(self):
         """Test validation of val_ratio."""
@@ -89,9 +106,6 @@ class TestSplitConfig:
 
         with pytest.raises(ValueError, match="val_ratio must be between 0 and 1"):
             SplitConfig(val_ratio=-0.1)
-
-        with pytest.raises(ValueError, match="val_ratio must be between 0 and 1"):
-            SplitConfig(val_ratio=0)
 
     def test_invalid_test_ratio(self):
         """Test validation of test_ratio."""
@@ -109,19 +123,19 @@ class TestSplitConfig:
     def test_stratified_without_column(self):
         """Test that stratified strategy requires stratify_column."""
         with pytest.raises(ValueError, match="stratify_column must be provided"):
-            SplitConfig(strategy="stratified")
+            SplitConfig(val_ratio=0.2, strategy="stratified")
 
     def test_sequence_unique_without_column(self):
         """Test that sequence_unique strategy requires sequence_column."""
         with pytest.raises(ValueError, match="sequence_column must be provided"):
-            SplitConfig(strategy="sequence_unique", sequence_column=None)
+            SplitConfig(val_ratio=0.2, strategy="sequence_unique", sequence_column=None)
 
     def test_strategy_normalization(self):
         """Test that strategy string is normalized to enum."""
-        config = SplitConfig(strategy="RANDOM")
+        config = SplitConfig(val_ratio=0.2, strategy="RANDOM")
         assert config.strategy == SplitStrategy.RANDOM
 
-        config = SplitConfig(strategy="sequence_unique")
+        config = SplitConfig(val_ratio=0.2, strategy="sequence_unique")
         assert config.strategy == SplitStrategy.SEQUENCE_UNIQUE
 
 
@@ -143,6 +157,18 @@ class TestRandomSplitter:
         assert len(result["train"]) == 80
         assert len(result["val"]) == 20
         assert len(result["train"]) + len(result["val"]) == len(simple_dataset)
+
+    def test_train_test_split(self, simple_dataset):
+        """Test two-way train/test split (no val)."""
+        config = SplitConfig(test_ratio=0.2, strategy="random", seed=42)
+        splitter = create_splitter(config)
+
+        result = splitter.split(simple_dataset)
+
+        assert "train" in result
+        assert "test" in result
+        assert "val" not in result
+        assert len(result["train"]) + len(result["test"]) == len(simple_dataset)
 
     def test_three_way_split(self, simple_dataset):
         """Test three-way split (train/val/test)."""
@@ -253,6 +279,32 @@ class TestStratifiedSplitter:
 
         with pytest.raises(ValueError, match="Stratification column.*not found"):
             splitter.split(simple_dataset)
+
+    def test_stratified_auto_casts_non_classlabel_column(self):
+        """Test that a plain int column is auto-cast to ClassLabel with a warning."""
+        import warnings
+
+        from datasets import Dataset
+
+        data = {
+            "sequence": [f"PEP{i}" for i in range(100)],
+            "label": [i % 3 for i in range(100)],  # plain int64, not ClassLabel
+        }
+        dataset = Dataset.from_dict(data)
+        assert not hasattr(dataset.features["label"], "names")  # confirm not ClassLabel
+
+        config = SplitConfig(
+            val_ratio=0.2, strategy="stratified", stratify_column="label", seed=42
+        )
+        splitter = create_splitter(config)
+
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            result = splitter.split(dataset)
+
+        assert any("Auto-casting" in str(w.message) for w in caught)
+        assert "train" in result and "val" in result
+        assert len(result["train"]) + len(result["val"]) == len(dataset)
 
     def test_stratified_reproducibility(self, imbalanced_dataset):
         """Test reproducibility of stratified splits."""
@@ -389,19 +441,21 @@ class TestCreateSplitter:
 
     def test_create_random_splitter(self):
         """Test creating a random splitter."""
-        config = SplitConfig(strategy="random")
+        config = SplitConfig(val_ratio=0.2, strategy="random")
         splitter = create_splitter(config)
         assert isinstance(splitter, RandomSplitter)
 
     def test_create_stratified_splitter(self):
         """Test creating a stratified splitter."""
-        config = SplitConfig(strategy="stratified", stratify_column="label")
+        config = SplitConfig(
+            val_ratio=0.2, strategy="stratified", stratify_column="label"
+        )
         splitter = create_splitter(config)
         assert isinstance(splitter, StratifiedSplitter)
 
     def test_create_sequence_unique_splitter(self):
         """Test creating a sequence-unique splitter."""
-        config = SplitConfig(strategy="sequence_unique")
+        config = SplitConfig(val_ratio=0.2, strategy="sequence_unique")
         splitter = create_splitter(config)
         assert isinstance(splitter, SequenceUniqueSplitter)
 

@@ -248,11 +248,12 @@ class PeptideDataset:
     def _load_from_inmemory_hf_dataset(self):
         self._empty_dataset_mode = False
 
-        warnings.warn(
-            f'The provided data is assumed to be an in-memory Hugging Face Dataset or DatasetDict object since data_format is set to "hf". Validation and test data sources will be ignored and the split names of the DatasetDict has to follow the default namings {PeptideDataset.DEFAULT_SPLIT_NAMES}. If a Dataset is provided it will be split according to the split configuration provided by the user.'
-        )
-
         if isinstance(self.data_source, DatasetDict):
+            warnings.warn(
+                'data_format="hf" with a DatasetDict: using the provided splits as-is. '
+                f"Split names must follow {PeptideDataset.DEFAULT_SPLIT_NAMES}. "
+                "val_data_source and test_data_source are ignored."
+            )
             self.hf_dataset = self.data_source
             self._data_files_available_splits = {
                 split: f"in-memory Dataset object - {split}"
@@ -260,6 +261,11 @@ class PeptideDataset:
             }
 
         elif isinstance(self.data_source, Dataset):
+            warnings.warn(
+                'data_format="hf" with a Dataset: the dataset will be automatically split '
+                "into train/val (and optionally test) according to the split configuration. "
+                "val_data_source and test_data_source are ignored."
+            )
             self.hf_dataset = DatasetDict()
             self.hf_dataset[PeptideDataset.DEFAULT_SPLIT_NAMES[0]] = self.data_source
             self._data_files_available_splits = {
@@ -272,9 +278,9 @@ class PeptideDataset:
 
     def _has_explicit_split_params(self) -> bool:
         return (
-            self.test_ratio is not None
+            self.val_ratio is not None
+            or self.test_ratio is not None
             or (self.split_strategy and self.split_strategy.lower() != "random")
-            or self.split_seed is not None
             or self.stratify_by_column is not None
         )
 
@@ -307,16 +313,43 @@ class PeptideDataset:
     def _decide_on_splitting(self):
         self._split_mode = self._determine_split_mode()
 
+        if self._split_mode == _DatasetSplitMode.PREDEFINED:
+            warnings.warn(
+                f"Using provided splits as-is: {list(self._data_files_available_splits.keys())}. "
+                "No automatic splitting will occur."
+            )
+        elif self._split_mode == _DatasetSplitMode.TEST_ONLY:
+            warnings.warn(
+                "Only a test split was provided. No automatic splitting will occur."
+            )
+
+        if self._split_mode != _DatasetSplitMode.AUTO and self.split_seed is not None:
+            warnings.warn(
+                f"split_seed={self.split_seed} is set but no automatic splitting will occur "
+                f"(splits are predefined or only a test set was provided). The seed is ignored."
+            )
+
         if (
             self._split_mode == _DatasetSplitMode.PREDEFINED
             and self._has_explicit_split_params()
         ):
             raise ValueError(
-                f"Cannot use split configuration parameters (split_strategy, split_seed, "
-                f"test_ratio, stratify_by_column) when providing predefined data sources. "
-                f"Found predefined splits: {self._data_files_available_splits}. "
+                f"Cannot use split configuration parameters (val_ratio, test_ratio, "
+                f"split_strategy, stratify_by_column) when providing predefined data sources. "
+                f"Found predefined splits: {list(self._data_files_available_splits.keys())}. "
                 f"Either provide only data_source for automatic splitting or provide predefined "
                 f"splits without split configuration parameters."
+            )
+
+        if (
+            self._split_mode == _DatasetSplitMode.TEST_ONLY
+            and self._has_explicit_split_params()
+        ):
+            raise ValueError(
+                "Cannot use split configuration parameters (val_ratio, test_ratio, "
+                "split_strategy, stratify_by_column) when only test data is provided — "
+                "there is no training data to split. "
+                "Either omit the split parameters or also provide data_source."
             )
 
     def _remove_unnecessary_columns(self):

@@ -13,9 +13,8 @@ class DatasetConfig:
 
     Splitting Parameters
     --------------------
-    val_ratio : float
-        Ratio of validation data (0 < val_ratio < 1). Default is 0.2.
-        Used for automatic splitting when val_data_source is not provided.
+    val_ratio : Optional[float]
+        Fraction of data for the validation split. None or 0 means no val split. Default None.
     split_strategy : Optional[str]
         Strategy for splitting the dataset. Options: 'random', 'sequence_unique', 'stratified'.
         Default is 'random'. Only used when automatic splitting is performed.
@@ -35,7 +34,6 @@ class DatasetConfig:
     data_format: str
     sequence_column: str
     label_column: List[str]
-    val_ratio: float
     max_seq_len: int
     dataset_type: str
     batch_size: int
@@ -55,7 +53,8 @@ class DatasetConfig:
     num_proc: Optional[int]
     batch_processing_size: int
     torch_dataloader_kwargs: Optional[Dict] = field(default_factory=dict)
-    # New splitting parameters
+    # Splitting parameters
+    val_ratio: Optional[float] = None
     split_strategy: Optional[str] = "random"
     split_seed: Optional[int] = None
     test_ratio: Optional[float] = None

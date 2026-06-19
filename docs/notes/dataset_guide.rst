@@ -146,7 +146,42 @@ DLOmix supports three high-level data source modes:
    )
 
 .. note::
-   Splitting parameters (``split_strategy``, ``split_seed``, ``test_ratio``, ``stratify_by_column``) are only valid in **Mode 1**. Providing them alongside pre-defined sources raises a ``ValueError``.
+   Splitting parameters (``val_ratio``, ``test_ratio``, ``split_strategy``, ``stratify_by_column``) are only valid in **Mode 1**. Providing them alongside pre-defined sources raises a ``ValueError``.
+
+The table below summarises all combinations of data sources and split parameters and their outcome:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 22 44 10 24
+
+   * - Situation
+     - Example parameters
+     - Ratios set?
+     - Outcome
+   * - Single train source
+     - ``data_source="train.csv", val_ratio=0.2``
+     - yes
+     - Auto-split using the configured strategy
+   * - Multiple sources
+     - ``data_source="train.csv", val_data_source="val.csv"``
+     - no
+     - Splits used as-is; warns that no auto-split occurs
+   * - Multiple sources
+     - ``data_source="train.csv", val_data_source="val.csv", val_ratio=0.2``
+     - yes
+     - ``ValueError``
+   * - HF Hub or DatasetDict
+     - ``data_source="hub/dataset", data_format="hub"``
+     - no
+     - Splits used as-is; warns that no auto-split occurs
+   * - Test-only source
+     - ``test_data_source="test.csv"``
+     - no
+     - Test data used as-is; warns that no auto-split occurs
+   * - Test-only source
+     - ``test_data_source="test.csv", val_ratio=0.2``
+     - yes
+     - ``ValueError``
 
 Splitting Strategies
 --------------------
@@ -169,7 +204,7 @@ Shuffles and splits the data randomly. Use ``split_seed`` for reproducible resul
 
 **Sequence-unique**
 
-Ensures that the same peptide sequence never appears in both train and validation sets.
+Ensures that the same peptide sequence never appears in more than one split.
 This prevents data leakage when a dataset contains multiple measurements for the same sequence
 (e.g. multiple charge states or collision energies for the same peptide).
 
@@ -184,39 +219,50 @@ This prevents data leakage when a dataset contains multiple measurements for the
 
 **Stratified**
 
-Splits while preserving the class distribution of a specified column. Requires
-``stratify_by_column`` to point to a column with a ``ClassLabel`` feature type (as defined
-by the HuggingFace ``datasets`` library).
+Splits while preserving the class distribution of a specified column. The column should have
+a ``ClassLabel`` feature type (as defined by the HuggingFace ``datasets`` library); if it
+does not, DLOmix will auto-cast it and emit a warning.
 
 .. code-block:: python
 
-   from datasets import ClassLabel, Features, Value
-
-   # The column used for stratification must have a ClassLabel type
    dataset = ChargeStateDataset(
        data_source="data.csv",
        val_ratio=0.2,
        split_strategy="stratified",
-       stratify_by_column="charge"   # must be a ClassLabel column
+       stratify_by_column="charge"
    )
 
-Three-way Splits
------------------
+Multi-split Configurations
+---------------------------
 
-All three strategies support an optional ``test_ratio`` parameter that carves out a held-out test
-set in a single pass, producing train/val/test from a single source file.
+``val_ratio`` and ``test_ratio`` are independent — set either or both. At least one must be provided when auto-splitting.
 
 .. code-block:: python
 
+   # train/val only
+   dataset = RetentionTimeDataset(
+       data_source="data.csv",
+       val_ratio=0.2,
+       split_seed=42
+   )
+
+   # train/test only (no val split)
+   dataset = RetentionTimeDataset(
+       data_source="data.csv",
+       test_ratio=0.2,
+       split_seed=42
+   )
+
+   # train/val/test — remaining fraction goes to train
    dataset = RetentionTimeDataset(
        data_source="data.csv",
        val_ratio=0.15,
-       test_ratio=0.15,          # remaining 70% goes to train
+       test_ratio=0.15,          # remaining 70% → train
        split_strategy="random",
        split_seed=42
    )
 
-   # Also works with sequence_unique to ensure no leakage across all three splits
+   # sequence_unique also works for all three configurations
    dataset = RetentionTimeDataset(
        data_source="data.csv",
        val_ratio=0.15,
@@ -451,7 +497,7 @@ Save processed datasets to disk to avoid reprocessing:
    # Save processed dataset
    dataset = RetentionTimeDataset(
        data_source="train.csv",
-       val_ratio=0.2
+       val_ratio=0.2        # required — no default
    )
    dataset.save_to_disk("processed_datasets/rt_dataset")
 
@@ -554,16 +600,16 @@ DatasetConfig Parameters
 
 **Training**
 
-* ``val_ratio``: Validation split ratio (0-1)
 * ``batch_size``: Batch size for tensor datasets
 * ``dataset_type``: ``"tf"`` or ``"pt"``
 * ``shuffle``: Shuffle data (default: False)
 
 **Splitting** (only used when a single ``data_source`` is provided)
 
+* ``val_ratio``: Fraction of data for the validation split. ``None`` or ``0`` means no val split (default: ``None``)
+* ``test_ratio``: Fraction of data for the test split. ``None`` or ``0`` means no test split (default: ``None``). At least one of ``val_ratio`` / ``test_ratio`` must be set when auto-splitting.
 * ``split_strategy``: Splitting strategy — ``"random"`` (default), ``"sequence_unique"``, or ``"stratified"``
 * ``split_seed``: Integer seed for reproducible splits (default: ``None``)
-* ``test_ratio``: Fraction of data to hold out as a test set for three-way splits (default: ``None``, train/val only)
 * ``stratify_by_column``: Column name to stratify by; required when ``split_strategy="stratified"`` (default: ``None``)
 
 

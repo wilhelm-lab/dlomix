@@ -53,6 +53,7 @@ def test_parquet_rtdataset(download_path_for_assets):
         data_source=join(download_path_for_assets, "file_1.parquet"),
         sequence_column="modified_sequence",
         label_column="indexed_retention_time",
+        val_ratio=0.2,
     )
     assert rtdataset.hf_dataset is not None
     assert rtdataset._empty_dataset_mode is False
@@ -81,6 +82,7 @@ def test_rtdataset_inmemory(download_path_for_assets):
         data_format="hf",
         sequence_column="modified_sequence",
         label_column="indexed_retention_time",
+        val_ratio=0.2,
     )
     assert rtdataset.hf_dataset is not None
     assert rtdataset._empty_dataset_mode is False
@@ -148,6 +150,7 @@ def test_parquet_intensitydataset(download_path_for_assets):
         sequence_column="sequence",
         label_column="intensities",
         model_features=["precursor_charge_onehot", "collision_energy_aligned_normed"],
+        val_ratio=0.2,
     )
 
     assert intensity_dataset.hf_dataset is not None
@@ -178,6 +181,7 @@ def test_csv_intensitydataset(download_path_for_assets):
         data_source=filepath,
         sequence_column="sequence",
         label_column="intensities",
+        val_ratio=0.2,
     )
 
     assert intensity_dataset.hf_dataset is not None
@@ -229,6 +233,7 @@ def test_save_dataset(raw_generic_nested_data):
         sequence_column="seq",
         label_column="label",
         model_features=["nested_feature"],
+        val_ratio=0.1,
     )
 
     save_path = "./.test_dataset_2"
@@ -399,6 +404,7 @@ def test_shuffle_parameter(raw_generic_nested_data):
         dataset_type="tf",
         shuffle=True,
         batch_size=1,
+        val_ratio=0.2,
     )
 
     # Test with shuffle=True for PyTorch
@@ -410,6 +416,7 @@ def test_shuffle_parameter(raw_generic_nested_data):
         dataset_type="pt",
         shuffle=True,
         batch_size=1,
+        val_ratio=0.2,
     )
 
     # Verify datasets are created successfully
@@ -430,6 +437,7 @@ def test_torch_dataloader_kwargs(raw_generic_nested_data):
         label_column="label",
         dataset_type="pt",
         batch_size=1,
+        val_ratio=0.2,
         torch_dataloader_kwargs={
             "drop_last": True,
             "pin_memory": False,
@@ -458,6 +466,7 @@ def test_tf_tensor_dataset_string_label(raw_generic_nested_data):
         label_column="label",
         dataset_type="tf",
         batch_size=1,
+        val_ratio=0.2,
     )
 
     # Get the TensorFlow dataset
@@ -482,6 +491,7 @@ def test_tf_tensor_dataset_singelton_list_label(raw_generic_nested_data):
         label_column=["label"],
         dataset_type="tf",
         batch_size=1,
+        val_ratio=0.2,
     )
 
     # Get the TensorFlow dataset
@@ -506,6 +516,7 @@ def test_tf_tensor_dataset_list_multi_label(raw_generic_nested_data):
         label_column=["label", "label2"],
         dataset_type="tf",
         batch_size=1,
+        val_ratio=0.2,
     )
 
     # Get the TensorFlow dataset

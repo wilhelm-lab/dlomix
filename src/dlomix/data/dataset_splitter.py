@@ -1,21 +1,18 @@
 """
 Dataset splitting strategies for peptide datasets.
 
-This module provides a flexible and extensible framework for splitting datasets
-using various strategies including random, sequence-based uniqueness, and stratified
-splitting.
+Provides random, stratified, and sequence-unique splitting via a common interface.
 """
 
-import logging
 import warnings
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
 from typing import Optional
 
-from datasets import Dataset, DatasetDict
-
-logger = logging.getLogger(__name__)
+import numpy as np
+import pandas as pd
+from datasets import ClassLabel, Dataset, DatasetDict
 
 
 class SplitStrategy(str, Enum):
@@ -25,6 +22,19 @@ class SplitStrategy(str, Enum):
     SEQUENCE_UNIQUE = "sequence_unique"
     STRATIFIED = "stratified"
 
+    @classmethod
+    def _missing_(cls, value: object) -> "SplitStrategy":
+        # Accept hyphens as well as underscores (e.g. "sequence-unique")
+        if isinstance(value, str):
+            normalized = value.lower().replace("-", "_")
+            for member in cls:
+                if member.value == normalized:
+                    return member
+        valid = [m.value for m in cls]
+        raise ValueError(
+            f"{value!r} is not a valid split strategy. " f"Valid options are: {valid}"
+        )
+
 
 @dataclass(frozen=True)
 class SplitConfig:
@@ -33,32 +43,23 @@ class SplitConfig:
 
     Parameters
     ----------
-    val_ratio : float
-        Ratio of validation data (0 < val_ratio < 1). Default is 0.2.
+    val_ratio : Optional[float]
+        Fraction of data for the validation split. None or 0 means no val split. Default None.
     test_ratio : Optional[float]
-        Ratio of test data for three-way splits (0 < test_ratio < 1).
-        If None, only train/val split is performed. Default is None.
+        Fraction of data for the test split. None or 0 means no test split. Default None.
     strategy : str or SplitStrategy
-        Splitting strategy to use. Options: 'random', 'sequence_unique', 'stratified'.
-        Default is 'random'.
+        One of 'random', 'sequence_unique', 'stratified'. Default 'random'.
     seed : Optional[int]
-        Random seed for reproducibility. Default is None.
+        Random seed for reproducibility. Default None.
     stratify_column : Optional[str]
-        Column name to use for stratified splitting. Can be a label column or
-        any other feature column. Only used with 'stratified' strategy. Default is None.
+        Column to stratify on. Required for 'stratified' strategy. Default None.
     sequence_column : str
-        Column name containing sequences. Used for 'sequence_unique' strategy.
-        Default is 'sequence'.
-    Raises
-    ------
-    ValueError
-        If val_ratio or test_ratio are not in valid range (0, 1).
-        If val_ratio + test_ratio >= 1.
-        If stratify_column is not provided for stratified strategy.
-        If sequence_column is not provided for sequence_unique strategy.
+        Sequence column name. Used by 'sequence_unique' strategy. Default 'sequence'.
+
+    At least one of val_ratio or test_ratio must be provided and > 0.
     """
 
-    val_ratio: float = 0.2
+    val_ratio: Optional[float] = None
     test_ratio: Optional[float] = None
     strategy: str = "random"
     seed: Optional[int] = None
@@ -66,26 +67,34 @@ class SplitConfig:
     sequence_column: str = "sequence"
 
     def __post_init__(self):
-        """Validate configuration parameters."""
-        # Normalize strategy to enum
         if isinstance(self.strategy, str):
             object.__setattr__(self, "strategy", SplitStrategy(self.strategy.lower()))
 
-        # Validate ratios
-        if not 0 < self.val_ratio < 1:
+        # Treat 0 the same as None: no split for that portion
+        if self.val_ratio == 0:
+            object.__setattr__(self, "val_ratio", None)
+        if self.test_ratio == 0:
+            object.__setattr__(self, "test_ratio", None)
+
+        if self.val_ratio is None and self.test_ratio is None:
+            raise ValueError(
+                "At least one of val_ratio or test_ratio must be set and > 0."
+            )
+
+        if self.val_ratio is not None and not 0 < self.val_ratio < 1:
             raise ValueError(f"val_ratio must be between 0 and 1, got {self.val_ratio}")
 
-        if self.test_ratio is not None:
-            if not 0 < self.test_ratio < 1:
-                raise ValueError(
-                    f"test_ratio must be between 0 and 1, got {self.test_ratio}"
-                )
+        if self.test_ratio is not None and not 0 < self.test_ratio < 1:
+            raise ValueError(
+                f"test_ratio must be between 0 and 1, got {self.test_ratio}"
+            )
+
+        if self.val_ratio is not None and self.test_ratio is not None:
             if self.val_ratio + self.test_ratio >= 1:
                 raise ValueError(
                     f"val_ratio + test_ratio must be < 1, got {self.val_ratio + self.test_ratio}"
                 )
 
-        # Validate strategy-specific requirements
         if self.strategy == SplitStrategy.STRATIFIED and self.stratify_column is None:
             raise ValueError(
                 "stratify_column must be provided for stratified splitting strategy"
@@ -101,23 +110,24 @@ class SplitConfig:
 
 
 class DatasetSplitter(ABC):
-    """
-    Abstract base class for dataset splitting strategies.
-
-    This class follows the processor pattern used in the dlomix codebase,
-    providing a consistent interface for different splitting strategies.
-    """
+    """Abstract base class for dataset splitting strategies."""
 
     def __init__(self, config: SplitConfig):
-        """
-        Initialize the splitter with a configuration.
-
-        Parameters
-        ----------
-        config : SplitConfig
-            Configuration object containing splitting parameters.
-        """
         self.config = config
+
+    def _check_min_split_size(
+        self, n_samples: int, ratio: float, split_names: list
+    ) -> None:
+        """Raise ValueError if any split would be empty."""
+        n_second = max(1, round(n_samples * ratio))
+        n_first = n_samples - n_second
+        if n_first < 1 or n_second < 1:
+            raise ValueError(
+                f"Dataset too small for the requested split ratios: "
+                f"{n_samples} samples with ratio {ratio:.2f} would produce "
+                f"splits {split_names} with sizes {n_first} / {n_second}. "
+                f"Provide more data or reduce the split ratio."
+            )
 
     @abstractmethod
     def split(self, dataset: Dataset) -> DatasetDict:
@@ -132,37 +142,20 @@ class DatasetSplitter(ABC):
         Returns
         -------
         DatasetDict
-            Dictionary containing 'train', 'val', and optionally 'test' splits.
+            Dictionary with 'train' and any combination of 'val' / 'test' splits.
         """
 
     def _perform_two_way_split(
-        self, dataset: Dataset, test_size: float, seed: Optional[int] = None, **kwargs
+        self,
+        dataset: Dataset,
+        ratio: float,
+        second_name: str = "val",
+        seed: Optional[int] = None,
+        **kwargs,
     ) -> DatasetDict:
-        """
-        Helper method to perform a two-way split.
-
-        Parameters
-        ----------
-        dataset : Dataset
-            Dataset to split.
-        test_size : float
-            Ratio of the second split.
-        seed : Optional[int]
-            Random seed for reproducibility.
-        **kwargs
-            Additional arguments passed to train_test_split.
-
-        Returns
-        -------
-        DatasetDict
-            Dictionary with 'train' and 'val' keys.
-        """
-        split_dataset = dataset.train_test_split(
-            test_size=test_size, seed=seed, **kwargs
-        )
-        return DatasetDict(
-            {"train": split_dataset["train"], "val": split_dataset["test"]}
-        )
+        self._check_min_split_size(len(dataset), ratio, ["train", second_name])
+        split = dataset.train_test_split(test_size=ratio, seed=seed, **kwargs)
+        return DatasetDict({"train": split["train"], second_name: split["test"]})
 
     def _perform_three_way_split(
         self,
@@ -172,342 +165,192 @@ class DatasetSplitter(ABC):
         seed: Optional[int] = None,
         **kwargs,
     ) -> DatasetDict:
-        """
-        Helper method to perform a three-way split.
-
-        Parameters
-        ----------
-        dataset : Dataset
-            Dataset to split.
-        val_size : float
-            Ratio of validation data.
-        test_size : float
-            Ratio of test data.
-        seed : Optional[int]
-            Random seed for reproducibility.
-        **kwargs
-            Additional arguments passed to train_test_split.
-
-        Returns
-        -------
-        DatasetDict
-            Dictionary with 'train', 'val', and 'test' keys.
-        """
-        # First split: separate test set
-        first_split = dataset.train_test_split(test_size=test_size, seed=seed, **kwargs)
-        test_dataset = first_split["test"]
-        train_val_dataset = first_split["train"]
-
-        # Calculate adjusted val ratio for remaining data
-        adjusted_val_ratio = val_size / (1 - test_size)
-
-        # Second split: separate train and val from remaining data
-        second_split = train_val_dataset.train_test_split(
-            test_size=adjusted_val_ratio, seed=seed, **kwargs
+        self._check_min_split_size(len(dataset), test_size, ["train", "val", "test"])
+        first = dataset.train_test_split(test_size=test_size, seed=seed, **kwargs)
+        # val_size is expressed as a fraction of the full dataset; adjust for the remaining portion
+        adjusted_val = val_size / (1 - test_size)
+        second = first["train"].train_test_split(
+            test_size=adjusted_val, seed=seed, **kwargs
         )
-
         return DatasetDict(
-            {
-                "train": second_split["train"],
-                "val": second_split["test"],
-                "test": test_dataset,
-            }
+            {"train": second["train"], "val": second["test"], "test": first["test"]}
         )
 
 
 class RandomSplitter(DatasetSplitter):
-    """
-    Random splitting strategy.
-
-    Splits dataset randomly into train/val or train/val/test sets.
-    Uses HuggingFace's train_test_split with optional seed for reproducibility.
-    """
+    """Splits dataset randomly into train/val, train/test, or train/val/test sets."""
 
     def split(self, dataset: Dataset) -> DatasetDict:
-        """
-        Perform random splitting.
-
-        Parameters
-        ----------
-        dataset : Dataset
-            HuggingFace Dataset to split.
-
-        Returns
-        -------
-        DatasetDict
-            Dictionary containing split datasets.
-        """
-        logger.info(
-            "Performing random split with val_ratio=%.2f, test_ratio=%s, seed=%s",
-            self.config.val_ratio,
-            self.config.test_ratio,
-            self.config.seed,
-        )
-
-        if self.config.test_ratio is None:
-            # Two-way split: train/val
-            return self._perform_two_way_split(
-                dataset, test_size=self.config.val_ratio, seed=self.config.seed
-            )
-        else:
-            # Three-way split: train/val/test
+        val, test = self.config.val_ratio, self.config.test_ratio
+        if val and test:
             return self._perform_three_way_split(
-                dataset,
-                val_size=self.config.val_ratio,
-                test_size=self.config.test_ratio,
-                seed=self.config.seed,
+                dataset, val_size=val, test_size=test, seed=self.config.seed
             )
+        if val:
+            return self._perform_two_way_split(
+                dataset, ratio=val, second_name="val", seed=self.config.seed
+            )
+        return self._perform_two_way_split(
+            dataset, ratio=test, second_name="test", seed=self.config.seed  # type: ignore[arg-type]
+        )
 
 
 class StratifiedSplitter(DatasetSplitter):
-    """
-    Stratified splitting strategy.
-
-    Splits dataset while maintaining the distribution of a specified column
-    (e.g., label column or any feature column) across splits.
-    """
+    """Splits dataset while preserving the class distribution of a given column."""
 
     def split(self, dataset: Dataset) -> DatasetDict:
-        """
-        Perform stratified splitting.
-
-        Parameters
-        ----------
-        dataset : Dataset
-            HuggingFace Dataset to split.
-
-        Returns
-        -------
-        DatasetDict
-            Dictionary containing split datasets.
-
-        Raises
-        ------
-        ValueError
-            If stratify_column is not found in the dataset.
-        """
-        # Validate stratify column exists
         if self.config.stratify_column not in dataset.column_names:
             raise ValueError(
                 f"Stratification column '{self.config.stratify_column}' not found in dataset. "
                 f"Available columns: {dataset.column_names}"
             )
 
-        logger.info(
-            "Performing stratified split on column '%s' with val_ratio=%.2f, test_ratio=%s, seed=%s",
-            self.config.stratify_column,
-            self.config.val_ratio,
-            self.config.test_ratio,
-            self.config.seed,
-        )
-
-        if self.config.test_ratio is None:
-            # Two-way split: train/val
-            return self._perform_two_way_split(
-                dataset,
-                test_size=self.config.val_ratio,
-                seed=self.config.seed,
-                stratify_by_column=self.config.stratify_column,
+        # HF train_test_split requires ClassLabel feature type for stratification.
+        # Auto-cast if the column is a plain Value type so users don't need to do this manually.
+        if not isinstance(dataset.features[self.config.stratify_column], ClassLabel):
+            warnings.warn(
+                f"Stratification column '{self.config.stratify_column}' is not ClassLabel type "
+                f"(got {dataset.features[self.config.stratify_column]}). "
+                f"Auto-casting to ClassLabel for stratified splitting."
             )
-        else:
-            # Three-way split: train/val/test
+            dataset = dataset.class_encode_column(self.config.stratify_column)
+
+        val, test = self.config.val_ratio, self.config.test_ratio
+        strat = self.config.stratify_column
+        if val and test:
             return self._perform_three_way_split(
                 dataset,
-                val_size=self.config.val_ratio,
-                test_size=self.config.test_ratio,
+                val_size=val,
+                test_size=test,
                 seed=self.config.seed,
-                stratify_by_column=self.config.stratify_column,
+                stratify_by_column=strat,
             )
+        if val:
+            return self._perform_two_way_split(
+                dataset,
+                ratio=val,
+                second_name="val",
+                seed=self.config.seed,
+                stratify_by_column=strat,
+            )
+        return self._perform_two_way_split(
+            dataset,
+            ratio=test,
+            second_name="test",
+            seed=self.config.seed,  # type: ignore[arg-type]
+            stratify_by_column=strat,
+        )
 
 
 class SequenceUniqueSplitter(DatasetSplitter):
     """
-    Sequence-based unique splitting strategy.
+    Splits dataset so that each base sequence appears in exactly one split.
 
-    Ensures that sequences are unique across train/val splits and optionally
-    test split. This is important for preventing data leakage when the same
-    sequence appears in both training and validation sets.
+    PTM notation (e.g. [UNIMOD:1], [+57]) is stripped before grouping, so
+    PEPTIDE and PEP[UNIMOD:1]TIDE are treated as the same sequence.
     """
 
     def split(self, dataset: Dataset) -> DatasetDict:
-        """
-        Perform sequence-unique splitting.
-
-        Parameters
-        ----------
-        dataset : Dataset
-            HuggingFace Dataset to split.
-
-        Returns
-        -------
-        DatasetDict
-            Dictionary containing split datasets with unique sequences.
-
-        Raises
-        ------
-        ValueError
-            If sequence_column is not found in the dataset.
-        """
-        # Validate sequence column exists
         if self.config.sequence_column not in dataset.column_names:
             raise ValueError(
                 f"Sequence column '{self.config.sequence_column}' not found in dataset. "
                 f"Available columns: {dataset.column_names}"
             )
 
-        logger.info(
-            "Performing sequence-unique split with val_ratio=%.2f, test_ratio=%s, seed=%s",
-            self.config.val_ratio,
-            self.config.test_ratio,
-            self.config.seed,
+        df = dataset.to_pandas()
+        assert isinstance(df, pd.DataFrame)
+
+        # Strip PTM notation before computing unique sequences so that
+        # PEPTIDE and PEP[UNIMOD:1]TIDE map to the same base sequence.
+        base_sequences = df[self.config.sequence_column].str.replace(
+            r"\[.*?\]", "", regex=True
         )
-
-        # Convert to pandas for easier groupby operations
-        import pandas as pd
-
-        df: pd.DataFrame = dataset.to_pandas()
-
-        # Group by sequence to get unique sequences
-        unique_sequences = df[self.config.sequence_column].unique()
+        unique_sequences = base_sequences.unique()
         n_unique = len(unique_sequences)
 
-        logger.info(
-            "Dataset contains %d total samples with %d unique sequences",
-            len(df),
-            n_unique,
-        )
-
-        # Create a dataset of unique sequences for splitting
-        import numpy as np
-
         rng = np.random.default_rng(self.config.seed)
+        shuffled = unique_sequences.copy()
+        rng.shuffle(shuffled)
 
-        # Shuffle unique sequences
-        shuffled_sequences = unique_sequences.copy()
-        rng.shuffle(shuffled_sequences)
+        val, test = self.config.val_ratio, self.config.test_ratio
 
-        # Calculate split indices
-        if self.config.test_ratio is None:
-            # Two-way split
-            val_size = int(n_unique * self.config.val_ratio)
-            train_sequences = shuffled_sequences[val_size:]
-            val_sequences = shuffled_sequences[:val_size]
-            test_sequences = None
-
-            logger.info(
-                "Split into %d train sequences, %d val sequences",
-                len(train_sequences),
-                len(val_sequences),
-            )
+        if val and test:
+            test_size = max(1, int(n_unique * test))
+            val_size = max(1, int(n_unique * val))
+            if n_unique - test_size - val_size < 1:
+                raise ValueError(
+                    f"Dataset too small: {n_unique} unique base sequences with "
+                    f"val_ratio={val}, test_ratio={test} would leave no train sequences."
+                )
+            test_seqs = shuffled[:test_size]
+            val_seqs = shuffled[test_size : test_size + val_size]
+            train_seqs = shuffled[test_size + val_size :]
+        elif val:
+            val_size = max(1, int(n_unique * val))
+            if n_unique - val_size < 1:
+                raise ValueError(
+                    f"Dataset too small: {n_unique} unique base sequences with "
+                    f"val_ratio={val} would leave no train sequences."
+                )
+            val_seqs = shuffled[:val_size]
+            train_seqs = shuffled[val_size:]
+            test_seqs = None
         else:
-            # Three-way split
-            test_size = int(n_unique * self.config.test_ratio)
-            val_size = int(n_unique * self.config.val_ratio)
+            assert test is not None
+            test_size = max(1, int(n_unique * test))
+            if n_unique - test_size < 1:
+                raise ValueError(
+                    f"Dataset too small: {n_unique} unique base sequences with "
+                    f"test_ratio={test} would leave no train sequences."
+                )
+            test_seqs = shuffled[:test_size]
+            train_seqs = shuffled[test_size:]
+            val_seqs = None
 
-            test_sequences = shuffled_sequences[:test_size]
-            val_sequences = shuffled_sequences[test_size : test_size + val_size]
-            train_sequences = shuffled_sequences[test_size + val_size :]
-
-            logger.info(
-                "Split into %d train sequences, %d val sequences, %d test sequences",
-                len(train_sequences),
-                len(val_sequences),
-                len(test_sequences),
-            )
-
-        # Filter dataframe by sequence membership
-        train_mask = df[self.config.sequence_column].isin(train_sequences)
-        val_mask = df[self.config.sequence_column].isin(val_sequences)
-
-        train_df = df[train_mask]
-        val_df = df[val_mask]
-
-        logger.info(
-            "Train split: %d samples, Val split: %d samples",
-            len(train_df),
-            len(val_df),
-        )
-
-        # Convert back to HuggingFace datasets
+        train_mask = base_sequences.isin(train_seqs)
         result = DatasetDict(
-            {
-                "train": Dataset.from_pandas(train_df, preserve_index=False),
-                "val": Dataset.from_pandas(val_df, preserve_index=False),
-            }
+            {"train": Dataset.from_pandas(df[train_mask], preserve_index=False)}
         )
+        split_bases = {"train": set(base_sequences[train_mask])}
 
-        # Handle test split
-        if test_sequences is not None:
-            test_df = df[df[self.config.sequence_column].isin(test_sequences)]
-            logger.info("Test split: %d samples", len(test_df))
-            result["test"] = Dataset.from_pandas(test_df, preserve_index=False)
+        if val_seqs is not None:
+            val_mask = base_sequences.isin(val_seqs)
+            result["val"] = Dataset.from_pandas(df[val_mask], preserve_index=False)
+            split_bases["val"] = set(base_sequences[val_mask])
 
-        # Verify uniqueness
-        train_seqs = set(result["train"][self.config.sequence_column])
-        val_seqs = set(result["val"][self.config.sequence_column])
+        if test_seqs is not None:
+            test_mask = base_sequences.isin(test_seqs)
+            result["test"] = Dataset.from_pandas(df[test_mask], preserve_index=False)
+            split_bases["test"] = set(base_sequences[test_mask])
 
-        if "test" in result:
-            test_seqs = set(result["test"][self.config.sequence_column])
-            train_val_overlap = train_seqs & val_seqs
-            train_test_overlap = train_seqs & test_seqs
-            val_test_overlap = val_seqs & test_seqs
-
-            if train_val_overlap or train_test_overlap or val_test_overlap:
-                warnings.warn(
-                    f"Sequence overlap detected after splitting: "
-                    f"train-val: {len(train_val_overlap)}, "
-                    f"train-test: {len(train_test_overlap)}, "
-                    f"val-test: {len(val_test_overlap)}"
-                )
-        else:
-            overlap = train_seqs & val_seqs
-            if overlap:
-                warnings.warn(
-                    f"Sequence overlap detected between train and val: {len(overlap)} sequences"
-                )
+        # Verify no base-sequence leakage across splits
+        names = list(split_bases)
+        for i, a in enumerate(names):
+            for b in names[i + 1 :]:
+                overlap = split_bases[a] & split_bases[b]
+                if overlap:
+                    warnings.warn(
+                        f"Base-sequence overlap between {a} and {b}: {len(overlap)} sequences"
+                    )
 
         return result
 
 
 def create_splitter(config: SplitConfig) -> DatasetSplitter:
     """
-    Factory method to create the appropriate splitter based on configuration.
-
-    Parameters
-    ----------
-    config : SplitConfig
-        Configuration object specifying the splitting strategy and parameters.
-
-    Returns
-    -------
-    DatasetSplitter
-        Concrete splitter instance based on the specified strategy.
-
-    Raises
-    ------
-    ValueError
-        If an unknown strategy is specified.
+    Create the appropriate splitter for the given configuration.
 
     Examples
     --------
-    >>> # Random splitting
     >>> config = SplitConfig(val_ratio=0.2, strategy='random', seed=42)
     >>> splitter = create_splitter(config)
     >>> split_data = splitter.split(dataset)
 
-    >>> # Stratified splitting by label
     >>> config = SplitConfig(val_ratio=0.2, strategy='stratified', stratify_column='label', seed=42)
     >>> splitter = create_splitter(config)
     >>> split_data = splitter.split(dataset)
 
-    >>> # Sequence-unique splitting with three-way split
-    >>> config = SplitConfig(
-    ...     val_ratio=0.15,
-    ...     test_ratio=0.15,
-    ...     strategy='sequence_unique',
-    ...     sequence_column='sequence',
-    ...     seed=42
-    ... )
+    >>> config = SplitConfig(val_ratio=0.15, test_ratio=0.15, strategy='sequence_unique', seed=42)
     >>> splitter = create_splitter(config)
     >>> split_data = splitter.split(dataset)
     """
@@ -516,13 +359,4 @@ def create_splitter(config: SplitConfig) -> DatasetSplitter:
         SplitStrategy.STRATIFIED: StratifiedSplitter,
         SplitStrategy.SEQUENCE_UNIQUE: SequenceUniqueSplitter,
     }
-
-    splitter_class = strategy_map.get(config.strategy)
-
-    if splitter_class is None:
-        raise ValueError(
-            f"Unknown splitting strategy: {config.strategy}. "
-            f"Available strategies: {list(strategy_map.keys())}"
-        )
-
-    return splitter_class(config)
+    return strategy_map[config.strategy](config)  # type: ignore[index]

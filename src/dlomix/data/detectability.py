@@ -16,7 +16,7 @@ class DetectabilityDataset(PeptideDataset):
         data_format (str): The format of the data source file(s). Default is "csv".
         sequence_column (str): The name of the column containing the peptide sequences. Default is "Sequences".
         label_column (str): The name of the column containing the class labels. Default is "Classes".
-        val_ratio (float): The ratio of validation data to split from the training data. Default is 0.2.
+        val_ratio (Optional[float]): Fraction of data for the validation split. None or 0 means no val split. Default None.
         max_seq_len (Union[int, str]): The maximum length of the peptide sequences. Default is 40.
         dataset_type (str): The type of dataset to use. Default is "tf". Fallback is to TensorFlow dataset tensors.
         batch_size (int): The batch size for training and evaluation. Default is 256.
@@ -50,7 +50,7 @@ class DetectabilityDataset(PeptideDataset):
         data_format: str = "csv",
         sequence_column: str = "Sequences",
         label_column: str = "Classes",
-        val_ratio: float = 0.2,
+        val_ratio: Optional[float] = None,
         max_seq_len: Union[int, str] = 40,
         dataset_type: str = "tf",
         batch_size: int = 256,

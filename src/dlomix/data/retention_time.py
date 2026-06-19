@@ -16,7 +16,7 @@ class RetentionTimeDataset(PeptideDataset):
         data_format (str): The format of the data source. Defaults to "parquet".
         sequence_column (str): The column name for the peptide sequence in the dataset. Defaults to "modified_sequence".
         label_column (str): The column name for the retention time label in the dataset. Defaults to "indexed_retention_time".
-        val_ratio (float): The ratio of validation data to split from the main dataset. Defaults to 0.2.
+        val_ratio (Optional[float]): Fraction of data for the validation split. None or 0 means no val split. Defaults to None.
         max_seq_len (Union[int, str]): The maximum sequence length allowed in the dataset. Defaults to 30.
         dataset_type (str): The type of dataset to use. Defaults to "tf". Fallback is to TensorFlow dataset tensors.
         batch_size (int): The batch size for the dataset. Defaults to 256.
@@ -50,7 +50,7 @@ class RetentionTimeDataset(PeptideDataset):
         data_format: str = "parquet",
         sequence_column: str = "modified_sequence",
         label_column: str = "indexed_retention_time",
-        val_ratio: float = 0.2,
+        val_ratio: Optional[float] = None,
         max_seq_len: Union[int, str] = 30,
         dataset_type: str = "tf",
         batch_size: int = 256,
