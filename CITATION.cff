@@ -1,0 +1,32 @@
+cff-version: 1.2.0
+title: "DLOmix: Deep Learning for Proteomics"
+message: "If you use this software, please cite it using the metadata from this file."
+type: software
+authors:
+  # TODO: complete the author list, ordering, and add ORCID iDs before submission.
+  - given-names: Omar
+    family-names: Shouman
+    email: o.shouman@tum.de
+    affiliation: "Wilhelm Lab, TU Munich, School of Life Sciences"
+    # orcid: "https://orcid.org/0000-0000-0000-0000"
+  - name: "Wilhelm Lab, TU Munich"
+repository-code: "https://github.com/wilhelm-lab/dlomix"
+url: "https://github.com/wilhelm-lab/dlomix"
+abstract: >-
+  DLOmix is a Python framework for deep learning in proteomics with
+  multi-backend support for both TensorFlow/Keras (Keras 3) and PyTorch,
+  exposing identical APIs across backends. It provides datasets, models,
+  losses, and evaluation utilities for tasks such as retention time,
+  fragment-ion intensity, charge-state, detectability, and ion-mobility
+  prediction.
+keywords:
+  - proteomics
+  - deep learning
+  - mass spectrometry
+  - tensorflow
+  - keras
+  - pytorch
+license: MIT
+version: "0.2.7"
+# TODO: set the release date when tagging the cited version.
+date-released: "2026-06-19"
