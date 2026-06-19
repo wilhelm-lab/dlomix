@@ -34,6 +34,10 @@ format:
 	black ./run_scripts/*.py
 	black ./tests/*.py
 
+format-check:
+	black --check ./src/dlomix ./run_scripts ./tests
+	isort --profile black --check-only ./src/dlomix ./run_scripts ./tests
+
 lint:
 	pylint --disable=R,C ./src/dlomix/*
 

@@ -17,7 +17,7 @@ jobs:
       github.event.workflow_run.conclusion == 'success' &&
       github.event.workflow_run.head_branch == 'main'
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - name: Set up Python
         uses: actions/setup-python@v6
         with:
@@ -30,7 +30,7 @@ jobs:
         run: python -m build
       - name: Publish to PyPI
         id: publishpypi
-        uses: pypa/gh-action-pypi-publish@v1.13.0
+        uses: pypa/gh-action-pypi-publish@v1.14.0
       - name: Create Github release
         if: steps.publishpypi.outcome == 'success'
         env:
