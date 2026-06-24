@@ -67,11 +67,11 @@ test_d = RetentionTimeDataset(
 test_targets = test_d["test"]["irt"]
 test_sequences = test_d["test"]["sequence"]
 
-predictions = model.predict(test_sequences)
+predictions = model.predict(test_d.tensor_test_data)
 predictions = predictions.ravel()
 
 train_sequences = d["train"]["sequence"]
-train_predictions = model.predict(train_sequences)
+train_predictions = model.predict(d.tensor_train_data)
 train_predictions = train_predictions.ravel()
 
 print(train_sequences[:5])

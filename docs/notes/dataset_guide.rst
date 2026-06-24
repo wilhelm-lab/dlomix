@@ -429,6 +429,76 @@ The tensor datasets can be accessed via the ``train_data``, ``val_data``, and ``
             **kwargs)
 
 
+Inference on New Data
+=====================
+
+To predict on new, unlabelled peptides you need the *exact* preprocessing used at
+training time (the learned alphabet, encoding scheme, padding, feature extractors).
+``PeptidePreprocessor`` captures that recipe and applies it to raw inputs, so you do not
+have to reconstruct a full dataset or remember the original parameters.
+
+Preprocess raw inputs
+---------------------
+
+Derive a preprocessor from a processed dataset, then call it on raw sequences. The output
+is the same tensor object the model consumes during training (a ``tf.data.Dataset`` or a
+torch ``DataLoader`` depending on ``dataset_type``):
+
+.. code-block:: python
+
+   prep = dataset.get_preprocessor()
+
+   tensors = prep(["PEPTIDEK", "ACDEM[UNIMOD:35]K"])   # raw -> model-ready tensors
+   predictions = model.predict(tensors)
+
+Accepted input formats: a single string, a list/``numpy`` array of strings, a ``dict``
+that also carries ``model_features`` (e.g. ``collision_energy``, ``precursor_charge``),
+a ``pandas`` DataFrame, or an in-memory HuggingFace ``Dataset``.
+
+A preprocessor can also be rebuilt from a saved dataset directory (no need to load the
+data), or saved/loaded as its own small artifact for shipping next to a model:
+
+.. code-block:: python
+
+   from dlomix.data import PeptidePreprocessor
+
+   # from a save_to_disk() directory (reads config + metadata only)
+   prep = PeptidePreprocessor.from_saved("processed_datasets/rt_dataset")
+
+   # standalone lightweight artifact
+   prep.save("rt_preprocessor")
+   prep = PeptidePreprocessor.load("rt_preprocessor")
+
+.. note::
+   Custom *callable* feature extractors cannot be serialized. They are preserved by
+   ``get_preprocessor()`` (in-memory) but dropped by ``save()`` / ``from_saved()`` with a
+   warning. Built-in feature names (strings) are always restored.
+
+Bundle a model with its preprocessor
+-------------------------------------
+
+``InferencePipeline`` ties a trained model together with its preprocessor so inference is
+a single ``predict`` call on raw inputs, and both travel together as one saved artifact
+(similar to a HuggingFace tokenizer + model):
+
+.. code-block:: python
+
+   from dlomix.pipelines import InferencePipeline
+
+   pipeline = InferencePipeline.from_model_and_dataset(model, dataset)
+   predictions = pipeline.predict(["PEPTIDEK", "ACDEK"])   # numpy array
+
+   pipeline.save("my_rt_model")                  # preprocessor + model weights + metadata
+   pipeline = InferencePipeline.load("my_rt_model")
+   predictions = pipeline.predict(["PEPTIDEK", "ACDEK"])
+
+On construction and on load, the pipeline checks that the model's embedding vocabulary
+size matches the preprocessor's alphabet and raises a ``ValueError`` on mismatch, guarding
+against accidentally pairing a model with the wrong preprocessor. The backend
+(TensorFlow/PyTorch) is selected at import time via ``DLOMIX_BACKEND``; a pipeline must be
+loaded under the same backend it was saved with.
+
+
 Advanced Features
 =================
 

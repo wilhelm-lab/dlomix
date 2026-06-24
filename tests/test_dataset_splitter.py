@@ -306,6 +306,48 @@ class TestStratifiedSplitter:
         assert "train" in result and "val" in result
         assert len(result["train"]) + len(result["val"]) == len(dataset)
 
+    def test_stratified_on_one_hot_list_column(self):
+        """A one-hot/list column is stratified on its exact value; temp key is dropped."""
+        import warnings
+
+        from datasets import Dataset
+
+        labels = [i % 3 for i in range(120)]
+        one_hot = [[1 if j == c else 0 for j in range(6)] for c in labels]
+        dataset = Dataset.from_dict(
+            {"sequence": [f"PEP{i}" for i in range(120)], "label": one_hot}
+        )
+
+        config = SplitConfig(
+            val_ratio=0.25, strategy="stratified", stratify_column="label", seed=42
+        )
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            result = create_splitter(config).split(dataset)
+
+        assert any("list/vector column" in str(w.message) for w in caught)
+        # all rows accounted for, no leaked temp key column
+        assert len(result["train"]) + len(result["val"]) == len(dataset)
+        for split in result.values():
+            assert "_stratify_key" not in split.column_names
+            assert "label" in split.column_names
+
+    def test_stratified_too_few_members_raises_clear_error(self):
+        """A class with a single member raises an actionable error, not the raw HF one."""
+        from datasets import Dataset
+
+        # class 2 appears exactly once -> cannot be stratified
+        labels = [0] * 50 + [1] * 49 + [2]
+        one_hot = [[1 if j == c else 0 for j in range(3)] for c in labels]
+        dataset = Dataset.from_dict(
+            {"sequence": [f"PEP{i}" for i in range(100)], "label": one_hot}
+        )
+        config = SplitConfig(
+            val_ratio=0.2, strategy="stratified", stratify_column="label", seed=42
+        )
+        with pytest.raises(ValueError, match="too few members"):
+            create_splitter(config).split(dataset)
+
     def test_stratified_reproducibility(self, imbalanced_dataset):
         """Test reproducibility of stratified splits."""
         config1 = SplitConfig(

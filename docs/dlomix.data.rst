@@ -60,13 +60,37 @@ Submodules
    :show-inheritance:
 
 
+.. automodule:: dlomix.data.inference
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+
 .. automodule:: dlomix.data.ion_mobility
    :members:
    :undoc-members:
    :show-inheritance:
 
 
+.. automodule:: dlomix.data.loading
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+
 .. automodule:: dlomix.data.retention_time
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+
+.. automodule:: dlomix.data.serialization
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+
+.. automodule:: dlomix.data.tensor_conversion
    :members:
    :undoc-members:
    :show-inheritance:

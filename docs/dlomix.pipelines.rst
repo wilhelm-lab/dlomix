@@ -14,3 +14,9 @@ Submodules
    :members:
    :undoc-members:
    :show-inheritance:
+
+
+.. automodule:: dlomix.pipelines.predictor
+   :members:
+   :undoc-members:
+   :show-inheritance:

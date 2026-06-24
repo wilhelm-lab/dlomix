@@ -12,7 +12,7 @@ from typing import Optional
 
 import numpy as np
 import pandas as pd
-from datasets import ClassLabel, Dataset, DatasetDict
+from datasets import ClassLabel, Dataset, DatasetDict, Sequence
 
 
 class SplitStrategy(str, Enum):
@@ -196,7 +196,16 @@ class RandomSplitter(DatasetSplitter):
 
 
 class StratifiedSplitter(DatasetSplitter):
-    """Splits dataset while preserving the class distribution of a given column."""
+    """Splits dataset while preserving the class distribution of a given column.
+
+    HF's ``train_test_split`` needs a scalar categorical key. A ``ClassLabel`` column is
+    used directly, a scalar ``Value`` column is class-encoded, and a list/one-hot column
+    is stratified on its *exact value* (each distinct vector becomes one stratum — for
+    one-hot labels this is equivalent to stratifying by class) via a temporary key that is
+    dropped after splitting.
+    """
+
+    STRATIFY_KEY_COLUMN = "_stratify_key"
 
     def split(self, dataset: Dataset) -> DatasetDict:
         if self.config.stratify_column not in dataset.column_names:
@@ -205,41 +214,85 @@ class StratifiedSplitter(DatasetSplitter):
                 f"Available columns: {dataset.column_names}"
             )
 
-        # HF train_test_split requires ClassLabel feature type for stratification.
-        # Auto-cast if the column is a plain Value type so users don't need to do this manually.
-        if not isinstance(dataset.features[self.config.stratify_column], ClassLabel):
-            warnings.warn(
-                f"Stratification column '{self.config.stratify_column}' is not ClassLabel type "
-                f"(got {dataset.features[self.config.stratify_column]}). "
-                f"Auto-casting to ClassLabel for stratified splitting."
-            )
-            dataset = dataset.class_encode_column(self.config.stratify_column)
+        dataset, strat, temp_key = self._resolve_stratify_column(dataset)
 
         val, test = self.config.val_ratio, self.config.test_ratio
-        strat = self.config.stratify_column
-        if val and test:
-            return self._perform_three_way_split(
-                dataset,
-                val_size=val,
-                test_size=test,
-                seed=self.config.seed,
-                stratify_by_column=strat,
+        try:
+            if val and test:
+                result = self._perform_three_way_split(
+                    dataset,
+                    val_size=val,
+                    test_size=test,
+                    seed=self.config.seed,
+                    stratify_by_column=strat,
+                )
+            elif val:
+                result = self._perform_two_way_split(
+                    dataset,
+                    ratio=val,
+                    second_name="val",
+                    seed=self.config.seed,
+                    stratify_by_column=strat,
+                )
+            else:
+                assert test is not None
+                result = self._perform_two_way_split(
+                    dataset,
+                    ratio=test,
+                    second_name="test",
+                    seed=self.config.seed,
+                    stratify_by_column=strat,
+                )
+        except ValueError as exc:
+            if "least populated" in str(exc) or "member" in str(exc):
+                raise ValueError(
+                    f"Stratified split failed: column '{self.config.stratify_column}' has "
+                    "a class with too few members (each class needs at least 2 to be split). "
+                    "Use a column with fewer/larger classes, gather more data, or switch to "
+                    "split_strategy='random'."
+                ) from exc
+            raise
+
+        if temp_key is not None:
+            result = result.remove_columns(temp_key)
+        return result
+
+    def _resolve_stratify_column(self, dataset: Dataset):
+        """Return ``(dataset, stratify_column_name, temp_key_column_or_None)``.
+
+        Produces a scalar categorical column suitable for HF stratification.
+        """
+        column = self.config.stratify_column
+        assert column is not None  # guaranteed by SplitConfig + split() validation
+        feature = dataset.features[column]
+
+        if isinstance(feature, ClassLabel):
+            return dataset, column, None
+
+        # list / one-hot / vector column: stratify on the exact value via a derived key
+        if isinstance(feature, (Sequence, list)):
+            warnings.warn(
+                f"Stratification column '{column}' is a list/vector column; stratifying on "
+                "its exact value (each distinct vector is treated as one class — for one-hot "
+                "labels this stratifies by class). A temporary key column is used and dropped "
+                "after splitting."
             )
-        if val:
-            return self._perform_two_way_split(
-                dataset,
-                ratio=val,
-                second_name="val",
-                seed=self.config.seed,
-                stratify_by_column=strat,
+            dataset = dataset.map(
+                lambda batch: {
+                    self.STRATIFY_KEY_COLUMN: [str(v) for v in batch[column]]
+                },
+                batched=True,
             )
-        return self._perform_two_way_split(
-            dataset,
-            ratio=test,
-            second_name="test",
-            seed=self.config.seed,  # type: ignore[arg-type]
-            stratify_by_column=strat,
+            dataset = dataset.class_encode_column(self.STRATIFY_KEY_COLUMN)
+            return dataset, self.STRATIFY_KEY_COLUMN, self.STRATIFY_KEY_COLUMN
+
+        # scalar Value column: encode in place
+        warnings.warn(
+            f"Stratification column '{column}' is not ClassLabel type (got {feature}). "
+            "Auto-casting to ClassLabel for stratified splitting."
         )
+        dataset = dataset.class_encode_column(column)
+        return dataset, column, None
 
 
 class SequenceUniqueSplitter(DatasetSplitter):
