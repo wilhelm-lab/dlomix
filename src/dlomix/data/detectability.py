@@ -16,7 +16,7 @@ class DetectabilityDataset(PeptideDataset):
         data_format (str): The format of the data source file(s). Default is "csv".
         sequence_column (str): The name of the column containing the peptide sequences. Default is "Sequences".
         label_column (str): The name of the column containing the class labels. Default is "Classes".
-        val_ratio (float): The ratio of validation data to split from the training data. Default is 0.2.
+        val_ratio (Optional[float]): Fraction of data for the validation split. None or 0 means no val split. Default None.
         max_seq_len (Union[int, str]): The maximum length of the peptide sequences. Default is 40.
         dataset_type (str): The type of dataset to use. Default is "tf". Fallback is to TensorFlow dataset tensors.
         batch_size (int): The batch size for training and evaluation. Default is 256.
@@ -36,6 +36,10 @@ class DetectabilityDataset(PeptideDataset):
         num_proc (Optional[int]): Number of processes to use for dataset processing. Use -1 for all available processors, None for single-process mode, or a positive integer. Default is -1.
         batch_processing_size (int): Size of batches for processing. Default is 1000.
         torch_dataloader_kwargs (Optional[Dict]): Additional keyword arguments to pass to PyTorch DataLoader. Default is None.
+        split_strategy (Optional[str]): Strategy for splitting the dataset. Options: 'random', 'sequence_unique', 'stratified'. Default is 'random'.
+        split_seed (Optional[int]): Random seed for reproducible splits. Default is None.
+        test_ratio (Optional[float]): Ratio of test data for three-way splits. If None, only train/val split is performed. Default is None.
+        stratify_by_column (Optional[str]): Column name for stratified splitting. Default is None.
     """
 
     def __init__(
@@ -46,7 +50,7 @@ class DetectabilityDataset(PeptideDataset):
         data_format: str = "csv",
         sequence_column: str = "Sequences",
         label_column: str = "Classes",
-        val_ratio: float = 0.2,
+        val_ratio: Optional[float] = None,
         max_seq_len: Union[int, str] = 40,
         dataset_type: str = "tf",
         batch_size: int = 256,
@@ -66,6 +70,10 @@ class DetectabilityDataset(PeptideDataset):
         num_proc: Optional[int] = -1,
         batch_processing_size: int = 1000,
         torch_dataloader_kwargs: Optional[Dict] = None,
+        split_strategy: Optional[str] = "random",
+        split_seed: Optional[int] = None,
+        test_ratio: Optional[float] = None,
+        stratify_by_column: Optional[str] = None,
         **kwargs,
     ):
         config_kwargs = {

@@ -15,6 +15,10 @@ class PeptideDatasetBaseProcessor(abc.ABC):
         Whether to process data in batches.
     """
 
+    # Whether the pipeline must apply this processor to the fit splits (train/val)
+    # before the eval split (test) — e.g. to learn a vocabulary first.
+    requires_ordered_splits = False
+
     def __init__(self, sequence_column_name: str = "", batched: bool = False):
         self.sequence_column_name = sequence_column_name
         self.batched = batched
@@ -29,6 +33,26 @@ class PeptideDatasetBaseProcessor(abc.ABC):
 
     def __call__(self, input_data, **kwargs):
         return self.process(input_data, **kwargs)
+
+    def apply_to_split(self, dataset, split, ctx):
+        """Apply this processor to a single split and return the new dataset.
+
+        Default is a uniform ``.map()``. Processors with split-specific behavior
+        (learn-then-apply, dropping truncated rows, ...) override this instead of the
+        pipeline special-casing them. ``ctx`` is a ``PipelineContext`` carrying
+        ``num_proc``, ``batch_size``, the (mutable) learned ``alphabet`` and the
+        ``fit_splits`` names.
+        """
+        return dataset.map(
+            self,
+            desc=f"Mapping {self._map_description()} on split {split}",
+            batched=self.batched,
+            batch_size=ctx.batch_size,
+            num_proc=ctx.num_proc,
+        )
+
+    def _map_description(self) -> str:
+        return self.__class__.__name__
 
     def __repr__(self):
         members = [
@@ -208,6 +232,28 @@ class SequencePaddingProcessor(PeptideDatasetBaseProcessor):
         self.padding_index = padding_index
         self.max_length = max_length
 
+    def apply_to_split(self, dataset, split, ctx):
+        # pad all splits; drop sequences truncated to max_length only on the fit
+        # splits (train/val) — the test split keeps every row for evaluation
+        result = super().apply_to_split(dataset, split, ctx)
+        if split in ctx.fit_splits:
+            n_before = len(result)
+            result = result.filter(
+                lambda batch: batch[self.KEEP_COLUMN_NAME],
+                batched=True,
+                num_proc=ctx.num_proc,
+                batch_size=ctx.batch_size,
+            )
+            n_dropped = n_before - len(result)
+            if n_dropped:
+                warnings.warn(
+                    f"Dropped {n_dropped} sequence(s) from split '{split}' that exceed "
+                    "the maximum sequence length; truncated sequences are removed from "
+                    "train/val (they are retained in a test split). Increase max_seq_len "
+                    "to keep them."
+                )
+        return result
+
     def batch_process(self, input_data, **kwargs):
         input_data[SequencePaddingProcessor.KEEP_COLUMN_NAME] = [True] * len(
             input_data[self.sequence_column_name]
@@ -259,6 +305,41 @@ class SequenceEncodingProcessor(PeptideDatasetBaseProcessor):
     fallback_unmodified : bool (default=False)
         Whether to fallback to unmodified amino acid encoding for unseen modifications.
     """
+
+    # learn the vocabulary on train/val before encoding the test split
+    requires_ordered_splits = True
+
+    def apply_to_split(self, dataset, split, ctx):
+        if split in ctx.fit_splits:
+            # learn/extend the alphabet on the fit splits; force single-process while
+            # learning so the vocabulary is built over the whole split, not a shard
+            single_process = bool(self.extend_alphabet)
+            result = dataset.map(
+                self,
+                desc=f"Mapping {self._map_description()} on split {split}",
+                batched=self.batched,
+                batch_size=ctx.batch_size,
+                num_proc=None if single_process else ctx.num_proc,
+            )
+            ctx.alphabet = self.alphabet.copy()
+            return result
+
+        # eval split(s): encode with the learned alphabet, falling back to the
+        # unmodified amino acid for unseen (AA, PTM) combinations
+        eval_processor = SequenceEncodingProcessor(
+            sequence_column_name=self.sequence_column_name,
+            alphabet=ctx.alphabet,
+            batched=self.batched,
+            extend_alphabet=False,
+            fallback_unmodified=True,
+        )
+        return dataset.map(
+            eval_processor,
+            desc=f"Mapping {eval_processor._map_description()} on split {split}",
+            batched=self.batched,
+            batch_size=ctx.batch_size,
+            num_proc=ctx.num_proc,
+        )
 
     def __init__(
         self,
@@ -421,6 +502,9 @@ class FunctionProcessor(PeptideDatasetBaseProcessor):
         super().__init__(batched=False)
         self.function = function
         self.name = name if name != "" else self.function.__name__
+
+    def _map_description(self) -> str:
+        return f"{self.__class__.__name__} (function name: {self.function.__name__})"
 
     def batch_process(self, input_data, **kwargs):
         raise NotImplementedError("FunctionProcessor does not support batch processing")

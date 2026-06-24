@@ -25,6 +25,8 @@ d = ChargeStateDataset(
     max_seq_len=30,
     batch_size=8,
     dataset_type="pt",
+    val_ratio=0.2,
+    with_termini=False,
 )
 print(d)
 for x in d.tensor_train_data:
@@ -39,6 +41,7 @@ test_d = ChargeStateDataset(
     max_seq_len=30,
     batch_size=8,
     dataset_type="pt",
+    with_termini=False,
 )
 
 

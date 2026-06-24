@@ -1,3 +1,24 @@
+"""
+Feature extractors that compute per-residue/per-sequence features from parsed peptides.
+
+Pass built-in feature names to a dataset via ``features_to_extract``; call
+:func:`available_feature_extractors` to discover them. To add your own feature, either:
+
+1. subclass :class:`FeatureExtractor`, or
+2. write a function and pass it in ``features_to_extract`` (it is wrapped in a
+   ``FunctionProcessor`` and mapped over the HuggingFace dataset).
+
+In both cases you can read the parsed sequence information from each row via the keys
+exposed in ``SequenceParsingProcessor.PARSED_COL_NAMES``:
+
+- ``_parsed_sequence``: the parsed sequence (list of amino-acid + PTM tokens)
+- ``_n_term_mods``: N-terminal modifications
+- ``_c_term_mods``: C-terminal modifications
+
+A custom function must return the row with the new feature column added, and must pad the
+feature to the sequence length so all tensors share the sequence-length dimension.
+"""
+
 from collections import defaultdict
 from operator import itemgetter
 
@@ -46,6 +67,18 @@ FEATURE_EXTRACTORS_PARAMETERS = {
 }
 
 AVAILABLE_FEATURE_EXTRACTORS = list(FEATURE_EXTRACTORS_PARAMETERS.keys())
+
+
+def available_feature_extractors() -> dict:
+    """Return a ``{name: description}`` mapping of the built-in feature extractors.
+
+    Use any of the returned names in a dataset's ``features_to_extract``. See this
+    module's docstring for how to write a custom feature extractor.
+    """
+    return {
+        name: params.get("description")
+        for name, params in FEATURE_EXTRACTORS_PARAMETERS.items()
+    }
 
 
 class FeatureExtractor(PeptideDatasetBaseProcessor):
