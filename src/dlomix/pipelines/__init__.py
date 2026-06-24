@@ -1,8 +1,8 @@
+from .finetune import FineTunePipeline
 from .predictor import InferencePipeline
 
-__all__ = ["InferencePipeline"]
+__all__ = ["InferencePipeline", "FineTunePipeline"]
 
-# Legacy TF-only pipeline; keep importable where its dependencies resolve.
 try:
     from .pipeline import RetentionTimePipeline
 

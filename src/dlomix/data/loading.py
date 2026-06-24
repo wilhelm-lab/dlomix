@@ -123,6 +123,26 @@ class DataSourceLoader:
             available = {DEFAULT_SPLIT_NAMES[0]: "in-memory Dataset object"}
             return hf_dataset, available, False
 
+        # Individual HF Dataset objects provided for specific splits
+        # (e.g. test_data_source=some_dataset for inference-only evaluation).
+        # Mirrors the file-based path: collect whichever splits are non-None.
+        split_sources = [
+            self.config.data_source,
+            self.config.val_data_source,
+            self.config.test_data_source,
+        ]
+        provided = {
+            split: src
+            for split, src in zip(DEFAULT_SPLIT_NAMES, split_sources)
+            if isinstance(src, Dataset)
+        }
+        if provided:
+            hf_dataset = DatasetDict(provided.items())
+            available = {
+                split: f"in-memory Dataset object - {split}" for split in provided
+            }
+            return hf_dataset, available, False
+
         raise ValueError(
             "The provided data source is not a valid Hugging Face Dataset/DatasetDict "
             "object. The data_format value should be set to 'hf' if you plan to use an "

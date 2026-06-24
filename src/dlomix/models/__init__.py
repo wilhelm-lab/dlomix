@@ -7,10 +7,19 @@ if _BACKEND in TENSORFLOW_BACKEND:
     from .chargestate import ChargeStatePredictor
     from .deepLC import DeepLCRetentionTimePredictor
     from .detectability import DetectabilityModel
+    from .model_utils import (
+        download_remote_model_weights,
+        load_and_adapt_pretrained_model,
+    )
     from .prosit import PrositIntensityPredictor, PrositRetentionTimePredictor
 
+    # TensorFlow models only
     __all__.append("RetentionTimePredictor")
     __all__.append("DeepLCRetentionTimePredictor")
+
+    # TensorFlow utility functions
+    __all__.append("load_and_adapt_pretrained_model")
+    __all__.append("download_remote_model_weights")
 
 
 elif _BACKEND in PYTORCH_BACKEND:
@@ -19,6 +28,7 @@ elif _BACKEND in PYTORCH_BACKEND:
     from .ionmob_torch import Ionmob
     from .prosit_torch import PrositIntensityPredictor, PrositRetentionTimePredictor
 
+    # PyTorch models only
     __all__.append("Ionmob")
 
 __all__.extend(
