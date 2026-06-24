@@ -39,7 +39,7 @@ setuptools.setup(
     python_requires=">=3.10",
     install_requires=[
         "datasets>=4.0.0",
-        "huggingface_hub",
+        "huggingface_hub>=0.20.0",
         "fpdf",
         "pandas",
         "numpy",
