@@ -57,6 +57,7 @@ def intensity_dataset_kwargs():
             "collision_energy_aligned_normed",
         ],
         "with_termini": False,
+        "val_ratio": 0.1,
     }
 
 

@@ -490,7 +490,7 @@ def _find_best_fit_tokens_for_new_tokens(
             temp_alphabet.update({new: current_old_token_idx})
             test_data_current_token = FragmentIonIntensityDataset(
                 data_format="hf",
-                data_source=example_data,
+                test_data_source=example_data,
                 sequence_column=sequence_column,
                 label_column=label_column,
                 alphabet=temp_alphabet,
@@ -498,7 +498,7 @@ def _find_best_fit_tokens_for_new_tokens(
             )
 
             sa = []
-            for inputs, labels in test_data_current_token.tensor_train_data:
+            for inputs, labels in test_data_current_token.tensor_test_data:
                 preds = old_model.predict(inputs, verbose=0)
                 current_sa = 1 - eval_metric(labels, preds)
                 sa.extend(current_sa)

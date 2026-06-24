@@ -19,7 +19,7 @@ class IonMobilityDataset(PeptideDataset):
         data_format (str): The format of the data source. Defaults to "parquet".
         sequence_column (str): The column name for the peptide sequence in the dataset. Defaults to "sequence_modified".
         label_column (str): The column name for ion mobility in the dataset. Defaults to ["ccs", "ccs_std"].
-        val_ratio (float): The ratio of validation data to split from the main dataset. Defaults to 0.2.
+        val_ratio (Optional[float]): Fraction of data for the validation split. None or 0 means no val split. Defaults to None.
         max_seq_len (Union[int, str]): The maximum sequence length allowed in the dataset. Defaults to 30.
         dataset_type (str): The type of dataset to use. Defaults to "tf". Fallback is to TensorFlow dataset tensors.
         batch_size (int): The batch size for the dataset. Defaults to 256.
@@ -45,7 +45,7 @@ class IonMobilityDataset(PeptideDataset):
         data_format: str = "parquet",
         sequence_column: str = "sequence_modified",
         label_column: Union[str, List] = ["ccs", "ccs_std"],
-        val_ratio: float = 0.1,
+        val_ratio: Optional[float] = None,
         max_seq_len: Union[int, str] = 50,
         dataset_type: str = "tf",
         batch_size: int = 256,
@@ -63,6 +63,10 @@ class IonMobilityDataset(PeptideDataset):
         auto_cleanup_cache: bool = True,
         num_proc: Optional[int] = -1,
         batch_processing_size: int = 1000,
+        split_strategy: Optional[str] = "random",
+        split_seed: Optional[int] = None,
+        test_ratio: Optional[float] = None,
+        stratify_by_column: Optional[str] = None,
     ):
         kwargs = {k: v for k, v in locals().items() if k not in ["self", "__class__"]}
         super().__init__(DatasetConfig(**kwargs))

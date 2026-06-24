@@ -22,6 +22,8 @@ d = ChargeStateDataset(
     label_column="observed_charge_states",
     max_seq_len=30,
     batch_size=8,
+    val_ratio=0.2,
+    split_strategy="sequence-unique",
 )
 print(d)
 for x in d.tensor_train_data:
@@ -62,7 +64,7 @@ history = model.fit(
     callbacks=callbacks,
 )
 
-predictions = model.predict(test_sequences)
+predictions = model.predict(test_d.tensor_test_data)
 
 print("first 5 test sequences:\n", test_sequences[:5])
 print("first 5 test observed charge state vectors (label):\n", test_targets[:5])
