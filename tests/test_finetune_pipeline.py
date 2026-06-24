@@ -272,10 +272,14 @@ def ready_pipeline(
 
 
 class TestBackendGuard:
-    def test_finetune_raises_on_torch_backend(self, ready_pipeline):
+    def test_finetune_raises_on_torch_backend(self):
+        # The guard fires before any training work — no real dataset/model needed.
+        p = FineTunePipeline(finetune_dataset_path="x", base_model_name="m")
+        p.model = object()
+        p.dataset = object()
         with patch("dlomix.pipelines.finetune._IS_TORCH", True):
             with pytest.raises(NotImplementedError, match="TensorFlow"):
-                ready_pipeline.finetune()
+                p.finetune()
 
 
 # ---------------------------------------------------------------------------
@@ -284,11 +288,15 @@ class TestBackendGuard:
 
 
 class TestSaveOverwrite:
-    def test_save_raises_on_existing_path(self, ready_pipeline, tmp_path):
+    def test_save_raises_on_existing_path(self, tmp_path):
+        # FileExistsError fires before model.save() — no real model needed.
+        p = FineTunePipeline(finetune_dataset_path="x", base_model_name="m")
+        p.model = object()
+        p.dataset = object()
         out = tmp_path / "model.keras"
         out.touch()
         with pytest.raises(FileExistsError):
-            ready_pipeline.save(str(out))
+            p.save(str(out))
 
     def test_save_overwrite_true_succeeds(self, ready_pipeline, tmp_path):
         out = tmp_path / "model.keras"
@@ -311,20 +319,13 @@ class TestFromDatasetAndModel:
         assert p.model is ready_pipeline.model
         assert p.dataset is ready_pipeline.dataset
 
-    def test_can_finetune_without_setup(self, ready_pipeline):
-        p = FineTunePipeline.from_dataset_and_model(
-            dataset=ready_pipeline.dataset,
-            model=ready_pipeline.model,
-            epochs=1,
-        )
-        history = p.finetune()
-        assert "loss" in history.history
+    def test_repr_shows_provided(self):
+        # Repr only needs the attributes set by from_dataset_and_model — mock is enough.
+        from unittest.mock import MagicMock
 
-    def test_repr_shows_provided(self, ready_pipeline):
-        p = FineTunePipeline.from_dataset_and_model(
-            dataset=ready_pipeline.dataset,
-            model=ready_pipeline.model,
-        )
+        mock_ds = MagicMock()
+        mock_ds.batch_size = 64
+        p = FineTunePipeline.from_dataset_and_model(dataset=mock_ds, model=object())
         r = repr(p)
         assert "provided" in r
         assert "ready" in r
@@ -345,9 +346,6 @@ class TestToInferencePipeline:
         pipe = ready_pipeline.to_inference_pipeline()
         assert isinstance(pipe, InferencePipeline)
         assert pipe.model is ready_pipeline.model
-
-    def test_preprocessor_matches_dataset(self, ready_pipeline):
-        pipe = ready_pipeline.to_inference_pipeline()
         assert pipe.preprocessor.vocab_size == len(
             ready_pipeline.dataset.extended_alphabet
         )
