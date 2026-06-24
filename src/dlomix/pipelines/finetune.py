@@ -29,11 +29,14 @@ import logging
 from pathlib import Path
 from typing import Any
 
+from ..config import _BACKEND, PYTORCH_BACKEND
 from ..data import FragmentIonIntensityDataset, PeptideDataset
 from ..losses import masked_spectral_distance
 from ..models import download_remote_model_weights, load_and_adapt_pretrained_model
 
 logger = logging.getLogger(__name__)
+
+_IS_TORCH = _BACKEND in PYTORCH_BACKEND
 
 
 class FineTunePipeline:
@@ -176,6 +179,56 @@ class FineTunePipeline:
 
         return cls(**config)
 
+    @classmethod
+    def from_dataset_and_model(
+        cls,
+        dataset: PeptideDataset,
+        model,
+        output_model_path: str = "./finetuned_model",
+        epochs: int = 10,
+        learning_rate: float = 1e-4,
+    ) -> "FineTunePipeline":
+        """Create a ready-to-use pipeline from an already-built dataset and model.
+
+        Useful when the dataset has been prepared and the model has been adapted
+        (e.g. via :func:`~dlomix.models.load_and_adapt_pretrained_model`) outside
+        the pipeline.  :meth:`setup` does **not** need to be called — the pipeline
+        is immediately ready for :meth:`finetune` and :meth:`save`.
+
+        Parameters
+        ----------
+        dataset:
+            A processed :class:`~dlomix.data.PeptideDataset` (or subclass).
+        model:
+            A compiled or uncompiled model to fine-tune.
+        output_model_path:
+            Default save destination used by :meth:`save` when no path is given.
+        epochs:
+            Number of training epochs passed to :meth:`finetune`.
+        learning_rate:
+            Initial learning rate for the default Adam optimiser.
+        """
+        instance = cls.__new__(cls)
+        # Config attributes — None/defaults since dataset + model are pre-built
+        instance.finetune_dataset_path = None
+        instance.base_model_name = None
+        instance.base_model_weights_filepath = None
+        instance.old_model_vocab = None
+        instance.new_model_vocab = None
+        instance.initialization_strategy = None
+        instance.best_fit_kwargs = None
+        instance.seed = None
+        instance.output_model_path = output_model_path
+        instance.epochs = epochs
+        instance.batch_size = getattr(dataset, "batch_size", 64)
+        instance.learning_rate = learning_rate
+        instance.dataset_kwargs = {}
+        # Pre-populated — no setup() needed
+        instance.dataset = dataset
+        instance.model = model
+        instance.best_fit_info = None
+        return instance
+
     # ------------------------------------------------------------------
     # Setup
     # ------------------------------------------------------------------
@@ -242,6 +295,27 @@ class FineTunePipeline:
         else:
             self.model = result
 
+    def to_inference_pipeline(self):
+        """Wrap the fine-tuned model in an :class:`~dlomix.pipelines.InferencePipeline`.
+
+        The preprocessor is derived from ``self.dataset`` so the inference pipeline
+        reproduces the exact training-time preprocessing.  The natural workflow after
+        fine-tuning is::
+
+            history = pipeline.setup().finetune()
+            inference = pipeline.to_inference_pipeline()
+            inference.save("path/to/bundle")          # or .push_to_hub(...)
+
+        Raises
+        ------
+        RuntimeError
+            If :meth:`setup` (or :meth:`from_dataset_and_model`) has not been called.
+        """
+        self._require_setup()
+        from .predictor import InferencePipeline
+
+        return InferencePipeline.from_model_and_dataset(self.model, self.dataset)
+
     # ------------------------------------------------------------------
     # Training
     # ------------------------------------------------------------------
@@ -280,6 +354,12 @@ class FineTunePipeline:
         """
         self._require_setup()
 
+        if _IS_TORCH:
+            raise NotImplementedError(
+                "FineTunePipeline.finetune() currently supports TensorFlow only. "
+                "Set DLOMIX_BACKEND=tensorflow before importing dlomix."
+            )
+
         import tensorflow as tf
 
         resolved_loss = loss_fn or masked_spectral_distance
@@ -314,7 +394,7 @@ class FineTunePipeline:
     # Saving
     # ------------------------------------------------------------------
 
-    def save(self, path: str | None = None) -> str:
+    def save(self, path: str | None = None, overwrite: bool = False) -> str:
         """Save the fine-tuned model weights to disk.
 
         Parameters
@@ -322,6 +402,10 @@ class FineTunePipeline:
         path:
             Destination directory or file path.  Falls back to
             ``self.output_model_path`` when omitted.
+        overwrite:
+            If False (default) raise :exc:`FileExistsError` when ``path``
+            already exists, matching the behaviour of
+            :meth:`~dlomix.pipelines.InferencePipeline.save`.
 
         Returns
         -------
@@ -330,6 +414,10 @@ class FineTunePipeline:
         """
         self._require_setup()
         destination = path or self.output_model_path
+        if Path(destination).exists() and not overwrite:
+            raise FileExistsError(
+                f"'{destination}' already exists. Set overwrite=True to replace it."
+            )
         logger.info("Saving model to '%s' …", destination)
         self.model.save(destination)
         return destination
@@ -348,9 +436,14 @@ class FineTunePipeline:
 
     def __repr__(self) -> str:
         status = "ready" if self.model is not None else "not set up"
+        model_label = self.base_model_name or (
+            Path(self.base_model_weights_filepath).name
+            if self.base_model_weights_filepath
+            else "<provided>"
+        )
         return (
             f"FineTunePipeline("
-            f"model={self.base_model_name or Path(self.base_model_weights_filepath).name!r}, "
+            f"model={model_label!r}, "
             f"epochs={self.epochs}, "
             f"lr={self.learning_rate}, "
             f"status={status!r})"
