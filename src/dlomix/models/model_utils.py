@@ -155,6 +155,15 @@ def load_and_adapt_pretrained_model(
         )
 
         for new_token, fit_info in best_fit_dict.items():
+            if (
+                not fit_info
+            ):  # no examples found for this token — keep mean-init fallback
+                logger.warning(
+                    "No evaluation examples found for new token '%s'; "
+                    "keeping mean-initialization fallback.",
+                    new_token,
+                )
+                continue
             new_idx = new_alphabet[new_token]
             old_idx = fit_info["old_token_idx"]
 
@@ -474,7 +483,7 @@ def _find_best_fit_tokens_for_new_tokens(
 
     for new in new_tokens:
         best_fit_dict[new] = {}
-        best_sa = 0
+        best_sa = -np.inf  # ensure the first valid SA (even negative) is recorded
 
         filtered_data = new_hf_data.filter(lambda x: new in x[sequence_column])
 

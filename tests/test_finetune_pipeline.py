@@ -12,6 +12,7 @@ import yaml
 
 from dlomix.constants import ALPHABET_UNMOD
 from dlomix.models import PrositIntensityPredictor
+from dlomix.pipelines import InferencePipeline
 from dlomix.pipelines.finetune import FineTunePipeline
 
 # ---------------------------------------------------------------------------
@@ -244,3 +245,110 @@ class TestSetupAndFinetune:
             _, call_kwargs = mock_load.call_args
             assert call_kwargs["best_fit_kwargs"] is sentinel
             assert call_kwargs["initialization_strategy"] == "best-fit"
+
+
+# ---------------------------------------------------------------------------
+# Shared fixture: a fully set-up pipeline (dataset + model loaded)
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture
+def ready_pipeline(
+    saved_intensity_model, intensity_parquet_path, intensity_dataset_kwargs
+):
+    p = FineTunePipeline(
+        finetune_dataset_path=intensity_parquet_path,
+        base_model_weights_filepath=saved_intensity_model,
+        epochs=1,
+        dataset_kwargs=intensity_dataset_kwargs,
+    )
+    p.setup()
+    return p
+
+
+# ---------------------------------------------------------------------------
+# Backend guard
+# ---------------------------------------------------------------------------
+
+
+class TestBackendGuard:
+    def test_finetune_raises_on_torch_backend(self):
+        # The guard fires before any training work — no real dataset/model needed.
+        p = FineTunePipeline(finetune_dataset_path="x", base_model_name="m")
+        p.model = object()
+        p.dataset = object()
+        with patch("dlomix.pipelines.finetune._IS_TORCH", True):
+            with pytest.raises(NotImplementedError, match="TensorFlow"):
+                p.finetune()
+
+
+# ---------------------------------------------------------------------------
+# save() overwrite behaviour
+# ---------------------------------------------------------------------------
+
+
+class TestSaveOverwrite:
+    def test_save_raises_on_existing_path(self, tmp_path):
+        # FileExistsError fires before model.save() — no real model needed.
+        p = FineTunePipeline(finetune_dataset_path="x", base_model_name="m")
+        p.model = object()
+        p.dataset = object()
+        out = tmp_path / "model.keras"
+        out.touch()
+        with pytest.raises(FileExistsError):
+            p.save(str(out))
+
+    def test_save_overwrite_true_succeeds(self, ready_pipeline, tmp_path):
+        out = tmp_path / "model.keras"
+        out.touch()
+        result = ready_pipeline.save(str(out), overwrite=True)
+        assert result == str(out)
+
+
+# ---------------------------------------------------------------------------
+# from_dataset_and_model
+# ---------------------------------------------------------------------------
+
+
+class TestFromDatasetAndModel:
+    def test_is_immediately_ready(self, ready_pipeline):
+        p = FineTunePipeline.from_dataset_and_model(
+            dataset=ready_pipeline.dataset,
+            model=ready_pipeline.model,
+        )
+        assert p.model is ready_pipeline.model
+        assert p.dataset is ready_pipeline.dataset
+
+    def test_repr_shows_provided(self):
+        # Repr only needs the attributes set by from_dataset_and_model — mock is enough.
+        from unittest.mock import MagicMock
+
+        mock_ds = MagicMock()
+        mock_ds.batch_size = 64
+        p = FineTunePipeline.from_dataset_and_model(dataset=mock_ds, model=object())
+        r = repr(p)
+        assert "provided" in r
+        assert "ready" in r
+
+
+# ---------------------------------------------------------------------------
+# to_inference_pipeline
+# ---------------------------------------------------------------------------
+
+
+class TestToInferencePipeline:
+    def test_raises_before_setup(self):
+        p = FineTunePipeline(finetune_dataset_path="x", base_model_name="m")
+        with pytest.raises(RuntimeError, match="setup"):
+            p.to_inference_pipeline()
+
+    def test_returns_inference_pipeline(self, ready_pipeline):
+        pipe = ready_pipeline.to_inference_pipeline()
+        assert isinstance(pipe, InferencePipeline)
+        assert pipe.model is ready_pipeline.model
+        assert pipe.preprocessor.vocab_size == len(
+            ready_pipeline.dataset.extended_alphabet
+        )
+        assert (
+            pipe.preprocessor.sequence_column == ready_pipeline.dataset.sequence_column
+        )
