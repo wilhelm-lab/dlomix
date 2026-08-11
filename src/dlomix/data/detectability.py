@@ -18,7 +18,7 @@ class DetectabilityDataset(PeptideDataset):
         label_column (str): The name of the column containing the class labels. Default is "Classes".
         val_ratio (Optional[float]): Fraction of data for the validation split. None or 0 means no val split. Default None.
         max_seq_len (Union[int, str]): The maximum length of the peptide sequences. Default is 40.
-        dataset_type (str): The type of dataset to use. Default is "tf". Fallback is to TensorFlow dataset tensors.
+        dataset_type (str): The type of dataset to use. Default is None, which resolves to "pt" or "tf" based on the active DLOMIX_BACKEND.
         batch_size (int): The batch size for training and evaluation. Default is 256.
         shuffle (bool): Whether to shuffle the data. Default is False.
         model_features (Optional[List[str]]): The list of features to use for the model. Default is None.
@@ -52,7 +52,7 @@ class DetectabilityDataset(PeptideDataset):
         label_column: str = "Classes",
         val_ratio: Optional[float] = None,
         max_seq_len: Union[int, str] = 40,
-        dataset_type: str = "tf",
+        dataset_type: Optional[str] = None,
         batch_size: int = 256,
         shuffle: bool = False,
         model_features: Optional[List[str]] = None,

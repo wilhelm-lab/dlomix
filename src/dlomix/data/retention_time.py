@@ -18,7 +18,7 @@ class RetentionTimeDataset(PeptideDataset):
         label_column (str): The column name for the retention time label in the dataset. Defaults to "indexed_retention_time".
         val_ratio (Optional[float]): Fraction of data for the validation split. None or 0 means no val split. Defaults to None.
         max_seq_len (Union[int, str]): The maximum sequence length allowed in the dataset. Defaults to 30.
-        dataset_type (str): The type of dataset to use. Defaults to "tf". Fallback is to TensorFlow dataset tensors.
+        dataset_type (str): The type of dataset to use. Defaults to None, which resolves to "pt" or "tf" based on the active DLOMIX_BACKEND.
         batch_size (int): The batch size for the dataset. Defaults to 256.
         shuffle (bool): Whether to shuffle the data. Default is False.
         model_features (Optional[List[str]]): The features to use in the model. Defaults to None.
@@ -52,7 +52,7 @@ class RetentionTimeDataset(PeptideDataset):
         label_column: str = "indexed_retention_time",
         val_ratio: Optional[float] = None,
         max_seq_len: Union[int, str] = 30,
-        dataset_type: str = "tf",
+        dataset_type: Optional[str] = None,
         batch_size: int = 256,
         shuffle: bool = False,
         model_features: Optional[List[str]] = None,
