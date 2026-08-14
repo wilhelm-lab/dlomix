@@ -116,6 +116,7 @@ class PeptidePreprocessor:
             encoding_extend_alphabet=False,
             encoding_fallback_unmodified=True,
             warn_unmod=False,
+            fail_on_missing_modified_amino_acid=False,
         )
 
     @property

@@ -35,7 +35,7 @@ setuptools.setup(
     packages=setuptools.find_packages(where="src"),
     package_dir={"": "src"},
     include_package_data=True,
-    package_data={"": ["data/processing/pickled_feature_dicts/*"]},
+    package_data={"": ["data/processing/feature_dicts/*"]},
     python_requires=">=3.10",
     install_requires=[
         "datasets>=4.0.0",
