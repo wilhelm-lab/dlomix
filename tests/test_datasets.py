@@ -3,6 +3,8 @@ import time
 from os.path import join
 from shutil import rmtree
 
+import pytest
+import torch
 from datasets import Dataset, DatasetDict, load_dataset
 
 from dlomix.data import (
@@ -52,6 +54,7 @@ def test_parquet_rtdataset(download_path_for_assets):
         data_source=join(download_path_for_assets, "file_1.parquet"),
         sequence_column="modified_sequence",
         label_column="indexed_retention_time",
+        val_ratio=0.2,
     )
     assert rtdataset.hf_dataset is not None
     assert rtdataset._empty_dataset_mode is False
@@ -80,6 +83,7 @@ def test_rtdataset_inmemory(download_path_for_assets):
         data_format="hf",
         sequence_column="modified_sequence",
         label_column="indexed_retention_time",
+        val_ratio=0.2,
     )
     assert rtdataset.hf_dataset is not None
     assert rtdataset._empty_dataset_mode is False
@@ -147,6 +151,7 @@ def test_parquet_intensitydataset(download_path_for_assets):
         sequence_column="sequence",
         label_column="intensities",
         model_features=["precursor_charge_onehot", "collision_energy_aligned_normed"],
+        val_ratio=0.2,
     )
 
     assert intensity_dataset.hf_dataset is not None
@@ -177,6 +182,7 @@ def test_csv_intensitydataset(download_path_for_assets):
         data_source=filepath,
         sequence_column="sequence",
         label_column="intensities",
+        val_ratio=0.2,
     )
 
     assert intensity_dataset.hf_dataset is not None
@@ -209,13 +215,14 @@ def test_nested_model_features(raw_generic_nested_data):
         sequence_column="seq",
         label_column="label",
         model_features=["nested_feature"],
+        val_ratio=0.5,
     )
 
     assert intensity_dataset.hf_dataset is not None
     assert intensity_dataset._empty_dataset_mode is False
 
     example = iter(intensity_dataset.tensor_train_data).next()
-    assert example[0]["nested_feature"].shape == [2, 1, 2]
+    assert example[0]["nested_feature"].shape == [1, 1, 2]
 
 
 def test_save_dataset(raw_generic_nested_data):
@@ -227,6 +234,7 @@ def test_save_dataset(raw_generic_nested_data):
         sequence_column="seq",
         label_column="label",
         model_features=["nested_feature"],
+        val_ratio=0.1,
     )
 
     save_path = "./.test_dataset_2"
@@ -397,6 +405,7 @@ def test_shuffle_parameter(raw_generic_nested_data):
         dataset_type="tf",
         shuffle=True,
         batch_size=1,
+        val_ratio=0.2,
     )
 
     # Test with shuffle=True for PyTorch
@@ -408,6 +417,7 @@ def test_shuffle_parameter(raw_generic_nested_data):
         dataset_type="pt",
         shuffle=True,
         batch_size=1,
+        val_ratio=0.2,
     )
 
     # Verify datasets are created successfully
@@ -428,6 +438,7 @@ def test_torch_dataloader_kwargs(raw_generic_nested_data):
         label_column="label",
         dataset_type="pt",
         batch_size=1,
+        val_ratio=0.2,
         torch_dataloader_kwargs={
             "drop_last": True,
             "pin_memory": False,
@@ -445,6 +456,40 @@ def test_torch_dataloader_kwargs(raw_generic_nested_data):
     assert dataset.torch_dataloader_kwargs is not None
 
 
+def test_dataset_torch(raw_generic_nested_data):
+    hfdata = Dataset.from_dict(raw_generic_nested_data)
+
+    intensity_dataset = FragmentIonIntensityDataset(
+        data_format="hf",
+        data_source=hfdata,
+        sequence_column="seq",
+        label_column="label",
+        model_features=["nested_feature"],
+        dataset_type="pt",
+        batch_size=2,
+        max_seq_len=15,
+        with_termini=False,
+        val_ratio=0.5,
+    )
+
+    logger.info(intensity_dataset)
+    assert intensity_dataset.hf_dataset is not None
+    assert intensity_dataset._empty_dataset_mode is False
+
+    batch = next(iter(intensity_dataset.tensor_train_data))
+
+    logger.info(batch)
+
+    assert list(batch["nested_feature"].shape) == [1, 1, 2]
+    assert list(batch["seq"].shape) == [1, 15]
+    assert list(batch["label"].shape) == [
+        1,
+    ]
+
+    assert batch["seq"].dtype == torch.int64
+    assert batch["label"].dtype == torch.float32
+
+
 def test_tf_tensor_dataset_string_label(raw_generic_nested_data):
     """Test that TensorFlow TensorDataset is created properly."""
     hfdata = Dataset.from_dict(raw_generic_nested_data)
@@ -456,6 +501,7 @@ def test_tf_tensor_dataset_string_label(raw_generic_nested_data):
         label_column="label",
         dataset_type="tf",
         batch_size=1,
+        val_ratio=0.2,
     )
 
     # Get the TensorFlow dataset
@@ -480,6 +526,7 @@ def test_tf_tensor_dataset_singelton_list_label(raw_generic_nested_data):
         label_column=["label"],
         dataset_type="tf",
         batch_size=1,
+        val_ratio=0.2,
     )
 
     # Get the TensorFlow dataset
@@ -504,6 +551,7 @@ def test_tf_tensor_dataset_list_multi_label(raw_generic_nested_data):
         label_column=["label", "label2"],
         dataset_type="tf",
         batch_size=1,
+        val_ratio=0.2,
     )
 
     # Get the TensorFlow dataset
@@ -515,3 +563,49 @@ def test_tf_tensor_dataset_list_multi_label(raw_generic_nested_data):
         features, labels = batch
         assert features is not None
         assert labels is not None
+
+
+# Integration tests for dataset splitter
+def test_rtdataset_with_sequence_unique_splitter(download_path_for_assets):
+    """Test RetentionTimeDataset with sequence-unique splitting."""
+    # Use a dataset from HF directly to avoid the processing step modifying sequences
+    from datasets import load_dataset as hf_load_dataset
+
+    hf_data = hf_load_dataset(
+        "csv",
+        data_files=join(download_path_for_assets, "file_2.csv"),
+        split="train",
+    )
+
+    rtdataset = RetentionTimeDataset(
+        data_source=hf_data,
+        data_format="hf",
+        sequence_column="sequence",
+        label_column="irt",
+        val_ratio=0.2,
+        split_strategy="sequence_unique",
+        split_seed=42,
+    )
+
+    assert rtdataset.hf_dataset is not None
+
+    # Note: After processing, sequence column is still present but may be modified
+    # We verify the split happened correctly by checking dataset existence
+    assert "train" in rtdataset.hf_dataset
+    assert "val" in rtdataset.hf_dataset
+    assert rtdataset["train"].num_rows > 0
+    assert rtdataset["val"].num_rows > 0
+
+
+def test_rtdataset_split_config_conflict(download_path_for_assets):
+    """Test that providing both predefined splits and split config raises error."""
+    with pytest.raises(ValueError, match="Cannot use split configuration parameters"):
+        RetentionTimeDataset(
+            data_source=join(download_path_for_assets, "file_2.csv"),
+            val_data_source=join(download_path_for_assets, "file_2.csv"),
+            data_format="csv",
+            sequence_column="sequence",
+            label_column="irt",
+            split_strategy="sequence_unique",  # Conflict: predefined val_data_source + split_strategy
+            split_seed=42,
+        )

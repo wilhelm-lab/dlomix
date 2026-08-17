@@ -171,4 +171,5 @@ assets/
 
 src/dlomix/reports/quarto/.local_quarto_plots
 
+# Claude Code project instructions (local, not checked in)
 CLAUDE.md

@@ -23,6 +23,7 @@ d = ChargeStateDataset(
     label_column="charge_state_dist",
     max_seq_len=30,
     batch_size=8,
+    val_ratio=0.2,
 )
 print(d)
 for x in d.tensor_train_data:

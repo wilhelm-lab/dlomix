@@ -148,7 +148,7 @@ class PrositIntensityPredictor(tf.keras.Model):
     alphabet : dict, optional
         Dictionary mapping for the alphabet (the amino acids in this case). Defaults to ALPHABET_UNMOD.
     with_termini : bool, optional
-        Whether to include terminal tokens in the sequence embedding. Defaults to False.
+        Whether to include terminal tokens in the sequence embedding. Defaults to True.
     embedding_output_dim : int, optional
         Size of the embeddings to use. Defaults to 16.
     seq_length : int, optional
@@ -196,10 +196,6 @@ class PrositIntensityPredictor(tf.keras.Model):
     bidirectional GRU encoders, attention mechanisms, and dense regressor layers.
 
 
-
-
-
-
     """
 
     REQUIRED_INPUT_SEQUENCE_KEY = "SEQUENCE_KEY"
@@ -228,7 +224,7 @@ class PrositIntensityPredictor(tf.keras.Model):
         input_keys=None,
         meta_data_keys=None,
         alphabet=None,
-        with_termini=False,
+        with_termini=True,
         embedding_output_dim=16,
         seq_length=30,
         len_fragment_ion=6,
@@ -323,6 +319,7 @@ class PrositIntensityPredictor(tf.keras.Model):
         # Compute derived attributes (will be recomputed during deserialization)
         self.max_ion = self.raw_seq_length - 1
 
+        # computed for reference only on the total sequence length including termini, but not used directly
         self.seq_length = (
             self.raw_seq_length + 2 if self.with_termini else self.raw_seq_length
         )
@@ -334,7 +331,7 @@ class PrositIntensityPredictor(tf.keras.Model):
         self.embedding = tf.keras.layers.Embedding(
             input_dim=self.embeddings_count,
             output_dim=self.embedding_output_dim,
-            name="sequence_embedding",
+            name="embedding",
         )
 
         self.instrument_embedding = None

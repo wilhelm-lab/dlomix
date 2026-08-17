@@ -1,5 +1,6 @@
 import numpy as np
 import tensorflow as tf
+from datasets import load_dataset
 
 from dlomix.constants import PTMS_ALPHABET
 from dlomix.data import ChargeStateDataset
@@ -16,13 +17,18 @@ optimizer = tf.keras.optimizers.Adam(learning_rate=0.0001)
 
 TESTING_DATA = "example_dataset/chargestate/chargestate_data.parquet"
 
+hf_charge_dataset = load_dataset("Wilhelmlab/prospect-ptms-charge", split="val")
+
 d = ChargeStateDataset(
-    data_format="parquet",  # "hub",
-    data_source=TESTING_DATA,  # "Wilhelmlab/prospect-ptms-charge",
+    data_format="hf",
+    data_source=hf_charge_dataset,
     sequence_column="modified_sequence",
     label_column="most_abundant_charge_state",
     max_seq_len=30,
     batch_size=8,
+    val_ratio=0.2,
+    split_strategy="stratified",
+    stratify_by_column="most_abundant_charge_state",
 )
 print(d)
 for x in d.tensor_train_data:

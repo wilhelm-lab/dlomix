@@ -10,7 +10,7 @@ Submodules
 ----------
 
 
-.. automodule:: dlomix.pipelines.pipeline
+.. automodule:: dlomix.pipelines.predictor
    :members:
    :show-inheritance:
    :undoc-members:

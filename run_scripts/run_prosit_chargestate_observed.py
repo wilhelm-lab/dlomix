@@ -22,6 +22,8 @@ d = ChargeStateDataset(
     label_column="observed_charge_states",
     max_seq_len=30,
     batch_size=8,
+    val_ratio=0.2,
+    split_strategy="sequence-unique",
 )
 print(d)
 for x in d.tensor_train_data:

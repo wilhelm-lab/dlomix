@@ -3,6 +3,7 @@ import os
 from dataclasses import dataclass, field
 from typing import Callable, Dict, List, Optional, Union
 
+from ..config import _BACKEND, PYTORCH_BACKEND
 from .dataset_utils import EncodingScheme, validate_num_proc_value
 
 
@@ -10,6 +11,22 @@ from .dataset_utils import EncodingScheme, validate_num_proc_value
 class DatasetConfig:
     """
     Configuration class for the dataset.
+
+    Splitting Parameters
+    --------------------
+    val_ratio : Optional[float]
+        Fraction of data for the validation split. None or 0 means no val split. Default None.
+    split_strategy : Optional[str]
+        Strategy for splitting the dataset. Options: 'random', 'sequence_unique', 'stratified'.
+        Default is 'random'. Only used when automatic splitting is performed.
+    split_seed : Optional[int]
+        Random seed for reproducible splits. Default is None.
+    test_ratio : Optional[float]
+        Ratio of test data for three-way splits (0 < test_ratio < 1).
+        If None, only train/val split is performed. Default is None.
+    stratify_by_column : Optional[str]
+        Column name for stratified splitting. Can be a label column or any feature column.
+        Only used when split_strategy='stratified'. Default is None.
     """
 
     data_source: Union[str, List]
@@ -18,9 +35,7 @@ class DatasetConfig:
     data_format: str
     sequence_column: str
     label_column: List[str]
-    val_ratio: float
     max_seq_len: int
-    dataset_type: str
     batch_size: int
     shuffle: bool
     model_features: List[str]
@@ -37,10 +52,20 @@ class DatasetConfig:
     auto_cleanup_cache: bool
     num_proc: Optional[int]
     batch_processing_size: int
+    dataset_type: Optional[str] = None
     torch_dataloader_kwargs: Optional[Dict] = field(default_factory=dict)
+    # Splitting parameters
+    val_ratio: Optional[float] = None
+    split_strategy: Optional[str] = "random"
+    split_seed: Optional[int] = None
+    test_ratio: Optional[float] = None
+    stratify_by_column: Optional[str] = None
 
     # validate input parameters
     def __post_init__(self):
+        if self.dataset_type is None:
+            self.dataset_type = "pt" if _BACKEND in PYTORCH_BACKEND else "tf"
+
         # sequence length validation
         if self.max_seq_len <= 0:
             raise ValueError(

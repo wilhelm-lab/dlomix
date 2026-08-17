@@ -20,9 +20,9 @@ class FragmentIonIntensityDataset(PeptideDataset):
         data_format (str): The format of the data source file(s). Default is "parquet".
         sequence_column (str): The name of the column containing the peptide sequences. Default is "modified_sequence".
         label_column (str): The name of the column containing the intensity labels. Default is "intensities_raw".
-        val_ratio (float): The ratio of validation data to split from the training data. Default is 0.2.
+        val_ratio (Optional[float]): Fraction of data for the validation split. None or 0 means no val split. Default None.
         max_seq_len (Union[int, str]): The maximum length of the peptide sequences. Default is 30.
-        dataset_type (str): The type of dataset to use (e.g., "tf" for TensorFlow dataset). Default is "tf". Fallback is to TensorFlow dataset tensors.
+        dataset_type (str): The type of dataset to use (e.g., "tf" for TensorFlow dataset). Default is None, which resolves to "pt" or "tf" based on the active DLOMIX_BACKEND.
         batch_size (int): The batch size for training and evaluation. Default is 64.
         shuffle (bool): Whether to shuffle the data. Default is False.
         model_features (Optional[List[str]]): The list of features to use for the model. Default is None.
@@ -32,7 +32,7 @@ class FragmentIonIntensityDataset(PeptideDataset):
         padding_value (str): The value to use for padding. Default is '-'.
         alphabet (Optional[Dict]): The mapping of characters to integers for encoding the sequences. Default is None to trigger learning the alphabet.
         with_termini (bool): Whether to add the N- and C-termini in the sequence column, even if they do not exist. Defaults to True.
-        encoding_scheme (Union[str, EncodingScheme]): The encoding scheme to use for encoding the sequences. Default is EncodingScheme.UNMOD.
+        encoding_scheme (Union[str, EncodingScheme]): The encoding scheme to use for encoding the sequences. Default is EncodingScheme.NAIVE_MODS.
         processed (bool): Whether the data has been preprocessed before or not. Default is False.
         enable_tf_dataset_cache (bool): Flag to indicate whether to enable TensorFlow Dataset caching (call `.cache()` on the generated TF Datasets). Default is False.
         disable_cache (bool): Whether to disable Hugging Face datasets caching. Default is False.
@@ -40,6 +40,10 @@ class FragmentIonIntensityDataset(PeptideDataset):
         num_proc (Optional[int]): Number of processes to use for dataset processing. Use -1 for all available processors, None for single-process mode, or a positive integer. Default is -1.
         batch_processing_size (int): Size of batches for processing. Default is 1000.
         torch_dataloader_kwargs (Optional[Dict]): Additional keyword arguments to pass to PyTorch DataLoader. Default is None.
+        split_strategy (Optional[str]): Strategy for splitting the dataset. Options: 'random', 'sequence_unique', 'stratified'. Default is 'random'.
+        split_seed (Optional[int]): Random seed for reproducible splits. Default is None.
+        test_ratio (Optional[float]): Ratio of test data for three-way splits. If None, only train/val split is performed. Default is None.
+        stratify_by_column (Optional[str]): Column name for stratified splitting. Default is None.
         **kwargs: Additional arguments to pass to the parent class.
     """
 
@@ -51,9 +55,9 @@ class FragmentIonIntensityDataset(PeptideDataset):
         data_format: str = "parquet",
         sequence_column: str = "modified_sequence",
         label_column: str = "intensities_raw",
-        val_ratio: float = 0.2,
+        val_ratio: Optional[float] = None,
         max_seq_len: Union[int, str] = 30,
-        dataset_type: str = "tf",
+        dataset_type: Optional[str] = None,
         batch_size: int = 64,
         shuffle: bool = False,
         model_features: Optional[List[str]] = None,
@@ -63,7 +67,7 @@ class FragmentIonIntensityDataset(PeptideDataset):
         padding_value: str = "-",
         alphabet: Optional[Dict] = None,
         with_termini: bool = True,
-        encoding_scheme: Union[str, EncodingScheme] = EncodingScheme.UNMOD,
+        encoding_scheme: Union[str, EncodingScheme] = EncodingScheme.NAIVE_MODS,
         processed: bool = False,
         enable_tf_dataset_cache: bool = False,
         disable_cache: bool = False,
@@ -71,6 +75,10 @@ class FragmentIonIntensityDataset(PeptideDataset):
         num_proc: Optional[int] = -1,
         batch_processing_size: int = 1000,
         torch_dataloader_kwargs: Optional[Dict] = None,
+        split_strategy: Optional[str] = "random",
+        split_seed: Optional[int] = None,
+        test_ratio: Optional[float] = None,
+        stratify_by_column: Optional[str] = None,
         **kwargs,
     ):
         # Create config kwargs dictionary from all local parameters

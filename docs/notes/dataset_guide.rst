@@ -116,22 +116,22 @@ Core Concepts
 Data Splits and Validation
 ---------------------------
 
-DLOmix supports three splitting strategies:
+DLOmix supports three high-level data source modes:
 
-1. **Single source with auto-split**: Set ``val_ratio`` to automatically split training data into train/val randomly
-2. **Multiple sources**: Provide separate files for train/val/test
-3. **Pre-split datasets**: Use HuggingFace Hub or ``DatasetDict`` with existing splits
+1. **Single source with auto-split**: Provide only ``data_source``; DLOmix splits it automatically using the configured strategy.
+2. **Multiple sources**: Provide separate files for train/val/test; no splitting is performed.
+3. **Pre-split datasets**: Use a HuggingFace Hub dataset or pass a ``DatasetDict``; splits are used as-is.
 
 .. code-block:: python
 
-   # Strategy 1: Auto-split
+   # Mode 1: Auto-split (random by default)
    dataset = RetentionTimeDataset(
        data_source="train.csv",
-       val_ratio=0.2,  # 20% for validation
+       val_ratio=0.2,        # 20% for validation
        data_format="csv"
    )
 
-   # Strategy 2: Separate files
+   # Mode 2: Separate files
    dataset = RetentionTimeDataset(
        data_source="train.csv",
        val_data_source="val.csv",
@@ -139,10 +139,136 @@ DLOmix supports three splitting strategies:
        data_format="csv"
    )
 
-   # Strategy 3: pre-split dataset (example below points to a remote hugging face dataset hosted on the hub)
+   # Mode 3: Pre-split dataset from the HF Hub
    dataset = RetentionTimeDataset(
        data_source="wilhelmlab/prospect-rt",
        data_format="hub"
+   )
+
+.. note::
+   Splitting parameters (``val_ratio``, ``test_ratio``, ``split_strategy``, ``stratify_by_column``) are only valid in **Mode 1**. Providing them alongside pre-defined sources raises a ``ValueError``.
+
+The table below summarises all combinations of data sources and split parameters and their outcome:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 22 44 10 24
+
+   * - Situation
+     - Example parameters
+     - Ratios set?
+     - Outcome
+   * - Single train source
+     - ``data_source="train.csv", val_ratio=0.2``
+     - yes
+     - Auto-split using the configured strategy
+   * - Multiple sources
+     - ``data_source="train.csv", val_data_source="val.csv"``
+     - no
+     - Splits used as-is; warns that no auto-split occurs
+   * - Multiple sources
+     - ``data_source="train.csv", val_data_source="val.csv", val_ratio=0.2``
+     - yes
+     - ``ValueError``
+   * - HF Hub or DatasetDict
+     - ``data_source="hub/dataset", data_format="hub"``
+     - no
+     - Splits used as-is; warns that no auto-split occurs
+   * - Test-only source
+     - ``test_data_source="test.csv"``
+     - no
+     - Test data used as-is; warns that no auto-split occurs
+   * - Test-only source
+     - ``test_data_source="test.csv", val_ratio=0.2``
+     - yes
+     - ``ValueError``
+
+Splitting Strategies
+--------------------
+
+When using auto-split (Mode 1), the splitting strategy is controlled by the ``split_strategy`` parameter.
+Three strategies are available:
+
+**Random** (default)
+
+Shuffles and splits the data randomly. Use ``split_seed`` for reproducible results.
+
+.. code-block:: python
+
+   dataset = RetentionTimeDataset(
+       data_source="data.csv",
+       val_ratio=0.2,
+       split_strategy="random",
+       split_seed=42            # optional, for reproducibility
+   )
+
+**Sequence-unique**
+
+Ensures that the same peptide sequence never appears in more than one split.
+This prevents data leakage when a dataset contains multiple measurements for the same sequence
+(e.g. multiple charge states or collision energies for the same peptide).
+
+.. code-block:: python
+
+   dataset = RetentionTimeDataset(
+       data_source="data.csv",
+       val_ratio=0.2,
+       split_strategy="sequence_unique",
+       split_seed=42
+   )
+
+**Stratified**
+
+Splits while preserving the class distribution of a specified column. The column should have
+a ``ClassLabel`` feature type (as defined by the HuggingFace ``datasets`` library); if it
+does not, DLOmix will auto-cast it and emit a warning.
+
+.. code-block:: python
+
+   dataset = ChargeStateDataset(
+       data_source="data.csv",
+       val_ratio=0.2,
+       split_strategy="stratified",
+       stratify_by_column="charge"
+   )
+
+Multi-split Configurations
+---------------------------
+
+``val_ratio`` and ``test_ratio`` are independent — set either or both. At least one must be provided when auto-splitting.
+
+.. code-block:: python
+
+   # train/val only
+   dataset = RetentionTimeDataset(
+       data_source="data.csv",
+       val_ratio=0.2,
+       split_seed=42
+   )
+
+   # train/test only (no val split)
+   dataset = RetentionTimeDataset(
+       data_source="data.csv",
+       test_ratio=0.2,
+       split_seed=42
+   )
+
+   # train/val/test — remaining fraction goes to train
+   dataset = RetentionTimeDataset(
+       data_source="data.csv",
+       val_ratio=0.15,
+       test_ratio=0.15,          # remaining 70% → train
+       split_strategy="random",
+       split_seed=42
+   )
+
+   # sequence_unique also works for all three configurations
+   dataset = RetentionTimeDataset(
+       data_source="data.csv",
+       val_ratio=0.15,
+       test_ratio=0.15,
+       split_strategy="sequence_unique",
+       split_seed=42
    )
 
 
@@ -212,8 +338,8 @@ Sequences are parsed and are integer encoded to be fed into sequence models (spe
 
 Two primary encoding schemes for sequences are available:
 
+* **NAIVE_MODS** (default): Assumes sequences contain modifications in UNIMOD format (e.g., ``M[UNIMOD:35]``) and encodes them as distinct tokens; separate token from the amino acid.
 * **UNMOD**: Assumes the sequences do not contain modifications, hence any [UNIMOD] strings are removed.
-* **NAIVE_MODS**: Assumes sequences contain modifications in UNIMOD format (e.g., ``M[UNIMOD:35]``) and encodes them as distinct tokens; separate token from the amino acid.
 
 The alphabet is a python dict that maps each character (amino acid or amino acid + PTM combination) to a unique integer index. It can either be learnt from the provided data implicitily or provided by the user.
 
@@ -232,18 +358,18 @@ Note that if an alphabet is provided, the user has to ensure that it covers all 
    from dlomix.data import RetentionTimeDataset
    from dlomix.constants import ALPHABET_UNMOD, ALPHABET_NAIVE_MODS
 
+   # With PTMs (default), uses built-in naive-mods alphabet with tokens for some amino acids + PTMs combinations
+   dataset = RetentionTimeDataset(
+       data_source="data.csv",
+       encoding_scheme="naive-mods",
+       alphabet=ALPHABET_NAIVE_MODS
+   )
+
    # Unmodified sequences, uses built-in unmodified alphabet
    dataset = RetentionTimeDataset(
        data_source="data.csv",
        encoding_scheme="unmod",
        alphabet=ALPHABET_UNMOD
-   )
-
-   # With PTMs, uses built-in naive-mods alphabet with tokens for some amino acids + PTMs combinations
-   dataset = RetentionTimeDataset(
-       data_source="data.csv",
-       encoding_scheme="naive-mods",
-       alphabet=ALPHABET_NAIVE_MODS
    )
 
 2. Define and use a custom alphabet
@@ -301,6 +427,84 @@ The tensor datasets can be accessed via the ``train_data``, ``val_data``, and ``
             validation_data=dataset.val_data,
             epochs=10,
             **kwargs)
+
+
+Inference on New Data
+=====================
+
+To predict on new, unlabelled peptides you need the *exact* preprocessing used at
+training time (the learned alphabet, encoding scheme, padding, feature extractors).
+``PeptidePreprocessor`` captures that recipe and applies it to raw inputs, so you do not
+have to reconstruct a full dataset or remember the original parameters.
+
+Preprocess raw inputs
+---------------------
+
+Derive a preprocessor from a processed dataset, then call it on raw sequences. The output
+is the same tensor object the model consumes during training (a ``tf.data.Dataset`` or a
+torch ``DataLoader`` depending on ``dataset_type``):
+
+.. code-block:: python
+
+   prep = dataset.get_preprocessor()
+
+   tensors = prep(["PEPTIDEK", "ACDEM[UNIMOD:35]K"])   # raw -> model-ready tensors
+   predictions = model.predict(tensors)
+
+Accepted input formats: a single string, a list/``numpy`` array of strings, a ``dict``
+that also carries ``model_features`` (e.g. ``collision_energy``, ``precursor_charge``),
+a ``pandas`` DataFrame, or an in-memory HuggingFace ``Dataset``.
+
+A preprocessor can also be rebuilt from a saved dataset directory (no need to load the
+data), or saved/loaded as its own small artifact for shipping next to a model:
+
+.. code-block:: python
+
+   from dlomix.data import PeptidePreprocessor
+
+   # from a save_to_disk() directory (reads config + metadata only)
+   prep = PeptidePreprocessor.from_saved("processed_datasets/rt_dataset")
+
+   # standalone lightweight artifact
+   prep.save("rt_preprocessor")
+   prep = PeptidePreprocessor.load("rt_preprocessor")
+
+.. note::
+   Custom *callable* feature extractors cannot be serialized. They are preserved by
+   ``get_preprocessor()`` (in-memory) but dropped by ``save()`` / ``from_saved()`` with a
+   warning. Built-in feature names (strings) are always restored.
+
+Bundle a model with its preprocessor
+-------------------------------------
+
+``InferencePipeline`` ties a trained model together with its preprocessor so inference is
+a single ``predict`` call on raw inputs, and both travel together as one saved artifact
+(similar to a HuggingFace tokenizer + model):
+
+.. code-block:: python
+
+   from dlomix.pipelines import InferencePipeline
+
+   pipeline = InferencePipeline.from_model_and_dataset(model, dataset)
+   predictions = pipeline.predict(["PEPTIDEK", "ACDEK"])   # numpy array
+
+   pipeline.save("my_rt_model")                  # preprocessor + model weights + metadata
+   pipeline = InferencePipeline.load("my_rt_model")
+   predictions = pipeline.predict(["PEPTIDEK", "ACDEK"])
+
+On construction and on load, the pipeline checks that the model and preprocessor are
+consistent, raising a ``ValueError`` on mismatch to guard against accidentally pairing a
+model with the wrong preprocessor:
+
+* the model's embedding vocabulary size must match the preprocessor's alphabet size
+* for architectures that expose ``raw_seq_length``/``with_termini`` (e.g.
+  ``PrositIntensityPredictor``), the model's expected sequence length (adjusted for
+  ``with_termini``) must match the preprocessor's ``max_seq_len``
+
+Both checks are skipped for models/attributes they don't apply to (e.g. architectures
+without an ``embedding`` attribute, or without ``raw_seq_length``/``with_termini``). The
+backend (TensorFlow/PyTorch) is selected at import time via ``DLOMIX_BACKEND``; a pipeline
+must be loaded under the same backend it was saved with.
 
 
 Advanced Features
@@ -371,7 +575,7 @@ Save processed datasets to disk to avoid reprocessing:
    # Save processed dataset
    dataset = RetentionTimeDataset(
        data_source="train.csv",
-       val_ratio=0.2
+       val_ratio=0.2        # required — no default
    )
    dataset.save_to_disk("processed_datasets/rt_dataset")
 
@@ -390,16 +594,22 @@ This saves configuration, processed HuggingFace datasets, and metadata.
 TensorFlow vs PyTorch
 =====================
 
+.. note::
+   ``dataset_type`` defaults to ``None``, which resolves to ``"pt"`` or ``"tf"`` based on
+   the active ``DLOMIX_BACKEND`` (see :doc:`backend_usage`) at the time the dataset is
+   constructed. Pass ``dataset_type`` explicitly to override this and get a specific tensor
+   format regardless of the active backend.
+
 Generating TensorFlow Datasets
 -------------------------------
 
-Default behavior returns ``tf.data.Dataset`` objects:
+Returns ``tf.data.Dataset`` objects (the default under a TensorFlow backend):
 
 .. code-block:: python
 
    dataset = RetentionTimeDataset(
        data_source="data.csv",
-       dataset_type="tf",  # Default
+       dataset_type="tf",  # Explicit; matches the default under DLOMIX_BACKEND=tensorflow
        batch_size=64
    )
 
@@ -464,7 +674,7 @@ DatasetConfig Parameters
 * ``pad``: Enable padding (default: True)
 * ``padding_value``: Character for padding (default: ``"-"``)
 * ``with_termini``: Add N/C termini markers (default: True)
-* ``encoding_scheme``: ``"unmod"`` or ``"naive-mods"``
+* ``encoding_scheme``: ``"unmod"`` or ``"naive-mods"`` (default: ``"naive-mods"``)
 * ``alphabet``: Dict mapping tokens to integers
 
 **Features**
@@ -474,10 +684,17 @@ DatasetConfig Parameters
 
 **Training**
 
-* ``val_ratio``: Validation split ratio (0-1)
 * ``batch_size``: Batch size for tensor datasets
-* ``dataset_type``: ``"tf"`` or ``"pt"``
+* ``dataset_type``: ``"tf"`` or ``"pt"`` (default: ``None``, resolved from the active ``DLOMIX_BACKEND``)
 * ``shuffle``: Shuffle data (default: False)
+
+**Splitting** (only used when a single ``data_source`` is provided)
+
+* ``val_ratio``: Fraction of data for the validation split. ``None`` or ``0`` means no val split (default: ``None``)
+* ``test_ratio``: Fraction of data for the test split. ``None`` or ``0`` means no test split (default: ``None``). At least one of ``val_ratio`` / ``test_ratio`` must be set when auto-splitting.
+* ``split_strategy``: Splitting strategy — ``"random"`` (default), ``"sequence_unique"``, or ``"stratified"``
+* ``split_seed``: Integer seed for reproducible splits (default: ``None``)
+* ``stratify_by_column``: Column name to stratify by; required when ``split_strategy="stratified"`` (default: ``None``)
 
 
 Best Practices
@@ -497,8 +714,11 @@ Best Practices
 
 **Validation Splits**
 
-* Prefer explicit ``val_data_source`` for consistent evaluation
-* Always use a separate test dataset for final evaluation, can also be created independently using another Dataset instance with ``test_data_source`` only.
+* Prefer explicit ``val_data_source`` for consistent evaluation across runs
+* Use ``split_seed`` when relying on auto-split so results are reproducible
+* Use ``split_strategy="sequence_unique"`` when your dataset has multiple rows per peptide (e.g. multiple charge states) to prevent the same sequence from leaking across train and validation
+* Use ``split_strategy="stratified"`` for imbalanced classification tasks to preserve class proportions in each split
+* Always use a separate test dataset for final evaluation — either via ``test_data_source`` or ``test_ratio`` in a three-way auto-split
 
 **Feature Engineering**
 
