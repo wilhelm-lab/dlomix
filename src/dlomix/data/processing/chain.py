@@ -40,6 +40,7 @@ def build_processing_chain(
     encoding_extend_alphabet: bool = False,
     encoding_fallback_unmodified: bool = False,
     warn_unmod: bool = True,
+    fail_on_missing_modified_amino_acid: bool = True,
 ) -> Tuple[List[PeptideDatasetBaseProcessor], List[str]]:
     """Build the ordered processor chain and the names of extracted feature columns.
 
@@ -48,6 +49,15 @@ def build_processing_chain(
       then handled by the encoder's ``apply_to_split``);
     - inference: ``encoding_extend_alphabet=False, encoding_fallback_unmodified=True``
       (frozen vocabulary, unseen tokens fall back to the unmodified amino acid).
+
+    ``fail_on_missing_modified_amino_acid`` mirrors that same training/inference split:
+    strict (default, ``True``, raises) while curating a lookup table against known
+    training data; ``False`` warns and falls back to the default value instead. For the
+    training pipeline this is automatically relaxed to ``False`` on the test split by
+    ``LookupFeatureExtractor.apply_to_split`` — no extra wiring needed here.
+    ``PeptidePreprocessor`` (real inference) instead has no split concept and applies
+    these processors directly, so it passes ``fail_on_missing_modified_amino_acid=False``
+    itself to get the same "warn, don't crash scoring" behavior.
 
     Returns ``(processors, extracted_feature_names)``.
     """
@@ -105,7 +115,9 @@ def build_processing_chain(
         )
 
     feature_processors, extracted_feature_names = _build_feature_extractors(
-        features_to_extract, max_length
+        features_to_extract,
+        max_length,
+        fail_on_missing_modified_amino_acid,
     )
     processors.extend(feature_processors)
 
@@ -113,7 +125,9 @@ def build_processing_chain(
 
 
 def _build_feature_extractors(
-    features_to_extract, max_length
+    features_to_extract,
+    max_length,
+    fail_on_missing_modified_amino_acid: bool = True,
 ) -> Tuple[List[PeptideDatasetBaseProcessor], List[str]]:
     processors: List[PeptideDatasetBaseProcessor] = []
     names: List[str] = []
@@ -138,6 +152,11 @@ def _build_feature_extractors(
                     **FEATURE_EXTRACTORS_PARAMETERS[feature_name],
                     max_length=max_length,
                     batched=True,
+                    # provided features are expected to be complete, so we fail if a modified amino acid is missing from the lookup table
+                    # this is critical to give the user a chance to fix the lookup table, otherwise the model will be trained with missing features and will not learn the correct representation
+                    # (relaxed to a warning on the eval/test split by LookupFeatureExtractor.apply_to_split;
+                    # disabled by the caller entirely for real inference, since unseen data should warn and fall back rather than crash)
+                    fail_on_missing_modified_amino_acid=fail_on_missing_modified_amino_acid,
                 )
             )
         elif callable(feature):
