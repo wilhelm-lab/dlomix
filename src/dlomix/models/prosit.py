@@ -161,10 +161,6 @@ class PrositIntensityPredictor(tf.keras.Model):
     bidirectional GRU encoders, attention mechanisms, and dense regressor layers.
 
 
-
-
-
-
     """
 
     REQUIRED_INPUT_SEQUENCE_KEY = "SEQUENCE_KEY"
@@ -288,6 +284,7 @@ class PrositIntensityPredictor(tf.keras.Model):
         # Compute derived attributes (will be recomputed during deserialization)
         self.max_ion = self.raw_seq_length - 1
 
+        # computed for reference only on the total sequence length including termini, but not used directly
         self.seq_length = (
             self.raw_seq_length + 2 if self.with_termini else self.raw_seq_length
         )
@@ -299,7 +296,7 @@ class PrositIntensityPredictor(tf.keras.Model):
         self.embedding = tf.keras.layers.Embedding(
             input_dim=self.embeddings_count,
             output_dim=self.embedding_output_dim,
-            name="sequence_embedding",
+            name="embedding",
         )
 
         self.instrument_embedding = None

@@ -21,6 +21,7 @@ def test_dataset_torch(raw_generic_nested_data):
         batch_size=2,
         max_seq_len=15,
         with_termini=False,
+        val_ratio=0.5,
     )
 
     logger.info(intensity_dataset)
@@ -31,10 +32,10 @@ def test_dataset_torch(raw_generic_nested_data):
 
     logger.info(batch)
 
-    assert list(batch["nested_feature"].shape) == [2, 1, 2]
-    assert list(batch["seq"].shape) == [2, 15]
+    assert list(batch["nested_feature"].shape) == [1, 1, 2]
+    assert list(batch["seq"].shape) == [1, 15]
     assert list(batch["label"].shape) == [
-        2,
+        1,
     ]
 
     assert batch["seq"].dtype == torch.int64

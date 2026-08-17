@@ -1,33 +1,43 @@
-"""Module to load pickled feature dictionaries."""
+"""Module to load JSON feature dictionaries."""
 
+import json
 import os
-import pickle
+from typing import Tuple
 
 MODULE_PATH = os.path.abspath(os.path.dirname(__file__))
-PKL_BASE_PATH = os.path.join(MODULE_PATH, "pickled_feature_dicts")
+FEATURE_DICTS_BASE_PATH = os.path.join(MODULE_PATH, "feature_dicts")
 
 
-def load_pickled_feature(pickle_filename: str):
+def load_feature_dict(json_filename: str):
     """
-    Load a pickled feature dictionary.
+    Load a JSON feature dictionary.
 
     Parameters
     ----------
-    pickle_filename : str
-        Name of the pickled file.
+    json_filename : str
+        Name of the JSON file.
 
     Returns
     -------
     dict
-        Loaded pickled dictionary.
+        Loaded feature dictionary.
     """
 
-    with open(os.path.join(PKL_BASE_PATH, pickle_filename), "rb") as f:
-        return pickle.load(f)
+    with open(os.path.join(FEATURE_DICTS_BASE_PATH, json_filename)) as f:
+        return json.load(f)
 
 
-PTM_LOSS_LOOKUP = load_pickled_feature("saved_loss_atoms.pkl")
-PTM_MOD_DELTA_MASS_LOOKUP = load_pickled_feature("mz_diff.pkl")
-PTM_GAIN_LOOKUP = load_pickled_feature("saved_gained_atoms.pkl")
-PTM_ATOM_COUNT_LOOKUP = load_pickled_feature("saved_ac_count.pkl")
-PTM_RED_SMILES_LOOKUP = load_pickled_feature("red_smiles.pkl")
+def _split_loss_gain(combined: dict) -> Tuple[dict, dict]:
+    """Split a ``{token: {"loss": [...], "gain": [...]}}`` dict into two flat lookups."""
+    return (
+        {token: values["loss"] for token, values in combined.items()},
+        {token: values["gain"] for token, values in combined.items()},
+    )
+
+
+PTM_LOSS_LOOKUP, PTM_GAIN_LOOKUP = _split_loss_gain(
+    load_feature_dict("saved_loss_gain_atoms.json")
+)
+PTM_MOD_DELTA_MASS_LOOKUP = load_feature_dict("mz_diff.json")
+PTM_ATOM_COUNT_LOOKUP = load_feature_dict("saved_ac_count.json")
+PTM_RED_SMILES_LOOKUP = load_feature_dict("red_smiles.json")

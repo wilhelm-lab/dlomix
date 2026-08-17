@@ -1,3 +1,4 @@
-from .pipeline import RetentionTimePipeline
+from .finetune import FineTunePipeline
+from .predictor import InferencePipeline
 
-__all__ = ["RetentionTimePipeline"]
+__all__ = ["InferencePipeline", "FineTunePipeline"]
