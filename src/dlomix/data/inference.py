@@ -19,6 +19,7 @@ import numpy as np
 import pandas as pd
 from datasets import Dataset
 
+from ..config import _BACKEND, PYTORCH_BACKEND
 from .dataset_utils import EncodingScheme
 from .processing.chain import build_processing_chain
 from .processing.processors import SequencePaddingProcessor
@@ -45,7 +46,7 @@ class PeptidePreprocessor:
     padding_value : str
         Padding token; must exist in ``alphabet``. Default '-'.
     encoding_scheme : str or EncodingScheme
-        'unmod' or 'naive-mods'. Default 'unmod'.
+        'unmod' or 'naive-mods'. Default 'naive-mods'.
     with_termini : bool
         Whether N/C termini were added to sequences. Default True.
     model_features : list of str, optional
@@ -53,7 +54,8 @@ class PeptidePreprocessor:
     features_to_extract : list, optional
         Built-in feature names (str) or custom callables, reproducing training features.
     dataset_type : str
-        'tf' or 'pt'; selects the output tensor format. Default 'tf'.
+        'tf' or 'pt'; selects the output tensor format. Defaults to None, which resolves
+        to 'pt' or 'tf' based on the active DLOMIX_BACKEND.
     batch_size : int
         Batch size for the produced tensor dataset. Default 64.
     batch_processing_size : int
@@ -66,14 +68,17 @@ class PeptidePreprocessor:
         sequence_column: str,
         max_seq_len: int,
         padding_value: str = "-",
-        encoding_scheme: Union[str, EncodingScheme] = EncodingScheme.UNMOD,
+        encoding_scheme: Union[str, EncodingScheme] = EncodingScheme.NAIVE_MODS,
         with_termini: bool = True,
         model_features: Optional[List[str]] = None,
         features_to_extract: Optional[List[Union[str, Callable]]] = None,
-        dataset_type: str = "tf",
+        dataset_type: Optional[str] = None,
         batch_size: int = 64,
         batch_processing_size: int = 1000,
     ):
+        if dataset_type is None:
+            dataset_type = "pt" if _BACKEND in PYTORCH_BACKEND else "tf"
+
         self.alphabet = dict(alphabet)
         self.sequence_column = sequence_column
         self.max_seq_len = max_seq_len

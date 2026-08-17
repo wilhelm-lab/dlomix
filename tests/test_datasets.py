@@ -4,6 +4,7 @@ from os.path import join
 from shutil import rmtree
 
 import pytest
+import torch
 from datasets import Dataset, DatasetDict, load_dataset
 
 from dlomix.data import (
@@ -453,6 +454,40 @@ def test_torch_dataloader_kwargs(raw_generic_nested_data):
     assert dataloader.pin_memory is False
     assert dataloader.num_workers == 0
     assert dataset.torch_dataloader_kwargs is not None
+
+
+def test_dataset_torch(raw_generic_nested_data):
+    hfdata = Dataset.from_dict(raw_generic_nested_data)
+
+    intensity_dataset = FragmentIonIntensityDataset(
+        data_format="hf",
+        data_source=hfdata,
+        sequence_column="seq",
+        label_column="label",
+        model_features=["nested_feature"],
+        dataset_type="pt",
+        batch_size=2,
+        max_seq_len=15,
+        with_termini=False,
+        val_ratio=0.5,
+    )
+
+    logger.info(intensity_dataset)
+    assert intensity_dataset.hf_dataset is not None
+    assert intensity_dataset._empty_dataset_mode is False
+
+    batch = next(iter(intensity_dataset.tensor_train_data))
+
+    logger.info(batch)
+
+    assert list(batch["nested_feature"].shape) == [1, 1, 2]
+    assert list(batch["seq"].shape) == [1, 15]
+    assert list(batch["label"].shape) == [
+        1,
+    ]
+
+    assert batch["seq"].dtype == torch.int64
+    assert batch["label"].dtype == torch.float32
 
 
 def test_tf_tensor_dataset_string_label(raw_generic_nested_data):

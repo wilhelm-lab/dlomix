@@ -22,10 +22,15 @@ from dlomix.pipelines.finetune import FineTunePipeline
 
 @pytest.fixture
 def saved_intensity_model(tmp_path):
+    # with_termini=False: this model is built/pickled at a fixed width of 30 (see the
+    # dummy input below), matching the with_termini=False dataset in
+    # intensity_dataset_kwargs. Leaving this at the class default (True) would make the
+    # model's own with_termini metadata disagree with that width.
     model = PrositIntensityPredictor(
         embedding_output_dim=8,
         seq_length=30,
         alphabet=ALPHABET_UNMOD,
+        with_termini=False,
         meta_data_keys=["collision_energy_aligned_normed", "precursor_charge_onehot"],
     )
     dummy = {
@@ -46,10 +51,10 @@ def intensity_parquet_path(download_path_for_assets):
 
 @pytest.fixture
 def intensity_dataset_kwargs():
-    # with_termini=False keeps sequences at max_seq_len=30, matching the model
-    # default (PrositIntensityPredictor also defaults to with_termini=False).
-    # The dataset default is with_termini=True which would pad to 32 and break
-    # the AttentionLayer bias shape.
+    # with_termini=False keeps sequences at max_seq_len=30, matching the fixed
+    # width `saved_intensity_model` was built with (seq_length=30, dummy input
+    # shaped (2, 30)). The dataset default is with_termini=True, which would pad
+    # to 32 and break the AttentionLayer bias shape.
     return {
         "sequence_column": "sequence",
         "label_column": "intensities",

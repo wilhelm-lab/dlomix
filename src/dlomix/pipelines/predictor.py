@@ -36,6 +36,15 @@ def _model_vocab_size(model):
     return None
 
 
+def _model_expected_seq_len(model):
+    """Best-effort read of a model's expected input sequence length (None if unavailable)."""
+    raw_seq_length = getattr(model, "raw_seq_length", None)
+    if raw_seq_length is None:
+        return None
+    with_termini = getattr(model, "with_termini", False)
+    return raw_seq_length + 2 if with_termini else raw_seq_length
+
+
 class InferencePipeline:
     """A model + its preprocessor, with a single ``predict`` and combined save/load.
 
@@ -65,6 +74,18 @@ class InferencePipeline:
                 f"{model_vocab}, but the preprocessor alphabet has "
                 f"{self.preprocessor.vocab_size} tokens. They were likely not trained "
                 f"together."
+            )
+
+        expected_seq_len = _model_expected_seq_len(self.model)
+        if (
+            expected_seq_len is not None
+            and expected_seq_len != self.preprocessor.max_seq_len
+        ):
+            raise ValueError(
+                f"Model/preprocessor mismatch: the model expects sequences of length "
+                f"{expected_seq_len}, but the preprocessor pads sequences to "
+                f"max_seq_len={self.preprocessor.max_seq_len}. They were likely not "
+                f"trained together."
             )
 
     def predict(self, inputs, **predict_kwargs) -> np.ndarray:

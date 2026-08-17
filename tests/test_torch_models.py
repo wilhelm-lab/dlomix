@@ -112,10 +112,12 @@ def test_tf_torch_equivalence_intensity_model_shapes():
 
     model_tf = PrositIntensityPredictor(
         seq_length=seq_len,
+        with_termini=False,
     )
 
     model_torch = PrositIntensityPredictorTorch(
         seq_length=seq_len,
+        with_termini=False,
     )
 
     output_tf = model_tf(dummi_input_tf)
