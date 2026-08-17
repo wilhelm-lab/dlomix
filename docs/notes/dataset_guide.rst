@@ -338,8 +338,8 @@ Sequences are parsed and are integer encoded to be fed into sequence models (spe
 
 Two primary encoding schemes for sequences are available:
 
+* **NAIVE_MODS** (default): Assumes sequences contain modifications in UNIMOD format (e.g., ``M[UNIMOD:35]``) and encodes them as distinct tokens; separate token from the amino acid.
 * **UNMOD**: Assumes the sequences do not contain modifications, hence any [UNIMOD] strings are removed.
-* **NAIVE_MODS**: Assumes sequences contain modifications in UNIMOD format (e.g., ``M[UNIMOD:35]``) and encodes them as distinct tokens; separate token from the amino acid.
 
 The alphabet is a python dict that maps each character (amino acid or amino acid + PTM combination) to a unique integer index. It can either be learnt from the provided data implicitily or provided by the user.
 
@@ -358,18 +358,18 @@ Note that if an alphabet is provided, the user has to ensure that it covers all 
    from dlomix.data import RetentionTimeDataset
    from dlomix.constants import ALPHABET_UNMOD, ALPHABET_NAIVE_MODS
 
+   # With PTMs (default), uses built-in naive-mods alphabet with tokens for some amino acids + PTMs combinations
+   dataset = RetentionTimeDataset(
+       data_source="data.csv",
+       encoding_scheme="naive-mods",
+       alphabet=ALPHABET_NAIVE_MODS
+   )
+
    # Unmodified sequences, uses built-in unmodified alphabet
    dataset = RetentionTimeDataset(
        data_source="data.csv",
        encoding_scheme="unmod",
        alphabet=ALPHABET_UNMOD
-   )
-
-   # With PTMs, uses built-in naive-mods alphabet with tokens for some amino acids + PTMs combinations
-   dataset = RetentionTimeDataset(
-       data_source="data.csv",
-       encoding_scheme="naive-mods",
-       alphabet=ALPHABET_NAIVE_MODS
    )
 
 2. Define and use a custom alphabet
@@ -492,11 +492,19 @@ a single ``predict`` call on raw inputs, and both travel together as one saved a
    pipeline = InferencePipeline.load("my_rt_model")
    predictions = pipeline.predict(["PEPTIDEK", "ACDEK"])
 
-On construction and on load, the pipeline checks that the model's embedding vocabulary
-size matches the preprocessor's alphabet and raises a ``ValueError`` on mismatch, guarding
-against accidentally pairing a model with the wrong preprocessor. The backend
-(TensorFlow/PyTorch) is selected at import time via ``DLOMIX_BACKEND``; a pipeline must be
-loaded under the same backend it was saved with.
+On construction and on load, the pipeline checks that the model and preprocessor are
+consistent, raising a ``ValueError`` on mismatch to guard against accidentally pairing a
+model with the wrong preprocessor:
+
+* the model's embedding vocabulary size must match the preprocessor's alphabet size
+* for architectures that expose ``raw_seq_length``/``with_termini`` (e.g.
+  ``PrositIntensityPredictor``), the model's expected sequence length (adjusted for
+  ``with_termini``) must match the preprocessor's ``max_seq_len``
+
+Both checks are skipped for models/attributes they don't apply to (e.g. architectures
+without an ``embedding`` attribute, or without ``raw_seq_length``/``with_termini``). The
+backend (TensorFlow/PyTorch) is selected at import time via ``DLOMIX_BACKEND``; a pipeline
+must be loaded under the same backend it was saved with.
 
 
 Advanced Features
@@ -586,16 +594,22 @@ This saves configuration, processed HuggingFace datasets, and metadata.
 TensorFlow vs PyTorch
 =====================
 
+.. note::
+   ``dataset_type`` defaults to ``None``, which resolves to ``"pt"`` or ``"tf"`` based on
+   the active ``DLOMIX_BACKEND`` (see :doc:`backend_usage`) at the time the dataset is
+   constructed. Pass ``dataset_type`` explicitly to override this and get a specific tensor
+   format regardless of the active backend.
+
 Generating TensorFlow Datasets
 -------------------------------
 
-Default behavior returns ``tf.data.Dataset`` objects:
+Returns ``tf.data.Dataset`` objects (the default under a TensorFlow backend):
 
 .. code-block:: python
 
    dataset = RetentionTimeDataset(
        data_source="data.csv",
-       dataset_type="tf",  # Default
+       dataset_type="tf",  # Explicit; matches the default under DLOMIX_BACKEND=tensorflow
        batch_size=64
    )
 
@@ -660,7 +674,7 @@ DatasetConfig Parameters
 * ``pad``: Enable padding (default: True)
 * ``padding_value``: Character for padding (default: ``"-"``)
 * ``with_termini``: Add N/C termini markers (default: True)
-* ``encoding_scheme``: ``"unmod"`` or ``"naive-mods"``
+* ``encoding_scheme``: ``"unmod"`` or ``"naive-mods"`` (default: ``"naive-mods"``)
 * ``alphabet``: Dict mapping tokens to integers
 
 **Features**
@@ -671,7 +685,7 @@ DatasetConfig Parameters
 **Training**
 
 * ``batch_size``: Batch size for tensor datasets
-* ``dataset_type``: ``"tf"`` or ``"pt"``
+* ``dataset_type``: ``"tf"`` or ``"pt"`` (default: ``None``, resolved from the active ``DLOMIX_BACKEND``)
 * ``shuffle``: Shuffle data (default: False)
 
 **Splitting** (only used when a single ``data_source`` is provided)
