@@ -3,6 +3,7 @@ import os
 from dataclasses import dataclass, field
 from typing import Callable, Dict, List, Optional, Union
 
+from ..config import _BACKEND, PYTORCH_BACKEND
 from .dataset_utils import EncodingScheme, validate_num_proc_value
 
 
@@ -35,7 +36,6 @@ class DatasetConfig:
     sequence_column: str
     label_column: List[str]
     max_seq_len: int
-    dataset_type: str
     batch_size: int
     shuffle: bool
     model_features: List[str]
@@ -52,6 +52,7 @@ class DatasetConfig:
     auto_cleanup_cache: bool
     num_proc: Optional[int]
     batch_processing_size: int
+    dataset_type: Optional[str] = None
     torch_dataloader_kwargs: Optional[Dict] = field(default_factory=dict)
     # Splitting parameters
     val_ratio: Optional[float] = None
@@ -62,6 +63,9 @@ class DatasetConfig:
 
     # validate input parameters
     def __post_init__(self):
+        if self.dataset_type is None:
+            self.dataset_type = "pt" if _BACKEND in PYTORCH_BACKEND else "tf"
+
         # sequence length validation
         if self.max_seq_len <= 0:
             raise ValueError(

@@ -18,7 +18,7 @@ class RetentionTimeDataset(PeptideDataset):
         label_column (str): The column name for the retention time label in the dataset. Defaults to "indexed_retention_time".
         val_ratio (Optional[float]): Fraction of data for the validation split. None or 0 means no val split. Defaults to None.
         max_seq_len (Union[int, str]): The maximum sequence length allowed in the dataset. Defaults to 30.
-        dataset_type (str): The type of dataset to use. Defaults to "tf". Fallback is to TensorFlow dataset tensors.
+        dataset_type (str): The type of dataset to use. Defaults to None, which resolves to "pt" or "tf" based on the active DLOMIX_BACKEND.
         batch_size (int): The batch size for the dataset. Defaults to 256.
         shuffle (bool): Whether to shuffle the data. Default is False.
         model_features (Optional[List[str]]): The features to use in the model. Defaults to None.
@@ -28,7 +28,7 @@ class RetentionTimeDataset(PeptideDataset):
         padding_value (str): The value to use for padding sequences. Defaults to '-'.
         alphabet (Optional[Dict]): The alphabet used for encoding sequences. Defaults to None to trigger learning the alphabet.
         with_termini (bool): Whether to add the N- and C-termini in the sequence column, even if they do not exist. Defaults to True.
-        encoding_scheme (Union[str, EncodingScheme]): The encoding scheme to use for sequences. Defaults to EncodingScheme.UNMOD.
+        encoding_scheme (Union[str, EncodingScheme]): The encoding scheme to use for sequences. Defaults to EncodingScheme.NAIVE_MODS.
         processed (bool): Whether the dataset has been preprocessed. Defaults to False.
         enable_tf_dataset_cache (bool): Flag to indicate whether to enable TensorFlow Dataset caching (call `.cache()` on the generated TF Datasets).
         disable_cache (bool): Whether to disable Hugging Face datasets caching. Default is False.
@@ -52,7 +52,7 @@ class RetentionTimeDataset(PeptideDataset):
         label_column: str = "indexed_retention_time",
         val_ratio: Optional[float] = None,
         max_seq_len: Union[int, str] = 30,
-        dataset_type: str = "tf",
+        dataset_type: Optional[str] = None,
         batch_size: int = 256,
         shuffle: bool = False,
         model_features: Optional[List[str]] = None,
@@ -62,7 +62,7 @@ class RetentionTimeDataset(PeptideDataset):
         padding_value: str = "-",
         alphabet: Optional[Dict] = None,
         with_termini: bool = True,
-        encoding_scheme: Union[str, EncodingScheme] = EncodingScheme.UNMOD,
+        encoding_scheme: Union[str, EncodingScheme] = EncodingScheme.NAIVE_MODS,
         processed: bool = False,
         enable_tf_dataset_cache: bool = False,
         disable_cache: bool = False,

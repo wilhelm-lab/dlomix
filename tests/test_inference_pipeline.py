@@ -31,6 +31,14 @@ class _FakeModel:
     """Stand-in model with no embedding (consistency check is skipped)."""
 
 
+class _FakeSeqLenModel:
+    """Stand-in model exposing only raw_seq_length/with_termini."""
+
+    def __init__(self, raw_seq_length, with_termini):
+        self.raw_seq_length = raw_seq_length
+        self.with_termini = with_termini
+
+
 def _make_card(tmp_path, **prep_kwargs) -> str:
     prep = PeptidePreprocessor(
         alphabet=_CARD_ALPHABET,
@@ -107,6 +115,13 @@ def test_consistency_check_rejects_mismatched_model(rt_dataset):
     # model built with a deliberately different (smaller) vocabulary
     small_alphabet = {"-": 0, "X": 1, "A": 2, "C": 3}
     bad_model = PrositRetentionTimePredictor(seq_length=22, alphabet=small_alphabet)
+    with pytest.raises(ValueError, match="Model/preprocessor mismatch"):
+        InferencePipeline.from_model_and_dataset(bad_model, rt_dataset)
+
+
+def test_consistency_check_rejects_mismatched_seq_len(rt_dataset):
+    # rt_dataset.max_seq_len is 20; a model expecting 22 (20 + termini) should be rejected.
+    bad_model = _FakeSeqLenModel(raw_seq_length=20, with_termini=True)
     with pytest.raises(ValueError, match="Model/preprocessor mismatch"):
         InferencePipeline.from_model_and_dataset(bad_model, rt_dataset)
 

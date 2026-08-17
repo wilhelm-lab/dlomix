@@ -116,7 +116,7 @@ class PrositIntensityPredictor(nn.Module):
     alphabet : dict, optional
         Dictionary mapping for the alphabet (the amino acids in this case). Defaults to ALPHABET_UNMOD.
     with_termini : bool, optional
-        Whether to include terminal tokens in the sequence embedding. Defaults to False.
+        Whether to include terminal tokens in the sequence embedding. Defaults to True.
     embedding_output_dim : int, optional
         Size of the embeddings to use. Defaults to 16.
     seq_length : int, optional
@@ -196,7 +196,7 @@ class PrositIntensityPredictor(nn.Module):
         input_keys=None,
         meta_data_keys=None,
         alphabet=None,
-        with_termini=False,
+        with_termini=True,
         embedding_output_dim=16,
         seq_length=30,
         len_fragment_ion=6,
@@ -240,7 +240,7 @@ class PrositIntensityPredictor(nn.Module):
         self._build_encoders()
         self._build_decoder()
         self.attention = AttentionLayer(
-            feature_dim=regressor_layer_size, seq_len=seq_length
+            feature_dim=regressor_layer_size, seq_len=self.seq_length
         )
         self._build_meta_data_fusion_layer()
         self._build_regressor()
