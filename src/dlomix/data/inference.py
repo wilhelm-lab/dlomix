@@ -46,7 +46,7 @@ class PeptidePreprocessor:
     padding_value : str
         Padding token; must exist in ``alphabet``. Default '-'.
     encoding_scheme : str or EncodingScheme
-        'unmod' or 'naive-mods'. Default 'unmod'.
+        'unmod' or 'naive-mods'. Default 'naive-mods'.
     with_termini : bool
         Whether N/C termini were added to sequences. Default True.
     model_features : list of str, optional
@@ -68,7 +68,7 @@ class PeptidePreprocessor:
         sequence_column: str,
         max_seq_len: int,
         padding_value: str = "-",
-        encoding_scheme: Union[str, EncodingScheme] = EncodingScheme.UNMOD,
+        encoding_scheme: Union[str, EncodingScheme] = EncodingScheme.NAIVE_MODS,
         with_termini: bool = True,
         model_features: Optional[List[str]] = None,
         features_to_extract: Optional[List[Union[str, Callable]]] = None,

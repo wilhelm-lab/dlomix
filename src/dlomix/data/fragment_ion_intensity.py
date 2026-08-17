@@ -32,7 +32,7 @@ class FragmentIonIntensityDataset(PeptideDataset):
         padding_value (str): The value to use for padding. Default is '-'.
         alphabet (Optional[Dict]): The mapping of characters to integers for encoding the sequences. Default is None to trigger learning the alphabet.
         with_termini (bool): Whether to add the N- and C-termini in the sequence column, even if they do not exist. Defaults to True.
-        encoding_scheme (Union[str, EncodingScheme]): The encoding scheme to use for encoding the sequences. Default is EncodingScheme.UNMOD.
+        encoding_scheme (Union[str, EncodingScheme]): The encoding scheme to use for encoding the sequences. Default is EncodingScheme.NAIVE_MODS.
         processed (bool): Whether the data has been preprocessed before or not. Default is False.
         enable_tf_dataset_cache (bool): Flag to indicate whether to enable TensorFlow Dataset caching (call `.cache()` on the generated TF Datasets). Default is False.
         disable_cache (bool): Whether to disable Hugging Face datasets caching. Default is False.
@@ -67,7 +67,7 @@ class FragmentIonIntensityDataset(PeptideDataset):
         padding_value: str = "-",
         alphabet: Optional[Dict] = None,
         with_termini: bool = True,
-        encoding_scheme: Union[str, EncodingScheme] = EncodingScheme.UNMOD,
+        encoding_scheme: Union[str, EncodingScheme] = EncodingScheme.NAIVE_MODS,
         processed: bool = False,
         enable_tf_dataset_cache: bool = False,
         disable_cache: bool = False,
