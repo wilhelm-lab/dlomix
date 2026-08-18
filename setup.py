@@ -25,7 +25,6 @@ else:
 
 tensorflow_extra_install = [
     f"tensorflow{apple_silicon_constraint}>=2.16",  # TF 2.16+ ships Keras 3 as default; dlomix targets Keras 3
-    "keras>=3.0.0",  # explicit: the TF backend requires Keras 3 (pulled transitively by TF 2.16+)
 ]
 
 pytorch_extra_install = [
@@ -46,13 +45,17 @@ setuptools.setup(
     package_dir={"": "src"},
     include_package_data=True,
     package_data={"": ["data/processing/feature_dicts/*"]},
-    python_requires=">=3.10",
+    python_requires=">=3.11",
     install_requires=[
         "datasets>=4.0.0",
         "huggingface_hub>=0.20.0",
+        # Keras 3 is backend-agnostic and pure Python: it provides the single
+        # `keras.ops` implementation of the losses and metrics shared by both
+        # backends, and does not pull in TensorFlow when KERAS_BACKEND=torch.
+        "keras>=3.0.0",
         "fpdf",
         "pandas",
-        "numpy",
+        "numpy>=2.0",
         "matplotlib",
         "scikit-learn",
         "pyarrow",
@@ -63,6 +66,7 @@ setuptools.setup(
             "pytest >= 7.0.0",
             "pytest-cov",
             "black",
+            "isort",  # invoked by `make format` / `make format-check`
             "twine",
             "setuptools",
             "wheel",
@@ -83,7 +87,6 @@ setuptools.setup(
     },
     classifiers=[
         "Programming Language :: Python :: 3",
-        "Programming Language :: Python :: 3.10",
         "Programming Language :: Python :: 3.11",
         "Programming Language :: Python :: 3.12",
         "License :: OSI Approved :: MIT License",
