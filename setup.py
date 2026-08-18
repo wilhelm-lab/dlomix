@@ -1,3 +1,5 @@
+import platform
+
 import setuptools
 
 with open("README.md", "r") as fh:
@@ -14,8 +16,15 @@ def get_metadata():
 # Load metadata
 META_DATA = get_metadata()
 
+# for apple silicon stay <= 2.20, current collision issue for Tensorflow 2.20 with pyarrow
+
+if platform.system() == "Darwin":
+    apple_silicon_constraint = "<2.20,"
+else:
+    apple_silicon_constraint = ""
+
 tensorflow_extra_install = [
-    "tensorflow>=2.16",  # TF 2.16+ ships Keras 3 as default; dlomix targets Keras 3
+    f"tensorflow{apple_silicon_constraint}>=2.16",  # TF 2.16+ ships Keras 3 as default; dlomix targets Keras 3
     "keras>=3.0.0",  # explicit: the TF backend requires Keras 3 (pulled transitively by TF 2.16+)
 ]
 
