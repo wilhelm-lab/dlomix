@@ -3,11 +3,21 @@ import logging
 import pytest
 import tensorflow as tf
 
+from dlomix.constants import ALPHABET_UNMOD, PTMS_ALPHABET
 from dlomix.models.chargestate import ChargeStatePredictor
 from dlomix.models.deepLC import DeepLCRetentionTimePredictor
 from dlomix.models.prosit import PrositIntensityPredictor, PrositRetentionTimePredictor
 
 logger = logging.getLogger(__name__)
+
+
+def _zeros_for(shapes, batch_size=2):
+    """Materialise a ``{key: shape}`` spec into zero tensors for a forward pass.
+
+    Keras 3 builds a subclassed model on its first call, not from a shape, so
+    the tests exercise the model the way callers do.
+    """
+    return {key: tf.zeros((batch_size, *shape[1:])) for key, shape in shapes.items()}
 
 
 def test_prosit_retention_time_model():
@@ -25,15 +35,14 @@ def test_prosit_intensity_model():
     )
 
     seq_len = model.seq_length
-    model.build(
-        {
-            "sequence": (
-                None,
-                seq_len,
-            ),
-            "collision_energy": (None, 1),
-            "precursor_charge": (None, 6),
-        }
+    model(
+        _zeros_for(
+            {
+                "sequence": (None, seq_len),
+                "collision_energy": (None, 1),
+                "precursor_charge": (None, 6),
+            }
+        )
     )
     model.summary(print_fn=logger.info)
     logger.info(model)
@@ -50,31 +59,18 @@ def test_prosit_intensity_model_ptm_on_input():
     )
 
     seq_len = model.seq_length
-    model.build(
-        {
-            "sequence": (
-                None,
-                seq_len,
-            ),
-            "collision_energy": (None, 1),
-            "precursor_charge": (None, 6),
-            "fragmentation_type": (None, 1),
-            PrositIntensityPredictor.PTM_INPUT_KEYS[0]: (
-                None,
-                seq_len,
-                6,
-            ),
-            PrositIntensityPredictor.PTM_INPUT_KEYS[1]: (
-                None,
-                seq_len,
-                6,
-            ),
-            PrositIntensityPredictor.PTM_INPUT_KEYS[2]: (
-                None,
-                seq_len,
-                1,
-            ),
-        }
+    model(
+        _zeros_for(
+            {
+                "sequence": (None, seq_len),
+                "collision_energy": (None, 1),
+                "precursor_charge": (None, 6),
+                "fragmentation_type": (None, 1),
+                PrositIntensityPredictor.PTM_INPUT_KEYS[0]: (None, seq_len, 6),
+                PrositIntensityPredictor.PTM_INPUT_KEYS[1]: (None, seq_len, 6),
+                PrositIntensityPredictor.PTM_INPUT_KEYS[2]: (None, seq_len, 1),
+            }
+        )
     )
     model.summary(print_fn=logger.info)
     logger.info(model.input_keys)
@@ -86,17 +82,16 @@ def test_prosit_intensity_model_ptm_on_missing():
     model = PrositIntensityPredictor(use_prosit_ptm_features=True)
     seq_len = model.seq_length
     with pytest.raises(ValueError, match="PTM"):
-        model.build(
-            {
-                "sequence": (
-                    None,
-                    seq_len,
-                ),
-                "collision_energy": (None,),
-                "precursor_charge": (None, 6),
-                "fragmentation_type": (None,),
-                # no PTM features
-            }
+        model(
+            _zeros_for(
+                {
+                    "sequence": (None, seq_len),
+                    "collision_energy": (None, 1),
+                    "precursor_charge": (None, 6),
+                    "fragmentation_type": (None, 1),
+                    # no PTM features
+                }
+            )
         )
 
 
@@ -107,14 +102,13 @@ def test_prosit_intensity_model_encoding_metadata_missing():
     seq_len = model.seq_length
 
     with pytest.raises(ValueError, match="metadata"):
-        model.build(
-            {
-                "sequence": (
-                    None,
-                    seq_len,
-                ),
-                # no meta-data while expected
-            }
+        model(
+            _zeros_for(
+                {
+                    "sequence": (None, seq_len),
+                    # no meta-data while expected
+                }
+            )
         )
 
 
@@ -130,14 +124,7 @@ def test_prosit_intensity_model_no_metadata():
 
     assert model.meta_data_keys == []
 
-    model.build(
-        {
-            "sequence": (
-                None,
-                seq_len,
-            ),
-        }
-    )
+    model(_zeros_for({"sequence": (None, seq_len)}))
 
     assert model is not None
     assert model.meta_encoder is None
@@ -256,8 +243,8 @@ def basic_model_existence_test(model):
     logger.info(model)
     assert model is not None
 
-    # Explicitly build the model with a dummy input shape (batch_size, seq_length)
-    model.build((None, 30))
+    # Keras 3 builds a subclassed model on its first call, not from a shape.
+    model(tf.zeros((2, 30)))
     assert len(model.trainable_variables) > 0
 
 
@@ -274,3 +261,31 @@ def test_observed_chargestate_model():
 def test_chargestate_distribution_model():
     model = ChargeStatePredictor(model_flavour="relative")
     basic_model_existence_test(model)
+
+
+# ---------------------------------------------------------------------------
+# Alphabet sizing
+# ---------------------------------------------------------------------------
+
+
+def test_raw_alphabet_with_out_of_range_indices_is_rejected():
+    """A raw alphabet whose top index exceeds its length cannot be embedded.
+
+    PTMS_ALPHABET maps 56 tokens onto indices up to 56, so it needs 57 embedding
+    rows. Without the guard the extra token would index out of range and gather
+    zeros silently on GPU. The dataset's extended_alphabet is the supported input.
+    """
+    assert max(PTMS_ALPHABET.values()) >= len(PTMS_ALPHABET)
+
+    with pytest.raises(ValueError, match="extended_alphabet"):
+        PrositIntensityPredictor(seq_length=30, alphabet=PTMS_ALPHABET)
+
+
+def test_alphabet_carrying_padding_and_unknown_is_accepted():
+    """The vocabulary a dataset produces sizes the embedding exactly."""
+    extended = {**ALPHABET_UNMOD, "": 0, "X": max(ALPHABET_UNMOD.values()) + 1}
+
+    model = PrositIntensityPredictor(seq_length=30, alphabet=extended)
+
+    assert model.embeddings_count == len(extended)
+    assert model.embeddings_count > max(extended.values())

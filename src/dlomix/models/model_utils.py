@@ -254,16 +254,14 @@ def expand_embedding_vocabulary(
             )
 
     # Get the embedding layer and extract weights
-    if hasattr(model, embedding_layer_name):
-        embedding_layer = getattr(model, embedding_layer_name)
-    else:
-        try:
-            embedding_layer = model.get_layer(embedding_layer_name)
-        except ValueError as e:
-            raise AttributeError(
-                f"Embedding layer '{embedding_layer_name}' not found in model. "
-                f"Available layers: {[layer.name for layer in model.layers]}"
-            ) from e
+    embedding_layer = _get_embedding_layer(model, embedding_layer_name)
+
+    if not embedding_layer.weights:
+        raise ValueError(
+            f"Embedding layer '{embedding_layer_name}' has no weights yet, so there is "
+            "nothing to transfer. Build the model before expanding its vocabulary, by "
+            "calling model.build(input_shape) or running one forward pass."
+        )
 
     old_weights = embedding_layer.get_weights()[0]
     embedding_dim = old_weights.shape[1]
@@ -275,64 +273,115 @@ def expand_embedding_vocabulary(
         f"embedding_dim={embedding_dim}"
     )
 
-    # Create expanded embedding weights
+    # Keras 3 forbids attaching new state (variables or sub-layers) to a model
+    # that is already built, so the embedding cannot be swapped in place with
+    # setattr any more. Instead rebuild the model from its own config with the
+    # new alphabet and carry every other weight across.
+    new_model = _rebuild_model_with_alphabet(model, new_alphabet)
+
+    # Each model applies its own vocabulary convention when sizing the embedding
+    # (len(alphabet), or len(alphabet) + 1 / + 2), so take the row count from the
+    # layer that will actually hold the weights rather than assuming it.
+    new_embedding_layer = _get_embedding_layer(new_model, embedding_layer_name)
+    target_vocab_size = int(new_embedding_layer.weights[0].shape[0])
+
     new_embedding_weights = _create_expanded_embedding_weights(
         old_weights=old_weights,
         old_alphabet=old_alphabet,
         new_alphabet=new_alphabet,
         initialization_strategy=initialization_strategy,
         random_seed=random_seed,
+        target_vocab_size=target_vocab_size,
     )
 
-    # For dlomix models (subclassed), use safe in-place modification
-    # For functional/sequential models, this approach also works well
-    new_embedding_layer = tf.keras.layers.Embedding(
-        input_dim=new_vocab_size,
-        output_dim=embedding_dim,
-        input_length=embedding_layer.input_length,
-        name=embedding_layer_name,
-        mask_zero=embedding_layer.mask_zero,
-        trainable=embedding_layer.trainable,
+    _transfer_weights(
+        old_model=model,
+        new_model=new_model,
+        embedding_layer_name=embedding_layer_name,
+        new_embedding_weights=new_embedding_weights,
     )
-
-    # Build the layer so it can accept weights
-    # Use the same input_shape as the old embedding layer
-    if (
-        hasattr(embedding_layer, "input_shape")
-        and embedding_layer.input_shape is not None
-    ):
-        new_embedding_layer.build(embedding_layer.input_shape)
-    else:
-        # Build with a standard input shape for sequence models
-        new_embedding_layer.build((None, None))
-
-    # Set the new weights
-    new_embedding_layer.set_weights([new_embedding_weights])
-
-    # Replace the embedding layer.
-    # Subclassed models (all dlomix models) expose the layer as a direct Python
-    # attribute, so setattr rewires the forward pass immediately.
-    # Keras functional/sequential models do not support in-place layer replacement
-    # without a full graph rebuild, so we raise rather than silently do nothing.
-    if hasattr(model, embedding_layer_name):
-        setattr(model, embedding_layer_name, new_embedding_layer)
-    else:
-        raise ValueError(
-            f"Cannot replace embedding layer '{embedding_layer_name}' on this model. "
-            "Vocabulary expansion requires a subclassed model that exposes the embedding "
-            f"as a direct attribute (self.{embedding_layer_name}). All dlomix models "
-            "(PrositIntensityPredictor, PrositRetentionTimePredictor, etc.) are subclassed "
-            "and are supported. Keras functional/sequential models are not."
-        )
-
-    # Update model attributes if they exist
-    if hasattr(model, "alphabet"):
-        model.alphabet = dict(new_alphabet)
-    if hasattr(model, "embeddings_count"):
-        model.embeddings_count = new_vocab_size
 
     logger.info("Vocabulary expansion completed successfully")
-    return model
+    return new_model
+
+
+def _rebuild_model_with_alphabet(
+    model: tf.keras.Model, new_alphabet: Dict[str, int]
+) -> tf.keras.Model:
+    """Recreate ``model`` from its config with ``new_alphabet``, built to the same shape.
+
+    The returned model has freshly initialized weights; the caller is responsible
+    for transferring them across.
+    """
+    config = model.get_config()
+    if "alphabet" not in config:
+        raise ValueError(
+            f"{type(model).__name__}.get_config() does not expose an 'alphabet' entry, "
+            "so its vocabulary cannot be expanded. Vocabulary expansion requires a model "
+            "that serializes its alphabet (PrositIntensityPredictor, "
+            "PrositRetentionTimePredictor, ChargeStatePredictor, ...)."
+        )
+    config["alphabet"] = dict(new_alphabet)
+    new_model = type(model).from_config(config)
+
+    build_config = model.get_build_config() or {}
+    if not build_config.get("input_shape"):
+        raise ValueError(
+            "The model must be built before its vocabulary can be expanded, so that the "
+            "rebuilt model can be given the same input shape. Call model.build(input_shape) "
+            "or run one forward pass first."
+        )
+    new_model.build_from_config(build_config)
+    return new_model
+
+
+def _transfer_weights(
+    old_model: tf.keras.Model,
+    new_model: tf.keras.Model,
+    embedding_layer_name: str,
+    new_embedding_weights: np.ndarray,
+) -> None:
+    """Copy every weight from ``old_model`` to ``new_model`` except the embedding.
+
+    The two models are the same class built from the same config, so their
+    ``weights`` lists line up positionally. Names cannot be used for matching:
+    Keras appends a global counter to auto-generated layer names, so the same
+    layer is called ``sequential_3`` in one instance and ``sequential_9`` in the
+    next. Every pair is shape-checked, and the embedding receives
+    ``new_embedding_weights`` instead of a copy.
+    """
+    old_weights, new_weights = old_model.weights, new_model.weights
+    if len(old_weights) != len(new_weights):
+        raise ValueError(
+            f"The rebuilt model has {len(new_weights)} weight tensors but the original has "
+            f"{len(old_weights)}. This usually means get_config() omits a parameter that "
+            "changes the architecture."
+        )
+
+    embedding_variable_ids = {
+        id(variable)
+        for variable in _get_embedding_layer(new_model, embedding_layer_name).weights
+    }
+
+    transferred = 0
+    for old_weight, new_weight in zip(old_weights, new_weights):
+        if id(new_weight) in embedding_variable_ids:
+            new_weight.assign(new_embedding_weights)
+            continue
+
+        if tuple(old_weight.shape) != tuple(new_weight.shape):
+            raise ValueError(
+                f"Shape mismatch while transferring '{new_weight.path}': the original weight "
+                f"is {tuple(old_weight.shape)} but the rebuilt one is {tuple(new_weight.shape)}. "
+                "Only the embedding is expected to change shape during vocabulary expansion."
+            )
+
+        new_weight.assign(old_weight)
+        transferred += 1
+
+    logger.info(
+        f"Transferred {transferred} non-embedding weight tensors to the rebuilt model"
+    )
 
 
 def _create_expanded_embedding_weights(
@@ -341,11 +390,26 @@ def _create_expanded_embedding_weights(
     new_alphabet: Dict[str, int],
     initialization_strategy: str,
     random_seed: Optional[int],
+    target_vocab_size: Optional[int] = None,
 ) -> np.ndarray:
-    """Create expanded embedding weights matrix with transferred and initialized embeddings."""
+    """Create expanded embedding weights matrix with transferred and initialized embeddings.
+
+    ``target_vocab_size`` is the number of rows the matrix must have. It defaults
+    to ``len(new_alphabet)``, but models that reserve extra slots (e.g. for
+    padding or termini tokens) size their embedding larger than the alphabet.
+    """
 
     embedding_dim = old_weights.shape[1]
-    new_vocab_size = len(new_alphabet)
+    new_vocab_size = (
+        len(new_alphabet) if target_vocab_size is None else target_vocab_size
+    )
+
+    max_index = max(new_alphabet.values(), default=-1)
+    if max_index >= new_vocab_size:
+        raise ValueError(
+            f"Alphabet index {max_index} is out of range for an embedding with "
+            f"{new_vocab_size} rows. The alphabet indices must fit the embedding size."
+        )
 
     if random_seed is not None:
         np.random.seed(random_seed)

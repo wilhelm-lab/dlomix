@@ -220,8 +220,10 @@ class TestSetupAndFinetune:
         pipeline.finetune()
         returned_path = pipeline.save()
 
-        assert returned_path == out_path
-        assert Path(out_path).exists()
+        # Keras 3 only writes to a .keras path, so save() normalises the
+        # extension and reports the file it actually wrote.
+        assert returned_path == out_path + ".keras"
+        assert Path(returned_path).exists()
 
     def test_best_fit_kwargs_forwarded_to_load_and_adapt(
         self,

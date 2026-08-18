@@ -39,6 +39,23 @@ logger = logging.getLogger(__name__)
 _IS_TORCH = _BACKEND in PYTORCH_BACKEND
 
 
+_KERAS_MODEL_SUFFIXES = (".keras", ".h5")
+
+
+def _ensure_keras_extension(destination: str) -> str:
+    """Return ``destination`` with a Keras-writable suffix.
+
+    Keras 3 refuses to save to a path that does not end in ``.keras`` or
+    ``.h5``, so a bare path (including the default ``./finetuned_model``) is
+    given a ``.keras`` suffix rather than failing at the end of a training run.
+    """
+    if destination.endswith(_KERAS_MODEL_SUFFIXES):
+        return destination
+    adjusted = f"{destination}.keras"
+    logger.info("Appended '.keras' to the save path: '%s'", adjusted)
+    return adjusted
+
+
 class FineTunePipeline:
     """Fine-tuning pipeline for DLomix fragment ion intensity models.
 
@@ -400,8 +417,10 @@ class FineTunePipeline:
         Parameters
         ----------
         path:
-            Destination directory or file path.  Falls back to
-            ``self.output_model_path`` when omitted.
+            Destination file path.  Falls back to ``self.output_model_path``
+            when omitted.  Keras 3 only writes to a path ending in ``.keras``
+            (or ``.h5``), so a ``.keras`` suffix is appended when the path has
+            neither; the returned value reflects the file actually written.
         overwrite:
             If False (default) raise :exc:`FileExistsError` when ``path``
             already exists, matching the behaviour of
@@ -413,7 +432,7 @@ class FineTunePipeline:
             The path the model was saved to.
         """
         self._require_setup()
-        destination = path or self.output_model_path
+        destination = _ensure_keras_extension(path or self.output_model_path)
         if Path(destination).exists() and not overwrite:
             raise FileExistsError(
                 f"'{destination}' already exists. Set overwrite=True to replace it."

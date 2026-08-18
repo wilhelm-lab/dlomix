@@ -1,6 +1,7 @@
 import tensorflow as tf
 
 from ..constants import ALPHABET_UNMOD
+from ._alphabet import validate_alphabet_size
 
 
 @tf.keras.utils.register_keras_serializable(package="dlomix")
@@ -37,8 +38,10 @@ class RetentionTimePredictor(tf.keras.Model):
         self.encoder_type = encoder
         self.alphabet = dict(alphabet)
 
-        # tie the count of embeddings to the size of the vocabulary (count of amino acids)
-        self.embeddings_count = len(alphabet) + 2
+        # the vocabulary already carries the padding and unknown tokens, so its
+        # length is exactly the number of embedding rows needed
+        validate_alphabet_size(alphabet, type(self).__name__)
+        self.embeddings_count = len(alphabet)
 
         self.embedding = tf.keras.layers.Embedding(
             input_dim=self.embeddings_count,
@@ -77,16 +80,6 @@ class RetentionTimePredictor(tf.keras.Model):
                     tf.keras.layers.LSTM(256),
                 ]
             )
-
-    def build(self, input_shape):
-        # Keras 3 does not build the sublayers of a subclassed model from an
-        # input shape alone; run one forward pass on a dummy input to
-        # instantiate the weights. self.call is used (rather than self(...))
-        # to avoid re-triggering build via __call__.
-        if not self.built:
-            seq_len = input_shape[-1] if input_shape[-1] is not None else 1
-            self.call(tf.zeros((1, seq_len)))
-        super().build(input_shape)
 
     def call(self, inputs, **kwargs):
         x = self.embedding(inputs)

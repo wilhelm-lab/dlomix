@@ -6,6 +6,7 @@ import tensorflow as tf
 from ..constants import ALPHABET_UNMOD
 from ..data.processing.feature_extractors import FEATURE_EXTRACTORS_PARAMETERS
 from ..layers.attention import AttentionLayer, DecoderAttentionLayer
+from ._alphabet import validate_alphabet_size
 
 logger = logging.getLogger("dlomix.models.prosit")
 
@@ -49,6 +50,7 @@ class PrositRetentionTimePredictor(tf.keras.Model):
         super(PrositRetentionTimePredictor, self).__init__(**kwargs)
 
         # tie the count of embeddings to the size of the vocabulary (count of amino acids)
+        validate_alphabet_size(alphabet, type(self).__name__)
         self.embeddings_count = len(alphabet)
 
         self.dropout_rate = dropout_rate
@@ -91,16 +93,6 @@ class PrositRetentionTimePredictor(tf.keras.Model):
                 tf.keras.layers.Dropout(rate=self.dropout_rate),
             ]
         )
-
-    def build(self, input_shape):
-        # Keras 3 does not build the sublayers of a subclassed model from an
-        # input shape alone; run one forward pass on a dummy input to
-        # instantiate the weights. self.call is used (rather than self(...))
-        # to avoid re-triggering build via __call__.
-        if not self.built:
-            seq_len = input_shape[-1] if input_shape[-1] is not None else 1
-            self.call(tf.zeros((1, seq_len)))
-        super().build(input_shape)
 
     def call(self, inputs, **kwargs):
         x = self.embedding(inputs)
@@ -325,6 +317,7 @@ class PrositIntensityPredictor(tf.keras.Model):
         )
 
         # tie the count of embeddings to the size of the vocabulary (count of amino acids)
+        validate_alphabet_size(self.alphabet, type(self).__name__)
         self.embeddings_count = len(self.alphabet)
 
     def _build_embedding_layers(self):
@@ -424,19 +417,11 @@ class PrositIntensityPredictor(tf.keras.Model):
             ]
         )
 
-    def build(self, input_shape):
-        # In Keras 3, build() no longer routes through call(), so input-key
-        # validation that used to happen on the first call is performed here
-        # to keep build-time validation behavior.
-        if isinstance(input_shape, dict):
-            self._validate_input_keys(input_shape)
-        super().build(input_shape)
-
     def _validate_input_keys(self, inputs):
         """Validate that the required input keys are present in ``inputs``.
 
-        ``inputs`` may be either a dict of tensors (from ``call``) or a dict of
-        shapes (from ``build``); only the keys are inspected.
+        Only the keys are inspected, so this accepts either a dict of tensors or
+        a dict of shapes.
         """
         missing_input_keys = [k for k in self.input_keys.values() if k not in inputs]
         if missing_input_keys:
@@ -475,9 +460,7 @@ class PrositIntensityPredictor(tf.keras.Model):
         return x
 
     def _forward_dict(self, inputs, **kwargs):
-        missing_input_keys = [k for k in self.input_keys.values() if k not in inputs]
-        if missing_input_keys:
-            raise ValueError(f"Missing required input keys: {missing_input_keys}")
+        self._validate_input_keys(inputs)
 
         meta_data = []
         encoded_meta = None
@@ -491,24 +474,12 @@ class PrositIntensityPredictor(tf.keras.Model):
 
         # collect meta data from the input dict
         if self.use_meta_data:
-            missing_meta_keys = [k for k in self.meta_data_keys if k not in inputs]
-            if missing_meta_keys:
-                raise ValueError(
-                    f"Missing required metadata inputs: {missing_meta_keys}"
-                )
-
             meta_data.extend(
                 self._collect_values_from_inputs_if_exists(inputs, self.meta_data_keys)
             )
 
         # collect PTM features from the input dict
         if self.use_prosit_ptm_features:
-            ptm_keys_exist = [k for k in self.PTM_INPUT_KEYS if k in inputs]
-            if not ptm_keys_exist:
-                raise ValueError(
-                    f"At least one PTM input feature is required when use_prosit_ptm_features=True. Missing all of: {self.PTM_INPUT_KEYS}"
-                )
-
             ptm_ac_features = self._collect_values_from_inputs_if_exists(
                 inputs, PrositIntensityPredictor.PTM_INPUT_KEYS
             )
