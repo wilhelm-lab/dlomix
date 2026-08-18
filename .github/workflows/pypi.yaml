@@ -19,7 +19,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - name: Set up Python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@v7
         with:
           python-version: '3.11'
       - name: Install dependencies
@@ -30,7 +30,7 @@ jobs:
         run: python -m build
       - name: Publish to PyPI
         id: publishpypi
-        uses: pypa/gh-action-pypi-publish@v1.14.0
+        uses: pypa/gh-action-pypi-publish@v1.14.2
       - name: Create Github release
         if: steps.publishpypi.outcome == 'success'
         env:
