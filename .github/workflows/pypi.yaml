@@ -36,5 +36,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.CLI_GH_TOKEN }}
         run: |
-          VERSION=$(python setup.py --version)
+          # Read the version from the same file setup.py reads; invoking setup.py
+          # directly is deprecated by setuptools.
+          VERSION=$(python -c "m = {}; exec(open('src/dlomix/_metadata.py').read(), m); print(m['__version__'])")
           gh release create v$VERSION --title $VERSION --generate-notes

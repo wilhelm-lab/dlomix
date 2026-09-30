@@ -1,5 +1,3 @@
-import platform
-
 import setuptools
 
 with open("README.md", "r") as fh:
@@ -16,20 +14,26 @@ def get_metadata():
 # Load metadata
 META_DATA = get_metadata()
 
-# for apple silicon stay <= 2.20, current collision issue for Tensorflow 2.20 with pyarrow
+# Upper bound = the newest TensorFlow CI actually installs and tests. Raise it
+# deliberately after CI passes on the new release, rather than letting users
+# silently pick up an untested minor version.
+# The floor: numpy>=2.0 (a core requirement) rules out TF 2.16/2.17, which pin numpy<2.
+TENSORFLOW_VERSION = ">=2.18,<2.22"
+# macOS: TF 2.20 collides with pyarrow, so stay below it there.
+TENSORFLOW_VERSION_MACOS = ">=2.18,<2.20"
 
-if platform.system() == "Darwin":
-    apple_silicon_constraint = "<2.20,"
-else:
-    apple_silicon_constraint = ""
-
+# Platform differences are expressed as environment markers, evaluated on the
+# installing machine. A build-time platform check would be baked into the
+# py3-none-any wheel for every platform.
 tensorflow_extra_install = [
-    f"tensorflow{apple_silicon_constraint}>=2.16",  # TF 2.16+ ships Keras 3 as default; dlomix targets Keras 3
+    f"tensorflow{TENSORFLOW_VERSION_MACOS}; platform_system == 'Darwin'",
+    f"tensorflow{TENSORFLOW_VERSION}; platform_system != 'Darwin'",
 ]
 
 pytorch_extra_install = [
-    "torch",
-    "torchvision",
+    # torch does not declare numpy as a dependency; builds before 2.3 were compiled
+    # against NumPy 1.x and fail at import under NumPy 2.
+    "torch>=2.3",
 ]
 
 setuptools.setup(
