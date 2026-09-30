@@ -16,19 +16,7 @@ Submodules
    :undoc-members:
 
 
-.. automodule:: dlomix.eval.chargestate_torch
-   :members:
-   :show-inheritance:
-   :undoc-members:
-
-
 .. automodule:: dlomix.eval.rt_eval
-   :members:
-   :show-inheritance:
-   :undoc-members:
-
-
-.. automodule:: dlomix.eval.rt_eval_torch
    :members:
    :show-inheritance:
    :undoc-members:

@@ -1,19 +1,12 @@
-from ..config import _BACKEND, PYTORCH_BACKEND, TENSORFLOW_BACKEND
+from ..config import _BACKEND, PYTORCH_BACKEND
 
-__all__ = []
+# The intensity losses are backend-agnostic (keras.ops) and shared by both backends.
+from .intensity import masked_pearson_correlation_distance, masked_spectral_distance
 
-if _BACKEND in TENSORFLOW_BACKEND:
-    from .intensity import masked_pearson_correlation_distance, masked_spectral_distance
+__all__ = ["masked_pearson_correlation_distance", "masked_spectral_distance"]
 
-elif _BACKEND in PYTORCH_BACKEND:
-    from .intensity_torch import (
-        masked_pearson_correlation_distance,
-        masked_spectral_distance,
-    )
+if _BACKEND in PYTORCH_BACKEND:
+    # Ionmob is a PyTorch-only model, and its loss is a stateful nn.Module.
     from .ionmob_torch import MaskedIonmobLoss
 
-    __all__.append(
-        "MaskedIonmobLoss",
-    )
-
-__all__.extend(["masked_pearson_correlation_distance", "masked_spectral_distance"])
+    __all__.append("MaskedIonmobLoss")

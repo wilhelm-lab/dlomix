@@ -9,7 +9,7 @@ import torch
 from tqdm import tqdm
 
 from dlomix.data import FragmentIonIntensityDataset
-from dlomix.losses.intensity_torch import masked_spectral_distance
+from dlomix.losses import masked_spectral_distance
 from dlomix.models import PrositIntensityPredictor
 
 logging.basicConfig(
@@ -55,7 +55,12 @@ model = PrositIntensityPredictor(
 
 optimizer = torch.optim.Adam(params=model.parameters(), lr=0.0001)
 
-loss_criterion = masked_spectral_distance
+
+def loss_criterion(y_true, y_pred):
+    # masked_spectral_distance is shared with the TensorFlow backend and returns
+    # one value per sample, so reduce it before calling .backward().
+    return masked_spectral_distance(y_true, y_pred).mean()
+
 
 for epoch in tqdm(range(0, N_EPOCHS)):
     epoch_loss = 0
