@@ -6,6 +6,7 @@ import torch
 import torch.nn as nn
 
 from ..constants import ALPHABET_UNMOD
+from ..data.processing.chain import padded_sequence_length
 from ..data.processing.feature_extractors import FEATURE_EXTRACTORS_PARAMETERS
 from ..layers.attention_torch import AttentionLayer
 from ..layers.bi_gru_seq_encoder_torch import BiGRUSequentialEncoder
@@ -293,9 +294,7 @@ class PrositIntensityPredictor(nn.Module):
         # Compute derived attributes (will be recomputed during deserialization)
         self.max_ion = self.raw_seq_length - 1
 
-        self.seq_length = (
-            self.raw_seq_length + 2 if self.with_termini else self.raw_seq_length
-        )
+        self.seq_length = padded_sequence_length(self.raw_seq_length, self.with_termini)
 
         # tie the count of embeddings to the size of the vocabulary (count of amino acids)
         self.embeddings_count = len(self.alphabet)

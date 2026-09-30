@@ -5,6 +5,7 @@ import keras
 import tensorflow as tf
 
 from ..constants import ALPHABET_UNMOD
+from ..data.processing.chain import padded_sequence_length
 from ..data.processing.feature_extractors import FEATURE_EXTRACTORS_PARAMETERS
 from ..layers.attention import AttentionLayer, DecoderAttentionLayer
 from ._alphabet import validate_alphabet_size
@@ -313,9 +314,7 @@ class PrositIntensityPredictor(tf.keras.Model):
         self.max_ion = self.raw_seq_length - 1
 
         # computed for reference only on the total sequence length including termini, but not used directly
-        self.seq_length = (
-            self.raw_seq_length + 2 if self.with_termini else self.raw_seq_length
-        )
+        self.seq_length = padded_sequence_length(self.raw_seq_length, self.with_termini)
 
         # tie the count of embeddings to the size of the vocabulary (count of amino acids)
         validate_alphabet_size(self.alphabet, type(self).__name__)
