@@ -1,7 +1,6 @@
 import functools
 
 import numpy as np
-import tensorflow as tf
 
 from ..losses import masked_spectral_distance
 
@@ -108,6 +107,10 @@ def calculate_spectral_angle(true, pred, batch_size=600):
 
 def get_spectral_angle(true, pred, batch_size=600):
     """Legacy sepctral angle calculation using TensorFlow 1.x session"""
+    # Imported here, not at module level: this opt-in legacy path is the only
+    # TensorFlow use in reports/, which must stay importable on the PyTorch backend.
+    import tensorflow as tf
+
     n = true.shape[0]
     sa = np.zeros([n])
 
