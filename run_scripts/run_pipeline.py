@@ -1,5 +1,5 @@
 from dlomix.data import RetentionTimeDataset
-from dlomix.eval import TimeDeltaMetric, TimeDeltaMetric2
+from dlomix.eval import TimeDeltaMetric
 
 # data path
 from dlomix.models import RetentionTimePredictor

@@ -156,7 +156,7 @@ class DetectabilityReport(Report):
         )
 
         for i, label in enumerate(CLASSES_LABELS):
-            df_data_results[label] = np.round_(
+            df_data_results[label] = np.round(
                 np.array(self.results_metrics_dict["probabilities"])[:, i], decimals=3
             )
 
@@ -724,7 +724,7 @@ class predictions_report:
         )
 
         for i, label in enumerate(CLASSES_LABELS):
-            df_data_results[label] = np.round_(
+            df_data_results[label] = np.round(
                 np.array(self.predictions)[:, i], decimals=3
             )
 
@@ -734,7 +734,7 @@ class predictions_report:
             + df_data_results["Strong Flyer"]
         )
         # df_data_results['Flyer'] = round(df_data_results['Flyer'], ndigits = 3)
-        df_data_results["Flyer"] = np.round_(df_data_results["Flyer"], decimals=3)
+        df_data_results["Flyer"] = np.round(df_data_results["Flyer"], decimals=3)
         df_data_results["Binary Predictions"] = np.where(
             df_data_results["Predictions"] == 0, 0, 1
         )

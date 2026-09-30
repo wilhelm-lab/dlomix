@@ -2,7 +2,7 @@ import pickle
 
 import tensorflow as tf
 
-from dlomix.data.RetentionTimeDataset import RetentionTimeDataset
+from dlomix.data import RetentionTimeDataset
 from dlomix.eval import TimeDeltaMetric
 from dlomix.models.deepLC import DeepLCRetentionTimePredictor
 
