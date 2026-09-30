@@ -30,6 +30,19 @@ tensorflow_extra_install = [
     f"tensorflow{TENSORFLOW_VERSION}; platform_system != 'Darwin'",
 ]
 
+# CUDA-enabled TensorFlow for Linux GPU machines. tensorflow[and-cuda] installs
+# CUDA/cuDNN as pip wheels, which NVIDIA publishes only for Linux; TF's own extra
+# carries no platform markers, so ungated it fails to resolve on macOS/Windows.
+# Gated here, the extra degrades to the regular build on other platforms.
+# Deliberately not part of `dev`: CI has no GPU and should not download CUDA.
+tensorflow_cuda_extra_install = [
+    f"tensorflow[and-cuda]{TENSORFLOW_VERSION}; platform_system == 'Linux'",
+    f"tensorflow{TENSORFLOW_VERSION_MACOS}; platform_system == 'Darwin'",
+    f"tensorflow{TENSORFLOW_VERSION}; "
+    "platform_system != 'Linux' and platform_system != 'Darwin'",
+]
+
+# PyTorch needs no GPU extra: its Linux wheels on PyPI are already CUDA builds.
 pytorch_extra_install = [
     # torch does not declare numpy as a dependency; builds before 2.3 were compiled
     # against NumPy 1.x and fail at import under NumPy 2.
@@ -83,6 +96,8 @@ setuptools.setup(
         ],
         "tensorflow": tensorflow_extra_install,
         "tf": tensorflow_extra_install,
+        "tensorflow-cuda": tensorflow_cuda_extra_install,
+        "tf-cuda": tensorflow_cuda_extra_install,
         "torch": pytorch_extra_install,
         "pytorch": pytorch_extra_install,
         "lightning": [
