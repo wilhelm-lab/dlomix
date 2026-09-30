@@ -33,10 +33,11 @@ format:
 	black ./src/dlomix/*.py
 	black ./run_scripts/*.py
 	black ./tests/*.py
+	black ./scripts/*.py
 
 format-check:
-	black --check ./src/dlomix ./run_scripts ./tests
-	isort --profile black --check-only ./src/dlomix ./run_scripts ./tests
+	black --check ./src/dlomix ./run_scripts ./tests ./scripts
+	isort --profile black --check-only ./src/dlomix ./run_scripts ./tests ./scripts
 
 lint:
 	pylint --disable=R,C ./src/dlomix/*
