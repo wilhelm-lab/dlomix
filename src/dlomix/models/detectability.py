@@ -27,6 +27,35 @@ class DetectabilityModel(tf.keras.Model):
         self.encoder = Encoder(self.num_units, padding_char=self.padding_char)
         self.decoder = Decoder(self.num_units, self.num_classes)
 
+    def build(self, input_shape):
+        """Instantiate the sub-layer weights from the sequence input shape.
+
+        Keras 3's default ``Model.build`` only flips the ``built`` flag -- it never
+        creates the weights of sub-layers that were constructed in ``__init__``.
+        Without this override, ``model.build(input_shape)`` left the model with zero
+        variables, and a subsequent ``load_weights`` matched that empty structure and
+        silently loaded **nothing**: no error, and the first forward pass then created
+        fresh random weights. Fine-tuning from a checkpoint appeared to work while
+        actually training from scratch.
+        """
+        batch_size, seq_len = input_shape[0], input_shape[-1]
+
+        # call() one-hot encodes the integer sequence before the encoder sees it.
+        self.encoder.build((batch_size, seq_len, self.alphabet_size))
+
+        # The encoder is bidirectional, so its outputs and the concatenated
+        # forward/backward states are both 2 * num_units wide.
+        state_shape = (batch_size, self.num_units)
+        self.decoder.build(
+            {
+                "decoder_outputs": (batch_size, 2 * self.num_units),
+                "state_f": state_shape,
+                "state_b": state_shape,
+                "encoder_outputs": (batch_size, seq_len, 2 * self.num_units),
+            }
+        )
+        super().build(input_shape)
+
     def call(self, inputs):
         onehot_inputs = tf.one_hot(tf.cast(inputs, "int32"), depth=self.alphabet_size)
         enc_outputs, enc_state_f, enc_state_b = self.encoder(onehot_inputs)
