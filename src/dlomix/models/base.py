@@ -1,10 +1,11 @@
+import keras
 import tensorflow as tf
 
 from ..constants import ALPHABET_UNMOD
 from ._alphabet import validate_alphabet_size
 
 
-@tf.keras.utils.register_keras_serializable(package="dlomix")
+@keras.saving.register_keras_serializable(package="dlomix")
 class RetentionTimePredictor(tf.keras.Model):
     """
     A simple class for Retention Time prediction models.

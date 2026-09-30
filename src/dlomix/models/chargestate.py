@@ -1,5 +1,6 @@
 import warnings
 
+import keras
 import tensorflow as tf
 
 from ..constants import ALPHABET_UNMOD
@@ -24,7 +25,7 @@ The model is provided in three flavours of predicting precursor charge states:
 """
 
 
-@tf.keras.utils.register_keras_serializable(package="dlomix")
+@keras.saving.register_keras_serializable(package="dlomix")
 class ChargeStatePredictor(tf.keras.Model):
     """
     Precursor Charge State Prediction Model for predicting either:

@@ -1,10 +1,11 @@
+import keras
 import numpy as np
 import tensorflow as tf
 
 from ..constants import CLASSES_LABELS, padding_char
 
 
-@tf.keras.utils.register_keras_serializable(package="dlomix")
+@keras.saving.register_keras_serializable(package="dlomix")
 class DetectabilityModel(tf.keras.Model):
     def __init__(
         self,
@@ -57,7 +58,7 @@ class DetectabilityModel(tf.keras.Model):
         return config
 
 
-@tf.keras.utils.register_keras_serializable(package="dlomix")
+@keras.saving.register_keras_serializable(package="dlomix")
 class Encoder(tf.keras.layers.Layer):
     def __init__(self, units, name="encoder", padding_char=padding_char, **kwargs):
         super(Encoder, self).__init__(name=name, **kwargs)
@@ -105,7 +106,7 @@ class Encoder(tf.keras.layers.Layer):
         return config
 
 
-@tf.keras.utils.register_keras_serializable(package="dlomix")
+@keras.saving.register_keras_serializable(package="dlomix")
 class BahdanauAttention(tf.keras.layers.Layer):
     def __init__(self, units, name="attention_layer", **kwargs):
         super(BahdanauAttention, self).__init__(name=name, **kwargs)
@@ -151,7 +152,7 @@ class BahdanauAttention(tf.keras.layers.Layer):
         return config
 
 
-@tf.keras.utils.register_keras_serializable(package="dlomix")
+@keras.saving.register_keras_serializable(package="dlomix")
 class Decoder(tf.keras.layers.Layer):
     def __init__(self, units, num_classes, name="decoder", **kwargs):
         super(Decoder, self).__init__(name=name, **kwargs)

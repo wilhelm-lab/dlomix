@@ -1,8 +1,9 @@
+import keras
 import numpy as np
 import tensorflow as tf
 
 
-@tf.keras.utils.register_keras_serializable("dlomix")
+@keras.saving.register_keras_serializable(package="dlomix")
 class CyclicLR(tf.keras.callbacks.Callback):
     """This callback implements a cyclical learning rate policy (CLR).
     The method cycles the learning rate between two boundaries with

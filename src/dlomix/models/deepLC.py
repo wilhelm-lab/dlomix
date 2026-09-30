@@ -1,9 +1,10 @@
+import keras
 import tensorflow as tf
 
 from ..constants import ALPHABET_UNMOD
 
 
-@tf.keras.utils.register_keras_serializable(package="dlomix")
+@keras.saving.register_keras_serializable(package="dlomix")
 class DeepLCRetentionTimePredictor(tf.keras.Model):
     """
     DeepLC multi-branch CNN.

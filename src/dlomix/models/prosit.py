@@ -1,6 +1,7 @@
 import logging
 from collections.abc import Sequence
 
+import keras
 import tensorflow as tf
 
 from ..constants import ALPHABET_UNMOD
@@ -11,7 +12,7 @@ from ._alphabet import validate_alphabet_size
 logger = logging.getLogger("dlomix.models.prosit")
 
 
-@tf.keras.utils.register_keras_serializable(package="dlomix")
+@keras.saving.register_keras_serializable(package="dlomix")
 class PrositRetentionTimePredictor(tf.keras.Model):
     """
     Implementation of the Prosit model for retention time prediction.
@@ -126,7 +127,7 @@ class PrositRetentionTimePredictor(tf.keras.Model):
         return cls(**config)
 
 
-@tf.keras.utils.register_keras_serializable(package="dlomix")
+@keras.saving.register_keras_serializable(package="dlomix")
 class PrositIntensityPredictor(tf.keras.Model):
     """
     Prosit model for intensity prediction with configurable branches for PTM features and metadata.
