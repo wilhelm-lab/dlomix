@@ -15,7 +15,7 @@ The PyTorch implementation was largely introduced during a hackathon as part of 
 DLOmix automatically detects and uses the appropriate backend based on your environment setup. You can control which backend to use through the `DLOMIX_BACKEND` environment variable:
 
 ### TensorFlow Backend (Default)
-The TensorFlow backend requires **TensorFlow 2.16+ (Keras 3)**.
+The TensorFlow backend requires **TensorFlow 2.18+ (Keras 3)**; the PyTorch backend requires **PyTorch 2.3+**.
 ```bash
 # Set TensorFlow as backend (default)
 export DLOMIX_BACKEND=tensorflow
@@ -46,6 +46,22 @@ pip install dlomix
 ```
 
 **Note**: The backend must be set **before** importing DLOmix. If no backend is specified, DLOmix defaults to TensorFlow with a user warning.
+
+### GPU Support (Linux, NVIDIA)
+
+**TensorFlow** needs its CUDA libraries installed explicitly. The `tf-cuda` extra installs them as pip packages through `tensorflow[and-cuda]`, so no system-wide CUDA toolkit is needed — only an NVIDIA driver:
+```bash
+pip install "dlomix[tf-cuda]"
+```
+NVIDIA publishes these CUDA wheels for Linux only. On macOS and Windows the `tf-cuda` extra installs the regular TensorFlow build instead of failing.
+
+**PyTorch** needs no extra: its Linux wheels on PyPI are already CUDA builds, so `pip install "dlomix[pytorch]"` is enough. Recent PyTorch releases target a recent CUDA version, which requires a correspondingly recent NVIDIA driver. On an older driver, install PyTorch from the matching CUDA index given by the [PyTorch install selector](https://pytorch.org/get-started/locally/), then install DLOmix.
+
+To check what your environment sees — backend, versions, and GPUs visible to the active backend:
+```bash
+python -m dlomix
+```
+Please include this output when reporting a bug. If a GPU is present but not detected, the usual causes are a driver that is too old for the CUDA version shown, or an `LD_LIBRARY_PATH` pointing at a different system CUDA installation.
 
 ## Usage
 Experiment a simple retention time prediction use-case using Google Colab &nbsp;&nbsp; [![Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/wilhelm-lab/dlomix/blob/develop/notebooks/Example_RTModel_Walkthrough_colab.ipynb)
