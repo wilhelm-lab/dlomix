@@ -1,8 +1,4 @@
-"""Ionmob loss for the TensorFlow backend, written against ``keras.ops``.
-
-Same constructor and call signature as the PyTorch ``nn.Module`` in
-:mod:`dlomix.losses.ionmob_torch`, and the same values for the same inputs.
-"""
+"""Ionmob loss, written once against ``keras.ops`` and shared by both backends."""
 
 import keras
 from keras import ops
@@ -36,7 +32,9 @@ class MaskedIonmobLoss:
         Returns:
             Combined loss of predicted CCS and masked CCS STD.
         """
-        ccs_output, ccs_std_output = outputs
+        # on PyTorch, keras.ops moves every tensor to Keras' device, so inputs on
+        # another device (e.g. CPU tensors on a Mac) must be converted too
+        ccs_output, ccs_std_output = map(ops.convert_to_tensor, outputs)
         target_ccs, target_ccs_std = targets
 
         # targets may come as (batch,) from a dataset; match the (batch, 1) outputs

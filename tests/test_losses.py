@@ -1,4 +1,4 @@
-"""Behaviour of the shared intensity losses.
+"""Behaviour of the shared losses.
 
 ``dlomix.losses`` has a single ``keras.ops`` implementation that runs on whichever
 backend ``DLOMIX_BACKEND`` selects, so this file is backend-neutral: it feeds plain
@@ -20,6 +20,7 @@ from dlomix.losses.intensity import (
     masked_pearson_correlation_distance,
     masked_spectral_distance,
 )
+from dlomix.losses.ionmob import MaskedIonmobLoss
 
 logger = logging.getLogger(__name__)
 
@@ -169,3 +170,31 @@ def test_gradients_flow_for_the_active_backend():
         gradient = tape.gradient(loss, predictions)
         assert gradient is not None
         assert bool(tf.reduce_all(tf.math.is_finite(gradient)))
+
+
+# MaskedIonmobLoss: CCS error over all samples plus CCS-std error over the samples
+# whose std target is not -1 (MSE: 0.25, 0, 1 -> 0.41667; 0.25, 1 -> 0.625).
+IONMOB_OUTPUTS = ([[1.0], [2.0], [3.0]], [[0.5], [1.0], [2.0]])
+IONMOB_TARGETS = ([[1.5], [2.0], [2.0]], [[1.0], [-1.0], [1.0]])
+
+
+@pytest.mark.parametrize(
+    "use_mse, std_targets, expected",
+    [
+        (True, IONMOB_TARGETS[1], 0.41666667 + 0.625),
+        (False, IONMOB_TARGETS[1], 0.5 + 0.75),
+        (True, [[-1.0], [-1.0], [-1.0]], 0.41666667),  # no std target: std term is 0
+    ],
+)
+def test_masked_ionmob_loss_reference_values(use_mse, std_targets, expected):
+    outputs = tuple(ops.convert_to_tensor(np.float32(o)) for o in IONMOB_OUTPUTS)
+    loss = MaskedIonmobLoss(use_mse=use_mse)(outputs, (IONMOB_TARGETS[0], std_targets))
+    np.testing.assert_allclose(as_numpy(loss), [expected], **TOLERANCE)
+
+
+def test_masked_ionmob_loss_accepts_flat_targets():
+    # datasets yield (batch,) targets for the (batch, 1) model outputs
+    outputs = tuple(ops.convert_to_tensor(np.float32(o)) for o in IONMOB_OUTPUTS)
+    targets = tuple(np.ravel(t) for t in IONMOB_TARGETS)
+    loss = MaskedIonmobLoss()(outputs, targets)
+    np.testing.assert_allclose(as_numpy(loss), [0.41666667 + 0.625], **TOLERANCE)

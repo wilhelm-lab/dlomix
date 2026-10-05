@@ -20,9 +20,3 @@ Submodules
    :members:
    :show-inheritance:
    :undoc-members:
-
-
-.. automodule:: dlomix.losses.ionmob_torch
-   :members:
-   :show-inheritance:
-   :undoc-members:
