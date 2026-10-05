@@ -1,3 +1,8 @@
+[build-system]
+# setuptools 77 added `license_expression` (the SPDX License-Expression field)
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
 [tool.pytest.ini_options]
 log_cli = true
 log_cli_level = "INFO"

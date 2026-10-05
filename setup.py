@@ -62,6 +62,9 @@ setuptools.setup(
     long_description=long_description,
     long_description_content_type="text/markdown",
     url=META_DATA["__github_url__"],
+    # SPDX expression (setuptools>=77, see pyproject.toml); replaces the deprecated
+    # license classifier
+    license_expression="MIT",
     packages=setuptools.find_packages(where="src"),
     package_dir={"": "src"},
     include_package_data=True,
@@ -115,7 +118,6 @@ setuptools.setup(
         "Programming Language :: Python :: 3.11",
         "Programming Language :: Python :: 3.12",
         "Programming Language :: Python :: 3.13",
-        "License :: OSI Approved :: MIT License",
         "Operating System :: OS Independent",
         "Topic :: Scientific/Engineering :: Bio-Informatics",
         "Development Status :: 4 - Beta",
