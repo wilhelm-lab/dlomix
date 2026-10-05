@@ -39,4 +39,14 @@ jobs:
           # Read the version from the same file setup.py reads; invoking setup.py
           # directly is deprecated by setuptools.
           VERSION=$(python -c "m = {}; exec(open('src/dlomix/_metadata.py').read(), m); print(m['__version__'])")
-          gh release create v$VERSION --title $VERSION --generate-notes
+          # the "## [VERSION] - date" section of CHANGELOG.md, without its heading;
+          # fails if the CHANGELOG has no section for this version
+          python - "$VERSION" > release_notes.md <<'EOF'
+          import re, sys
+          text = open("CHANGELOG.md").read()
+          match = re.search(rf"^## \[{re.escape(sys.argv[1])}\][^\n]*\n(.*?)(?=^## \[|\Z)", text, re.M | re.S)
+          if not match:
+              sys.exit(f"CHANGELOG.md has no section for {sys.argv[1]}")
+          print(match.group(1).strip())
+          EOF
+          gh release create v$VERSION --title $VERSION --notes-file release_notes.md
