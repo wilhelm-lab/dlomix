@@ -19,7 +19,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - name: Set up Python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@v7
         with:
           python-version: '3.11'
       - name: Install dependencies
@@ -30,11 +30,13 @@ jobs:
         run: python -m build
       - name: Publish to PyPI
         id: publishpypi
-        uses: pypa/gh-action-pypi-publish@v1.13.0
+        uses: pypa/gh-action-pypi-publish@v1.14.2
       - name: Create Github release
         if: steps.publishpypi.outcome == 'success'
         env:
           GITHUB_TOKEN: ${{ secrets.CLI_GH_TOKEN }}
         run: |
-          VERSION=$(python setup.py --version)
+          # Read the version from the same file setup.py reads; invoking setup.py
+          # directly is deprecated by setuptools.
+          VERSION=$(python -c "m = {}; exec(open('src/dlomix/_metadata.py').read(), m); print(m['__version__'])")
           gh release create v$VERSION --title $VERSION --generate-notes

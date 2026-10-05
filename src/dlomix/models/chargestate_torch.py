@@ -1,4 +1,3 @@
-import warnings
 from collections import OrderedDict
 
 import torch.nn as nn
@@ -6,6 +5,8 @@ import torch.nn as nn
 from ..constants import ALPHABET_UNMOD
 from ..layers.attention_torch import AttentionLayer
 from ..layers.bi_gru_seq_encoder_torch import BiGRUSequentialEncoder
+from ..layers.keras_initializers_torch import init_like_keras
+from ._alphabet import validate_alphabet_size
 
 """
 This module contains a deep learning model for precursor charge state prediction, inspired by Prosit's architecture.
@@ -37,7 +38,9 @@ class ChargeStatePredictor(nn.Module):
 
     Args:
         embedding_output_dim (int): The size of the embedding output dimension. Defaults to 16.
-        seq_length (int): The length of the input sequence. Defaults to 30.
+        seq_length (int): The length of the input sequence. Defaults to 30. Not used to
+            build the model (as in TensorFlow): the layers take the padded length from
+            the first input.
         alphabet (dict): Dictionary mapping for the alphabet (the amino acids in this case). Defaults to ALPHABET_UNMOD.
         dropout_rate (float): The dropout rate used in the encoder layers. Defaults to 0.5.
         latent_dropout_rate (float): The dropout rate for the latent space. Defaults to 0.1.
@@ -46,6 +49,9 @@ class ChargeStatePredictor(nn.Module):
         num_classes (int): The number of classes for the output corresponding to charge states available in the data. Defaults to 6.
         model_flavour (str): The type of precursor charge state prediction to be done.
             Can be either "dominant", "observed" or "relative". Defaults to "relative".
+            As in TensorFlow, "dominant" returns softmax probabilities, so train it with
+            ``nn.NLLLoss()`` on ``torch.log(probabilities)``, not with ``nn.CrossEntropyLoss``
+            (which expects logits).
     """
 
     def __init__(
@@ -62,8 +68,10 @@ class ChargeStatePredictor(nn.Module):
     ):
         super(ChargeStatePredictor, self).__init__()
 
-        # tie the count of embeddings to the size of the vocabulary (count of amino acids)
-        self.embeddings_count = len(alphabet) + 1
+        # the vocabulary already carries the padding and unknown tokens, so its
+        # length is exactly the number of embedding rows needed (as in Keras)
+        validate_alphabet_size(alphabet, type(self).__name__)
+        self.embeddings_count = len(alphabet)
         self.seq_length = seq_length
 
         self.dropout_rate = dropout_rate
@@ -71,33 +79,31 @@ class ChargeStatePredictor(nn.Module):
         self.regressor_layer_size = regressor_layer_size
         self.recurrent_layers_sizes = recurrent_layers_sizes
 
-        if model_flavour == "relative":
-            # regression problem
-            self.final_activation = nn.Identity()  # == "linear activation" in torch
-        elif model_flavour == "observed":
-            # multi-label multi-class classification problem
-            self.final_activation = nn.Sigmoid()
-        elif model_flavour == "dominant":
-            # multi-class classification problem
-            self.final_activation = nn.Identity()
-            # in contrast to tf, don't use Softmax here, cause already included in CrossEntropyLoss, which is to be used for dominant case
-        else:
-            warnings.warn(f"{model_flavour} not available")
-            exit
+        # same output on both backends: probabilities for the classification flavours
+        final_activations = {
+            "relative": nn.Identity,  # regression
+            "observed": nn.Sigmoid,  # multi-label classification
+            "dominant": lambda: nn.Softmax(dim=-1),  # multi-class classification
+        }
+        if model_flavour not in final_activations:
+            raise ValueError(
+                f"Unknown model_flavour {model_flavour!r}, expected one of "
+                f"{sorted(final_activations)}."
+            )
+        self.model_flavour = model_flavour
+        self.final_activation = final_activations[model_flavour]()
 
         self.embedding = nn.Embedding(
             num_embeddings=self.embeddings_count,
             embedding_dim=embedding_output_dim,
-            padding_idx=0,
         )
 
         self.encoder = BiGRUSequentialEncoder(
             embedding_output_dim, self.recurrent_layers_sizes, self.dropout_rate
         )
 
-        self.attention = AttentionLayer(
-            feature_dim=self.recurrent_layers_sizes[1], seq_len=self.seq_length
-        )
+        # the per-position attention bias is sized from the first input, as in Keras
+        self.attention = AttentionLayer(feature_dim=self.recurrent_layers_sizes[1])
 
         self.regressor = nn.Sequential(
             OrderedDict(
@@ -120,6 +126,9 @@ class ChargeStatePredictor(nn.Module):
         )
 
         self.activation = self.final_activation
+
+        # start from the same weight distribution as the Keras model
+        init_like_keras(self)
 
     def forward(self, inputs):
         """

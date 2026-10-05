@@ -1,16 +1,20 @@
 import logging
 from collections.abc import Sequence
 
+import keras
 import tensorflow as tf
 
 from ..constants import ALPHABET_UNMOD
+from ..data.processing.chain import padded_sequence_length
 from ..data.processing.feature_extractors import FEATURE_EXTRACTORS_PARAMETERS
 from ..layers.attention import AttentionLayer, DecoderAttentionLayer
+from ..layers.gru_kernel import gru_kernel_kwargs
+from ._alphabet import validate_alphabet_size
 
 logger = logging.getLogger("dlomix.models.prosit")
 
 
-@tf.keras.utils.register_keras_serializable(package="dlomix")
+@keras.saving.register_keras_serializable(package="dlomix")
 class PrositRetentionTimePredictor(tf.keras.Model):
     """
     Implementation of the Prosit model for retention time prediction.
@@ -44,22 +48,25 @@ class PrositRetentionTimePredictor(tf.keras.Model):
         latent_dropout_rate=0.1,
         recurrent_layers_sizes=(256, 512),
         regressor_layer_size=512,
+        **kwargs,
     ):
-        super(PrositRetentionTimePredictor, self).__init__()
+        super(PrositRetentionTimePredictor, self).__init__(**kwargs)
 
         # tie the count of embeddings to the size of the vocabulary (count of amino acids)
+        validate_alphabet_size(alphabet, type(self).__name__)
         self.embeddings_count = len(alphabet)
 
         self.dropout_rate = dropout_rate
         self.latent_dropout_rate = latent_dropout_rate
         self.regressor_layer_size = regressor_layer_size
-        self.recurrent_layers_sizes = recurrent_layers_sizes
+        self.recurrent_layers_sizes = tuple(recurrent_layers_sizes)
         self.embedding_output_dim = embedding_output_dim
+        self.seq_length = seq_length
+        self.alphabet = dict(alphabet)
 
         self.embedding = tf.keras.layers.Embedding(
             input_dim=self.embeddings_count,
             output_dim=self.embedding_output_dim,
-            input_length=seq_length,
         )
         self._build_encoder()
 
@@ -79,12 +86,16 @@ class PrositRetentionTimePredictor(tf.keras.Model):
             [
                 tf.keras.layers.Bidirectional(
                     tf.keras.layers.GRU(
-                        units=self.recurrent_layers_sizes[0], return_sequences=True
+                        units=self.recurrent_layers_sizes[0],
+                        return_sequences=True,
+                        **gru_kernel_kwargs(),
                     )
                 ),
                 tf.keras.layers.Dropout(rate=self.dropout_rate),
                 tf.keras.layers.GRU(
-                    units=self.recurrent_layers_sizes[1], return_sequences=True
+                    units=self.recurrent_layers_sizes[1],
+                    return_sequences=True,
+                    **gru_kernel_kwargs(),
                 ),
                 tf.keras.layers.Dropout(rate=self.dropout_rate),
             ]
@@ -98,8 +109,31 @@ class PrositRetentionTimePredictor(tf.keras.Model):
         x = self.output_layer(x)
         return x
 
+    def get_config(self):
+        config = super().get_config()
+        config.update(
+            {
+                "embedding_output_dim": self.embedding_output_dim,
+                "seq_length": self.seq_length,
+                "alphabet": self.alphabet,
+                "dropout_rate": self.dropout_rate,
+                "latent_dropout_rate": self.latent_dropout_rate,
+                "recurrent_layers_sizes": list(self.recurrent_layers_sizes),
+                "regressor_layer_size": self.regressor_layer_size,
+            }
+        )
+        return config
 
-@tf.keras.utils.register_keras_serializable(package="dlomix")
+    @classmethod
+    def from_config(cls, config):
+        if "recurrent_layers_sizes" in config and isinstance(
+            config["recurrent_layers_sizes"], list
+        ):
+            config["recurrent_layers_sizes"] = tuple(config["recurrent_layers_sizes"])
+        return cls(**config)
+
+
+@keras.saving.register_keras_serializable(package="dlomix")
 class PrositIntensityPredictor(tf.keras.Model):
     """
     Prosit model for intensity prediction with configurable branches for PTM features and metadata.
@@ -285,11 +319,10 @@ class PrositIntensityPredictor(tf.keras.Model):
         self.max_ion = self.raw_seq_length - 1
 
         # computed for reference only on the total sequence length including termini, but not used directly
-        self.seq_length = (
-            self.raw_seq_length + 2 if self.with_termini else self.raw_seq_length
-        )
+        self.seq_length = padded_sequence_length(self.raw_seq_length, self.with_termini)
 
         # tie the count of embeddings to the size of the vocabulary (count of amino acids)
+        validate_alphabet_size(self.alphabet, type(self).__name__)
         self.embeddings_count = len(self.alphabet)
 
     def _build_embedding_layers(self):
@@ -323,12 +356,16 @@ class PrositIntensityPredictor(tf.keras.Model):
             [
                 tf.keras.layers.Bidirectional(
                     tf.keras.layers.GRU(
-                        units=self.recurrent_layers_sizes[0], return_sequences=True
+                        units=self.recurrent_layers_sizes[0],
+                        return_sequences=True,
+                        **gru_kernel_kwargs(),
                     )
                 ),
                 tf.keras.layers.Dropout(rate=self.dropout_rate),
                 tf.keras.layers.GRU(
-                    units=self.recurrent_layers_sizes[1], return_sequences=True
+                    units=self.recurrent_layers_sizes[1],
+                    return_sequences=True,
+                    **gru_kernel_kwargs(),
                 ),
                 tf.keras.layers.Dropout(rate=self.dropout_rate),
             ]
@@ -372,6 +409,7 @@ class PrositIntensityPredictor(tf.keras.Model):
                     units=self.regressor_layer_size,
                     return_sequences=True,
                     name="decoder",
+                    **gru_kernel_kwargs(),
                 ),
                 tf.keras.layers.Dropout(rate=self.dropout_rate),
                 DecoderAttentionLayer(self.max_ion),
@@ -388,6 +426,30 @@ class PrositIntensityPredictor(tf.keras.Model):
                 tf.keras.layers.Flatten(name="out"),
             ]
         )
+
+    def _validate_input_keys(self, inputs):
+        """Validate that the required input keys are present in ``inputs``.
+
+        Only the keys are inspected, so this accepts either a dict of tensors or
+        a dict of shapes.
+        """
+        missing_input_keys = [k for k in self.input_keys.values() if k not in inputs]
+        if missing_input_keys:
+            raise ValueError(f"Missing required input keys: {missing_input_keys}")
+
+        if self.use_meta_data:
+            missing_meta_keys = [k for k in self.meta_data_keys if k not in inputs]
+            if missing_meta_keys:
+                raise ValueError(
+                    f"Missing required metadata inputs: {missing_meta_keys}"
+                )
+
+        if self.use_prosit_ptm_features:
+            ptm_keys_exist = [k for k in self.PTM_INPUT_KEYS if k in inputs]
+            if not ptm_keys_exist:
+                raise ValueError(
+                    f"At least one PTM input feature is required when use_prosit_ptm_features=True. Missing all of: {self.PTM_INPUT_KEYS}"
+                )
 
     def call(self, inputs, **kwargs):
         # Handle dict input, complex case: multiple inputs
@@ -408,9 +470,7 @@ class PrositIntensityPredictor(tf.keras.Model):
         return x
 
     def _forward_dict(self, inputs, **kwargs):
-        missing_input_keys = [k for k in self.input_keys.values() if k not in inputs]
-        if missing_input_keys:
-            raise ValueError(f"Missing required input keys: {missing_input_keys}")
+        self._validate_input_keys(inputs)
 
         meta_data = []
         encoded_meta = None
@@ -424,24 +484,12 @@ class PrositIntensityPredictor(tf.keras.Model):
 
         # collect meta data from the input dict
         if self.use_meta_data:
-            missing_meta_keys = [k for k in self.meta_data_keys if k not in inputs]
-            if missing_meta_keys:
-                raise ValueError(
-                    f"Missing required metadata inputs: {missing_meta_keys}"
-                )
-
             meta_data.extend(
                 self._collect_values_from_inputs_if_exists(inputs, self.meta_data_keys)
             )
 
         # collect PTM features from the input dict
         if self.use_prosit_ptm_features:
-            ptm_keys_exist = [k for k in self.PTM_INPUT_KEYS if k in inputs]
-            if not ptm_keys_exist:
-                raise ValueError(
-                    f"At least one PTM input feature is required when use_prosit_ptm_features=True. Missing all of: {self.PTM_INPUT_KEYS}"
-                )
-
             ptm_ac_features = self._collect_values_from_inputs_if_exists(
                 inputs, PrositIntensityPredictor.PTM_INPUT_KEYS
             )

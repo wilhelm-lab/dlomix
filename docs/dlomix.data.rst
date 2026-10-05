@@ -3,8 +3,8 @@
 
 .. automodule:: dlomix.data
    :members:
-   :undoc-members:
    :show-inheritance:
+   :undoc-members:
 
 Subpackages
 -----------
@@ -20,17 +20,23 @@ Submodules
 
 .. automodule:: dlomix.data.charge_state
    :members:
-   :undoc-members:
    :show-inheritance:
+   :undoc-members:
 
 
 .. automodule:: dlomix.data.dataset
    :members:
-   :undoc-members:
    :show-inheritance:
+   :undoc-members:
 
 
 .. automodule:: dlomix.data.dataset_config
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+
+.. automodule:: dlomix.data.dataset_splitter
    :members:
    :undoc-members:
    :show-inheritance:
@@ -44,17 +50,23 @@ Submodules
 
 .. automodule:: dlomix.data.dataset_utils
    :members:
-   :undoc-members:
    :show-inheritance:
+   :undoc-members:
 
 
 .. automodule:: dlomix.data.detectability
    :members:
-   :undoc-members:
    :show-inheritance:
+   :undoc-members:
 
 
 .. automodule:: dlomix.data.fragment_ion_intensity
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+
+.. automodule:: dlomix.data.inference
    :members:
    :undoc-members:
    :show-inheritance:
@@ -68,6 +80,12 @@ Submodules
 
 .. automodule:: dlomix.data.ion_mobility
    :members:
+   :show-inheritance:
+   :undoc-members:
+
+
+.. automodule:: dlomix.data.loading
+   :members:
    :undoc-members:
    :show-inheritance:
 
@@ -80,7 +98,6 @@ Submodules
 
 .. automodule:: dlomix.data.retention_time
    :members:
-   :undoc-members:
    :show-inheritance:
 
 

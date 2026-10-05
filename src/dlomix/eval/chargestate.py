@@ -1,78 +1,79 @@
-import tensorflow as tf
-from keras import backend as K
+"""Charge-state evaluation metrics, implemented once for both backends.
+
+Written against ``keras.ops`` so the TensorFlow and PyTorch backends share a
+single definition -- see :mod:`dlomix.losses.intensity` for the rationale.
+"""
+
+import keras
+from keras import ops
 
 
-@tf.keras.utils.register_keras_serializable("dlomix")
-def adjusted_mean_absolute_error(y_true: tf.Tensor, y_pred: tf.Tensor) -> tf.Tensor:
+def _pairwise_mask(y_true, y_pred):
+    """Mask keeping every component that is non-zero in at least one vector.
+
+    Only components that are zero in *both* vectors are discarded. The previous
+    PyTorch implementation required both to be non-zero, which discarded genuine
+    prediction errors and made the two backends report different numbers; this
+    is the TensorFlow behaviour, and the one the docstrings describe.
+    """
+    both_zero = ops.logical_and(ops.equal(y_true, 0.0), ops.equal(y_pred, 0.0))
+    return ops.cast(ops.logical_not(both_zero), "float32")
+
+
+def _adjusted_error(y_true, y_pred, error_fn):
+    y_true = ops.cast(ops.convert_to_tensor(y_true), "float32")
+    y_pred = ops.cast(ops.convert_to_tensor(y_pred), "float32")
+
+    mask = _pairwise_mask(y_true, y_pred)
+
+    errors = error_fn(y_true * mask - y_pred * mask)
+    count_non_zero = ops.sum(mask)
+
+    # Avoid division by zero by adding a small epsilon to the denominator
+    return ops.sum(errors) / (count_non_zero + keras.config.epsilon())
+
+
+@keras.saving.register_keras_serializable(package="dlomix")
+def adjusted_mean_absolute_error(y_true, y_pred):
     """
     Used as an evaluation metric for charge state prediction.
 
     For two vectors, discard those components that
     are 0 in both vectors and compute the mean
     absolute error for the adjusted vector.
+
+    Parameters
+    ----------
+    y_true : tensor
+        Ground-truth charge state vector.
+    y_pred : tensor
+        Predicted charge state vector, with the same shape as `y_true`.
+
+    Returns
+    -------
+    tensor
+        A scalar tensor with the adjusted mean absolute error.
     """
-    # Convert y_true and y_pred to float tensors
-    y_true = K.cast(y_true, dtype="float32")
-    y_pred = K.cast(y_pred, dtype="float32")
-
-    # Create a mask for elements that are not both zero
-    mask = K.cast(K.not_equal(y_true + y_pred, 0.0), dtype="float32")
-
-    # Apply mask to both y_true and y_pred
-    y_true_adjusted = y_true * mask
-    y_pred_adjusted = y_pred * mask
-
-    # Compute the mean absolute error
-    absolute_errors = K.abs(y_true_adjusted - y_pred_adjusted)
-    sum_absolute_errors = K.sum(absolute_errors)
-    count_non_zero = K.sum(mask)
-
-    # Avoid division by zero by adding a small epsilon to the denominator
-    epsilon = K.epsilon()
-    mean_absolute_error = sum_absolute_errors / (count_non_zero + epsilon)
-
-    return mean_absolute_error
+    return _adjusted_error(y_true, y_pred, ops.abs)
 
 
-@tf.keras.utils.register_keras_serializable("dlomix")
-def adjusted_mean_squared_error(y_true: tf.Tensor, y_pred: tf.Tensor) -> tf.Tensor:
+@keras.saving.register_keras_serializable(package="dlomix")
+def adjusted_mean_squared_error(y_true, y_pred):
     """
     For two vectors, discard those components that
     are 0 in both vectors and compute the mean
     squared error for the adjusted vector.
+
+    Parameters
+    ----------
+    y_true : tensor
+        Ground-truth charge state vector.
+    y_pred : tensor
+        Predicted charge state vector, with the same shape as `y_true`.
+
+    Returns
+    -------
+    tensor
+        A scalar tensor with the adjusted mean squared error.
     """
-    # Convert y_true and y_pred to float tensors
-    y_true = K.cast(y_true, dtype="float32")
-    y_pred = K.cast(y_pred, dtype="float32")
-
-    # Create a mask for elements that are not both zero
-    mask = K.cast(K.not_equal(y_true + y_pred, 0.0), dtype="float32")
-
-    # Apply mask to both y_true and y_pred
-    y_true_adjusted = y_true * mask
-    y_pred_adjusted = y_pred * mask
-
-    # Compute the mean squared error
-    squared_errors = K.square(y_true_adjusted - y_pred_adjusted)
-    sum_squared_errors = K.sum(squared_errors)
-    count_non_zero = K.sum(mask)
-
-    # Avoid division by zero by adding a small epsilon to the denominator
-    epsilon = K.epsilon()
-    mean_squared_error = sum_squared_errors / (count_non_zero + epsilon)
-
-    return mean_squared_error
-
-
-if __name__ == "__main__":
-    import numpy as np
-
-    y_true = K.constant([0, 1, 2, 2, 0, 0, 0, 0], dtype="float32")
-    y_pred = K.constant([0, 3, 0, 4, 0, 0, 2, 0], dtype="float32")
-    y_true, y_pred = K.to_dense(y_true), K.to_dense(y_pred)
-    mae = adjusted_mean_absolute_error(y_true, y_pred)
-    mse = adjusted_mean_squared_error(y_true, y_pred)
-    assert np.isclose(mae, 2.0)
-    assert np.isclose(mse, 4.0)
-    print(f"Adjusted MAE: {mae:.4f}")
-    print(f"Adjusted MSE: {mse:.4f}")
+    return _adjusted_error(y_true, y_pred, ops.square)

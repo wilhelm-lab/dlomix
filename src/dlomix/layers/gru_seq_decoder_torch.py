@@ -4,26 +4,30 @@ from .attention_torch import DecoderAttentionLayer
 
 
 class GRUSequentialDecoder(nn.Module):
-    """Encoder class needed to handle two GRU outputs in torch.
+    """Decoder of the Prosit intensity model: a GRU followed by decoder attention.
 
-    No implementation using nn.Sequential() possible.
+    Mirrors the Keras decoder (``GRU`` -> ``Dropout`` -> ``DecoderAttentionLayer``).
 
     Args:
-        embedding_output_dim (int): The size of the embedding output dimension. Defaults to 16.
-        recurrent_layers_sizes (tuple): The sizes of the recurrent layers. Defaults to (256, 512).
-        dropout_rate (float): The dropout rate used in the encoder layers. Defaults to 0.5.
+        input_size (int): Size of the features fed to the decoder, i.e. the size of the
+            fused encoder output (``recurrent_layers_sizes[1]`` in the model).
+        hidden_size (int): Number of units of the decoder GRU (``regressor_layer_size``
+            in the model, as in the Keras implementation).
+        dropout_rate (float): The dropout rate applied after the GRU.
+        max_ion (int): Number of fragment ion positions the decoder attends over.
     """
 
     def __init__(
         self,
-        recurrent_layers_sizes,
+        input_size,
+        hidden_size,
         dropout_rate,
         max_ion,
     ):
         super(GRUSequentialDecoder, self).__init__()
         self.unidirectional_GRU = nn.GRU(
-            input_size=recurrent_layers_sizes[1],
-            hidden_size=recurrent_layers_sizes[1],
+            input_size=input_size,
+            hidden_size=hidden_size,
             batch_first=True,
             bidirectional=False,
         )

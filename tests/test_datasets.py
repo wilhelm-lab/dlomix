@@ -1,3 +1,4 @@
+import gc
 import logging
 import time
 from os.path import join
@@ -7,12 +8,14 @@ import pytest
 import torch
 from datasets import Dataset, DatasetDict, load_dataset
 
+from dlomix.constants import ALPHABET_UNMOD
 from dlomix.data import (
     FragmentIonIntensityDataset,
+    IonMobilityDataset,
     RetentionTimeDataset,
     load_processed_dataset,
 )
-from dlomix.data.dataset_utils import EncodingScheme
+from dlomix.data.dataset_utils import EncodingScheme, fork_safe_gc
 
 logger = logging.getLogger(__name__)
 
@@ -39,6 +42,22 @@ def test_num_proc_none_forces_single_process(monkeypatch):
     dataset = RetentionTimeDataset(num_proc=None)
 
     assert dataset._num_proc is None
+
+
+@pytest.mark.parametrize("num_proc", [None, 1, 4])
+def test_fork_safe_gc_freezes_objects_only_while_forking(num_proc):
+    # forked map workers must not finalize the parent's objects (e.g. TensorFlow
+    # functions), which crashes them; the freeze lasts only for the processing
+    # compare with the starting count: Python 3.12 starts with some objects frozen
+    frozen_before = gc.get_freeze_count()
+    with fork_safe_gc(num_proc):
+        frozen_during = gc.get_freeze_count()
+    frozen_after = gc.get_freeze_count()
+    if num_proc and num_proc > 1:
+        assert frozen_during > frozen_before
+        assert frozen_after < frozen_during  # released again
+    else:
+        assert frozen_during == frozen_after == frozen_before
 
 
 def test_num_proc_user_value_is_capped_to_available(monkeypatch):
@@ -101,6 +120,9 @@ def test_rtdataset_hub():
         sequence_column="modified_sequence",
         label_column="indexed_retention_time",
         name="holdout",
+        # the holdout config has only a test split, so there is nothing to learn
+        # an alphabet from
+        alphabet=ALPHABET_UNMOD,
     )
     logger.info(rtdataset)
     assert rtdataset.hf_dataset is not None
@@ -390,6 +412,71 @@ def test_val_tokens_available_to_test_even_with_nonstandard_split_order():
 
     # with_termini=True means sequence starts with []- at index 0.
     assert test_encoded[1] == learned_token_index
+
+
+def test_ionmobility_dataset_inmemory():
+    data = Dataset.from_dict(
+        {
+            "sequence_modified": ["ACDEK", "PEPTIDEK", "MKLVAAR", "GGSSK"] * 5,
+            "ccs": [300.0 + i for i in range(20)],
+            "ccs_std": [2.0] * 20,
+            "charge": [2, 3, 2, 1] * 5,
+            "mz": [500.0 + i for i in range(20)],
+        }
+    )
+
+    dataset = IonMobilityDataset(
+        data_format="hf",
+        data_source=data,
+        val_ratio=0.2,
+        max_seq_len=10,
+        batch_size=4,
+        shuffle=True,
+    )
+
+    assert set(dataset.hf_dataset.keys()) == {"train", "val"}
+    assert dataset.shuffle is True
+    batch = next(iter(dataset.tensor_train_data))
+    assert batch is not None
+
+
+@pytest.mark.parametrize("source", ["hf_test_split", "test_data_source_file"])
+def test_test_only_dataset_requires_alphabet(source, tmp_path):
+    # The alphabet is learned on train/val only; a test-only dataset without one
+    # would silently encode every residue as the unknown token.
+    test_split = _make_rt_split_data(["ACDEK", "PEPTIDEK"])
+    if source == "hf_test_split":
+        source_kwargs = {
+            "data_format": "hf",
+            "data_source": DatasetDict({"test": test_split}),
+        }
+    else:
+        test_file = str(tmp_path / "test.csv")
+        test_split.to_csv(test_file)
+        source_kwargs = {"data_format": "csv", "test_data_source": test_file}
+
+    rt_kwargs = dict(
+        sequence_column="modified_sequence",
+        label_column="indexed_retention_time",
+        max_seq_len=10,
+        **source_kwargs,
+    )
+
+    with pytest.raises(ValueError, match="alphabet is required"):
+        RetentionTimeDataset(**rt_kwargs)
+
+    train = RetentionTimeDataset(
+        data_format="hf",
+        data_source=DatasetDict({"train": _make_rt_split_data(["ACDEKPTI"])}),
+        sequence_column="modified_sequence",
+        label_column="indexed_retention_time",
+        max_seq_len=10,
+    )
+    test = RetentionTimeDataset(alphabet=train.extended_alphabet, **rt_kwargs)
+
+    # every residue of the first test peptide is encoded with the training alphabet
+    encoded = test.hf_dataset["test"][0]["modified_sequence"]
+    assert encoded[1:6] == [train.extended_alphabet[aa] for aa in "ACDEK"]
 
 
 def test_shuffle_parameter(raw_generic_nested_data):

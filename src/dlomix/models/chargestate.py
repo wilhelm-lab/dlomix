@@ -1,9 +1,10 @@
-import warnings
-
+import keras
 import tensorflow as tf
 
 from ..constants import ALPHABET_UNMOD
 from ..layers.attention import AttentionLayer
+from ..layers.gru_kernel import gru_kernel_kwargs
+from ._alphabet import validate_alphabet_size
 
 """
 This module contains a deep learning model for precursor charge state prediction, inspired by Prosit's architecture.
@@ -23,7 +24,7 @@ The model is provided in three flavours of predicting precursor charge states:
 """
 
 
-@tf.keras.utils.register_keras_serializable(package="dlomix")
+@keras.saving.register_keras_serializable(package="dlomix")
 class ChargeStatePredictor(tf.keras.Model):
     """
     Precursor Charge State Prediction Model for predicting either:
@@ -57,34 +58,40 @@ class ChargeStatePredictor(tf.keras.Model):
         regressor_layer_size=512,
         num_classes=6,
         model_flavour="relative",
+        **kwargs,
     ):
-        super(ChargeStatePredictor, self).__init__()
+        super(ChargeStatePredictor, self).__init__(**kwargs)
 
-        # tie the count of embeddings to the size of the vocabulary (count of amino acids)
-        self.embeddings_count = len(alphabet) + 1
+        # the vocabulary already carries the padding and unknown tokens, so its
+        # length is exactly the number of embedding rows needed
+        validate_alphabet_size(alphabet, type(self).__name__)
+        self.embeddings_count = len(alphabet)
 
         self.dropout_rate = dropout_rate
         self.latent_dropout_rate = latent_dropout_rate
         self.regressor_layer_size = regressor_layer_size
-        self.recurrent_layers_sizes = recurrent_layers_sizes
+        self.recurrent_layers_sizes = tuple(recurrent_layers_sizes)
+        self.embedding_output_dim = embedding_output_dim
+        self.seq_length = seq_length
+        self.alphabet = dict(alphabet)
+        self.num_classes = num_classes
+        self.model_flavour = model_flavour
 
-        if model_flavour == "relative":
-            # regression problem
-            self.final_activation = "linear"
-        elif model_flavour == "observed":
-            # multi-label multi-class classification problem
-            self.final_activation = "sigmoid"
-        elif model_flavour == "dominant":
-            # multi-class classification problem
-            self.final_activation = "softmax"
-        else:
-            warnings.warn(f"{model_flavour} not available")
-            exit
+        final_activations = {
+            "relative": "linear",  # regression
+            "observed": "sigmoid",  # multi-label classification
+            "dominant": "softmax",  # multi-class classification
+        }
+        if model_flavour not in final_activations:
+            raise ValueError(
+                f"Unknown model_flavour {model_flavour!r}, expected one of "
+                f"{sorted(final_activations)}."
+            )
+        self.final_activation = final_activations[model_flavour]
 
         self.embedding = tf.keras.layers.Embedding(
             input_dim=self.embeddings_count,
             output_dim=embedding_output_dim,
-            input_length=seq_length,
         )
         self._build_encoder()
 
@@ -106,12 +113,16 @@ class ChargeStatePredictor(tf.keras.Model):
             [
                 tf.keras.layers.Bidirectional(
                     tf.keras.layers.GRU(
-                        units=self.recurrent_layers_sizes[0], return_sequences=True
+                        units=self.recurrent_layers_sizes[0],
+                        return_sequences=True,
+                        **gru_kernel_kwargs(),
                     )
                 ),
                 tf.keras.layers.Dropout(rate=self.dropout_rate),
                 tf.keras.layers.GRU(
-                    units=self.recurrent_layers_sizes[1], return_sequences=True
+                    units=self.recurrent_layers_sizes[1],
+                    return_sequences=True,
+                    **gru_kernel_kwargs(),
                 ),
                 tf.keras.layers.Dropout(rate=self.dropout_rate),
             ]
@@ -124,3 +135,28 @@ class ChargeStatePredictor(tf.keras.Model):
         x = self.regressor(x)
         x = self.output_layer(x)
         return x
+
+    def get_config(self):
+        config = super().get_config()
+        config.update(
+            {
+                "embedding_output_dim": self.embedding_output_dim,
+                "seq_length": self.seq_length,
+                "alphabet": self.alphabet,
+                "dropout_rate": self.dropout_rate,
+                "latent_dropout_rate": self.latent_dropout_rate,
+                "recurrent_layers_sizes": list(self.recurrent_layers_sizes),
+                "regressor_layer_size": self.regressor_layer_size,
+                "num_classes": self.num_classes,
+                "model_flavour": self.model_flavour,
+            }
+        )
+        return config
+
+    @classmethod
+    def from_config(cls, config):
+        if "recurrent_layers_sizes" in config and isinstance(
+            config["recurrent_layers_sizes"], list
+        ):
+            config["recurrent_layers_sizes"] = tuple(config["recurrent_layers_sizes"])
+        return cls(**config)

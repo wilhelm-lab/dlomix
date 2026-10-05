@@ -1,3 +1,4 @@
+from .chain import build_processing_chain, padded_sequence_length
 from .feature_extractors import (
     AVAILABLE_FEATURE_EXTRACTORS,
     FeatureExtractor,
@@ -13,6 +14,8 @@ from .processors import (
 )
 
 __all__ = [
+    "build_processing_chain",
+    "padded_sequence_length",
     "AVAILABLE_FEATURE_EXTRACTORS",
     "available_feature_extractors",
     "LookupFeatureExtractor",

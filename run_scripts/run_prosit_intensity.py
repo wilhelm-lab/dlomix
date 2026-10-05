@@ -7,6 +7,7 @@ import tensorflow as tf
 from dlomix.data import FragmentIonIntensityDataset
 from dlomix.losses import masked_spectral_distance
 from dlomix.models import PrositIntensityPredictor
+from dlomix.pipelines import InferencePipeline
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
 
@@ -78,6 +79,9 @@ history = model.fit(
     callbacks=callbacks,
 )
 
+# save the pipeline to a file
+pipeline = InferencePipeline.from_model_and_dataset(model=model, dataset=d)
+pipeline.save("run_scripts/output/prosit_intensity_pipeline_test", overwrite=True)
 
 predictions = model.predict(d.tensor_val_data)
 

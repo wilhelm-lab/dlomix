@@ -27,6 +27,19 @@ from .processors import (
 )
 
 
+def padded_sequence_length(max_seq_len: int, with_termini: bool) -> int:
+    """Width of an encoded sequence after padding.
+
+    Terminal modification tokens occupy two extra positions, so a peptide of at
+    most ``max_seq_len`` residues encodes to ``max_seq_len + 2`` when they are kept.
+
+    This is the single definition of that relationship. ``max_seq_len`` alone is the
+    *configured* residue budget and is **not** the width of the resulting tensor --
+    conflating the two is what made a correct model/preprocessor pair look mismatched.
+    """
+    return max_seq_len + 2 if with_termini else max_seq_len
+
+
 def build_processing_chain(
     *,
     sequence_column: str,
@@ -61,7 +74,7 @@ def build_processing_chain(
 
     Returns ``(processors, extracted_feature_names)``.
     """
-    max_length = max_seq_len + 2 if with_termini else max_seq_len
+    max_length = padded_sequence_length(max_seq_len, with_termini)
 
     processors: List[PeptideDatasetBaseProcessor] = [
         SequenceParsingProcessor(

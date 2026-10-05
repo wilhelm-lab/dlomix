@@ -23,6 +23,7 @@ class IonMobilityDataset(PeptideDataset):
         max_seq_len (Union[int, str]): The maximum sequence length allowed in the dataset. Defaults to 30.
         dataset_type (str): The type of dataset to use. Defaults to None, which resolves to "pt" or "tf" based on the active DLOMIX_BACKEND.
         batch_size (int): The batch size for the dataset. Defaults to 256.
+        shuffle (bool): Whether to shuffle the data. Default is False.
         model_features (Optional[List[str]]): The features to use in the model. Defaults to ["charge", "mz"].
         dataset_columns_to_keep (Optional[List[str]]): The columns to keep in the dataset. Defaults to None.
         features_to_extract (Optional[List[Union[Callable, str]]]): The features to extract from the dataset. Defaults to None.
@@ -35,6 +36,7 @@ class IonMobilityDataset(PeptideDataset):
         enable_tf_dataset_cache (bool): Flag to indicate whether to enable TensorFlow Dataset caching (call `.cache()` on the generated TF Datasets).
         disable_cache (bool): Whether to disable Hugging Face datasets caching. Default is False.
         num_proc (Optional[int]): Number of processes to use for dataset processing. Use -1 for all available processors, None for single-process mode, or a positive integer. Default is -1.
+        torch_dataloader_kwargs (Optional[Dict]): Additional keyword arguments to pass to PyTorch DataLoader. Default is None.
     """
 
     def __init__(
@@ -49,6 +51,7 @@ class IonMobilityDataset(PeptideDataset):
         max_seq_len: Union[int, str] = 50,
         dataset_type: Optional[str] = None,
         batch_size: int = 256,
+        shuffle: bool = False,
         model_features: Optional[List[str]] = ["charge", "mz"],
         dataset_columns_to_keep: Optional[List[str]] = None,
         features_to_extract: Optional[List[Union[Callable, str]]] = None,
@@ -63,13 +66,19 @@ class IonMobilityDataset(PeptideDataset):
         auto_cleanup_cache: bool = True,
         num_proc: Optional[int] = -1,
         batch_processing_size: int = 1000,
+        torch_dataloader_kwargs: Optional[Dict] = None,
         split_strategy: Optional[str] = "random",
         split_seed: Optional[int] = None,
         test_ratio: Optional[float] = None,
         stratify_by_column: Optional[str] = None,
+        **kwargs,
     ):
-        kwargs = {k: v for k, v in locals().items() if k not in ["self", "__class__"]}
-        super().__init__(DatasetConfig(**kwargs))
+        config_kwargs = {
+            k: v
+            for k, v in locals().items()
+            if k not in ["self", "__class__", "kwargs"]
+        }
+        super().__init__(DatasetConfig(**config_kwargs), **kwargs)
 
 
 def reduced_mobility_to_ccs(

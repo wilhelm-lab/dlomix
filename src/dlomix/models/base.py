@@ -1,9 +1,11 @@
+import keras
 import tensorflow as tf
 
 from ..constants import ALPHABET_UNMOD
+from ._alphabet import validate_alphabet_size
 
 
-@tf.keras.utils.register_keras_serializable(package="dlomix")
+@keras.saving.register_keras_serializable(package="dlomix")
 class RetentionTimePredictor(tf.keras.Model):
     """
     A simple class for Retention Time prediction models.
@@ -27,16 +29,24 @@ class RetentionTimePredictor(tf.keras.Model):
         seq_length=30,
         encoder="conv1d",
         alphabet=ALPHABET_UNMOD,
+        **kwargs,
     ):
-        super(RetentionTimePredictor, self).__init__()
+        super(RetentionTimePredictor, self).__init__(**kwargs)
 
-        # tie the count of embeddings to the size of the vocabulary (count of amino acids)
-        self.embeddings_count = len(alphabet) + 2
+        # store config for serialization
+        self.embedding_dim = embedding_dim
+        self.seq_length = seq_length
+        self.encoder_type = encoder
+        self.alphabet = dict(alphabet)
+
+        # the vocabulary already carries the padding and unknown tokens, so its
+        # length is exactly the number of embedding rows needed
+        validate_alphabet_size(alphabet, type(self).__name__)
+        self.embeddings_count = len(alphabet)
 
         self.embedding = tf.keras.layers.Embedding(
             input_dim=self.embeddings_count,
             output_dim=embedding_dim,
-            input_length=seq_length,
         )
 
         self._build_encoder(encoder)
@@ -80,3 +90,19 @@ class RetentionTimePredictor(tf.keras.Model):
         x = self.output_layer(x)
 
         return x
+
+    def get_config(self):
+        config = super().get_config()
+        config.update(
+            {
+                "embedding_dim": self.embedding_dim,
+                "seq_length": self.seq_length,
+                "encoder": self.encoder_type,
+                "alphabet": self.alphabet,
+            }
+        )
+        return config
+
+    @classmethod
+    def from_config(cls, config):
+        return cls(**config)

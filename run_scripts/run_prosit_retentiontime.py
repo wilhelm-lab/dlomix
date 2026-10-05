@@ -18,7 +18,7 @@ d = RetentionTimeDataset(
     sequence_column="sequence",
     label_column="irt",
     max_seq_len=30,
-    batch_size=512,
+    batch_size=64,
     val_ratio=0.2,
     with_termini=False,
     encoding_scheme="unmod",
@@ -29,12 +29,14 @@ model = PrositRetentionTimePredictor(seq_length=30, alphabet=d.extended_alphabet
 print(d)
 print(model)
 
-optimizer = tf.keras.optimizers.Adam(lr=0.0001)
+# with a smaller learning rate and fewer steps the model stays on the "predict the mean"
+# plateau for all 5 epochs (test R2 ~ 0)
+optimizer = tf.keras.optimizers.Adam(learning_rate=0.001)
 model.compile(
     optimizer=optimizer, loss="mse", metrics=["mean_absolute_error", timedelta]
 )
 
-weights_file = "./run_scripts/output/prosit_rt_test"
+weights_file = "./run_scripts/output/prosit_rt_test.weights.h5"
 checkpoint = tf.keras.callbacks.ModelCheckpoint(
     weights_file, save_best_only=True, save_weights_only=True
 )

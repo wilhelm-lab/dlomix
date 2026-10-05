@@ -3,8 +3,8 @@
 
 .. automodule:: dlomix.callbacks
    :members:
-   :undoc-members:
    :show-inheritance:
+   :undoc-members:
 
 Submodules
 ----------
@@ -12,5 +12,5 @@ Submodules
 
 .. automodule:: dlomix.callbacks.cyclic_lr
    :members:
-   :undoc-members:
    :show-inheritance:
+   :undoc-members:

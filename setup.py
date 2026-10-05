@@ -14,13 +14,43 @@ def get_metadata():
 # Load metadata
 META_DATA = get_metadata()
 
+# Upper bound = the newest TensorFlow CI actually installs and tests. Raise it
+# deliberately after CI passes on the new release, rather than letting users
+# silently pick up an untested minor version.
+# The floor: numpy>=2.0 (a core requirement) rules out TF 2.16/2.17, which pin numpy<2.
+TENSORFLOW_VERSION = ">=2.18,<2.22"
+# macOS below Python 3.13: stay below TF 2.20. tensorflow-metal 1.2.0 (the Apple
+# GPU plugin, latest release) does not load with TF 2.20+, and once it is installed
+# `import tensorflow` fails. It has no Python 3.13 wheels, and TF has none for 3.13
+# before 2.20, so Python 3.13 on macOS takes the regular range.
+TENSORFLOW_VERSION_MACOS = ">=2.18,<2.20"
+MACOS_METAL = "platform_system == 'Darwin' and python_version < '3.13'"
+NOT_MACOS_METAL = "(platform_system != 'Darwin' or python_version >= '3.13')"
+
+# Platform differences are expressed as environment markers, evaluated on the
+# installing machine. A build-time platform check would be baked into the
+# py3-none-any wheel for every platform.
 tensorflow_extra_install = [
-    "tensorflow>=2.13,<2.16",  # 2.16 introduces breaking changes and has Keras 3 as default
+    f"tensorflow{TENSORFLOW_VERSION_MACOS}; {MACOS_METAL}",
+    f"tensorflow{TENSORFLOW_VERSION}; {NOT_MACOS_METAL}",
 ]
 
+# CUDA-enabled TensorFlow for Linux GPU machines. tensorflow[and-cuda] installs
+# CUDA/cuDNN as pip wheels, which NVIDIA publishes only for Linux; TF's own extra
+# carries no platform markers, so ungated it fails to resolve on macOS/Windows.
+# Gated here, the extra degrades to the regular build on other platforms.
+# Deliberately not part of `dev`: CI has no GPU and should not download CUDA.
+tensorflow_cuda_extra_install = [
+    f"tensorflow[and-cuda]{TENSORFLOW_VERSION}; platform_system == 'Linux'",
+    f"tensorflow{TENSORFLOW_VERSION_MACOS}; {MACOS_METAL}",
+    f"tensorflow{TENSORFLOW_VERSION}; platform_system != 'Linux' and {NOT_MACOS_METAL}",
+]
+
+# PyTorch needs no GPU extra: its Linux wheels on PyPI are already CUDA builds.
 pytorch_extra_install = [
-    "torch",
-    "torchvision",
+    # torch does not declare numpy as a dependency; builds before 2.3 were compiled
+    # against NumPy 1.x and fail at import under NumPy 2.
+    "torch>=2.3",
 ]
 
 setuptools.setup(
@@ -36,16 +66,22 @@ setuptools.setup(
     package_dir={"": "src"},
     include_package_data=True,
     package_data={"": ["data/processing/feature_dicts/*"]},
-    python_requires=">=3.10",
+    python_requires=">=3.11",
     install_requires=[
         "datasets>=4.0.0",
         "huggingface_hub>=0.20.0",
+        # Keras 3 is backend-agnostic and pure Python: it provides the single
+        # `keras.ops` implementation of the losses and metrics shared by both
+        # backends, and does not pull in TensorFlow when KERAS_BACKEND=torch.
+        "keras>=3.0.0",
         "fpdf",
         "pandas",
-        "numpy",
+        "numpy>=2.0",
         "matplotlib",
         "scikit-learn",
-        "pyarrow",
+        # TF 2.20+ and pyarrow 21 or older deadlock when both are loaded on macOS
+        # ("mutex lock failed"); pyarrow 22 fixed it
+        "pyarrow>=22",
         "seaborn",
     ],
     extras_require={
@@ -53,6 +89,7 @@ setuptools.setup(
             "pytest >= 7.0.0",
             "pytest-cov",
             "black",
+            "isort",  # invoked by `make format` / `make format-check`
             "twine",
             "setuptools",
             "wheel",
@@ -65,6 +102,8 @@ setuptools.setup(
         ],
         "tensorflow": tensorflow_extra_install,
         "tf": tensorflow_extra_install,
+        "tensorflow-cuda": tensorflow_cuda_extra_install,
+        "tf-cuda": tensorflow_cuda_extra_install,
         "torch": pytorch_extra_install,
         "pytorch": pytorch_extra_install,
         "lightning": [
@@ -73,12 +112,13 @@ setuptools.setup(
     },
     classifiers=[
         "Programming Language :: Python :: 3",
-        "Programming Language :: Python :: 3.10",
         "Programming Language :: Python :: 3.11",
+        "Programming Language :: Python :: 3.12",
+        "Programming Language :: Python :: 3.13",
         "License :: OSI Approved :: MIT License",
         "Operating System :: OS Independent",
         "Topic :: Scientific/Engineering :: Bio-Informatics",
-        "Development Status :: 1 - Planning",
+        "Development Status :: 4 - Beta",
         "Intended Audience :: Science/Research",
     ],
 )

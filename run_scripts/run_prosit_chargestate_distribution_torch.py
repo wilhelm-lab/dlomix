@@ -1,7 +1,15 @@
+"""
+Train the relative charge state distribution model with a custom PyTorch training loop.
+
+Run from the repository root with the PyTorch backend:
+DLOMIX_BACKEND=pytorch python run_scripts/run_prosit_chargestate_distribution_torch.py
+"""
+
+import copy
+
 import torch
 import torch.optim as optim
 
-from dlomix.constants import PTMS_ALPHABET
 from dlomix.data import ChargeStateDataset
 from dlomix.eval import adjusted_mean_absolute_error
 from dlomix.models import ChargeStatePredictor
@@ -26,6 +34,7 @@ d = ChargeStateDataset(
     batch_size=8,
     dataset_type="pt",
     val_ratio=0.2,
+    test_ratio=0.1,  # hold out a test split that is not used for training
     with_termini=False,
 )
 print(d)
@@ -33,26 +42,16 @@ for x in d.tensor_train_data:
     print(x)
     break
 
-test_d = ChargeStateDataset(
-    data_format="parquet",  # "hub",
-    test_data_source=TESTING_DATA,  # "Wilhelmlab/prospect-ptms-charge",
-    sequence_column="modified_sequence",
-    label_column="charge_state_dist",
-    max_seq_len=30,
-    batch_size=8,
-    dataset_type="pt",
-    with_termini=False,
-)
-
-
 model = ChargeStatePredictor(
-    num_classes=6, seq_length=30, alphabet=PTMS_ALPHABET, model_flavour="relative"
+    num_classes=6,
+    alphabet=d.extended_alphabet,
+    model_flavour="relative",
 )
 print(model)
 model.to(device)
 
 
-# criterion = nn.MSELoss()
+# the metric takes (y_true, y_pred) and is written with keras.ops, so it works on torch tensors
 criterion = adjusted_mean_absolute_error
 
 optimizer = optim.Adam(model.parameters(), lr=0.0001)
@@ -90,7 +89,7 @@ for epoch in range(1, 2):
 
         optimizer.zero_grad()
         pred_cs = model(train_seq)
-        loss = criterion(pred_cs, train_label)
+        loss = criterion(train_label, pred_cs)
         loss.backward()
         optimizer.step()
 
@@ -115,10 +114,8 @@ for epoch in range(1, 2):
             val_label = val_label.to(device, dtype=torch.float32)
 
             val_pred_cs = model(val_seq)
-            val_loss = criterion(val_pred_cs, val_label)
+            val_loss = criterion(val_label, val_pred_cs)
             val_loss_total += val_loss.item()
-
-            # TODO add adjusted_mean_absolute_error metric
 
     avg_val_loss = val_loss_total / len(d.tensor_val_data)
     print(
@@ -134,7 +131,8 @@ for epoch in range(1, 2):
     if avg_val_loss < best_val_loss:
         best_val_loss = avg_val_loss
         epochs_without_improvement = 0
-        best_model_state = model.state_dict()
+        # copy: state_dict() references the live tensors, which later epochs overwrite
+        best_model_state = copy.deepcopy(model.state_dict())
     else:
         epochs_without_improvement += 1
         print(f"No improvement for {epochs_without_improvement} epoch(s).")
@@ -178,7 +176,7 @@ if best_model_state is not None:
 model.eval()
 test_loss_total = 0.0
 with torch.no_grad():
-    for batch in test_d.tensor_test_data:
+    for batch in d.tensor_test_data:
         test_seq = batch["modified_sequence"]
         test_label = batch["charge_state_dist"]
 
@@ -187,10 +185,10 @@ with torch.no_grad():
         test_label = test_label.to(device, dtype=torch.float32)
 
         test_pred_cs = model(test_seq)
-        test_loss = criterion(test_pred_cs, test_label)
+        test_loss = criterion(test_label, test_pred_cs)
 
         test_loss_total += test_loss.item()
-avg_test_loss = test_loss_total / len(test_d.tensor_test_data)
+avg_test_loss = test_loss_total / len(d.tensor_test_data)
 print(f"Test Loss: {avg_test_loss:.4f}")
 
 # Append final test metrics as an extra row in our log.
