@@ -116,6 +116,8 @@ jobs:
             tests/test_feature_extractors.py \
             tests/test_dataset_splitter.py \
             tests/test_environment_report.py \
+            tests/test_backend_equivalence.py \
+            tests/test_postprocessing.py \
             -v
 
   resolve-extras:
