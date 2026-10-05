@@ -1,8 +1,9 @@
+import keras
 import numpy as np
 import tensorflow as tf
 
 
-@tf.keras.utils.register_keras_serializable("dlomix")
+@keras.saving.register_keras_serializable(package="dlomix")
 class CyclicLR(tf.keras.callbacks.Callback):
     """This callback implements a cyclical learning rate policy (CLR).
     The method cycles the learning rate between two boundaries with
@@ -75,9 +76,9 @@ class CyclicLR(tf.keras.callbacks.Callback):
     def on_train_begin(self, logs=None):
 
         if self.clr_iterations == 0:
-            tf.keras.backend.set_value(self.model.optimizer.lr, self.base_lr)
+            self.model.optimizer.learning_rate.assign(self.base_lr)
         else:
-            tf.keras.backend.set_value(self.model.optimizer.lr, self.clr())
+            self.model.optimizer.learning_rate.assign(self.clr())
 
     def on_batch_end(self, epoch, logs=None):
         logs = logs or {}
@@ -85,14 +86,14 @@ class CyclicLR(tf.keras.callbacks.Callback):
         self.clr_iterations += 1
 
         self.history.setdefault("lr", []).append(
-            tf.keras.backend.get_value(self.model.optimizer.lr)
+            float(self.model.optimizer.learning_rate)
         )
         self.history.setdefault("iterations", []).append(self.trn_iterations)
 
         for k, v in logs.items():
             self.history.setdefault(k, []).append(v)
 
-        tf.keras.backend.set_value(self.model.optimizer.lr, self.clr())
+        self.model.optimizer.learning_rate.assign(self.clr())
 
     def get_config(self):
         return {

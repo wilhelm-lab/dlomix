@@ -6,7 +6,6 @@ import warnings
 from os import makedirs
 from os.path import join
 
-import tensorflow as tf
 from fpdf import FPDF
 from matplotlib import pyplot as plt
 
@@ -40,19 +39,19 @@ class Report(abc.ABC):
         self._init_report_resources()
 
     def _set_history_dict(self, history):
+        # Duck-typed rather than isinstance(history, keras.callbacks.History): reports
+        # are backend-agnostic and must import without TensorFlow, and any object
+        # exposing a `history` dict (e.g. from a hand-written PyTorch loop) works.
         if isinstance(history, dict):
             self._history_dict = history
-        elif not isinstance(history, tf.keras.callbacks.History):
-            raise ValueError(
-                f"Reporting requires a History object (tf.keras.callbacks.History) or its history dict attribute (History.history), which is returned from a call to "
-                f"model.fit(). Passed history argument is of type {type(history)}"
-            )
-        elif not hasattr(history, "history"):
-            raise ValueError(
-                "The passed History object does not have a history attribute, which is a dict with results."
-            )
-        else:
+        elif isinstance(getattr(history, "history", None), dict):
             self._history_dict = history.history
+        else:
+            raise ValueError(
+                "Reporting requires a History object (as returned by model.fit()) or any "
+                "object with a `history` dict attribute, or that dict itself. Passed "
+                f"history argument is of type {type(history)}"
+            )
 
         if len(self._history_dict.keys()) == 0:
             warnings.warn(

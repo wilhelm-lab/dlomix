@@ -6,28 +6,167 @@ on:
     branches:
       - main
       - develop
+  pull_request:
+    branches:
+      - main
+      - develop
+    # ready_for_review: a draft PR runs nothing until it is marked ready
+    types: [opened, synchronize, reopened, ready_for_review]
+
+# A new push to a PR cancels the run of its previous commit; runs on main and
+# develop always finish.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   build:
-
+    name: TensorFlow backend (py${{ matrix.python-version }})
+    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
-        python-version: ["3.10", "3.11"]
+        # Keep in sync with python_requires and the classifiers in setup.py.
+        python-version: ["3.11", "3.12", "3.13"]
 
     steps:
       - uses: actions/checkout@v7
       - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@v7
         with:
           python-version: ${{ matrix.python-version }}
           cache: 'pip'
+      - name: Install CPU-only PyTorch
+        # PyPI's Linux torch wheels are CUDA builds (~15 NVIDIA packages, several GB).
+        # CI has no GPU, so install the CPU build first; `make install-dev` then
+        # finds torch>=2.3 already satisfied and leaves it alone.
+        run: |
+          pip install torch --index-url https://download.pytorch.org/whl/cpu
       - name: Install dependencies
         run: |
           make install-dev
-      - name: Format with black
+      - name: Report the environment
         run: |
-          make format
+          python -m dlomix
+      - name: Check formatting (black + isort)
+        run: |
+          make format-check
       - name: Test with pytest
         run: |
           make test
+
+  torch-backend:
+    # The losses and metrics in dlomix.losses / dlomix.eval have a single
+    # keras.ops implementation shared by both backends. tests/test_losses.py and
+    # tests/test_eval.py assert fixed reference values, so running them here as
+    # well as in the job above is what proves the two backends agree -- without
+    # it, the PyTorch side of that contract is never executed and they can drift
+    # apart unnoticed, which is exactly how they diverged before unification.
+    name: PyTorch backend
+    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v7
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+          cache: 'pip'
+      - name: Install CPU-only PyTorch
+        # PyPI's Linux torch wheels are CUDA builds (~15 NVIDIA packages, several GB).
+        # CI has no GPU, so install the CPU build first; `make install-dev` then
+        # finds torch>=2.3 already satisfied and leaves it alone.
+        run: |
+          pip install torch --index-url https://download.pytorch.org/whl/cpu
+      - name: Install dependencies
+        run: |
+          make install-dev
+      - name: Report the environment
+        env:
+          DLOMIX_BACKEND: pytorch
+        run: |
+          python -m dlomix
+      - name: Smoke-test the backend-agnostic imports
+        env:
+          DLOMIX_BACKEND: pytorch
+        run: |
+          python -c "
+          import sys, dlomix, keras
+          from dlomix import data, models, losses, eval, layers
+          assert keras.backend.backend() == 'torch', keras.backend.backend()
+          assert 'tensorflow' not in sys.modules, 'the torch backend must not import TensorFlow'
+          print('dlomix', dlomix.__version__, '| backend', dlomix._BACKEND, '| keras', keras.backend.backend())
+          "
+      - name: Test the shared and torch-native code paths
+        env:
+          DLOMIX_BACKEND: pytorch
+        # dlomix.pipelines and the TensorFlow-only model utilities are excluded:
+        # they are TensorFlow-only today, and are covered by the job above.
+        run: |
+          python -m pytest \
+            tests/test_torch_models.py \
+            tests/test_layers_torch.py \
+            tests/test_eval.py \
+            tests/test_losses.py \
+            tests/test_models.py \
+            tests/test_byo_model.py \
+            tests/test_processors.py \
+            tests/test_feature_extractors.py \
+            tests/test_dataset_splitter.py \
+            tests/test_environment_report.py \
+            -v
+
+  resolve-extras:
+    # Resolves every install path on every platform from package metadata alone --
+    # no GPU, no wheel downloads, a few seconds. This is how the platform-gated
+    # extras (notably tf-cuda) are tested without GPU or macOS/Windows runners: a
+    # bad environment marker, or a pin conflict with tensorflow[and-cuda]'s exact
+    # NVIDIA pins, fails here instead of on a user's machine.
+    name: Resolve extras across platforms
+    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v7
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+      - name: Install uv
+        run: |
+          pip install uv
+      - name: Every extra resolves on every platform
+        run: |
+          set -e
+          for python in 3.11 3.12 3.13; do
+            for platform in x86_64-manylinux_2_28 aarch64-manylinux_2_28 aarch64-apple-darwin x86_64-pc-windows-msvc; do
+              for extra in tf tf-cuda torch dev; do
+                echo "dlomix[$extra] @ file://$PWD" \
+                  | uv pip compile - --quiet --python-version "$python" --python-platform "$platform" > /dev/null \
+                  || { echo "::error::dlomix[$extra] does not resolve on $platform (python $python)"; exit 1; }
+              done
+            done
+          done
+      - name: tf-cuda brings CUDA on Linux, and only on Linux
+        # Output is captured before grepping, and every check fails explicitly:
+        # under Actions' `bash -eo pipefail`, `! cmd | grep -q` is not caught by
+        # errexit, and grep -q's early exit can SIGPIPE uv and fail a real match.
+        run: |
+          expect() {  # extra platform pattern present|absent
+            out=$(echo "dlomix[$1] @ file://$PWD" \
+              | uv pip compile - --quiet --python-version 3.11 --python-platform "$2")
+            if grep -q "$3" <<< "$out"; then found=present; else found=absent; fi
+            if [ "$found" != "$4" ]; then
+              echo "::error::dlomix[$1] on $2: expected '$3' to be $4, but it is $found"
+              exit 1
+            fi
+            echo "ok: dlomix[$1] on $2 -> '$3' $4"
+          }
+          expect tf-cuda x86_64-manylinux_2_28  '^nvidia-cudnn-cu12==' present
+          expect tf-cuda aarch64-manylinux_2_28 '^nvidia-cudnn-cu12==' present
+          expect tf-cuda aarch64-apple-darwin   '^nvidia-'             absent
+          expect tf-cuda x86_64-pc-windows-msvc '^nvidia-'             absent
+          expect tf      x86_64-manylinux_2_28  '^nvidia-.*-cu12=='    absent
+          expect dev     x86_64-manylinux_2_28  '^nvidia-.*-cu12=='    absent

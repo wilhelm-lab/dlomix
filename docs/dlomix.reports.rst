@@ -3,8 +3,8 @@
 
 .. automodule:: dlomix.reports
    :members:
-   :undoc-members:
    :show-inheritance:
+   :undoc-members:
 
 Submodules
 ----------
@@ -12,41 +12,41 @@ Submodules
 
 .. automodule:: dlomix.reports.DetectabilityReport
    :members:
-   :undoc-members:
    :show-inheritance:
+   :undoc-members:
 
 
 .. automodule:: dlomix.reports.IntensityReport
    :members:
-   :undoc-members:
    :show-inheritance:
+   :undoc-members:
 
 
 .. automodule:: dlomix.reports.Report
    :members:
-   :undoc-members:
    :show-inheritance:
+   :undoc-members:
 
 
 .. automodule:: dlomix.reports.RetentionTimeReport
    :members:
-   :undoc-members:
    :show-inheritance:
+   :undoc-members:
 
 
 .. automodule:: dlomix.reports.RetentionTimeReportModelComparisonWandb
    :members:
-   :undoc-members:
    :show-inheritance:
+   :undoc-members:
 
 
 .. automodule:: dlomix.reports.RetentionTimeReportRunComparisonWandb
    :members:
-   :undoc-members:
    :show-inheritance:
+   :undoc-members:
 
 
 .. automodule:: dlomix.reports.postprocessing
    :members:
-   :undoc-members:
    :show-inheritance:
+   :undoc-members:

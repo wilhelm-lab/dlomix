@@ -1,6 +1,12 @@
+import math
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from torch.nn.modules.lazy import LazyModuleMixin
+from torch.nn.parameter import UninitializedParameter
+
+from .keras_initializers_torch import KerasLazyLinear
 
 
 class DecoderAttentionLayer(nn.Module):
@@ -22,7 +28,7 @@ class DecoderAttentionLayer(nn.Module):
         super(DecoderAttentionLayer, self).__init__()
         self.time_steps = time_steps
         # This linear layer maps a vector of length time_steps to a vector of length time_steps.
-        self.linear = nn.LazyLinear(time_steps)
+        self.linear = KerasLazyLinear(time_steps)
 
     def forward(self, x):
         """
@@ -54,7 +60,7 @@ class DecoderAttentionLayer(nn.Module):
         return out
 
 
-class AttentionLayer(nn.Module):
+class AttentionLayer(LazyModuleMixin, nn.Module):
     """
     Attention layer.
 
@@ -71,8 +77,9 @@ class AttentionLayer(nn.Module):
     ----------
     feature_dim : int
         The number of features (i.e. the last dimension of the input tensor).
-    seq_len : int
-        The fixed length of the time dimension of the input.
+    seq_len : int, optional
+        The fixed length of the time dimension of the input. If None (the default), it
+        is taken from the first input, as the Keras layer does when it is built.
     context : bool, optional
         Whether to use a separate context vector. If True, the attention score is computed as
         a dot product with this vector (ignoring the tanh of the weighted sum). Defaults to False.
@@ -80,38 +87,57 @@ class AttentionLayer(nn.Module):
         Whether to use a learned bias (with one bias per time step). Defaults to True.
     """
 
-    def __init__(self, feature_dim, seq_len, context=False, bias=True, epsilon=1e-8):
+    def __init__(
+        self, feature_dim, seq_len=None, context=False, bias=True, epsilon=1e-8
+    ):
         super(AttentionLayer, self).__init__()
         self.feature_dim = feature_dim
-        self.seq_len = seq_len
         self.context = context
         self.bias = bias
         self.epsilon = epsilon
 
         # Weight vector W of shape (feature_dim,)
-        self.W = nn.Parameter(torch.Tensor(feature_dim))
+        self.W = nn.Parameter(torch.empty(feature_dim))
 
-        # Optional bias of shape (seq_len,)
-        if bias:
-            self.b = nn.Parameter(torch.Tensor(seq_len))
-        else:
+        # Optional bias of shape (seq_len,), created on the first forward pass
+        # when seq_len is not given
+        if not bias:
             self.register_parameter("b", None)
+        elif seq_len is None:
+            self.b = UninitializedParameter()
+        else:
+            self.b = nn.Parameter(torch.empty(seq_len))
 
         # Optional context vector u of shape (feature_dim,)
         if context:
-            self.u = nn.Parameter(torch.Tensor(feature_dim))
+            self.u = nn.Parameter(torch.empty(feature_dim))
         else:
             self.register_parameter("u", None)
 
         self.reset_parameters()
 
+    @property
+    def seq_len(self):
+        """Length of the time dimension, or None until the first forward pass."""
+        if self.b is None or self.has_uninitialized_params():
+            return None
+        return self.b.shape[0]
+
     def reset_parameters(self):
-        # Initialize the weights using Xavier (Glorot) uniform initialization.
-        nn.init.xavier_uniform_(self.W.unsqueeze(0))
-        if self.bias:
+        # Glorot uniform as Keras computes it for a vector: fan_in = fan_out = length,
+        # so the bound is sqrt(6 / (2 * feature_dim))
+        bound = math.sqrt(3.0 / self.feature_dim)
+        nn.init.uniform_(self.W, -bound, bound)
+        if self.bias and not self.has_uninitialized_params():
             nn.init.zeros_(self.b)
         if self.context:
-            nn.init.xavier_uniform_(self.u.unsqueeze(0))
+            nn.init.uniform_(self.u, -bound, bound)
+
+    def initialize_parameters(self, x, mask=None):
+        if self.has_uninitialized_params():
+            with torch.no_grad():
+                self.b.materialize((x.shape[1],))
+                nn.init.zeros_(self.b)
 
     def forward(self, x, mask=None):
         """
@@ -138,6 +164,12 @@ class AttentionLayer(nn.Module):
 
         # Add bias if applicable (bias is per time step)
         if self.bias:
+            if x.shape[1] != self.b.shape[0]:
+                raise ValueError(
+                    f"AttentionLayer was built for sequences of length "
+                    f"{self.b.shape[0]}, got length {x.shape[1]}. Use the same padded "
+                    "sequence length for all inputs of a model."
+                )
             # self.b has shape (seq_len,), and will be broadcast over the batch dimension.
             a = a + self.b
 

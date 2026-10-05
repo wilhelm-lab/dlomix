@@ -8,8 +8,12 @@ import pytest
 from datasets import Dataset
 
 from dlomix.config import _BACKEND, PYTORCH_BACKEND
-from dlomix.data import PeptidePreprocessor, RetentionTimeDataset
-from dlomix.models import PrositRetentionTimePredictor
+from dlomix.data import (
+    FragmentIonIntensityDataset,
+    PeptidePreprocessor,
+    RetentionTimeDataset,
+)
+from dlomix.models import PrositIntensityPredictor, PrositRetentionTimePredictor
 from dlomix.pipelines import InferencePipeline
 
 DATASET_TYPE = "pt" if _BACKEND in PYTORCH_BACKEND else "tf"
@@ -120,10 +124,98 @@ def test_consistency_check_rejects_mismatched_model(rt_dataset):
 
 
 def test_consistency_check_rejects_mismatched_seq_len(rt_dataset):
-    # rt_dataset.max_seq_len is 20; a model expecting 22 (20 + termini) should be rejected.
-    bad_model = _FakeSeqLenModel(raw_seq_length=20, with_termini=True)
+    # rt_dataset is max_seq_len=20 with termini, so it produces width 22.
+    # A model built for 30 residues expects 32 and must be rejected.
+    bad_model = _FakeSeqLenModel(raw_seq_length=30, with_termini=True)
     with pytest.raises(ValueError, match="Model/preprocessor mismatch"):
         InferencePipeline.from_model_and_dataset(bad_model, rt_dataset)
+
+
+def test_consistency_check_accepts_model_that_accounts_for_termini(rt_dataset):
+    """Regression: a correct with_termini pair used to be rejected.
+
+    The check compared the model's *padded* width against the preprocessor's
+    *configured* ``max_seq_len``, which omits the two terminal positions the
+    preprocessor adds itself. Both sides here produce 22, so this must pass.
+    """
+    assert rt_dataset.with_termini is True
+    assert rt_dataset.max_seq_len == 20
+
+    good_model = _FakeSeqLenModel(raw_seq_length=20, with_termini=True)
+    pipeline = InferencePipeline.from_model_and_dataset(good_model, rt_dataset)
+
+    assert pipeline.preprocessor.padded_seq_len == 22
+
+
+def test_padded_seq_len_matches_the_emitted_tensor_width(rt_dataset):
+    """``padded_seq_len`` must describe what the preprocessor actually emits."""
+    preprocessor = rt_dataset.get_preprocessor()
+
+    batch = next(iter(preprocessor(["ACDEFGHIK", "PEPTIDEK"])))
+    # A sequence-only model gets the bare tensor; a metadata model gets a dict.
+    sequences = (
+        batch[preprocessor.sequence_column] if isinstance(batch, dict) else batch
+    )
+    emitted_width = np.asarray(sequences).shape[-1]
+
+    assert emitted_width == preprocessor.padded_seq_len
+    assert emitted_width != preprocessor.max_seq_len  # termini add two positions
+
+
+@pytest.mark.parametrize("with_termini", [True, False])
+def test_prosit_intensity_pipeline_builds_for_both_termini_settings(with_termini):
+    """End-to-end regression for the failure seen in run_prosit_intensity.py.
+
+    ``PrositIntensityPredictor`` is the only model exposing ``raw_seq_length``, so it
+    is the only one the sequence-length check applies to. With ``with_termini=True``
+    -- the default on both the dataset and the model -- building the pipeline used to
+    raise ``Model/preprocessor mismatch``.
+    """
+    sequences = [f"{seq}K" for seq in RAW_SEQUENCES] * 4
+    data = {
+        "modified_sequence": sequences,
+        "intensities_raw": [[0.1] * 174 for _ in sequences],
+        "precursor_charge_onehot": [[1, 0, 0, 0, 0, 0] for _ in sequences],
+        "collision_energy_aligned_normed": [0.25 for _ in sequences],
+    }
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        dataset = FragmentIonIntensityDataset(
+            data_source=Dataset.from_dict(data),
+            data_format="hf",
+            sequence_column="modified_sequence",
+            label_column="intensities_raw",
+            model_features=[
+                "precursor_charge_onehot",
+                "collision_energy_aligned_normed",
+            ],
+            max_seq_len=30,
+            batch_size=8,
+            val_ratio=0.2,
+            with_termini=with_termini,
+            dataset_type=DATASET_TYPE,
+        )
+
+    model = PrositIntensityPredictor(
+        seq_length=30,
+        input_keys={"SEQUENCE_KEY": "modified_sequence"},
+        meta_data_keys={
+            "COLLISION_ENERGY_KEY": "collision_energy_aligned_normed",
+            "PRECURSOR_CHARGE_KEY": "precursor_charge_onehot",
+        },
+        with_termini=with_termini,
+        alphabet=dataset.extended_alphabet,
+        use_meta_data=True,
+    )
+
+    pipeline = InferencePipeline.from_model_and_dataset(model, dataset)
+
+    expected_width = 32 if with_termini else 30
+    assert pipeline.preprocessor.padded_seq_len == expected_width
+    assert model.seq_length == expected_width
+    # the width the training data actually carries, which both must agree with
+    assert len(dataset["train"][0]["modified_sequence"]) == expected_width
 
 
 def test_save_load_reproduces_predictions(rt_dataset, rt_model, tmp_path):

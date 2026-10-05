@@ -2,17 +2,10 @@ import numpy as np
 import tensorflow as tf
 from datasets import load_dataset
 
-from dlomix.constants import PTMS_ALPHABET
 from dlomix.data import ChargeStateDataset
 from dlomix.models import ChargeStatePredictor
 
-model = ChargeStatePredictor(
-    num_classes=6, seq_length=30, alphabet=PTMS_ALPHABET, model_flavour="dominant"
-)
-print(model)
-
-
-optimizer = tf.keras.optimizers.Adam(lr=0.0001)
+optimizer = tf.keras.optimizers.Adam(learning_rate=0.0001)
 
 
 TESTING_DATA = "example_dataset/chargestate/chargestate_data.parquet"
@@ -25,7 +18,7 @@ d = ChargeStateDataset(
     sequence_column="modified_sequence",
     label_column="most_abundant_charge_state",
     max_seq_len=30,
-    batch_size=8,
+    batch_size=512,  # ~330k peptides; small batches make one epoch very slow
     val_ratio=0.2,
     split_strategy="stratified",
     stratify_by_column="most_abundant_charge_state",
@@ -42,13 +35,25 @@ test_d = ChargeStateDataset(
     label_column="most_abundant_charge_state",
     max_seq_len=30,
     batch_size=8,
+    alphabet=d.extended_alphabet,  # a test-only dataset cannot learn an alphabet
 )
 test_targets = test_d["test"]["most_abundant_charge_state"]
 test_sequences = test_d["test"]["modified_sequence"]
 
 
+# the model must use the vocabulary the dataset learned (its extended_alphabet), not the
+# raw PTMS_ALPHABET constant, which lacks the padding and unknown tokens
+model = ChargeStatePredictor(
+    num_classes=6,
+    seq_length=32,  # max_seq_len + the N-/C-terminal tokens kept by default
+    alphabet=d.extended_alphabet,
+    model_flavour="dominant",
+)
+print(model)
+
+
 # callbacks
-weights_file = "./run_scripts/output/prosit_charge_major_test"
+weights_file = "./run_scripts/output/prosit_charge_major_test.weights.h5"
 checkpoint = tf.keras.callbacks.ModelCheckpoint(
     weights_file, save_best_only=True, save_weights_only=True
 )

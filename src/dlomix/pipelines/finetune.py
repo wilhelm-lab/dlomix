@@ -32,11 +32,46 @@ from typing import Any
 from ..config import _BACKEND, PYTORCH_BACKEND
 from ..data import FragmentIonIntensityDataset, PeptideDataset
 from ..losses import masked_spectral_distance
-from ..models import download_remote_model_weights, load_and_adapt_pretrained_model
 
 logger = logging.getLogger(__name__)
 
 _IS_TORCH = _BACKEND in PYTORCH_BACKEND
+
+# The pretrained-model helpers live in the TensorFlow-only ``models.model_utils``,
+# which imports TensorFlow at module level, so they are only imported on that
+# backend. Fine-tuning is TensorFlow-only for now: the methods that need these
+# helpers call ``_require_tensorflow`` first.
+if _IS_TORCH:
+    download_remote_model_weights = None
+    load_and_adapt_pretrained_model = None
+else:
+    from ..models import download_remote_model_weights, load_and_adapt_pretrained_model
+
+
+def _require_tensorflow(operation: str) -> None:
+    """Raise :exc:`NotImplementedError` for ``operation`` on the PyTorch backend."""
+    if _IS_TORCH:
+        raise NotImplementedError(
+            f"FineTunePipeline.{operation}() currently supports TensorFlow only. "
+            "Set DLOMIX_BACKEND=tensorflow before importing dlomix."
+        )
+
+
+_KERAS_MODEL_SUFFIXES = (".keras", ".h5")
+
+
+def _ensure_keras_extension(destination: str) -> str:
+    """Return ``destination`` with a Keras-writable suffix.
+
+    Keras 3 refuses to save to a path that does not end in ``.keras`` or
+    ``.h5``, so a bare path (including the default ``./finetuned_model``) is
+    given a ``.keras`` suffix rather than failing at the end of a training run.
+    """
+    if destination.endswith(_KERAS_MODEL_SUFFIXES):
+        return destination
+    adjusted = f"{destination}.keras"
+    logger.info("Appended '.keras' to the save path: '%s'", adjusted)
+    return adjusted
 
 
 class FineTunePipeline:
@@ -60,8 +95,10 @@ class FineTunePipeline:
         Target vocabulary for the fine-tuned model.  ``None`` means the
         pipeline will derive it from the dataset's ``extended_alphabet``.
     initialization_strategy:
-        Strategy for initialising weights that are new after a vocabulary
-        expansion (e.g. ``"random"``, ``"zeros"``, ``"mean"``, ``"best-fit"``).
+        Strategy for initialising the embeddings of tokens that are new after a
+        vocabulary expansion: ``"random"`` (Glorot uniform), ``"mean"`` (the mean
+        of the pretrained embeddings) or ``"best-fit"`` (the embedding of the
+        pretrained token that predicts the new token's spectra best).
     best_fit_kwargs:
         Required when ``initialization_strategy="best-fit"``.  Forwarded
         verbatim to :func:`load_and_adapt_pretrained_model`.  Must contain at
@@ -241,6 +278,8 @@ class FineTunePipeline:
 
             history = FineTunePipeline(...).setup().finetune()
         """
+        # fail before the (potentially slow) dataset preparation
+        _require_tensorflow("setup")
         logger.info("Setting up FineTunePipeline …")
         self._prepare_dataset()
         self._resolve_vocab()
@@ -353,12 +392,7 @@ class FineTunePipeline:
             If :meth:`setup` has not been called yet.
         """
         self._require_setup()
-
-        if _IS_TORCH:
-            raise NotImplementedError(
-                "FineTunePipeline.finetune() currently supports TensorFlow only. "
-                "Set DLOMIX_BACKEND=tensorflow before importing dlomix."
-            )
+        _require_tensorflow("finetune")
 
         import tensorflow as tf
 
@@ -400,8 +434,10 @@ class FineTunePipeline:
         Parameters
         ----------
         path:
-            Destination directory or file path.  Falls back to
-            ``self.output_model_path`` when omitted.
+            Destination file path.  Falls back to ``self.output_model_path``
+            when omitted.  Keras 3 only writes to a path ending in ``.keras``
+            (or ``.h5``), so a ``.keras`` suffix is appended when the path has
+            neither; the returned value reflects the file actually written.
         overwrite:
             If False (default) raise :exc:`FileExistsError` when ``path``
             already exists, matching the behaviour of
@@ -413,7 +449,8 @@ class FineTunePipeline:
             The path the model was saved to.
         """
         self._require_setup()
-        destination = path or self.output_model_path
+        _require_tensorflow("save")
+        destination = _ensure_keras_extension(path or self.output_model_path)
         if Path(destination).exists() and not overwrite:
             raise FileExistsError(
                 f"'{destination}' already exists. Set overwrite=True to replace it."

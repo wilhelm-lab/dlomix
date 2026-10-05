@@ -3,8 +3,8 @@
 
 .. automodule:: dlomix
    :members:
-   :undoc-members:
    :show-inheritance:
+   :undoc-members:
 
 Subpackages
 -----------
@@ -27,11 +27,11 @@ Submodules
 
 .. automodule:: dlomix.config
    :members:
-   :undoc-members:
    :show-inheritance:
+   :undoc-members:
 
 
 .. automodule:: dlomix.constants
    :members:
-   :undoc-members:
    :show-inheritance:
+   :undoc-members:

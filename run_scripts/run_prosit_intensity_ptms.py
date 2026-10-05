@@ -48,7 +48,7 @@ optimizer = tf.keras.optimizers.Adam(learning_rate=0.0001)
 
 model.compile(optimizer=optimizer, loss=masked_spectral_distance, metrics=["mse"])
 
-weights_file = "./run_scripts/output/prosit_intensity_test_ptms"
+weights_file = "./run_scripts/output/prosit_intensity_test_ptms.weights.h5"
 checkpoint = tf.keras.callbacks.ModelCheckpoint(
     weights_file, save_best_only=True, save_weights_only=True
 )

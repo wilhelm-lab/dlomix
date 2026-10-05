@@ -21,7 +21,7 @@ from datasets import Dataset
 
 from ..config import _BACKEND, PYTORCH_BACKEND
 from .dataset_utils import EncodingScheme
-from .processing.chain import build_processing_chain
+from .processing.chain import build_processing_chain, padded_sequence_length
 from .processing.processors import SequencePaddingProcessor
 from .tensor_conversion import (
     cast_feature_columns_to_float,
@@ -100,6 +100,16 @@ class PeptidePreprocessor:
 
         self.vocab_size = len(self.alphabet)
         self._build_pipeline()
+
+    @property
+    def padded_seq_len(self) -> int:
+        """Width of the sequence tensors this preprocessor emits, termini included.
+
+        ``max_seq_len`` is the configured residue budget; when ``with_termini`` is set,
+        the terminal tokens add two more positions. Compare against this -- not against
+        ``max_seq_len`` -- when checking a model's expected input width.
+        """
+        return padded_sequence_length(self.max_seq_len, self.with_termini)
 
     # ------------------------------------------------------------------ builders
 

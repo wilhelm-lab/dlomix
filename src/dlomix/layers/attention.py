@@ -1,9 +1,9 @@
+import keras
 import tensorflow as tf
-import tensorflow.keras.backend as K
 from tensorflow.keras import constraints, initializers, regularizers
 
 
-@tf.keras.utils.register_keras_serializable(package="dlomix")
+@keras.saving.register_keras_serializable(package="dlomix")
 class DecoderAttentionLayer(tf.keras.layers.Layer):
     def __init__(self, time_steps, **kwargs):
         super().__init__(**kwargs)
@@ -33,7 +33,7 @@ class DecoderAttentionLayer(tf.keras.layers.Layer):
     # No from_config needed! Default works fine.
 
 
-@tf.keras.utils.register_keras_serializable(package="dlomix")
+@keras.saving.register_keras_serializable(package="dlomix")
 class AttentionLayer(tf.keras.layers.Layer):
     def __init__(
         self,
@@ -93,19 +93,22 @@ class AttentionLayer(tf.keras.layers.Layer):
         return None
 
     def call(self, x, mask=None):
-        a = K.squeeze(K.dot(x, K.expand_dims(self.W)), axis=-1)
+        a = tf.tensordot(x, self.W, axes=1)
         if self.bias:
             a += self.b
-        a = K.tanh(a)
+        a = tf.tanh(a)
         if self.context:
-            a = K.squeeze(K.dot(x, K.expand_dims(self.u)), axis=-1)
-        a = K.exp(a)
+            a = tf.tensordot(x, self.u, axes=1)
+        a = tf.exp(a)
         if mask is not None:
-            a *= K.cast(mask, K.floatx())
-        a /= K.cast(K.sum(a, axis=1, keepdims=True) + K.epsilon(), K.floatx())
-        a = K.expand_dims(a)
+            a *= tf.cast(mask, keras.config.floatx())
+        a /= tf.cast(
+            tf.reduce_sum(a, axis=1, keepdims=True) + keras.config.epsilon(),
+            keras.config.floatx(),
+        )
+        a = tf.expand_dims(a, axis=-1)
         weighted_input = x * a
-        return K.sum(weighted_input, axis=1)
+        return tf.reduce_sum(weighted_input, axis=1)
 
     def compute_output_shape(self, input_shape):
         return (input_shape[0], input_shape[-1])

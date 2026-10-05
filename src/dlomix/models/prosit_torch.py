@@ -6,10 +6,12 @@ import torch
 import torch.nn as nn
 
 from ..constants import ALPHABET_UNMOD
+from ..data.processing.chain import padded_sequence_length
 from ..data.processing.feature_extractors import FEATURE_EXTRACTORS_PARAMETERS
 from ..layers.attention_torch import AttentionLayer
 from ..layers.bi_gru_seq_encoder_torch import BiGRUSequentialEncoder
 from ..layers.gru_seq_decoder_torch import GRUSequentialDecoder
+from ..layers.keras_initializers_torch import KerasLazyLinear, init_like_keras
 
 logger = logging.getLogger("dlomix.models.prosit_torch")
 
@@ -23,7 +25,9 @@ class PrositRetentionTimePredictor(nn.Module):
     embedding_output_dim : int, optional
         Size of the embeddings to use. Defaults to 16.
     seq_length : int, optional
-        Sequence length of the peptide sequences. Defaults to 30.
+        Sequence length of the peptide sequences. Defaults to 30. Not used to build
+        the model (as in TensorFlow): the layers take the padded length from the
+        first input.
     alphabet : dict, optional
         Dictionary mapping for the alphabet (the amino acids in this case). Defaults to ALPHABET_UNMOD.
     dropout_rate : float, optional
@@ -63,16 +67,14 @@ class PrositRetentionTimePredictor(nn.Module):
         self.embedding = nn.Embedding(
             num_embeddings=self.embeddings_count,
             embedding_dim=embedding_output_dim,
-            padding_idx=0,  # TODO check this
         )
 
         self.encoder = BiGRUSequentialEncoder(
             embedding_output_dim, self.recurrent_layers_sizes, self.dropout_rate
         )
 
-        self.attention = AttentionLayer(
-            feature_dim=self.recurrent_layers_sizes[1], seq_len=self.seq_length
-        )
+        # the per-position attention bias is sized from the first input, as in Keras
+        self.attention = AttentionLayer(feature_dim=self.recurrent_layers_sizes[1])
 
         self.regressor = nn.Sequential(
             OrderedDict(
@@ -93,6 +95,9 @@ class PrositRetentionTimePredictor(nn.Module):
         self.output_layer = nn.Linear(
             in_features=self.regressor_layer_size, out_features=1
         )
+
+        # start from the same weight distribution as the Keras model
+        init_like_keras(self)
 
     def forward(self, inputs, **kwargs):
         x = self.embedding(inputs)
@@ -239,11 +244,16 @@ class PrositIntensityPredictor(nn.Module):
         self._build_embedding_layers()
         self._build_encoders()
         self._build_decoder()
+        # attends over the sequence encoder output, whose size is the second GRU's
         self.attention = AttentionLayer(
-            feature_dim=regressor_layer_size, seq_len=self.seq_length
+            feature_dim=self.recurrent_layers_sizes[1], seq_len=self.seq_length
         )
         self._build_meta_data_fusion_layer()
         self._build_regressor()
+
+        # start from the same weight distribution as the Keras model (lazy layers are
+        # initialized like Keras when they are created on the first forward pass)
+        init_like_keras(self)
 
     def _handle_alphabet_and_keys(self, alphabet, input_keys, meta_data_keys):
         # Handle alphabet
@@ -293,9 +303,7 @@ class PrositIntensityPredictor(nn.Module):
         # Compute derived attributes (will be recomputed during deserialization)
         self.max_ion = self.raw_seq_length - 1
 
-        self.seq_length = (
-            self.raw_seq_length + 2 if self.with_termini else self.raw_seq_length
-        )
+        self.seq_length = padded_sequence_length(self.raw_seq_length, self.with_termini)
 
         # tie the count of embeddings to the size of the vocabulary (count of amino acids)
         self.embeddings_count = len(self.alphabet)
@@ -338,7 +346,9 @@ class PrositIntensityPredictor(nn.Module):
                     [
                         (
                             "meta_dense",
-                            nn.LazyLinear(out_features=self.recurrent_layers_sizes[1]),
+                            KerasLazyLinear(
+                                out_features=self.recurrent_layers_sizes[1]
+                            ),
                         ),
                         ("dropout", nn.Dropout(p=self.dropout_rate)),
                     ]
@@ -350,19 +360,22 @@ class PrositIntensityPredictor(nn.Module):
         if self.use_prosit_ptm_features:
             self.ptm_input_encoder = nn.Sequential(
                 Concatenate(dim=-1),
-                nn.LazyLinear(out_features=self.regressor_layer_size // 2),
+                KerasLazyLinear(out_features=self.regressor_layer_size // 2),
                 nn.Dropout(p=self.dropout_rate),
-                nn.LazyLinear(out_features=self.embedding_output_dim * 4),
+                KerasLazyLinear(out_features=self.embedding_output_dim * 4),
                 nn.Dropout(p=self.dropout_rate),
-                nn.LazyLinear(out_features=self.embedding_output_dim),
+                KerasLazyLinear(out_features=self.embedding_output_dim),
                 nn.Dropout(p=self.dropout_rate),
             )
 
             self.ptm_aa_fusion = Concatenate(dim=-1)
 
     def _build_decoder(self):
+        # as in the Keras model: the decoder GRU has regressor_layer_size units and
+        # reads the fused encoder output of size recurrent_layers_sizes[1]
         self.decoder = GRUSequentialDecoder(
-            recurrent_layers_sizes=self.recurrent_layers_sizes,
+            input_size=self.recurrent_layers_sizes[1],
+            hidden_size=self.regressor_layer_size,
             dropout_rate=self.dropout_rate,
             max_ion=self.max_ion,
         )
@@ -371,8 +384,9 @@ class PrositIntensityPredictor(nn.Module):
         self.regressor = nn.Sequential(
             OrderedDict(
                 [
-                    ("time_dense", nn.LazyLinear(out_features=self.len_fragment_ion)),
-                    ("activation", nn.LeakyReLU()),
+                    ("time_dense", KerasLazyLinear(out_features=self.len_fragment_ion)),
+                    # Keras' LeakyReLU default slope (and Prosit's), not PyTorch's 0.01
+                    ("activation", nn.LeakyReLU(negative_slope=0.3)),
                     ("output", nn.Flatten()),
                 ]
             )

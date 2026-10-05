@@ -26,8 +26,12 @@ from lightning.pytorch.tuner import Tuner
 from sklearn.metrics import mean_absolute_error, mean_squared_error
 from torch.utils.data import DataLoader
 
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-device = torch.device("mps" if torch.mps.is_available() else "cpu")
+if torch.cuda.is_available():
+    device = torch.device("cuda")
+elif torch.backends.mps.is_available():
+    device = torch.device("mps")
+else:
+    device = torch.device("cpu")
 device
 
 # %% [markdown]

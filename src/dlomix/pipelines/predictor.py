@@ -16,6 +16,7 @@ import numpy as np
 
 from ..config import _BACKEND, PYTORCH_BACKEND
 from ..data.inference import PeptidePreprocessor
+from ..data.processing.chain import padded_sequence_length
 
 _IS_TORCH = _BACKEND in PYTORCH_BACKEND
 
@@ -37,12 +38,18 @@ def _model_vocab_size(model):
 
 
 def _model_expected_seq_len(model):
-    """Best-effort read of a model's expected input sequence length (None if unavailable)."""
+    """Best-effort read of a model's expected input width (None if unavailable).
+
+    Returns the *padded* width, so it is directly comparable with
+    ``PeptidePreprocessor.padded_seq_len``. Models that do not expose
+    ``raw_seq_length`` (everything but the Prosit intensity predictors) are not
+    checked.
+    """
     raw_seq_length = getattr(model, "raw_seq_length", None)
     if raw_seq_length is None:
         return None
     with_termini = getattr(model, "with_termini", False)
-    return raw_seq_length + 2 if with_termini else raw_seq_length
+    return padded_sequence_length(raw_seq_length, with_termini)
 
 
 class InferencePipeline:
@@ -76,15 +83,17 @@ class InferencePipeline:
                 f"together."
             )
 
+        # Both sides must be *padded* widths. Comparing against the preprocessor's
+        # configured `max_seq_len` instead rejected every correct with_termini=True
+        # pipeline, because the preprocessor adds the two terminal positions itself.
         expected_seq_len = _model_expected_seq_len(self.model)
-        if (
-            expected_seq_len is not None
-            and expected_seq_len != self.preprocessor.max_seq_len
-        ):
+        produced_seq_len = self.preprocessor.padded_seq_len
+        if expected_seq_len is not None and expected_seq_len != produced_seq_len:
             raise ValueError(
                 f"Model/preprocessor mismatch: the model expects sequences of length "
-                f"{expected_seq_len}, but the preprocessor pads sequences to "
-                f"max_seq_len={self.preprocessor.max_seq_len}. They were likely not "
+                f"{expected_seq_len}, but the preprocessor produces {produced_seq_len} "
+                f"(max_seq_len={self.preprocessor.max_seq_len}, "
+                f"with_termini={self.preprocessor.with_termini}). They were likely not "
                 f"trained together."
             )
 

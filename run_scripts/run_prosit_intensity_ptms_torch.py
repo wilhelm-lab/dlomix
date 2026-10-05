@@ -1,6 +1,6 @@
 """
-    To run this script, use the following command:
-    DLOMIX_BACKEND=torch python run_scripts/run_prosit_intensity_ptms_torch.py
+To run this script, use the following command:
+DLOMIX_BACKEND=pytorch python run_scripts/run_prosit_intensity_ptms_torch.py
 """
 
 import logging
@@ -9,7 +9,7 @@ import torch
 from tqdm import tqdm
 
 from dlomix.data import FragmentIonIntensityDataset
-from dlomix.losses.intensity_torch import masked_spectral_distance
+from dlomix.losses import masked_spectral_distance
 from dlomix.models import PrositIntensityPredictor
 
 logging.basicConfig(
@@ -42,6 +42,7 @@ print(d)
 model = PrositIntensityPredictor(
     seq_length=30,
     use_prosit_ptm_features=True,
+    use_meta_data=True,  # use the collision energy and precursor charge features
     input_keys={
         "SEQUENCE_KEY": "modified_sequence",
     },
@@ -55,7 +56,12 @@ model = PrositIntensityPredictor(
 
 optimizer = torch.optim.Adam(params=model.parameters(), lr=0.0001)
 
-loss_criterion = masked_spectral_distance
+
+def loss_criterion(y_true, y_pred):
+    # masked_spectral_distance is shared with the TensorFlow backend and returns
+    # one value per sample, so reduce it before calling .backward().
+    return masked_spectral_distance(y_true, y_pred).mean()
+
 
 for epoch in tqdm(range(0, N_EPOCHS)):
     epoch_loss = 0

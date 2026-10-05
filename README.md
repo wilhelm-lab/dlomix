@@ -15,6 +15,7 @@ The PyTorch implementation was largely introduced during a hackathon as part of 
 DLOmix automatically detects and uses the appropriate backend based on your environment setup. You can control which backend to use through the `DLOMIX_BACKEND` environment variable:
 
 ### TensorFlow Backend (Default)
+The TensorFlow backend requires **TensorFlow 2.18+ (Keras 3)**; the PyTorch backend requires **PyTorch 2.3+**.
 ```bash
 # Set TensorFlow as backend (default)
 export DLOMIX_BACKEND=tensorflow
@@ -45,6 +46,39 @@ pip install dlomix
 ```
 
 **Note**: The backend must be set **before** importing DLOmix. If no backend is specified, DLOmix defaults to TensorFlow with a user warning.
+
+### GPU Support (Linux, NVIDIA)
+
+**TensorFlow** needs its CUDA libraries installed explicitly. The `tf-cuda` extra installs them as pip packages through `tensorflow[and-cuda]`, so no system-wide CUDA toolkit is needed — only an NVIDIA driver:
+```bash
+pip install "dlomix[tf-cuda]"
+```
+NVIDIA publishes these CUDA wheels for Linux only. On macOS and Windows the `tf-cuda` extra installs the regular TensorFlow build instead of failing.
+
+**PyTorch** needs no extra: its Linux wheels on PyPI are already CUDA builds, so `pip install "dlomix[pytorch]"` is enough. Recent PyTorch releases target a recent CUDA version, which requires a correspondingly recent NVIDIA driver. On an older driver, install PyTorch from the matching CUDA index given by the [PyTorch install selector](https://pytorch.org/get-started/locally/), then install DLOmix.
+
+To check what your environment sees — backend, versions, and GPUs visible to the active backend:
+```bash
+python -m dlomix
+```
+Please include this output when reporting a bug. If a GPU is present but not detected, the usual causes are a driver that is too old for the CUDA version shown, or an `LD_LIBRARY_PATH` pointing at a different system CUDA installation.
+
+### Apple GPUs (macOS, tensorflow-metal)
+
+With `tensorflow-metal` installed, TensorFlow trains on the Apple GPU. Its fused GRU kernel (tensorflow-metal 1.2.0) does not compute the standard GRU: it ignores the GRU's input bias and adds the recurrent bias outside the reset gate. Both agree while the biases are zero, as Keras initializes them, so training on a Mac looks normal. But once the biases are trained, the weights compute a different function on any other platform or in PyTorch: weights trained on a Mac give other predictions elsewhere, and published weights give wrong predictions on a Mac. This is a different formula, not floating-point error. The DLOmix TensorFlow models therefore use the standard GRU kernel when an Apple GPU is visible, and warn once. Results are then the same on every platform and in PyTorch, but the standard kernel is slow on the Apple GPU. Training Prosit intensity on an M1 Max:
+
+| Setup | Time per epoch |
+|---|---|
+| TensorFlow, Apple GPU, standard GRU (default with `tensorflow-metal`) | 622 s |
+| TensorFlow, CPU | 78 s |
+| PyTorch, Apple GPU (MPS) | 16 s |
+
+For the models with GRU layers (Prosit, charge state, detectability, Ionmob), train TensorFlow on the CPU by hiding the GPU before TensorFlow uses it, or use the PyTorch backend:
+```python
+import tensorflow as tf
+tf.config.set_visible_devices([], "GPU")
+```
+`tensorflow-metal` 1.2.0 only works with TensorFlow below 2.20, which DLOmix installs on macOS for Python 3.11 and 3.12.
 
 ## Usage
 Experiment a simple retention time prediction use-case using Google Colab &nbsp;&nbsp; [![Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/wilhelm-lab/dlomix/blob/develop/notebooks/Example_RTModel_Walkthrough_colab.ipynb)
@@ -97,8 +131,8 @@ DLOmix provides a unified API across both TensorFlow and PyTorch backends:
 | `PrositIntensityPredictor` [1] | ✅ | ✅ |
 | `ChargeStatePredictor` | ✅ | ✅ |
 | `DetectabilityModel` [4] | ✅ | ✅ |
-| `DeepLCRetentionTimePredictor` [2,3] | ✅ | ❌ |
-| `Ionmob` [5] | ❌ | ✅ |
+| `DeepLCRetentionTimePredictor` [2,3] | ✅ | ✅ |
+| `Ionmob` [5] | ✅ | ✅ |
 | `PIMMS-CF` [6] | ❌ | ⚠ (experimental) |
 
 

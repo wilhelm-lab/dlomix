@@ -3,8 +3,8 @@
 
 .. automodule:: dlomix.losses
    :members:
-   :undoc-members:
    :show-inheritance:
+   :undoc-members:
 
 Submodules
 ----------
@@ -12,17 +12,11 @@ Submodules
 
 .. automodule:: dlomix.losses.intensity
    :members:
-   :undoc-members:
    :show-inheritance:
+   :undoc-members:
 
 
-.. automodule:: dlomix.losses.intensity_torch
+.. automodule:: dlomix.losses.ionmob
    :members:
-   :undoc-members:
    :show-inheritance:
-
-
-.. automodule:: dlomix.losses.ionmob_torch
-   :members:
    :undoc-members:
-   :show-inheritance:
