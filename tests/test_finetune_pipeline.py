@@ -2,6 +2,9 @@
 Regression tests for FineTunePipeline.
 """
 
+import os
+import subprocess
+import sys
 from os.path import join
 from pathlib import Path
 from unittest.mock import patch
@@ -287,6 +290,31 @@ class TestBackendGuard:
         with patch("dlomix.pipelines.finetune._IS_TORCH", True):
             with pytest.raises(NotImplementedError, match="TensorFlow"):
                 p.finetune()
+
+    def test_setup_and_save_raise_on_torch_backend(self):
+        p = FineTunePipeline(finetune_dataset_path="x", base_model_name="m")
+        with patch("dlomix.pipelines.finetune._IS_TORCH", True):
+            # setup() fails before touching the (non-existent) dataset path
+            with pytest.raises(NotImplementedError, match=r"setup\(\).*TensorFlow"):
+                p.setup()
+            p.model = object()
+            p.dataset = object()
+            with pytest.raises(NotImplementedError, match=r"save\(\).*TensorFlow"):
+                p.save()
+
+    def test_pipelines_import_on_torch_backend(self):
+        # The backend is fixed at import time, so check it in a fresh interpreter.
+        result = subprocess.run(
+            [
+                sys.executable,
+                "-c",
+                "from dlomix.pipelines import FineTunePipeline, InferencePipeline",
+            ],
+            env={**os.environ, "DLOMIX_BACKEND": "pytorch"},
+            capture_output=True,
+            text=True,
+        )
+        assert result.returncode == 0, result.stderr
 
 
 # ---------------------------------------------------------------------------

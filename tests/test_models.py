@@ -263,6 +263,11 @@ def test_chargestate_distribution_model():
     basic_model_existence_test(model)
 
 
+def test_chargestate_unknown_flavour_raises():
+    with pytest.raises(ValueError, match="model_flavour"):
+        ChargeStatePredictor(model_flavour="dominnant")
+
+
 # ---------------------------------------------------------------------------
 # Alphabet sizing
 # ---------------------------------------------------------------------------

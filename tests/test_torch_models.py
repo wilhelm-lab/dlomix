@@ -58,6 +58,11 @@ def test_chargestate_distribution_model_torch():
     basic_model_existence_test_torch(model)
 
 
+def test_chargestate_unknown_flavour_raises_torch():
+    with pytest.raises(ValueError, match="model_flavour"):
+        ChargeStatePredictorTorch(model_flavour="dominnant")
+
+
 # ------------------ CS | comparison of tf & torch ------------------
 
 
@@ -88,6 +93,25 @@ def test_tf_torch_equivalence_chargestate_model_shapes():
 def test_RT_model_torch():
     model = PrositRetentionTimePredictorTorch()
     basic_model_existence_test_torch(model)
+
+
+@pytest.mark.parametrize(
+    "model_cls", [PrositRetentionTimePredictorTorch, ChargeStatePredictorTorch]
+)
+def test_attention_length_taken_from_first_input_torch(model_cls):
+    # seq_length does not have to match the padded width, as in TensorFlow
+    model = model_cls(seq_length=30).eval()
+    sequences = torch.randint(low=1, high=15, size=(2, 32))
+    output = model(sequences)
+    assert model.attention.seq_len == 32
+
+    # a fresh model loads the weights without a forward pass first
+    reloaded = model_cls(seq_length=30).eval()
+    reloaded.load_state_dict(model.state_dict())
+    assert torch.equal(reloaded(sequences), output)
+
+    with pytest.raises(ValueError, match="length 32, got length 34"):
+        model(torch.randint(low=1, high=15, size=(2, 34)))
 
 
 # -------------- Prosit RT | comparison of tf & torch ----------------------
