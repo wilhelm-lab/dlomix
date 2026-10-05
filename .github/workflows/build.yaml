@@ -20,7 +20,7 @@ jobs:
       fail-fast: false
       matrix:
         # Keep in sync with python_requires and the classifiers in setup.py.
-        python-version: ["3.11", "3.12"]
+        python-version: ["3.11", "3.12", "3.13"]
 
     steps:
       - uses: actions/checkout@v7
@@ -130,7 +130,7 @@ jobs:
       - name: Every extra resolves on every platform
         run: |
           set -e
-          for python in 3.11 3.12; do
+          for python in 3.11 3.12 3.13; do
             for platform in x86_64-manylinux_2_28 aarch64-manylinux_2_28 aarch64-apple-darwin x86_64-pc-windows-msvc; do
               for extra in tf tf-cuda torch dev; do
                 echo "dlomix[$extra] @ file://$PWD" \
