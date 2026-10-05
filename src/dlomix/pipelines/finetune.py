@@ -32,11 +32,29 @@ from typing import Any
 from ..config import _BACKEND, PYTORCH_BACKEND
 from ..data import FragmentIonIntensityDataset, PeptideDataset
 from ..losses import masked_spectral_distance
-from ..models import download_remote_model_weights, load_and_adapt_pretrained_model
 
 logger = logging.getLogger(__name__)
 
 _IS_TORCH = _BACKEND in PYTORCH_BACKEND
+
+# The pretrained-model helpers live in the TensorFlow-only ``models.model_utils``,
+# which imports TensorFlow at module level, so they are only imported on that
+# backend. Fine-tuning is TensorFlow-only for now: the methods that need these
+# helpers call ``_require_tensorflow`` first.
+if _IS_TORCH:
+    download_remote_model_weights = None
+    load_and_adapt_pretrained_model = None
+else:
+    from ..models import download_remote_model_weights, load_and_adapt_pretrained_model
+
+
+def _require_tensorflow(operation: str) -> None:
+    """Raise :exc:`NotImplementedError` for ``operation`` on the PyTorch backend."""
+    if _IS_TORCH:
+        raise NotImplementedError(
+            f"FineTunePipeline.{operation}() currently supports TensorFlow only. "
+            "Set DLOMIX_BACKEND=tensorflow before importing dlomix."
+        )
 
 
 _KERAS_MODEL_SUFFIXES = (".keras", ".h5")
@@ -258,6 +276,8 @@ class FineTunePipeline:
 
             history = FineTunePipeline(...).setup().finetune()
         """
+        # fail before the (potentially slow) dataset preparation
+        _require_tensorflow("setup")
         logger.info("Setting up FineTunePipeline …")
         self._prepare_dataset()
         self._resolve_vocab()
@@ -370,12 +390,7 @@ class FineTunePipeline:
             If :meth:`setup` has not been called yet.
         """
         self._require_setup()
-
-        if _IS_TORCH:
-            raise NotImplementedError(
-                "FineTunePipeline.finetune() currently supports TensorFlow only. "
-                "Set DLOMIX_BACKEND=tensorflow before importing dlomix."
-            )
+        _require_tensorflow("finetune")
 
         import tensorflow as tf
 
@@ -432,6 +447,7 @@ class FineTunePipeline:
             The path the model was saved to.
         """
         self._require_setup()
+        _require_tensorflow("save")
         destination = _ensure_keras_extension(path or self.output_model_path)
         if Path(destination).exists() and not overwrite:
             raise FileExistsError(
