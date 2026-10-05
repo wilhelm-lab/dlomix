@@ -1,3 +1,10 @@
+"""
+Build the detectability dataset and run one forward pass of the PyTorch detectability model.
+
+Run from the repository root with the PyTorch backend:
+DLOMIX_BACKEND=pytorch python run_scripts/run_detectability_torch.py
+"""
+
 from dlomix.constants import CLASSES_LABELS, aa_to_int_dict, alphabet
 from dlomix.data import DetectabilityDataset
 

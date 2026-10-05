@@ -1,6 +1,6 @@
 """
 To run this script, use the following command:
-DLOMIX_BACKEND=torch python run_scripts/run_prosit_intensity_ptms_torch.py
+DLOMIX_BACKEND=pytorch python run_scripts/run_prosit_intensity_ptms_torch.py
 """
 
 import logging
@@ -42,6 +42,7 @@ print(d)
 model = PrositIntensityPredictor(
     seq_length=30,
     use_prosit_ptm_features=True,
+    use_meta_data=True,  # use the collision energy and precursor charge features
     input_keys={
         "SEQUENCE_KEY": "modified_sequence",
     },

@@ -1,3 +1,12 @@
+"""
+Train the Prosit retention time model with a custom PyTorch training loop.
+
+Run from the repository root with the PyTorch backend:
+DLOMIX_BACKEND=pytorch python run_scripts/run_prosit_RT_torch.py
+"""
+
+import copy
+
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -17,6 +26,7 @@ print(f"Using device: {device}")
 TRAIN_DATA = "example_dataset/proteomTools_train.csv"
 VAL_DATA = "example_dataset/proteomTools_val.csv"
 TEST_DATA = "example_dataset/proteomTools_test.csv"
+MAX_SEQ_LEN = 30
 
 d = RetentionTimeDataset(
     data_format="csv",  # "hub",
@@ -25,7 +35,7 @@ d = RetentionTimeDataset(
     test_data_source=TEST_DATA,
     sequence_column="sequence",
     label_column="irt",
-    max_seq_len=30,
+    max_seq_len=MAX_SEQ_LEN,
     batch_size=128,
     dataset_type="pt",
 )
@@ -35,7 +45,7 @@ for x in d.tensor_train_data:
     break
 
 
-model = PrositRetentionTimePredictor(seq_length=30)
+model = PrositRetentionTimePredictor(alphabet=d.extended_alphabet)
 print(model)
 model.to(device)
 
@@ -75,7 +85,8 @@ for epoch in range(1, 5):
         train_label = train_label.to(device, dtype=torch.float32)
 
         optimizer.zero_grad()
-        pred_cs = model(train_seq)
+        # (batch, 1) -> (batch,) to match the labels; otherwise MSELoss broadcasts
+        pred_cs = model(train_seq).squeeze(-1)
         loss = criterion(pred_cs, train_label)
         loss.backward()
         optimizer.step()
@@ -100,18 +111,14 @@ for epoch in range(1, 5):
             val_seq = val_seq.to(device, dtype=torch.int32)
             val_label = val_label.to(device, dtype=torch.float32)
 
-            val_pred_cs = model(val_seq)
+            val_pred_cs = model(val_seq).squeeze(-1)
             val_loss = criterion(val_pred_cs, val_label)
             val_loss_total += val_loss.item()
-
-            # TODO add adjusted_mean_absolute_error metric
 
     avg_val_loss = val_loss_total / len(d.tensor_val_data)
     print(
         f"Epoch {epoch} Summary: Train Loss: {avg_train_loss:.4f}, Validation Loss: {avg_val_loss:.4f}"
     )
-
-    # TODO continue adjustment here
 
     # Learning rate scheduler using the validation loss.
     scheduler.step(avg_val_loss)
@@ -122,7 +129,8 @@ for epoch in range(1, 5):
     if avg_val_loss < best_val_loss:
         best_val_loss = avg_val_loss
         epochs_without_improvement = 0
-        best_model_state = model.state_dict()
+        # copy: state_dict() references the live tensors, which later epochs overwrite
+        best_model_state = copy.deepcopy(model.state_dict())
     else:
         epochs_without_improvement += 1
         print(f"No improvement for {epochs_without_improvement} epoch(s).")
@@ -174,7 +182,7 @@ with torch.no_grad():
         test_seq = test_seq.to(device, dtype=torch.int32)
         test_label = test_label.to(device, dtype=torch.float32)
 
-        test_pred_cs = model(test_seq)
+        test_pred_cs = model(test_seq).squeeze(-1)
         test_loss = criterion(test_pred_cs, test_label)
 
         test_loss_total += test_loss.item()

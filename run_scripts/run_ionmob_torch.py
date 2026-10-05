@@ -1,5 +1,14 @@
 #!/usr/bin/env python
+"""
+Train the Ionmob ion mobility (CCS) model with a custom PyTorch training loop.
+
+Run from the repository root:
+DLOMIX_BACKEND=pytorch python run_scripts/run_ionmob_torch.py --help
+"""
+
 import argparse
+import copy
+import os
 
 import matplotlib.pyplot as plt
 import pandas as pd
@@ -80,6 +89,10 @@ def main():
         help="Path to save the high resolution training plots image",
     )
     args = parser.parse_args()
+
+    for path in (args.save_path, args.metrics_csv, args.plot_path):
+        if path and os.path.dirname(path):
+            os.makedirs(os.path.dirname(path), exist_ok=True)
 
     # Verbose: print out configuration settings
     if args.verbose:
@@ -216,7 +229,8 @@ def main():
         if avg_val_loss < best_val_loss:
             best_val_loss = avg_val_loss
             epochs_without_improvement = 0
-            best_model_state = model.state_dict()
+            # copy: state_dict() references the live tensors, which later epochs overwrite
+            best_model_state = copy.deepcopy(model.state_dict())
         else:
             epochs_without_improvement += 1
             print(f"No improvement for {epochs_without_improvement} epoch(s).")
