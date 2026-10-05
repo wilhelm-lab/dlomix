@@ -28,7 +28,19 @@ Submodules
    :undoc-members:
 
 
+.. automodule:: dlomix.layers.gru_kernel
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+
 .. automodule:: dlomix.layers.gru_seq_decoder_torch
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+
+.. automodule:: dlomix.layers.keras_initializers_torch
    :members:
    :show-inheritance:
    :undoc-members:
