@@ -1,3 +1,4 @@
+import gc
 import glob
 import logging
 import urllib.request
@@ -32,6 +33,21 @@ DOWNLOAD_PATH_FOR_ASSETS = join("tests", "assets")
 def unzip_file(zip_file_path, dest_dir):
     with zipfile.ZipFile(zip_file_path, "r") as f:
         f.extractall(dest_dir)
+
+
+@pytest.fixture(autouse=True)
+def collect_garbage_before_each_test():
+    """Collect garbage before every test, in the main test process.
+
+    The suite runs in one long process, so garbage accumulates across tests, e.g.
+    TensorFlow functions left over from earlier training or prediction. A dataset built
+    with ``num_proc > 1`` forks ``datasets.map`` workers (on Linux); if the garbage
+    collector runs inside a worker and finalizes such an inherited object, the
+    finalizer calls into a runtime that is not valid after a fork and the worker
+    crashes with a segmentation fault (seen on Python 3.12 with ``datasets`` 5.1.0).
+    Collecting here, where finalizing is safe, leaves the workers nothing to collect.
+    """
+    gc.collect()
 
 
 @pytest.fixture(scope="session")

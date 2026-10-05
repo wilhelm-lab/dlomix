@@ -6,12 +6,7 @@ from datasets import Dataset, DatasetDict
 
 from .dataset_config import DatasetConfig
 from .dataset_splitter import SplitConfig, create_splitter
-from .dataset_utils import (
-    EncodingScheme,
-    fork_safe_gc,
-    get_num_processors,
-    resolve_num_proc,
-)
+from .dataset_utils import EncodingScheme, get_num_processors, resolve_num_proc
 from .loading import DataSourceLoader, _DatasetSplitMode
 from .processing.pipeline import PipelineContext, ProcessingPipeline
 from .serialization import save_dataset
@@ -156,14 +151,12 @@ class PeptideDataset:
             if not self._empty_dataset_mode:
                 self._remove_unnecessary_columns()
                 self._split_dataset()
-                # map(num_proc > 1) forks workers; see fork_safe_gc
-                with fork_safe_gc(self._num_proc):
-                    self._run_processing_pipeline()
-                    if (
-                        self.model_features is not None
-                        or len(self._extracted_features_columns) > 0
-                    ):
-                        self._cast_model_feature_types_to_float()
+                self._run_processing_pipeline()
+                if (
+                    self.model_features is not None
+                    or len(self._extracted_features_columns) > 0
+                ):
+                    self._cast_model_feature_types_to_float()
                 self._cleanup_temp_dataset_cache_files()
                 self.processed = True
 
