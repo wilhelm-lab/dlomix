@@ -93,6 +93,9 @@ def fork_safe_gc(num_proc):
     whose finalizers call into a runtime that is not valid after a fork: the worker
     crashes with a segmentation fault. Collecting first and then freezing the parent's
     objects (:func:`gc.freeze`) keeps the workers' collector away from them.
+
+    Afterwards :func:`gc.unfreeze` releases every frozen object, including any frozen
+    elsewhere (Python 3.12 freezes some at startup); they only become collectable again.
     """
     if not num_proc or num_proc <= 1:
         yield

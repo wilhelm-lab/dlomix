@@ -48,14 +48,16 @@ def test_num_proc_none_forces_single_process(monkeypatch):
 def test_fork_safe_gc_freezes_objects_only_while_forking(num_proc):
     # forked map workers must not finalize the parent's objects (e.g. TensorFlow
     # functions), which crashes them; the freeze lasts only for the processing
+    # compare with the starting count: Python 3.12 starts with some objects frozen
     frozen_before = gc.get_freeze_count()
     with fork_safe_gc(num_proc):
         frozen_during = gc.get_freeze_count()
+    frozen_after = gc.get_freeze_count()
     if num_proc and num_proc > 1:
         assert frozen_during > frozen_before
+        assert frozen_after < frozen_during  # released again
     else:
-        assert frozen_during == frozen_before
-    assert gc.get_freeze_count() == 0
+        assert frozen_during == frozen_after == frozen_before
 
 
 def test_num_proc_user_value_is_capped_to_available(monkeypatch):
