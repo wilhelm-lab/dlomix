@@ -63,6 +63,10 @@ python -m dlomix
 ```
 Please include this output when reporting a bug. If a GPU is present but not detected, the usual causes are a driver that is too old for the CUDA version shown, or an `LD_LIBRARY_PATH` pointing at a different system CUDA installation.
 
+### Apple GPUs (macOS, tensorflow-metal)
+
+With `tensorflow-metal` installed, TensorFlow trains on the Apple GPU. Its fused GRU kernel computes a different function from the standard GRU once the biases are trained, so weights trained on a Mac would give other predictions elsewhere (and published weights wrong predictions on a Mac). The DLOmix TensorFlow models therefore use the standard GRU kernel when an Apple GPU is visible, and warn once: results are the same on every platform and in PyTorch, at some cost in speed. See [`dlomix.layers.gru_kernel`](src/dlomix/layers/gru_kernel.py) to opt back in to the fused kernel.
+
 ## Usage
 Experiment a simple retention time prediction use-case using Google Colab &nbsp;&nbsp; [![Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/wilhelm-lab/dlomix/blob/develop/notebooks/Example_RTModel_Walkthrough_colab.ipynb)
 
@@ -114,8 +118,8 @@ DLOmix provides a unified API across both TensorFlow and PyTorch backends:
 | `PrositIntensityPredictor` [1] | ✅ | ✅ |
 | `ChargeStatePredictor` | ✅ | ✅ |
 | `DetectabilityModel` [4] | ✅ | ✅ |
-| `DeepLCRetentionTimePredictor` [2,3] | ✅ | ❌ |
-| `Ionmob` [5] | ❌ | ✅ |
+| `DeepLCRetentionTimePredictor` [2,3] | ✅ | ✅ |
+| `Ionmob` [5] | ✅ | ✅ |
 | `PIMMS-CF` [6] | ❌ | ⚠ (experimental) |
 
 

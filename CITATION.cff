@@ -15,7 +15,7 @@ url: "https://github.com/wilhelm-lab/dlomix"
 abstract: >-
   DLOmix is a Python framework for deep learning in proteomics with
   multi-backend support for both TensorFlow/Keras (Keras 3) and PyTorch,
-  exposing identical APIs across backends. It provides datasets, models,
+  exposing APIs across both backends. It provides datasets, models,
   losses, and evaluation utilities for tasks such as retention time,
   fragment-ion intensity, charge-state, detectability, and ion-mobility
   prediction.
@@ -29,4 +29,4 @@ keywords:
 license: MIT
 version: "0.2.7"
 # TODO: set the release date when tagging the cited version.
-date-released: "2026-06-19"
+date-released: "2026-xx-xx"

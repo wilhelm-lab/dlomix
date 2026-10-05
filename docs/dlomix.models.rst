@@ -34,6 +34,12 @@ Submodules
    :undoc-members:
 
 
+.. automodule:: dlomix.models.deepLC_torch
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+
 .. automodule:: dlomix.models.detectability
    :members:
    :show-inheritance:
@@ -41,6 +47,12 @@ Submodules
 
 
 .. automodule:: dlomix.models.detectability_torch
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+
+.. automodule:: dlomix.models.ionmob
    :members:
    :show-inheritance:
    :undoc-members:

@@ -23,6 +23,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   reads only package metadata — no GPU runner, no wheel downloads — and asserts that
   `tf-cuda` brings the CUDA libraries on Linux and only there.
 - `CITATION.cff`, `CONTRIBUTING.md`, and this changelog.
+- **Every model now exists on both backends**: a TensorFlow `Ionmob` (with a
+  `keras.ops` `MaskedIonmobLoss` of the same signature as the PyTorch one; `fit`
+  applies it to `(total_ccs, ccs_std)` as the PyTorch loop does) and a PyTorch
+  `DeepLCRetentionTimePredictor`.
+- **Backend equivalence checks.** `tests/test_backend_equivalence.py` copies the
+  Keras weights of each model (Prosit RT, charge state, detectability, DeepLC,
+  Ionmob) into its PyTorch counterpart and requires the same outputs, and checks
+  that both start from the same weight distributions. For Prosit intensity,
+  `scripts/check_backend_parity.py` compares data, forward pass and training
+  outcome (spectral angle on a held-out split) across backends; run it before
+  longer experiments.
+- `IonMobilityDataset` accepts `shuffle`, `torch_dataloader_kwargs` and the other
+  `PeptideDataset` keyword arguments, like the other datasets.
 
 ### Changed
 - **Migrated the TensorFlow backend to TensorFlow 2.18+ / Keras 3.** The previous
@@ -52,8 +65,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `masked_pearson_correlation_distance`, `adjusted_mean_absolute_error`,
   `adjusted_mean_squared_error`, `timedelta` and `TimeDeltaMetric` now have a
   single implementation written against `keras.ops`, replacing the two
-  hand-written copies that had drifted apart. `MaskedIonmobLoss` stays
-  PyTorch-only.
+  hand-written copies that had drifted apart. `MaskedIonmobLoss` keeps one
+  implementation per backend (a stateful `nn.Module` on PyTorch).
   - `keras>=3.0.0` moved from the TensorFlow extra into `install_requires`, and
     `dlomix.config` now derives `KERAS_BACKEND` from `DLOMIX_BACKEND` before
     `keras` is imported. Keras 3 is pure Python and does not pull in TensorFlow
@@ -89,8 +102,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   GPU-less runner cannot use.
 - TensorFlow is capped at `<2.22`, the newest version CI installs and tests.
   Previously any future release was accepted on Linux; raise the cap deliberately.
+- **The PyTorch models now compute the same function as the TensorFlow models and
+  start training from the same weight distributions.** Results of PyTorch models
+  trained with earlier versions are not directly comparable.
+  - *PyTorch:* all models initialize their layers like Keras (Glorot-uniform
+    kernels, zero biases, orthogonal recurrent kernels, `uniform(±0.05)`
+    embeddings) instead of PyTorch's defaults, via
+    `dlomix.layers.keras_initializers_torch`. With PyTorch's defaults, Ionmob's test
+    error was 7% higher than TensorFlow's; with Keras' it is within run-to-run noise.
+  - *Breaking (PyTorch):* `ChargeStatePredictor(model_flavour="dominant")` returns
+    softmax probabilities, as in TensorFlow, instead of logits. Train it with
+    `nn.NLLLoss()` on `torch.log(probabilities)`, not `nn.CrossEntropyLoss`.
+  - *PyTorch:* the attention layer of `PrositRetentionTimePredictor` and
+    `ChargeStatePredictor` sizes its per-position bias from the first input, as
+    Keras does. `seq_length` no longer has to equal the padded width (`max_seq_len
+    + 2` with the terminal tokens); a width that changes between calls raises a
+    clear `ValueError` instead of a broadcasting error.
+- `ChargeStatePredictor` raises `ValueError` for an unknown `model_flavour` on both
+  backends; it used to warn and fail later.
+- **On Apple GPUs (`tensorflow-metal`), the TensorFlow models use the standard GRU
+  kernel**, and warn once. The fused Metal kernel that Keras picks by default
+  computes a different function once the GRU biases are non-zero (tensorflow-metal
+  1.2.0): a Prosit intensity model trained on a Mac reached median spectral angle
+  0.80 there but 0.77 with the standard GRU, i.e. on Linux, CPU or PyTorch, and
+  weights trained elsewhere predict wrongly on a Mac. Correct results cost GRU
+  speed on Macs; `dlomix.layers.gru_kernel` documents how to opt back in.
+- A dataset given only test data now requires an `alphabet` and raises `ValueError`
+  without one. The alphabet is learned from the training and validation splits
+  only, so a test-only dataset used to learn an alphabet holding just the padding
+  token and encode every peptide as padding.
+- `dlomix.pipelines` imports on the PyTorch backend. `FinetuneModel.setup`,
+  `finetune` and `save` raise `NotImplementedError` there, as they still need
+  TensorFlow.
 
 ### Removed
+- `run_scripts/run_deeplc.py`; use `notebooks/Example_DeepLC_RetentionTimePrediction.ipynb`
+  instead.
 - **`dlomix.losses.intensity_torch`, `dlomix.eval.chargestate_torch` and
   `dlomix.eval.rt_eval_torch`.** Their contents now live in the backend-agnostic
   `dlomix.losses.intensity`, `dlomix.eval.chargestate` and `dlomix.eval.rt_eval`.
@@ -150,13 +197,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `DetectabilityReport` used `np.round_`, removed in NumPy 2.0, so every report
   raised `AttributeError` at call time. The module has no test coverage, which is
   why the suite stayed green.
-- `run_scripts/run_deeplc.py` imported `dlomix.data.RetentionTimeDataset` and
-  `run_scripts/run_pipeline.py` imported `TimeDeltaMetric2`; neither has existed
-  since the dataset refactor. Both scripts failed at import.
+- `run_scripts/run_pipeline.py` imported `TimeDeltaMetric2`, which has not existed
+  since the dataset refactor, so the script failed at import.
 - Two notebooks called `save_weights` with a path lacking the `.weights.h5`
   suffix that Keras 3 requires, and two others pinned `dlomix[wandb]==0.1.0`.
 - `TimeDeltaMetric.get_config` did not call `super().get_config()`, dropping
   `name` and `dtype` and breaking the `from_config` round-trip.
+- **PyTorch model bugs found by the backend equivalence checks:**
+  - `PrositIntensityPredictor`: the attention was sized by `regressor_layer_size`
+    and the decoder GRU by `recurrent_layers_sizes[1]`, the other way round from
+    TensorFlow, which only agreed while both are equal (as with the defaults); and
+    the output `LeakyReLU` used PyTorch's slope 0.01 instead of Keras' (and
+    Prosit's) 0.3.
+  - `PrositRetentionTimePredictor` and `ChargeStatePredictor` froze the embedding
+    of token 0 (`padding_idx=0`), which Keras does not; `ChargeStatePredictor` also
+    allocated one embedding row too many.
+  - `DetectabilityModel` learned a trainable embedding where the Keras model
+    one-hot encodes, masked padding in its attention where the Keras model does
+    not, and crashed on a batch without a full-length sequence
+    (`pad_packed_sequence` without `total_length`).
+- The example notebooks and run scripts were updated for Keras 3 (a model must be
+  built before `load_weights`, which `model.build()` does not do for nested GRU
+  cells), pass the dataset's alphabet to test datasets and models, and the
+  PyTorch run scripts keep a copy of the best weights instead of a reference to
+  the live ones.
 - Added `isort` to the `dev` extra; `make format-check`, which CI runs, invoked it
   without declaring it.
 
