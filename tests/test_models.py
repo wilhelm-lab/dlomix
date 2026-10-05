@@ -1,5 +1,6 @@
 import logging
 
+import keras
 import pytest
 import tensorflow as tf
 
@@ -9,6 +10,12 @@ from dlomix.models.deepLC import DeepLCRetentionTimePredictor
 from dlomix.models.prosit import PrositIntensityPredictor, PrositRetentionTimePredictor
 
 logger = logging.getLogger(__name__)
+
+# These tests build TensorFlow models, so they need Keras on the TensorFlow backend.
+pytestmark = pytest.mark.skipif(
+    keras.backend.backend() != "tensorflow",
+    reason="builds TensorFlow models, which need the TensorFlow Keras backend",
+)
 
 
 def _zeros_for(shapes, batch_size=2):

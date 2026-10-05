@@ -8,6 +8,10 @@ from os.path import exists, join
 import pandas as pd
 import pytest
 
+# Import dlomix before any test module imports keras: dlomix sets KERAS_BACKEND from
+# DLOMIX_BACKEND, and Keras fixes its backend on first import (to TensorFlow if unset).
+import dlomix  # noqa: F401
+
 logger = logging.getLogger(__name__)
 
 RT_PARQUET_EXAMPLE_URL = "https://zenodo.org/record/6602020/files/TUM_missing_first_meta_data.parquet?download=1"

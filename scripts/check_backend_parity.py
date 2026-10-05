@@ -373,6 +373,14 @@ def worker_tensorflow(cfg, out_dir: Path) -> None:
     import keras
     import tensorflow as tf
 
+    if sys.platform == "darwin":
+        # On an Apple GPU, Keras GRUs either use tensorflow-metal's fused kernel, which
+        # computes a different function, or the standard kernel, which trains ~8x
+        # slower there than on the CPU (Prosit intensity: 622 vs 78 s/epoch on an M1 Max)
+        tf.config.set_visible_devices(
+            [], "GPU"
+        )  # must run before TensorFlow uses a GPU
+
     from dlomix.losses import masked_spectral_distance
     from dlomix.models import PrositIntensityPredictor
 

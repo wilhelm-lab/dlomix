@@ -17,6 +17,12 @@ import tensorflow as tf
 
 from dlomix.models.model_utils import expand_embedding_vocabulary
 
+# These tests build TensorFlow models, so they need Keras on the TensorFlow backend.
+pytestmark = pytest.mark.skipif(
+    keras.backend.backend() != "tensorflow",
+    reason="builds TensorFlow models, which need the TensorFlow Keras backend",
+)
+
 ALPHABET = {token: index for index, token in enumerate("ACDEF")}
 SEQ_LENGTH = 10
 

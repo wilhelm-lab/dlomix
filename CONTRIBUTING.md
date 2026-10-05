@@ -51,8 +51,8 @@ subpackage `__init__.py`.
 tensor math written once against `keras.ops` and run on either backend, so add
 new ones as backend-agnostic `keras.ops` code — do not write a `_torch` copy.
 Convert inputs with `ops.convert_to_tensor` so raw numpy arrays work too, and
-return per-sample values rather than a reduced scalar. The exception is
-`MaskedIonmobLoss`, a stateful `nn.Module` for the PyTorch-only Ionmob model.
+return per-sample values rather than a reduced scalar (`MaskedIonmobLoss`, which
+combines two masked means, is the one loss that returns a scalar).
 
 ## Development workflow
 

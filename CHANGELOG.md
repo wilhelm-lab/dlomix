@@ -23,10 +23,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   reads only package metadata — no GPU runner, no wheel downloads — and asserts that
   `tf-cuda` brings the CUDA libraries on Linux and only there.
 - `CITATION.cff`, `CONTRIBUTING.md`, and this changelog.
-- **Every model now exists on both backends**: a TensorFlow `Ionmob` (with a
-  `keras.ops` `MaskedIonmobLoss` of the same signature as the PyTorch one; `fit`
-  applies it to `(total_ccs, ccs_std)` as the PyTorch loop does) and a PyTorch
-  `DeepLCRetentionTimePredictor`.
+- **Every model now exists on both backends**: a TensorFlow `Ionmob` (`fit`
+  applies `MaskedIonmobLoss` to `(total_ccs, ccs_std)`, as the PyTorch loop does)
+  and a PyTorch `DeepLCRetentionTimePredictor`.
 - **Backend equivalence checks.** `tests/test_backend_equivalence.py` copies the
   Keras weights of each model (Prosit RT, charge state, detectability, DeepLC,
   Ionmob) into its PyTorch counterpart and requires the same outputs, and checks
@@ -65,8 +64,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `masked_pearson_correlation_distance`, `adjusted_mean_absolute_error`,
   `adjusted_mean_squared_error`, `timedelta` and `TimeDeltaMetric` now have a
   single implementation written against `keras.ops`, replacing the two
-  hand-written copies that had drifted apart. `MaskedIonmobLoss` keeps one
-  implementation per backend (a stateful `nn.Module` on PyTorch).
+  hand-written copies that had drifted apart. So does `MaskedIonmobLoss`.
+  - *PyTorch:* `MaskedIonmobLoss` is no longer an `nn.Module`; it is called the
+    same way, `loss((ccs, ccs_std), (target_ccs, target_ccs_std))`.
   - `keras>=3.0.0` moved from the TensorFlow extra into `install_requires`, and
     `dlomix.config` now derives `KERAS_BACKEND` from `DLOMIX_BACKEND` before
     `keras` is imported. Keras 3 is pure Python and does not pull in TensorFlow
@@ -111,7 +111,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   for the macOS cap.
 - **The PyTorch models now compute the same function as the TensorFlow models and
   start training from the same weight distributions.** Results of PyTorch models
-  trained with earlier versions are not directly comparable.
+  trained with earlier versions are not directly comparable, and some of their
+  checkpoints no longer load: `ChargeStatePredictor` (one embedding row fewer) and
+  `DetectabilityModel` (no embedding any more). `PrositIntensityPredictor`
+  checkpoints load but predict differently (output `LeakyReLU` slope 0.3).
   - *PyTorch:* all models initialize their layers like Keras (Glorot-uniform
     kernels, zero biases, orthogonal recurrent kernels, `uniform(±0.05)`
     embeddings) instead of PyTorch's defaults, via
@@ -132,8 +135,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   computes a different function once the GRU biases are non-zero (tensorflow-metal
   1.2.0): a Prosit intensity model trained on a Mac reached median spectral angle
   0.80 there but 0.77 with the standard GRU, i.e. on Linux, CPU or PyTorch, and
-  weights trained elsewhere predict wrongly on a Mac. Correct results cost GRU
-  speed on Macs; `dlomix.layers.gru_kernel` documents how to opt back in.
+  weights trained elsewhere predict wrongly on a Mac. The standard kernel is slow
+  on the Apple GPU (Prosit intensity on an M1 Max: 622 s per epoch, against 78 s
+  on the CPU and 16 s with PyTorch on MPS), so the warning and the README
+  recommend training GRU models on the CPU, or with the PyTorch backend.
 - A dataset given only test data now requires an `alphabet` and raises `ValueError`
   without one. The alphabet is learned from the training and validation splits
   only, so a test-only dataset used to learn an alphabet holding just the padding
@@ -228,6 +233,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   cells), pass the dataset's alphabet to test datasets and models, and the
   PyTorch run scripts keep a copy of the best weights instead of a reference to
   the live ones.
+- **The PyTorch CI job ran Keras on the TensorFlow backend.** A test module imported
+  `keras` before `dlomix`, so Keras fixed its backend to its TensorFlow default before
+  DLOmix could set `KERAS_BACKEND=torch`: the shared losses and metrics were never
+  checked on PyTorch in CI, and TensorFlow-only test files passed in the PyTorch job.
+  `tests/conftest.py` now imports `dlomix` first, and the TensorFlow-only test files
+  skip unless Keras runs on TensorFlow. (On PyTorch, the shared losses give the
+  reference values.)
 - Added `isort` to the `dev` extra; `make format-check`, which CI runs, invoked it
   without declaring it.
 

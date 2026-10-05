@@ -12,13 +12,14 @@ import torch
 from datasets import Dataset
 
 from dlomix.losses.ionmob import MaskedIonmobLoss
-from dlomix.losses.ionmob_torch import MaskedIonmobLoss as MaskedIonmobLossTorch
 from dlomix.models.deepLC_torch import (
     DeepLCRetentionTimePredictor as DeepLCRetentionTimePredictorTorch,
 )
 from dlomix.models.ionmob_torch import Ionmob as IonmobTorch
 
-# Building a tf.keras model needs the TensorFlow Keras backend (see test_torch_models.py).
+# tf.keras *is* Keras 3, whose backend is one process-wide setting, so the TensorFlow
+# models only build TensorFlow layers while Keras runs on TensorFlow (the default
+# DLOMIX_BACKEND). The PyTorch-only tests below run under either backend.
 requires_tensorflow_keras_backend = pytest.mark.skipif(
     keras.backend.backend() != "tensorflow",
     reason=(
@@ -288,33 +289,6 @@ def test_ionmob_tf_torch_same_function():
         )
 
 
-@pytest.mark.parametrize("use_mse", [True, False])
-@pytest.mark.parametrize("all_std_masked", [False, True])
-def test_masked_ionmob_loss_same_on_both_backends(use_mse, all_std_masked):
-    rng = np.random.default_rng(3)
-    ccs, ccs_std = rng.normal(size=(8, 1)), rng.normal(size=(8, 1))
-    target_ccs = rng.normal(size=(8, 1))
-    target_std = np.where(rng.random((8, 1)) < 0.5, -1.0, rng.normal(size=(8, 1)))
-    if all_std_masked:
-        target_std = np.full((8, 1), -1.0)
-    arrays = [a.astype(np.float32) for a in (ccs, ccs_std, target_ccs, target_std)]
-
-    expected = MaskedIonmobLossTorch(use_mse=use_mse)(
-        (_to_torch(arrays[0]), _to_torch(arrays[1])),
-        (_to_torch(arrays[2]), _to_torch(arrays[3])),
-    )
-    actual = MaskedIonmobLoss(use_mse=use_mse)(
-        (
-            keras.ops.convert_to_tensor(arrays[0]),
-            keras.ops.convert_to_tensor(arrays[1]),
-        ),
-        (arrays[2], arrays[3]),
-    )
-    np.testing.assert_allclose(
-        keras.ops.convert_to_numpy(actual), expected.item(), rtol=1e-6
-    )
-
-
 @requires_tensorflow_keras_backend
 def test_ionmob_tf_trains_on_ionmobility_dataset():
     from dlomix.data import IonMobilityDataset
@@ -528,6 +502,79 @@ def test_detectability_tf_torch_same_function():
         output_torch = model_torch(_to_torch(sequences))
     np.testing.assert_allclose(
         output_torch.numpy(), np.asarray(model_tf(sequences)), rtol=RTOL, atol=ATOL
+    )
+
+
+def _intensity_state(model_tf):
+    """The Prosit intensity model with meta data, as a PyTorch state."""
+    bidirectional = model_tf.sequence_encoder.layers[0]
+    meta_dense = model_tf.meta_encoder.layers[1]
+    decoder_attention = model_tf.decoder.layers[2].dense
+    time_dense = model_tf.regressor.layers[0].layer
+    state = {
+        "embedding.weight": model_tf.embedding.embeddings.numpy(),
+        "attention.W": model_tf.attention.W.numpy(),
+        "attention.b": model_tf.attention.b.numpy(),
+        "meta_encoder.meta_dense.weight": meta_dense.kernel.numpy().T,
+        "meta_encoder.meta_dense.bias": meta_dense.bias.numpy(),
+        "decoder.attention.linear.weight": decoder_attention.kernel.numpy().T,
+        "decoder.attention.linear.bias": decoder_attention.bias.numpy(),
+        "regressor.time_dense.weight": time_dense.kernel.numpy().T,
+        "regressor.time_dense.bias": time_dense.bias.numpy(),
+    }
+    for keras_layer, prefix, suffix in (
+        (bidirectional.forward_layer, "sequence_encoder.bidirectional_GRU", ""),
+        (
+            bidirectional.backward_layer,
+            "sequence_encoder.bidirectional_GRU",
+            "_reverse",
+        ),
+        (
+            model_tf.sequence_encoder.layers[2],
+            "sequence_encoder.unidirectional_GRU",
+            "",
+        ),
+        (model_tf.decoder.layers[0], "decoder.unidirectional_GRU", ""),
+    ):
+        state.update(_keras_gru_to_torch_state(keras_layer.cell, prefix, suffix))
+    return state
+
+
+@requires_tensorflow_keras_backend
+@pytest.mark.parametrize("with_termini", [False, True])
+def test_prosit_intensity_tf_torch_same_function(with_termini):
+    from dlomix.models.prosit import PrositIntensityPredictor
+    from dlomix.models.prosit_torch import (
+        PrositIntensityPredictor as PrositIntensityPredictorTorch,
+    )
+
+    width = 32 if with_termini else 30
+    rng = np.random.default_rng(7)
+    inputs = {
+        "sequence": _padded_sequences(len(ALPHABET), seq_length=width),
+        "charge": np.eye(6, dtype="float32")[rng.integers(0, 6, size=4)],
+        "ce": rng.uniform(0.2, 0.4, size=(4, 1)).astype("float32"),
+    }
+    kwargs = dict(
+        seq_length=30,
+        with_termini=with_termini,
+        alphabet=ALPHABET,
+        use_meta_data=True,
+        input_keys={"SEQUENCE_KEY": "sequence"},
+        meta_data_keys={"COLLISION_ENERGY_KEY": "ce", "PRECURSOR_CHARGE_KEY": "charge"},
+    )
+    model_tf = PrositIntensityPredictor(**kwargs)
+    model_torch = PrositIntensityPredictorTorch(**kwargs)
+    _prepare_keras_model(model_tf, inputs)
+    inputs_torch = {k: _to_torch(v) for k, v in inputs.items()}
+    model_torch(inputs_torch)  # creates the lazy layers
+    _load_state(model_torch, _intensity_state(model_tf))
+
+    model_torch.eval()
+    with torch.no_grad():
+        output_torch = model_torch(inputs_torch)
+    np.testing.assert_allclose(
+        output_torch.numpy(), np.asarray(model_tf(inputs)), rtol=RTOL, atol=ATOL
     )
 
 

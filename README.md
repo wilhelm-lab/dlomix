@@ -65,7 +65,20 @@ Please include this output when reporting a bug. If a GPU is present but not det
 
 ### Apple GPUs (macOS, tensorflow-metal)
 
-With `tensorflow-metal` installed, TensorFlow trains on the Apple GPU. Its fused GRU kernel computes a different function from the standard GRU once the biases are trained, so weights trained on a Mac would give other predictions elsewhere (and published weights wrong predictions on a Mac). The DLOmix TensorFlow models therefore use the standard GRU kernel when an Apple GPU is visible, and warn once: results are the same on every platform and in PyTorch, at some cost in speed. See [`dlomix.layers.gru_kernel`](src/dlomix/layers/gru_kernel.py) to opt back in to the fused kernel.
+With `tensorflow-metal` installed, TensorFlow trains on the Apple GPU. Its fused GRU kernel computes a different function from the standard GRU once the biases are trained, so weights trained on a Mac would give other predictions elsewhere (and published weights wrong predictions on a Mac). The DLOmix TensorFlow models therefore use the standard GRU kernel when an Apple GPU is visible, and warn once. Results are then the same on every platform and in PyTorch, but the standard kernel is slow on the Apple GPU. Training Prosit intensity on an M1 Max:
+
+| Setup | Time per epoch |
+|---|---|
+| TensorFlow, Apple GPU, standard GRU (default with `tensorflow-metal`) | 622 s |
+| TensorFlow, CPU | 78 s |
+| PyTorch, Apple GPU (MPS) | 16 s |
+
+For the models with GRU layers (Prosit, charge state, detectability, Ionmob), train TensorFlow on the CPU by hiding the GPU before TensorFlow uses it, or use the PyTorch backend:
+```python
+import tensorflow as tf
+tf.config.set_visible_devices([], "GPU")
+```
+`tensorflow-metal` 1.2.0 only works with TensorFlow below 2.20, which DLOmix installs on macOS for Python 3.11 and 3.12.
 
 ## Usage
 Experiment a simple retention time prediction use-case using Google Colab &nbsp;&nbsp; [![Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/wilhelm-lab/dlomix/blob/develop/notebooks/Example_RTModel_Walkthrough_colab.ipynb)
