@@ -95,8 +95,10 @@ class FineTunePipeline:
         Target vocabulary for the fine-tuned model.  ``None`` means the
         pipeline will derive it from the dataset's ``extended_alphabet``.
     initialization_strategy:
-        Strategy for initialising weights that are new after a vocabulary
-        expansion (e.g. ``"random"``, ``"zeros"``, ``"mean"``, ``"best-fit"``).
+        Strategy for initialising the embeddings of tokens that are new after a
+        vocabulary expansion: ``"random"`` (Glorot uniform), ``"mean"`` (the mean
+        of the pretrained embeddings) or ``"best-fit"`` (the embedding of the
+        pretrained token that predicts the new token's spectra best).
     best_fit_kwargs:
         Required when ``initialization_strategy="best-fit"``.  Forwarded
         verbatim to :func:`load_and_adapt_pretrained_model`.  Must contain at

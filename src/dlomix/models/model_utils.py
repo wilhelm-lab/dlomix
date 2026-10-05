@@ -44,8 +44,11 @@ def load_and_adapt_pretrained_model(
         If None, attempts to extract from the loaded model. Defaults to None.
     embedding_layer_name : str, optional
         Name of the embedding layer to expand. Defaults to "embedding".
-    initialization_strategy : {'random', 'mean'}, optional
-        Strategy for initializing new token embeddings. Defaults to 'random'.
+    initialization_strategy : {'random', 'mean', 'best-fit'}, optional
+        Strategy for initializing new token embeddings: Glorot-uniform random
+        values, the mean of the pretrained embeddings, or ('best-fit') the
+        embedding of the pretrained token whose substitution predicts the new
+        token's spectra best (requires ``best_fit_kwargs``). Defaults to 'random'.
     random_seed : int, optional
         Random seed for reproducible initialization. Defaults to None.
     custom_objects : Dict, optional
@@ -211,7 +214,9 @@ def expand_embedding_vocabulary(
     embedding_layer_name : str, optional
         Name of the embedding layer to expand. Defaults to "embedding".
     initialization_strategy : {'random', 'mean'}, optional
-        Strategy for initializing new token embeddings. Defaults to 'random'.
+        Strategy for initializing new token embeddings: Glorot-uniform random
+        values or the mean of the existing embeddings. Defaults to 'random'.
+        ('best-fit' is available through :func:`load_and_adapt_pretrained_model`.)
     random_seed : int, optional
         Random seed for reproducible initialization. Defaults to None.
 
@@ -219,8 +224,6 @@ def expand_embedding_vocabulary(
     -------
     tf.keras.Model
         Model with expanded embedding vocabulary.
-    dict
-        If initialization_strategy is 'best-fit' and return_fit_info is True, also returns a dictionary with best fit information for each new token.
 
     Raises
     ------
