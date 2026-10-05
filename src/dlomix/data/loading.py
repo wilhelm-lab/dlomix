@@ -189,6 +189,21 @@ class DataSourceLoader:
     def _validate_and_warn(
         self, split_mode: _DatasetSplitMode, available: dict
     ) -> None:
+        # The alphabet is learned on the fit splits (train/val) only. Without them
+        # nothing is learned and every residue would silently encode as unknown.
+        fit_splits = DEFAULT_SPLIT_NAMES[:2]
+        if (
+            available
+            and not self.config.alphabet
+            and not any(split in available for split in fit_splits)
+        ):
+            raise ValueError(
+                "An alphabet is required when no training or validation data is "
+                f"provided (available splits: {list(available.keys())}), since the "
+                "alphabet is learned from the train/val splits only. Pass the alphabet "
+                "the model was trained with, e.g. alphabet=train_dataset.extended_alphabet."
+            )
+
         if split_mode == _DatasetSplitMode.PREDEFINED:
             warnings.warn(
                 f"Using provided splits as-is: {list(available.keys())}. "

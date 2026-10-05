@@ -435,6 +435,3 @@ class PeptideDataset:
             ),
             dataloader_kwargs=getattr(self, "torch_dataloader_kwargs", None),
         )
-
-
-# ``load_processed_dataset`` lives in serialization.py (exported from ``dlomix.data``).
