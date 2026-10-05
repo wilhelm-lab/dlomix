@@ -23,16 +23,15 @@ collision energy as metadata inputs. It runs three checks:
 
 Each backend runs in its own subprocess, since DLOmix fixes the backend at import time.
 
-On macOS with tensorflow-metal, Keras runs GRU layers through a fused Metal kernel that
-does not follow the GRU definition once the biases are non-zero. The Keras forward
-reference is therefore computed with the GPU hidden, and the report states how a
-TensorFlow model trained on Metal scores when run with the standard GRU.
+On macOS, TensorFlow runs on the CPU: on an Apple GPU, Keras GRUs either use
+tensorflow-metal's fused kernel, which computes a different function (see
+``dlomix.layers.gru_kernel``), or the standard kernel, which is much slower there.
 
 Usage, from the repository root:
 
     python scripts/check_backend_parity.py                      # all checks
     python scripts/check_backend_parity.py --checks data forward  # quick, no training
-    python scripts/check_backend_parity.py --repeats 3 --max-epochs 50
+    python scripts/check_backend_parity.py --repeats 3 --max-epochs 100
     python scripts/check_backend_parity.py --reuse-training     # redo checks, keep runs
 
 Results (report, JSON, plots, predictions) are written to ``--output-dir``.
@@ -370,19 +369,13 @@ def reuse_runs(cfg, out_dir: Path, backend: str) -> bool:
 
 
 def worker_tensorflow(cfg, out_dir: Path) -> None:
-    import keras
     import tensorflow as tf
 
     if sys.platform == "darwin":
         # On an Apple GPU, Keras GRUs either use tensorflow-metal's fused kernel, which
         # computes a different function, or the standard kernel, which trains ~8x
         # slower there than on the CPU (Prosit intensity: 622 vs 78 s/epoch on an M1 Max)
-        tf.config.set_visible_devices(
-            [], "GPU"
-        )  # must run before TensorFlow uses a GPU
-
-    from dlomix.losses import masked_spectral_distance
-    from dlomix.models import PrositIntensityPredictor
+        tf.config.set_visible_devices([], "GPU")  # before TensorFlow uses a GPU
 
     dataset = build_dataset(cfg, "tf")
     save_data_fingerprint(dataset, cfg, "tensorflow", out_dir)
@@ -393,15 +386,17 @@ def worker_tensorflow(cfg, out_dir: Path) -> None:
         **{k: v[: cfg["forward_batch"]] for k, v in test.items()},
     )
 
-    if "training" not in cfg["checks"]:
-        return
+    if "training" in cfg["checks"] and not reuse_runs(cfg, out_dir, "tensorflow"):
+        train_tensorflow(cfg, out_dir, dataset)
+    if "forward" in cfg["checks"]:
+        save_tensorflow_forward(cfg, out_dir, dataset)
 
-    gpus = [d.name for d in tf.config.list_logical_devices("GPU")]
-    (out_dir / "tensorflow_devices.json").write_text(
-        json.dumps({"gpus": gpus, "metal": bool(gpus) and sys.platform == "darwin"})
-    )
-    if reuse_runs(cfg, out_dir, "tensorflow"):
-        return
+
+def train_tensorflow(cfg, out_dir: Path, dataset) -> None:
+    import keras
+
+    from dlomix.losses import masked_spectral_distance
+    from dlomix.models import PrositIntensityPredictor
 
     class RestoreBestWeights(keras.callbacks.Callback):
         """Keep the weights of the epoch with the lowest val_loss (as the PyTorch loop does)."""
@@ -458,22 +453,10 @@ def worker_tensorflow(cfg, out_dir: Path) -> None:
             )
 
 
-def worker_tensorflow_reference(cfg, out_dir: Path) -> None:
-    """The Keras forward reference, computed with every GPU hidden.
-
-    On macOS, tensorflow-metal makes Keras run ``GRU`` layers through a fused kernel
-    whose result differs from the GRU definition once the biases are non-zero. With
-    the GPU hidden, Keras uses its standard implementation, which follows the
-    definition, so this is the reference both for the forward comparison and for
-    scoring the trained Keras weights the way any non-Metal machine would run them.
-    """
-    import tensorflow as tf
-
-    tf.config.set_visible_devices([], "GPU")  # must run before TensorFlow uses a GPU
-
+def save_tensorflow_forward(cfg, out_dir: Path, dataset) -> None:
+    """The Keras forward stages, with initial and (if trained) run 0's weights."""
     from dlomix.models import PrositIntensityPredictor
 
-    dataset = build_dataset(cfg, "tf")
     batch = dict(np.load(out_dir / "forward_batch.npz"))
 
     model = PrositIntensityPredictor(**model_kwargs(cfg, dataset.extended_alphabet))
@@ -487,9 +470,7 @@ def worker_tensorflow_reference(cfg, out_dir: Path) -> None:
         load_weights_into_keras(model, dict(np.load(trained)))
         stages = tf_forward_stages(model, batch, cfg)
         np.savez(out_dir / "forward_trained_tensorflow.npz", **stages)
-        predictions = model.predict(dataset.tensor_test_data, verbose=0)
-        np.save(out_dir / "predictions_tensorflow_reference_run0.npy", predictions)
-        print("forward: saved the stages and test predictions of trained run 0")
+        print("forward: saved the stages with the trained weights of run 0")
 
 
 def worker_pytorch(cfg, out_dir: Path) -> None:
@@ -782,23 +763,6 @@ def check_training(out_dir: Path, cfg: dict) -> dict:
     }
 
 
-def check_metal(out_dir: Path) -> dict | None:
-    """Score TensorFlow run 0 on the standard GRU path, if it was trained with Metal."""
-    devices = out_dir / "tensorflow_devices.json"
-    reference = out_dir / "predictions_tensorflow_reference_run0.npy"
-    if not devices.exists() or not json.loads(devices.read_text())["metal"]:
-        return None
-    labels = np.load(out_dir / "test_labels.npy")
-    trained_on_metal = spectral_angle(
-        labels, np.load(out_dir / "predictions_tensorflow_run0.npy")
-    )
-    result = {"median_sa_metal": float(np.median(trained_on_metal))}
-    if reference.exists():
-        standard = spectral_angle(labels, np.load(reference))
-        result["median_sa_standard_gru"] = float(np.median(standard))
-    return result
-
-
 def plot_training(out_dir: Path, cfg: dict) -> None:
     import matplotlib
 
@@ -893,19 +857,6 @@ def print_report(results: dict, cfg: dict) -> None:
             f"  per-spectrum SA correlation between backends: "
             f"{r['per_spectrum_sa_correlation']:.3f} (between runs of one backend: {within})"
         )
-    if results.get("tensorflow_metal"):
-        r = results["tensorflow_metal"]
-        print(
-            "\n[tensorflow-metal] WARNING  TensorFlow trained on a Metal GPU. tensorflow-metal runs\n"
-            "  Keras GRU layers through a fused kernel that does not follow the GRU definition\n"
-            "  once the biases are non-zero, so these weights compute a different function on\n"
-            "  any other machine (Linux, CUDA, CPU, or PyTorch). Test median SA of run 0:"
-        )
-        print(f"    as trained, on Metal            {r['median_sa_metal']:.4f}")
-        if "median_sa_standard_gru" in r:
-            print(
-                f"    same weights, standard GRU     {r['median_sa_standard_gru']:.4f}"
-            )
 
 
 def main():
@@ -955,7 +906,13 @@ def main():
     parser.add_argument(
         "--repeats", type=int, default=2, help="Training runs per backend."
     )
-    parser.add_argument("--max-epochs", type=int, default=30)
+    parser.add_argument(
+        "--max-epochs",
+        type=int,
+        default=60,
+        help="Upper bound; early stopping ended the Prosit intensity runs between "
+        "epochs 36 and 58.",
+    )
     parser.add_argument("--patience", type=int, default=5)
     parser.add_argument("--batch-size", type=int, default=256)
     parser.add_argument("--learning-rate", type=float, default=1e-3)
@@ -983,7 +940,7 @@ def main():
     parser.add_argument("--output-dir", default="run_scripts/output/backend_parity")
     parser.add_argument(
         "--worker",
-        choices=["tensorflow", "tensorflow-reference", "pytorch"],
+        choices=["tensorflow", "pytorch"],
         help=argparse.SUPPRESS,
     )
     parser.add_argument("--config", help=argparse.SUPPRESS)
@@ -994,7 +951,6 @@ def main():
         out_dir = Path(cfg["output_dir"])
         workers = {
             "tensorflow": worker_tensorflow,
-            "tensorflow-reference": worker_tensorflow_reference,
             "pytorch": worker_pytorch,
         }
         workers[args.worker](cfg, out_dir)
@@ -1005,13 +961,10 @@ def main():
     cfg = {k: v for k, v in vars(args).items() if k not in ("worker", "config")}
     cfg["splits"] = prepare_splits(args)
 
-    # TensorFlow trains first and exports the forward batch, the trained weights and,
-    # with --torch-init keras, the initial weights of each run. The reference worker
-    # then computes the Keras forward stages with the GPU hidden (see its docstring),
-    # and PyTorch compares against them and trains last.
+    # TensorFlow trains first and exports the forward batch, its forward stages, the
+    # trained weights and, with --torch-init keras, the initial weights of each run;
+    # PyTorch then compares against them and trains last.
     run_worker("tensorflow", cfg, out_dir)
-    if "forward" in args.checks:
-        run_worker("tensorflow-reference", cfg, out_dir)
     run_worker("pytorch", cfg, out_dir)
 
     results = {"data": check_data(out_dir)}
@@ -1028,9 +981,6 @@ def main():
     if "training" in args.checks:
         results["training"] = check_training(out_dir, cfg)
         plot_training(out_dir, cfg)
-        metal = check_metal(out_dir)
-        if metal:
-            results["tensorflow_metal"] = metal  # a warning, not a parity verdict
 
     print_report(results, cfg)
     (out_dir / "parity_report.json").write_text(
