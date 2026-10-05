@@ -3,6 +3,7 @@ import numpy as np
 import tensorflow as tf
 
 from ..constants import CLASSES_LABELS, padding_char
+from ..layers.gru_kernel import gru_kernel_kwargs
 
 
 @keras.saving.register_keras_serializable(package="dlomix")
@@ -102,6 +103,7 @@ class Encoder(tf.keras.layers.Layer):
             return_sequences=True,
             return_state=True,
             recurrent_initializer="glorot_uniform",
+            **gru_kernel_kwargs()
         )
 
         self.encoder_bi = tf.keras.layers.Bidirectional(self.encoder_gru)
@@ -189,7 +191,10 @@ class Decoder(tf.keras.layers.Layer):
         self.num_classes = num_classes
 
         self.decoder_gru = tf.keras.layers.GRU(
-            self.units, return_state=True, recurrent_initializer="glorot_uniform"
+            self.units,
+            return_state=True,
+            recurrent_initializer="glorot_uniform",
+            **gru_kernel_kwargs()
         )
 
         self.attention = BahdanauAttention(self.units)

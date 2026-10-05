@@ -8,6 +8,7 @@ from ..constants import ALPHABET_UNMOD
 from ..data.processing.chain import padded_sequence_length
 from ..data.processing.feature_extractors import FEATURE_EXTRACTORS_PARAMETERS
 from ..layers.attention import AttentionLayer, DecoderAttentionLayer
+from ..layers.gru_kernel import gru_kernel_kwargs
 from ._alphabet import validate_alphabet_size
 
 logger = logging.getLogger("dlomix.models.prosit")
@@ -85,12 +86,16 @@ class PrositRetentionTimePredictor(tf.keras.Model):
             [
                 tf.keras.layers.Bidirectional(
                     tf.keras.layers.GRU(
-                        units=self.recurrent_layers_sizes[0], return_sequences=True
+                        units=self.recurrent_layers_sizes[0],
+                        return_sequences=True,
+                        **gru_kernel_kwargs(),
                     )
                 ),
                 tf.keras.layers.Dropout(rate=self.dropout_rate),
                 tf.keras.layers.GRU(
-                    units=self.recurrent_layers_sizes[1], return_sequences=True
+                    units=self.recurrent_layers_sizes[1],
+                    return_sequences=True,
+                    **gru_kernel_kwargs(),
                 ),
                 tf.keras.layers.Dropout(rate=self.dropout_rate),
             ]
@@ -351,12 +356,16 @@ class PrositIntensityPredictor(tf.keras.Model):
             [
                 tf.keras.layers.Bidirectional(
                     tf.keras.layers.GRU(
-                        units=self.recurrent_layers_sizes[0], return_sequences=True
+                        units=self.recurrent_layers_sizes[0],
+                        return_sequences=True,
+                        **gru_kernel_kwargs(),
                     )
                 ),
                 tf.keras.layers.Dropout(rate=self.dropout_rate),
                 tf.keras.layers.GRU(
-                    units=self.recurrent_layers_sizes[1], return_sequences=True
+                    units=self.recurrent_layers_sizes[1],
+                    return_sequences=True,
+                    **gru_kernel_kwargs(),
                 ),
                 tf.keras.layers.Dropout(rate=self.dropout_rate),
             ]
@@ -400,6 +409,7 @@ class PrositIntensityPredictor(tf.keras.Model):
                     units=self.regressor_layer_size,
                     return_sequences=True,
                     name="decoder",
+                    **gru_kernel_kwargs(),
                 ),
                 tf.keras.layers.Dropout(rate=self.dropout_rate),
                 DecoderAttentionLayer(self.max_ion),

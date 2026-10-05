@@ -1,10 +1,9 @@
-import warnings
-
 import keras
 import tensorflow as tf
 
 from ..constants import ALPHABET_UNMOD
 from ..layers.attention import AttentionLayer
+from ..layers.gru_kernel import gru_kernel_kwargs
 from ._alphabet import validate_alphabet_size
 
 """
@@ -78,18 +77,17 @@ class ChargeStatePredictor(tf.keras.Model):
         self.num_classes = num_classes
         self.model_flavour = model_flavour
 
-        if model_flavour == "relative":
-            # regression problem
-            self.final_activation = "linear"
-        elif model_flavour == "observed":
-            # multi-label multi-class classification problem
-            self.final_activation = "sigmoid"
-        elif model_flavour == "dominant":
-            # multi-class classification problem
-            self.final_activation = "softmax"
-        else:
-            warnings.warn(f"{model_flavour} not available")
-            exit
+        final_activations = {
+            "relative": "linear",  # regression
+            "observed": "sigmoid",  # multi-label classification
+            "dominant": "softmax",  # multi-class classification
+        }
+        if model_flavour not in final_activations:
+            raise ValueError(
+                f"Unknown model_flavour {model_flavour!r}, expected one of "
+                f"{sorted(final_activations)}."
+            )
+        self.final_activation = final_activations[model_flavour]
 
         self.embedding = tf.keras.layers.Embedding(
             input_dim=self.embeddings_count,
@@ -115,12 +113,16 @@ class ChargeStatePredictor(tf.keras.Model):
             [
                 tf.keras.layers.Bidirectional(
                     tf.keras.layers.GRU(
-                        units=self.recurrent_layers_sizes[0], return_sequences=True
+                        units=self.recurrent_layers_sizes[0],
+                        return_sequences=True,
+                        **gru_kernel_kwargs(),
                     )
                 ),
                 tf.keras.layers.Dropout(rate=self.dropout_rate),
                 tf.keras.layers.GRU(
-                    units=self.recurrent_layers_sizes[1], return_sequences=True
+                    units=self.recurrent_layers_sizes[1],
+                    return_sequences=True,
+                    **gru_kernel_kwargs(),
                 ),
                 tf.keras.layers.Dropout(rate=self.dropout_rate),
             ]

@@ -2,6 +2,8 @@ import numpy as np
 import torch
 import torch.nn as nn
 
+from ..layers.keras_initializers_torch import init_like_keras
+
 
 class SquareRootProjectionLayer(nn.Module):
     def __init__(self, weights, bias, trainable=True):
@@ -87,6 +89,11 @@ class Ionmob(nn.Module):
         self.out_ccs_std = nn.Linear(64, 1)
 
         self.relu = nn.ReLU()
+
+        # start from the same weight distribution as the Keras implementation: with
+        # PyTorch's default initializers the model overfits earlier and its test
+        # error is about 7% higher
+        init_like_keras(self)
 
     def forward(self, seq, mz, charge):
         """
