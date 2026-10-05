@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- Removed the `gc.freeze` handling around multi-process dataset processing added in
+  0.3.0. The crash it guarded against came from garbage accumulated across the test
+  suite; the test suite now collects garbage before each test instead.
+- GitHub release notes are taken from this changelog.
+- Packaging: SPDX license expression instead of the deprecated license classifier.
+- CI: the PyTorch job also runs `tests/test_backend_equivalence.py` and
+  `tests/test_postprocessing.py`.
+
+### Fixed
+- Documentation: installation and backend guides updated for Keras 3; dataset guide
+  examples use `tensor_train_data` / `tensor_val_data` / `tensor_test_data`.
+
 ## [0.3.0] - 2026-10-05
 
 First release with Keras 3 (TensorFlow 2.18+) support.
