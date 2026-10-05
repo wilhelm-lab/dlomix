@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-10-05
+
+First release with Keras 3 (TensorFlow 2.18+) support.
+
 
 ### Added
 - **`tf-cuda` / `tensorflow-cuda` extra** for Linux GPU machines, wrapping
@@ -251,10 +255,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added `isort` to the `dev` extra; `make format-check`, which CI runs, invoked it
   without declaring it.
 
-## [0.2.7]
+## [0.2.9] - 2026-08-17
+- More sensible defaults for the termini tokens, the dataset type and the encoding
+  scheme (#101, #102).
+- Documentation fixes in the dataset guide.
+
+## [0.2.8] - 2026-08-17
+- Dataset refactor and `InferencePipeline`, which bundles a model with its
+  preprocessing for prediction on raw inputs and sharing on the Hugging Face Hub
+  (#93); the dead `RetentionTimePipeline` code was removed in its favor (#98).
+- Fine-tuning pipeline enhancements (#95) and intensity data preparation for
+  Oktoberfest (#94).
+- Saved preprocessing state uses JSON files instead of pickles (#99).
+- Fixes to the PTM gain/loss features and to sequence encoding.
+
+## [0.2.7] - 2026-05-06
 - Maintenance release.
 
-## [0.2.6]
+## [0.2.6] - 2026-03-30
 - Fixes for alphabet learning and streamlined default behavior for the number of
   processes used during Hugging Face datasets processing.
 - DeepLC model revamp.
@@ -263,4 +281,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Introduced multi-backend support for TensorFlow/Keras and PyTorch with a
   shared public API. Earlier versions supported TensorFlow/Keras only.
 
-[Unreleased]: https://github.com/wilhelm-lab/dlomix/compare/v0.2.7...HEAD
+[Unreleased]: https://github.com/wilhelm-lab/dlomix/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/wilhelm-lab/dlomix/compare/v0.2.9...v0.3.0
+[0.2.9]: https://github.com/wilhelm-lab/dlomix/compare/v0.2.8...v0.2.9
+[0.2.8]: https://github.com/wilhelm-lab/dlomix/compare/v0.2.7...v0.2.8
+[0.2.7]: https://github.com/wilhelm-lab/dlomix/compare/v0.2.6...v0.2.7
+[0.2.6]: https://github.com/wilhelm-lab/dlomix/releases/tag/v0.2.6

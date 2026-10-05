@@ -27,6 +27,5 @@ keywords:
   - keras
   - pytorch
 license: MIT
-version: "0.2.7"
-# TODO: set the release date when tagging the cited version.
-date-released: "2026-xx-xx"
+version: "0.3.0"
+date-released: "2026-10-05"
