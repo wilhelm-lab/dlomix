@@ -170,6 +170,14 @@ First release with Keras 3 (TensorFlow 2.18+) support.
   matrix already only covered 3.11 and 3.12.
 
 ### Fixed
+- **Building a dataset with `num_proc > 1` could crash after TensorFlow work in the
+  same process.** `datasets` forks its `map` workers on Linux; when the garbage
+  collector ran inside a worker, it finalized TensorFlow functions inherited from
+  the parent (e.g. from an earlier `predict`), whose finalizers call into a runtime
+  that is not valid after a fork, and the worker died with a segmentation fault
+  ("One of the subprocesses has abruptly died during map operation"). Datasets now
+  collect garbage and freeze the existing objects (`gc.freeze`) while their
+  multi-process processing runs.
 - **Packaging.** Three dependency declarations could resolve to broken installs:
   - The macOS `tensorflow<2.20` cap was computed with `platform.system()` inside
     `setup.py`, i.e. when the wheel was *built*. The wheel is `py3-none-any`, so the

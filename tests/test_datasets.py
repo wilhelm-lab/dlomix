@@ -1,3 +1,4 @@
+import gc
 import logging
 import time
 from os.path import join
@@ -14,7 +15,7 @@ from dlomix.data import (
     RetentionTimeDataset,
     load_processed_dataset,
 )
-from dlomix.data.dataset_utils import EncodingScheme
+from dlomix.data.dataset_utils import EncodingScheme, fork_safe_gc
 
 logger = logging.getLogger(__name__)
 
@@ -41,6 +42,20 @@ def test_num_proc_none_forces_single_process(monkeypatch):
     dataset = RetentionTimeDataset(num_proc=None)
 
     assert dataset._num_proc is None
+
+
+@pytest.mark.parametrize("num_proc", [None, 1, 4])
+def test_fork_safe_gc_freezes_objects_only_while_forking(num_proc):
+    # forked map workers must not finalize the parent's objects (e.g. TensorFlow
+    # functions), which crashes them; the freeze lasts only for the processing
+    frozen_before = gc.get_freeze_count()
+    with fork_safe_gc(num_proc):
+        frozen_during = gc.get_freeze_count()
+    if num_proc and num_proc > 1:
+        assert frozen_during > frozen_before
+    else:
+        assert frozen_during == frozen_before
+    assert gc.get_freeze_count() == 0
 
 
 def test_num_proc_user_value_is_capped_to_available(monkeypatch):
