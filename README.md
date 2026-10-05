@@ -8,6 +8,8 @@
 
 **Note:** Multi-backend support was introduced in `dlomix==0.2`. Earlier versions supported TensorFlow/Keras only.
 
+**Note:** Keras 3 support was introduced in `dlomix==0.3`: the TensorFlow backend now requires TensorFlow 2.18 or newer (where `tf.keras` is Keras 3), and every model is available on both backends and verified to compute the same function given the same weights. Import `dlomix` before `keras`, since DLOmix sets the Keras backend from `DLOMIX_BACKEND`. For TensorFlow < 2.16 (Keras 2), use `dlomix<0.3`. Upgrading from 0.2 on PyTorch: models now start and train like their TensorFlow counterparts, and some older checkpoints no longer load; see the [changelog](CHANGELOG.md).
+
 The PyTorch implementation was largely introduced during a hackathon as part of the EuBIC Developer Meeting 2025. We appreciate the efforts and contributions of the team who joined the hackathon and the efforts of the EuBIC team and organizers.
 
 ## Backend Selection
