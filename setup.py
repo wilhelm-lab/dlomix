@@ -19,15 +19,20 @@ META_DATA = get_metadata()
 # silently pick up an untested minor version.
 # The floor: numpy>=2.0 (a core requirement) rules out TF 2.16/2.17, which pin numpy<2.
 TENSORFLOW_VERSION = ">=2.18,<2.22"
-# macOS: TF 2.20 collides with pyarrow, so stay below it there.
+# macOS below Python 3.13: stay below TF 2.20. tensorflow-metal 1.2.0 (the Apple
+# GPU plugin, latest release) does not load with TF 2.20+, and once it is installed
+# `import tensorflow` fails. It has no Python 3.13 wheels, and TF has none for 3.13
+# before 2.20, so Python 3.13 on macOS takes the regular range.
 TENSORFLOW_VERSION_MACOS = ">=2.18,<2.20"
+MACOS_METAL = "platform_system == 'Darwin' and python_version < '3.13'"
+NOT_MACOS_METAL = "(platform_system != 'Darwin' or python_version >= '3.13')"
 
 # Platform differences are expressed as environment markers, evaluated on the
 # installing machine. A build-time platform check would be baked into the
 # py3-none-any wheel for every platform.
 tensorflow_extra_install = [
-    f"tensorflow{TENSORFLOW_VERSION_MACOS}; platform_system == 'Darwin'",
-    f"tensorflow{TENSORFLOW_VERSION}; platform_system != 'Darwin'",
+    f"tensorflow{TENSORFLOW_VERSION_MACOS}; {MACOS_METAL}",
+    f"tensorflow{TENSORFLOW_VERSION}; {NOT_MACOS_METAL}",
 ]
 
 # CUDA-enabled TensorFlow for Linux GPU machines. tensorflow[and-cuda] installs
@@ -37,9 +42,8 @@ tensorflow_extra_install = [
 # Deliberately not part of `dev`: CI has no GPU and should not download CUDA.
 tensorflow_cuda_extra_install = [
     f"tensorflow[and-cuda]{TENSORFLOW_VERSION}; platform_system == 'Linux'",
-    f"tensorflow{TENSORFLOW_VERSION_MACOS}; platform_system == 'Darwin'",
-    f"tensorflow{TENSORFLOW_VERSION}; "
-    "platform_system != 'Linux' and platform_system != 'Darwin'",
+    f"tensorflow{TENSORFLOW_VERSION_MACOS}; {MACOS_METAL}",
+    f"tensorflow{TENSORFLOW_VERSION}; platform_system != 'Linux' and {NOT_MACOS_METAL}",
 ]
 
 # PyTorch needs no GPU extra: its Linux wheels on PyPI are already CUDA builds.
@@ -75,7 +79,9 @@ setuptools.setup(
         "numpy>=2.0",
         "matplotlib",
         "scikit-learn",
-        "pyarrow",
+        # TF 2.20+ and pyarrow 21 or older deadlock when both are loaded on macOS
+        # ("mutex lock failed"); pyarrow 22 fixed it
+        "pyarrow>=22",
         "seaborn",
     ],
     extras_require={

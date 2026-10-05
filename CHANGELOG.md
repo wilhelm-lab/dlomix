@@ -102,6 +102,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   GPU-less runner cannot use.
 - TensorFlow is capped at `<2.22`, the newest version CI installs and tests.
   Previously any future release was accepted on Linux; raise the cap deliberately.
+- **Python 3.13 support** (CI tests 3.11–3.13). On macOS, TensorFlow stays below
+  2.20 for Python 3.11/3.12, because `tensorflow-metal` 1.2.0 (the Apple GPU plugin)
+  makes `import tensorflow` fail with TF 2.20+; Python 3.13 on macOS gets TF 2.20+
+  (TF has no earlier 3.13 wheels, and `tensorflow-metal` none for 3.13, so it runs
+  on the CPU). `pyarrow` now requires `>=22`: with TF 2.20+, pyarrow 21 and older
+  deadlock on import on macOS (`mutex lock failed`), which was the original reason
+  for the macOS cap.
 - **The PyTorch models now compute the same function as the TensorFlow models and
   start training from the same weight distributions.** Results of PyTorch models
   trained with earlier versions are not directly comparable.
