@@ -65,7 +65,7 @@ Please include this output when reporting a bug. If a GPU is present but not det
 
 ### Apple GPUs (macOS, tensorflow-metal)
 
-With `tensorflow-metal` installed, TensorFlow trains on the Apple GPU. Its fused GRU kernel computes a different function from the standard GRU once the biases are trained, so weights trained on a Mac would give other predictions elsewhere (and published weights wrong predictions on a Mac). The DLOmix TensorFlow models therefore use the standard GRU kernel when an Apple GPU is visible, and warn once. Results are then the same on every platform and in PyTorch, but the standard kernel is slow on the Apple GPU. Training Prosit intensity on an M1 Max:
+With `tensorflow-metal` installed, TensorFlow trains on the Apple GPU. Its fused GRU kernel (tensorflow-metal 1.2.0) does not compute the standard GRU: it ignores the GRU's input bias and adds the recurrent bias outside the reset gate. Both agree while the biases are zero, as Keras initializes them, so training on a Mac looks normal. But once the biases are trained, the weights compute a different function on any other platform or in PyTorch: weights trained on a Mac give other predictions elsewhere, and published weights give wrong predictions on a Mac. This is a different formula, not floating-point error. The DLOmix TensorFlow models therefore use the standard GRU kernel when an Apple GPU is visible, and warn once. Results are then the same on every platform and in PyTorch, but the standard kernel is slow on the Apple GPU. Training Prosit intensity on an M1 Max:
 
 | Setup | Time per epoch |
 |---|---|
