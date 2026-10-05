@@ -95,7 +95,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Keras 3, but reaching it through `tf.keras` requires importing TensorFlow, which
   the backend-agnostic modules cannot do.
 - Raised the minimum Python to 3.11 and NumPy to 2.0, matching what CI tests.
-- CI now also runs on `feature/**` branches, reports the environment via
+- CI runs on pull requests to `main`/`develop` (not on drafts; a new push cancels
+  the run of the previous commit), on pushes to `main`/`develop`, and manually on any
+  branch (*Run workflow*). It reports the environment via
   `python -m dlomix`, and adds a `DLOMIX_BACKEND=pytorch` job so the shared code
   paths are exercised on both backends. It installs CPU-only PyTorch: PyPI's Linux
   torch wheels bring a full CUDA stack (~15 NVIDIA packages, several GB) that a
@@ -132,8 +134,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   backends; it used to warn and fail later.
 - **On Apple GPUs (`tensorflow-metal`), the TensorFlow models use the standard GRU
   kernel**, and warn once. The fused Metal kernel that Keras picks by default
-  computes a different function once the GRU biases are non-zero (tensorflow-metal
-  1.2.0): a Prosit intensity model trained on a Mac reached median spectral angle
+  (tensorflow-metal 1.2.0) does not compute the standard GRU: it ignores the input
+  bias and adds the recurrent bias outside the reset gate, so it agrees with the
+  standard GRU only while the biases are zero, as initialized. A Prosit intensity
+  model trained on a Mac reached median spectral angle
   0.80 there but 0.77 with the standard GRU, i.e. on Linux, CPU or PyTorch, and
   weights trained elsewhere predict wrongly on a Mac. The standard kernel is slow
   on the Apple GPU (Prosit intensity on an M1 Max: 622 s per epoch, against 78 s

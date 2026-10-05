@@ -6,15 +6,23 @@ on:
     branches:
       - main
       - develop
-      - 'feature/**'
   pull_request:
     branches:
       - main
       - develop
+    # ready_for_review: a draft PR runs nothing until it is marked ready
+    types: [opened, synchronize, reopened, ready_for_review]
+
+# A new push to a PR cancels the run of its previous commit; runs on main and
+# develop always finish.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   build:
     name: TensorFlow backend (py${{ matrix.python-version }})
+    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -56,6 +64,7 @@ jobs:
     # it, the PyTorch side of that contract is never executed and they can drift
     # apart unnoticed, which is exactly how they diverged before unification.
     name: PyTorch backend
+    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
     runs-on: ubuntu-latest
 
     steps:
@@ -116,6 +125,7 @@ jobs:
     # bad environment marker, or a pin conflict with tensorflow[and-cuda]'s exact
     # NVIDIA pins, fails here instead of on a user's machine.
     name: Resolve extras across platforms
+    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
     runs-on: ubuntu-latest
 
     steps:

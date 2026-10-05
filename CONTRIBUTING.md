@@ -59,7 +59,10 @@ combines two masked means, is the one loss that returns a scalar).
 1. Create a feature branch off `develop` (PRs target `main` or `develop`).
 2. Make your change, with tests, in both backends where applicable.
 3. Run the checks below locally — CI runs the same ones on your PR.
-4. Open a pull request describing the change and the motivation.
+4. Open a pull request describing the change and the motivation. CI runs once the
+   PR is ready for review (not on drafts), and again on each push to it. Pushes to
+   a feature branch alone run nothing; start the *Build* workflow manually from the
+   Actions tab to test a branch before opening a PR.
 
 ## Checks (run these before pushing)
 
