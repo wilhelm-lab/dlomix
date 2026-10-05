@@ -145,6 +145,33 @@ def normalize_intensity_predictions(
     compute_spectral_angle=True,
     use_legacy_tf_sa_fn=False,
 ):
+    """Post-process predicted fragment ion intensities, as Prosit does.
+
+    Clips negative intensities to 0, sets the ions a peptide cannot produce to -1
+    (positions beyond its length, and fragment charges above a precursor charge
+    below 3), and normalizes each spectrum to its base peak. With labels present,
+    also adds a ``spectral_angle`` column.
+
+    Args:
+        data: pandas DataFrame with one row per spectrum.
+        sequence_column_name: column holding each peptide as a **list of residues**,
+            e.g. the dataset's parsed column
+            ``SequenceParsingProcessor.PARSED_COL_NAMES["seq"]``
+            (``["L", "F", "C[UNIMOD:4]", ...]``, without terminal tokens), which is
+            what :class:`~dlomix.reports.IntensityReport` passes. The peptide length
+            is taken as ``len()`` of each entry, so a raw modified-sequence string
+            such as ``"[]-LFC[UNIMOD:4]R-[]"`` would count characters, not residues.
+        labels_column_name: column with the observed intensities (174 values).
+        predictions_column_name: column with the predicted intensities (174 values);
+            replaced by the post-processed predictions.
+        precursor_charge_column_name: column with the one-hot precursor charge.
+        batch_size: kept for API compatibility with the legacy spectral angle.
+        compute_spectral_angle: add the ``spectral_angle`` column when labels exist.
+        use_legacy_tf_sa_fn: use the TensorFlow 1 spectral angle implementation.
+
+    Returns:
+        The DataFrame, with post-processed predictions (and spectral angles).
+    """
     assert (
         sequence_column_name in data
     ), "Key sequences is missing in the data provided for post-processing"
