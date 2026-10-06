@@ -54,7 +54,8 @@ def intensity_model(base_alphabet):
         seq_length=10,
         alphabet=base_alphabet,
         dropout_rate=0.1,
-        meta_data_keys=["collision_energy", "precursor_charge"],
+        # no meta_data_keys: these tests only exercise the embedding, and the
+        # extra metadata inputs below are ignored
     )
     # Build the model
     dummy_input = {
@@ -559,3 +560,63 @@ class TestIntegrationWithRealAlphabet:
             output = adapted_model(dummy_input)
             assert output is not None
             assert adapted_model.alphabet == expanded_alphabet
+
+
+def test_best_fit_with_minimal_kwargs_never_picks_padding_or_unknown():
+    """Best-fit runs on its defaults (n_examples_for_eval, eval_metric) and never
+    copies the padding or unknown embedding into a new token."""
+    rng = np.random.default_rng(0)
+    data = Dataset.from_dict(
+        {
+            "sequence": ["AM[UNIMOD:1]CDEF", "ES[UNIMOD:2]CDEF", "CT[UNIMOD:3]CDEF"],
+            "collision_energy": [0.25, 0.3, 0.35],
+            "precursor_charge": [1.0, 2.0, 3.0],
+            "label": rng.random((3, 54)).tolist(),  # (10 - 1) positions x 2 x 3
+        }
+    )
+    old_alphabet = {"-": 0, "X": 1, "A": 2, "C": 3, "D": 4, "E": 5, "F": 6}
+    new_alphabet = {
+        **old_alphabet,
+        "M[UNIMOD:1]": 7,
+        "S[UNIMOD:2]": 8,
+        "T[UNIMOD:3]": 9,
+    }
+    model = PrositIntensityPredictor(
+        embedding_output_dim=8,
+        seq_length=10,
+        alphabet=old_alphabet,
+        use_meta_data=True,
+        meta_data_keys=["collision_energy", "precursor_charge"],
+    )
+    model(
+        {
+            "sequence": tf.zeros((2, 10), dtype=tf.int32),
+            "collision_energy": tf.ones((2, 1)),
+            "precursor_charge": tf.ones((2, 1)),
+        }
+    )
+    with tempfile.TemporaryDirectory() as tmpdir:
+        model_path = Path(tmpdir) / "intensity_model.keras"
+        model.save(model_path)
+        _, fit_info = load_and_adapt_pretrained_model(
+            model_path=str(model_path),
+            new_alphabet=new_alphabet,
+            initialization_strategy="best-fit",
+            best_fit_kwargs={
+                "new_hf_data": data,
+                "sequence_column": "sequence",
+                "label_column": "label",
+                "return_fit_info": True,
+                "dataset_kwargs": {
+                    "encoding_scheme": "naive-mods",
+                    "max_seq_len": 10,
+                    "with_termini": False,
+                    "num_proc": None,
+                    "model_features": ["collision_energy", "precursor_charge"],
+                },
+            },
+        )
+    assert set(fit_info) == {"M[UNIMOD:1]", "S[UNIMOD:2]", "T[UNIMOD:3]"}
+    for info in fit_info.values():
+        assert info, "every new token has examples, so each must get a fit"
+        assert info["old_token"] not in ("-", "X")

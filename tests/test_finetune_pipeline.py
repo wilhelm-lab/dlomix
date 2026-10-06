@@ -34,6 +34,7 @@ def saved_intensity_model(tmp_path):
         seq_length=30,
         alphabet=ALPHABET_UNMOD,
         with_termini=False,
+        use_meta_data=True,
         meta_data_keys=["collision_energy_aligned_normed", "precursor_charge_onehot"],
     )
     dummy = {
@@ -227,6 +228,72 @@ class TestSetupAndFinetune:
         # extension and reports the file it actually wrote.
         assert returned_path == out_path + ".keras"
         assert Path(returned_path).exists()
+
+    def test_base_model_name_downloads_from_the_hub(
+        self,
+        saved_intensity_model,
+        intensity_parquet_path,
+        intensity_dataset_kwargs,
+    ):
+        """base_model_name is a Hub repo id; its model.keras is downloaded."""
+        with patch(
+            "huggingface_hub.hf_hub_download", return_value=saved_intensity_model
+        ) as mock_download:
+            pipeline = FineTunePipeline(
+                finetune_dataset_path=intensity_parquet_path,
+                base_model_name="my-org/prosit-intensity",
+                dataset_kwargs=intensity_dataset_kwargs,
+            )
+            pipeline.setup()
+
+        mock_download.assert_called_once()
+        assert mock_download.call_args.kwargs["repo_id"] == "my-org/prosit-intensity"
+        assert mock_download.call_args.kwargs["filename"] == "model.keras"
+        assert pipeline.base_model_weights_filepath == saved_intensity_model
+        assert pipeline.model is not None
+
+    def test_new_model_vocab_is_used_to_encode_the_dataset(
+        self,
+        saved_intensity_model,
+        intensity_parquet_path,
+        intensity_dataset_kwargs,
+    ):
+        """An explicit new_model_vocab must also encode the data; a dataset left
+        to learn its own alphabet would give the same tokens other indices."""
+        from dlomix.data import FragmentIonIntensityDataset
+
+        learned = FragmentIonIntensityDataset(
+            data_format="parquet",
+            data_source=intensity_parquet_path,
+            **intensity_dataset_kwargs,
+        ).extended_alphabet
+        # same tokens, two residues swapped: a vocab no dataset would learn
+        vocab = dict(learned)
+        residues = [t for t in vocab if t not in ("-", "X")]
+        vocab[residues[0]], vocab[residues[1]] = vocab[residues[1]], vocab[residues[0]]
+
+        pipeline = FineTunePipeline(
+            finetune_dataset_path=intensity_parquet_path,
+            base_model_weights_filepath=saved_intensity_model,
+            new_model_vocab=vocab,
+            dataset_kwargs=intensity_dataset_kwargs,
+        )
+        pipeline.setup()
+
+        assert pipeline.dataset.extended_alphabet == vocab
+        assert pipeline.model.alphabet == vocab
+
+    def test_conflicting_dataset_alphabet_raises(
+        self, intensity_parquet_path, saved_intensity_model
+    ):
+        pipeline = FineTunePipeline(
+            finetune_dataset_path=intensity_parquet_path,
+            base_model_weights_filepath=saved_intensity_model,
+            new_model_vocab={"-": 0, "X": 1, "A": 2},
+            dataset_kwargs={"alphabet": {"-": 0, "X": 1, "C": 2}},
+        )
+        with pytest.raises(ValueError, match="new_model_vocab"):
+            pipeline._prepare_dataset()
 
     def test_best_fit_kwargs_forwarded_to_load_and_adapt(
         self,

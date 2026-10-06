@@ -418,6 +418,17 @@ def test_sequence_ptm_removal_processor_preserves_terminals():
     assert result[SEQ_COLUMN][-1] == "-[UNIMOD:1]"
 
 
+def test_sequence_ptm_removal_processor_without_termini():
+    """Without termini (with_termini=False) the first and last tokens are residues,
+    and lose their mods like every other residue."""
+    p = SequencePTMRemovalProcessor(sequence_column_name=SEQ_COLUMN)
+
+    input_data = {SEQ_COLUMN: ["M[UNIMOD:35]", "C[UNIMOD:4]", "D", "K[UNIMOD:737]"]}
+    result = p(input_data)
+
+    assert result[SEQ_COLUMN] == ["M", "C", "D", "K"]
+
+
 def test_sequence_ptm_removal_processor_non_list_input_raises_error():
     """Test that non-list input raises ValueError."""
     p = SequencePTMRemovalProcessor(sequence_column_name=SEQ_COLUMN)
@@ -519,6 +530,37 @@ def test_sequence_padding_processor_long_sequence():
     assert len(result[SEQ_COLUMN]) == 5
     assert result[SEQ_COLUMN] == long_sequence[:5]
     assert result[SequencePaddingProcessor.KEEP_COLUMN_NAME] is False
+
+
+@pytest.mark.parametrize(
+    "sequence, expected",
+    [
+        ("[UNIMOD:737]-SILDK-[]", ("[UNIMOD:737]-", ["S", "I", "L", "D", "K"], "-[]")),
+        ("[UNIMOD:1]-PEPK", ("[UNIMOD:1]-", ["P", "E", "P", "K"], "-[]")),
+        ("PEPK-[]", ("[]-", ["P", "E", "P", "K"], "-[]")),
+        ("PEPK", ("[]-", ["P", "E", "P", "K"], "-[]")),
+    ],
+)
+def test_sequence_parsing_processor_terminal_notations(sequence, expected):
+    p = SequenceParsingProcessor(sequence_column_name=SEQ_COLUMN)
+    assert p._parse_proforma_sequence(sequence) == expected
+
+
+@pytest.mark.parametrize(
+    "sequence, message",
+    [
+        # N-terminal mod without its hyphen: would be split into characters, several
+        # of them valid residues (U N I M O D ...)
+        ("[UNIMOD:737]SILDK[UNIMOD:737]", "needs a hyphen"),
+        # an empty N-terminal token without a C-terminal one: would be read as an
+        # empty peptide with the C-terminal token "-PEPK"
+        ("[]-PEPK", "Expected"),
+    ],
+)
+def test_sequence_parsing_processor_rejects_ambiguous_notations(sequence, message):
+    p = SequenceParsingProcessor(sequence_column_name=SEQ_COLUMN)
+    with pytest.raises(ValueError, match=message):
+        p._parse_proforma_sequence(sequence)
 
 
 def test_sequence_parsing_processor_invalid_format():

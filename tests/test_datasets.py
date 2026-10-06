@@ -1,5 +1,6 @@
 import logging
 import time
+import warnings
 from os.path import join
 from shutil import rmtree
 
@@ -679,3 +680,138 @@ def test_rtdataset_split_config_conflict(download_path_for_assets):
             split_strategy="sequence_unique",  # Conflict: predefined val_data_source + split_strategy
             split_seed=42,
         )
+
+
+def test_learned_alphabet_survives_cached_encoding(download_path_for_assets):
+    # The alphabet is learned as a side effect of the encoding map. When that map's
+    # result was cached by an earlier build (auto_cleanup_cache=False, or a crashed
+    # run), reusing the cache skipped the learning: the train split kept the first
+    # build's encoding while the alphabet was learned from val alone.
+    kwargs = dict(
+        data_format="parquet",
+        data_source=join(download_path_for_assets, "file_3.parquet"),
+        sequence_column="sequence",
+        label_column="intensities",
+        model_features=["precursor_charge_onehot", "collision_energy_aligned_normed"],
+        val_ratio=0.1,
+        split_seed=1,
+        num_proc=None,
+        auto_cleanup_cache=False,
+    )
+    first = FragmentIonIntensityDataset(**kwargs)
+    second = FragmentIonIntensityDataset(**kwargs)
+    try:
+        assert second.extended_alphabet == first.extended_alphabet
+        assert (
+            second.hf_dataset["train"]["sequence"]
+            == first.hf_dataset["train"]["sequence"]
+        )
+    finally:
+        second.hf_dataset.cleanup_cache_files()
+
+
+def test_tokens_missing_from_an_explicit_alphabet_are_reported():
+    # train/val encode them as X, test falls back to the unmodified residue; both
+    # used to happen silently
+    data = Dataset.from_dict(
+        {
+            "modified_sequence": [
+                "[]-PEPM[UNIMOD:35]K-[]",
+                "[]-AC[UNIMOD:4]DK-[]",
+                "[]-PEPS[UNIMOD:21]K-[]",
+            ],
+            "indexed_retention_time": [1.0, 2.0, 3.0],
+        }
+    )
+    alphabet = {
+        **{aa: i for i, aa in enumerate("-XPEMKACDS")},
+        "C[UNIMOD:4]": 10,
+        "[]-": 11,
+        "-[]": 12,
+    }
+    with pytest.warns(UserWarning, match="Tokens missing from the alphabet") as record:
+        RetentionTimeDataset(
+            data_source=DatasetDict({"train": data, "test": data}),
+            data_format="hf",
+            alphabet=alphabet,
+            encoding_scheme="naive-mods",
+            num_proc=None,
+        )
+    message = next(str(w.message) for w in record if "Tokens missing" in str(w.message))
+    assert "train: 2 occurrences of 2 tokens" in message
+    assert "test: 2 occurrences of 2 tokens" in message
+    assert "M[UNIMOD:35]" in message and "S[UNIMOD:21]" in message
+    assert "C[UNIMOD:4]" not in message
+
+
+def test_learned_alphabet_reports_only_unseen_test_tokens():
+    train = Dataset.from_dict(
+        {"modified_sequence": ["[]-PEPK-[]"] * 2, "indexed_retention_time": [1.0, 2.0]}
+    )
+    test = Dataset.from_dict(
+        {
+            "modified_sequence": ["[]-PEPM[UNIMOD:35]K-[]"],
+            "indexed_retention_time": [1.0],
+        }
+    )
+    with pytest.warns(UserWarning, match="Tokens missing") as record:
+        RetentionTimeDataset(
+            data_source=DatasetDict({"train": train, "test": test}),
+            data_format="hf",
+            encoding_scheme="naive-mods",
+            num_proc=None,
+        )
+    message = next(str(w.message) for w in record if "Tokens missing" in str(w.message))
+    assert "train:" not in message
+    assert "test: 1 occurrences of 1 tokens" in message
+
+
+def test_with_termini_false_warns_about_dropped_terminal_mods():
+    data = Dataset.from_dict(
+        {
+            "modified_sequence": [
+                "[UNIMOD:737]-PEPK-[]",
+                "[UNIMOD:737]-ACDK-[]",
+                "[UNIMOD:1]-PEPK-[]",
+                "[]-PEPK-[]",
+            ],
+            "indexed_retention_time": [1.0, 2.0, 3.0, 4.0],
+        }
+    )
+    with pytest.warns(UserWarning, match="drops terminal modifications") as record:
+        RetentionTimeDataset(
+            data_source=DatasetDict({"train": data}),
+            data_format="hf",
+            encoding_scheme="naive-mods",
+            with_termini=False,
+            num_proc=None,
+        )
+    message = next(str(w.message) for w in record if "drops terminal" in str(w.message))
+    assert "3 sequences" in message
+    assert "'[UNIMOD:737]-': 2" in message and "'[UNIMOD:1]-': 1" in message
+
+
+def test_with_termini_true_or_unmodified_termini_do_not_warn():
+    data = Dataset.from_dict(
+        {
+            "modified_sequence": ["[UNIMOD:737]-PEPK-[]", "[]-ACDK-[]"],
+            "indexed_retention_time": [1.0, 2.0],
+        }
+    )
+    unmodified = Dataset.from_dict(
+        {
+            "modified_sequence": ["[]-PEPK-[]", "ACDK"],
+            "indexed_retention_time": [1.0, 2.0],
+        }
+    )
+    for source, with_termini in ((data, True), (unmodified, False)):
+        with warnings.catch_warnings(record=True) as record:
+            warnings.simplefilter("always")
+            RetentionTimeDataset(
+                data_source=DatasetDict({"train": source}),
+                data_format="hf",
+                encoding_scheme="naive-mods",
+                with_termini=with_termini,
+                num_proc=None,
+            )
+        assert not any("drops terminal" in str(w.message) for w in record)

@@ -7,6 +7,7 @@ reproducibility checks.
 """
 
 import logging
+import re
 
 import pytest
 from datasets import Dataset
@@ -417,6 +418,35 @@ class TestSequenceUniqueSplitter:
         assert len(train_sequences & val_sequences) == 0
         assert len(train_sequences & test_sequences) == 0
         assert len(val_sequences & test_sequences) == 0
+
+    def test_sequence_unique_groups_across_sequence_formats(self):
+        """The same peptide written with or without termini, or with PTMs, is one
+        group, so it never lands in two splits."""
+        peptides = [f"PEPTIDE{chr(65 + i)}K" for i in range(20)]
+        formats = [
+            lambda p: p,
+            lambda p: f"[]-{p}-[]",
+            lambda p: f"[UNIMOD:1]-{p[:3]}[UNIMOD:21]{p[3:]}-[]",
+        ]
+        data = Dataset.from_dict(
+            {"sequence": [fmt(p) for p in peptides for fmt in formats]}
+        )
+        config = SplitConfig(
+            val_ratio=0.2,
+            test_ratio=0.2,
+            strategy="sequence_unique",
+            sequence_column="sequence",
+            seed=0,
+        )
+        result = create_splitter(config).split(data)
+
+        def residues(split):
+            return {re.sub(r"\[.*?\]|-", "", s) for s in result[split]["sequence"]}
+
+        assert residues("train").isdisjoint(residues("val"))
+        assert residues("train").isdisjoint(residues("test"))
+        assert residues("val").isdisjoint(residues("test"))
+        assert sum(len(result[s]) for s in result) == len(data)
 
     def test_sequence_unique_with_invalid_column(self, simple_dataset):
         """Test error when sequence column doesn't exist."""
