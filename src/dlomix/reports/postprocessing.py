@@ -2,6 +2,7 @@ import functools
 
 import numpy as np
 
+from ..data.processing.processors import SequenceParsingProcessor
 from ..losses import masked_spectral_distance
 
 
@@ -26,10 +27,33 @@ def normalize_base_peak(array):
 
 
 def mask_outofrange(array, lengths, mask=-1.0):
-    # dim
+    # dim; lengths are taken by position, so a pandas Series with any index works
+    lengths = np.asarray(lengths)
     for i in range(array.shape[0]):
         array[i, lengths[i] - 1 :, :, :, :] = mask
     return array
+
+
+def peptide_length(sequence):
+    """Number of residues of a peptide.
+
+    Accepts a parsed peptide (a list or array of residues, such as the dataset's
+    ``_parsed_sequence`` column) or a raw ProForma-style string such as
+    ``"[]-LFC[UNIMOD:4]R-[]"``, which is parsed so that terminal tokens and
+    modifications are not counted as residues.
+    """
+    if isinstance(sequence, str):
+        _, residues, _ = SequenceParsingProcessor(None)._parse_proforma_sequence(
+            sequence
+        )
+        return len(residues)
+    if len(sequence) > 0 and isinstance(sequence[0], (int, np.integer)):
+        raise ValueError(
+            "Post-processing needs peptides as residues or sequence strings, not "
+            "integer-encoded sequences: the length of an encoded (padded) sequence "
+            "is the padded width, not the peptide length."
+        )
+    return len(sequence)
 
 
 def mask_outofcharge(array, charges, mask=-1.0):
@@ -154,13 +178,14 @@ def normalize_intensity_predictions(
 
     Args:
         data: pandas DataFrame with one row per spectrum.
-        sequence_column_name: column holding each peptide as a **list of residues**,
-            e.g. the dataset's parsed column
+        sequence_column_name: column holding each peptide, either as a list of
+            residues, e.g. the dataset's parsed column
             ``SequenceParsingProcessor.PARSED_COL_NAMES["seq"]``
             (``["L", "F", "C[UNIMOD:4]", ...]``, without terminal tokens), which is
-            what :class:`~dlomix.reports.IntensityReport` passes. The peptide length
-            is taken as ``len()`` of each entry, so a raw modified-sequence string
-            such as ``"[]-LFC[UNIMOD:4]R-[]"`` would count characters, not residues.
+            what :class:`~dlomix.reports.IntensityReport` passes, or as a raw
+            modified-sequence string such as ``"[]-LFC[UNIMOD:4]R-[]"``, which is
+            parsed to count its residues. Integer-encoded sequences raise a
+            ``ValueError``.
         labels_column_name: column with the observed intensities (174 values).
         predictions_column_name: column with the predicted intensities (174 values);
             replaced by the post-processed predictions.
@@ -170,7 +195,9 @@ def normalize_intensity_predictions(
         use_legacy_tf_sa_fn: use the TensorFlow 1 spectral angle implementation.
 
     Returns:
-        The DataFrame, with post-processed predictions (and spectral angles).
+        The DataFrame, with post-processed predictions (and spectral angles). The
+        input DataFrame is updated in place and returned. Rows are matched by
+        position, so any index (e.g. of a filtered DataFrame) works.
     """
     assert (
         sequence_column_name in data
@@ -182,7 +209,7 @@ def normalize_intensity_predictions(
         precursor_charge_column_name in data
     ), "Key precursor_charge_onehot is missing in the data provided for post-processing"
 
-    sequence_lengths = data[sequence_column_name].apply(lambda x: len(x))
+    sequence_lengths = [peptide_length(s) for s in data[sequence_column_name]]
     intensities = np.stack(data[predictions_column_name].to_numpy()).astype(np.float32)
     precursor_charge_onehot = np.stack(data[precursor_charge_column_name].to_numpy())
     charges = list(precursor_charge_onehot.argmax(axis=1) + 1)
