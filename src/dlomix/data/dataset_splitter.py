@@ -299,8 +299,9 @@ class SequenceUniqueSplitter(DatasetSplitter):
     """
     Splits dataset so that each base sequence appears in exactly one split.
 
-    PTM notation (e.g. [UNIMOD:1], [+57]) is stripped before grouping, so
-    PEPTIDE and PEP[UNIMOD:1]TIDE are treated as the same sequence.
+    PTM notation (e.g. [UNIMOD:1], [+57]) and the terminal separators are
+    stripped before grouping, so PEPTIDE, PEP[UNIMOD:1]TIDE and []-PEPTIDE-[]
+    are treated as the same sequence.
     """
 
     def split(self, dataset: Dataset) -> DatasetDict:
@@ -313,10 +314,11 @@ class SequenceUniqueSplitter(DatasetSplitter):
         df = dataset.to_pandas()
         assert isinstance(df, pd.DataFrame)
 
-        # Strip PTM notation before computing unique sequences so that
-        # PEPTIDE and PEP[UNIMOD:1]TIDE map to the same base sequence.
+        # Strip PTM notation and the terminal "-" separators before computing
+        # unique sequences, so that PEPTIDE, PEP[UNIMOD:1]TIDE and []-PEPTIDE-[]
+        # map to the same base sequence.
         base_sequences = df[self.config.sequence_column].str.replace(
-            r"\[.*?\]", "", regex=True
+            r"\[.*?\]|-", "", regex=True
         )
         unique_sequences = base_sequences.unique()
         n_unique = len(unique_sequences)

@@ -1,7 +1,5 @@
 # most of this can go away, as it is not used anymore
 
-import contextlib
-import gc
 from enum import Enum
 
 
@@ -81,28 +79,3 @@ def resolve_num_proc(num_proc, n_processors):
         return n_processors, True
 
     return num_proc, False
-
-
-@contextlib.contextmanager
-def fork_safe_gc(num_proc):
-    """Keep forked ``datasets`` workers from finalizing objects of the parent process.
-
-    With ``num_proc > 1``, ``Dataset.map`` forks worker processes (on Linux). If the
-    garbage collector runs inside a worker, it can finalize objects inherited from the
-    parent, such as TensorFlow functions left over from earlier training or prediction,
-    whose finalizers call into a runtime that is not valid after a fork: the worker
-    crashes with a segmentation fault. Collecting first and then freezing the parent's
-    objects (:func:`gc.freeze`) keeps the workers' collector away from them.
-
-    Afterwards :func:`gc.unfreeze` releases every frozen object, including any frozen
-    elsewhere (Python 3.12 freezes some at startup); they only become collectable again.
-    """
-    if not num_proc or num_proc <= 1:
-        yield
-        return
-    gc.collect()  # finalize pending garbage here, in the parent, where it is safe
-    gc.freeze()
-    try:
-        yield
-    finally:
-        gc.unfreeze()

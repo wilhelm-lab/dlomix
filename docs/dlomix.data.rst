@@ -38,14 +38,8 @@ Submodules
 
 .. automodule:: dlomix.data.dataset_splitter
    :members:
-   :undoc-members:
    :show-inheritance:
-
-
-.. automodule:: dlomix.data.dataset_splitter
-   :members:
    :undoc-members:
-   :show-inheritance:
 
 
 .. automodule:: dlomix.data.dataset_utils
@@ -68,14 +62,8 @@ Submodules
 
 .. automodule:: dlomix.data.inference
    :members:
-   :undoc-members:
    :show-inheritance:
-
-
-.. automodule:: dlomix.data.inference
-   :members:
    :undoc-members:
-   :show-inheritance:
 
 
 .. automodule:: dlomix.data.ion_mobility
@@ -86,28 +74,23 @@ Submodules
 
 .. automodule:: dlomix.data.loading
    :members:
-   :undoc-members:
    :show-inheritance:
-
-
-.. automodule:: dlomix.data.loading
-   :members:
    :undoc-members:
-   :show-inheritance:
 
 
 .. automodule:: dlomix.data.retention_time
    :members:
    :show-inheritance:
+   :undoc-members:
 
 
 .. automodule:: dlomix.data.serialization
    :members:
-   :undoc-members:
    :show-inheritance:
+   :undoc-members:
 
 
 .. automodule:: dlomix.data.tensor_conversion
    :members:
-   :undoc-members:
    :show-inheritance:
+   :undoc-members:

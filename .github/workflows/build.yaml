@@ -6,12 +6,24 @@ on:
     branches:
       - main
       - develop
+    # Changes only to these paths skip the build. Anything not listed (a new
+    # folder included) triggers it. A docs-only merge to main therefore does not
+    # publish either: PyPI runs after a successful Build on main.
+    paths-ignore: &docs-only
+      - "docs/**"
+      - "notebooks/**"
+      - "*.md" # root only: README, CHANGELOG, CONTRIBUTING
+      - "CITATION.cff"
+      - "LICENSE"
+      - ".readthedocs.yaml"
+      - ".devcontainer/**"
   pull_request:
     branches:
       - main
       - develop
     # ready_for_review: a draft PR runs nothing until it is marked ready
     types: [opened, synchronize, reopened, ready_for_review]
+    paths-ignore: *docs-only
 
 # A new push to a PR cancels the run of its previous commit; runs on main and
 # develop always finish.
@@ -102,8 +114,8 @@ jobs:
       - name: Test the shared and torch-native code paths
         env:
           DLOMIX_BACKEND: pytorch
-        # dlomix.pipelines and the TensorFlow-only model utilities are excluded:
-        # they are TensorFlow-only today, and are covered by the job above.
+        # The fine-tuning pipeline and the model utilities are excluded: they are
+        # TensorFlow-only today, and are covered by the job above.
         run: |
           python -m pytest \
             tests/test_torch_models.py \
@@ -116,6 +128,9 @@ jobs:
             tests/test_feature_extractors.py \
             tests/test_dataset_splitter.py \
             tests/test_environment_report.py \
+            tests/test_backend_equivalence.py \
+            tests/test_postprocessing.py \
+            tests/test_inference_pipeline.py \
             -v
 
   resolve-extras:

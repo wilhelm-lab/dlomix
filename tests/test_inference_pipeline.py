@@ -70,7 +70,7 @@ RAW_SEQUENCES = [
 ]
 
 
-@pytest.fixture
+@pytest.fixture(scope="module")  # read-only in every test
 def rt_dataset():
     seqs = RAW_SEQUENCES * 4
     data = {
@@ -91,7 +91,7 @@ def rt_dataset():
         )
 
 
-@pytest.fixture
+@pytest.fixture(scope="module")  # read-only in every test
 def rt_model(rt_dataset):
     model = PrositRetentionTimePredictor(
         seq_length=22, alphabet=rt_dataset.extended_alphabet
@@ -231,6 +231,65 @@ def test_save_load_reproduces_predictions(rt_dataset, rt_model, tmp_path):
 
     assert before.shape == after.shape
     np.testing.assert_allclose(before, after, rtol=1e-4, atol=1e-4)
+
+
+def test_intensity_pipeline_with_metadata_save_load_reproduces_predictions(tmp_path):
+    """Prosit intensity with metadata (charge, CE and a fragmentation one-hot)
+    survives save/load, and every metadata input reaches the model."""
+    sequences = [f"{seq}K" for seq in RAW_SEQUENCES] * 4
+    rng = np.random.default_rng(0)
+    data = {
+        "modified_sequence": sequences,
+        "intensities_raw": rng.random((len(sequences), 174)).tolist(),
+        "precursor_charge_onehot": [
+            list(np.eye(6, dtype=int)[i % 3]) for i in range(len(sequences))
+        ],
+        "collision_energy_aligned_normed": [0.25 for _ in sequences],
+        "method_onehot": [[1, 0] if i % 2 else [0, 1] for i in range(len(sequences))],
+    }
+    model_features = [
+        "precursor_charge_onehot",
+        "collision_energy_aligned_normed",
+        "method_onehot",
+    ]
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        dataset = FragmentIonIntensityDataset(
+            data_source=Dataset.from_dict(data),
+            data_format="hf",
+            model_features=model_features,
+            max_seq_len=30,
+            batch_size=8,
+            val_ratio=0.2,
+            num_proc=None,
+            dataset_type=DATASET_TYPE,
+        )
+    model = PrositIntensityPredictor(
+        seq_length=30,
+        input_keys={"SEQUENCE_KEY": "modified_sequence"},
+        meta_data_keys=model_features,
+        alphabet=dataset.extended_alphabet,
+        use_meta_data=True,
+    )
+    pipe = InferencePipeline.from_model_and_dataset(model, dataset)
+
+    inputs = {key: data[key][:6] for key in ["modified_sequence", *model_features]}
+    before = pipe.predict(inputs)
+    assert before.shape == (6, 174)
+
+    flipped = dict(
+        inputs, method_onehot=[[1 - a, 1 - b] for a, b in inputs["method_onehot"]]
+    )
+    assert not np.allclose(
+        pipe.predict(flipped), before
+    ), "the fragmentation one-hot must reach the model"
+
+    save_dir = str(tmp_path / "bundle")
+    pipe.save(save_dir)
+    loaded = InferencePipeline.load(save_dir)
+
+    assert loaded.preprocessor.model_features == model_features
+    np.testing.assert_allclose(loaded.predict(inputs), before, rtol=1e-5, atol=1e-6)
 
 
 def test_save_refuses_existing_nonempty_dir(rt_dataset, rt_model, tmp_path):

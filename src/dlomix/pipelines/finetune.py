@@ -7,7 +7,7 @@ Typical usage
     # Option A — constructor directly
     pipeline = FineTunePipeline(
         finetune_dataset_path="data/finetuning.parquet",
-        base_model_name="Prosit_2020_intensity_HCD",
+        base_model_name="my-org/prosit-intensity",  # Hugging Face Hub repo id
         epochs=20,
         learning_rate=3e-4,
     )
@@ -82,18 +82,21 @@ class FineTunePipeline:
     finetune_dataset_path:
         Path to the Parquet file used for fine-tuning.
     base_model_name:
-        Name of a registered remote model whose weights will be downloaded
-        automatically.  Either this *or* ``base_model_weights_filepath`` must
-        be supplied.
+        Hugging Face Hub repo id of a DLOmix inference bundle saved on the
+        TensorFlow backend (:meth:`InferencePipeline.push_to_hub`); its
+        ``model.keras`` is downloaded automatically.  Either this *or*
+        ``base_model_weights_filepath`` must be supplied.
     base_model_weights_filepath:
-        Path to a local model weights file.  Takes precedence over
-        ``base_model_name`` when both are given.
+        Path to a local saved model (a full ``.keras`` model, not a weights-only
+        file).  Takes precedence over ``base_model_name`` when both are given.
     old_model_vocab:
         Amino-acid vocabulary of the *pretrained* model.  ``None`` means the
         pipeline will infer it from the loaded model object provided via the weights file.
     new_model_vocab:
         Target vocabulary for the fine-tuned model.  ``None`` means the
-        pipeline will derive it from the dataset's ``extended_alphabet``.
+        pipeline will derive it from the dataset's ``extended_alphabet``.  When
+        given, the dataset is encoded with it too (as its ``alphabet``), so the
+        model and the data use the same token indices.
     initialization_strategy:
         Strategy for initialising the embeddings of tokens that are new after a
         vocabulary expansion: ``"random"`` (Glorot uniform), ``"mean"`` (the mean
@@ -102,9 +105,9 @@ class FineTunePipeline:
     best_fit_kwargs:
         Required when ``initialization_strategy="best-fit"``.  Forwarded
         verbatim to :func:`load_and_adapt_pretrained_model`.  Must contain at
-        minimum: ``new_hf_data`` (a Hugging Face ``Dataset``), ``sequence_column``,
-        ``label_column``, ``n_examples_for_eval``, and ``eval_metric``.
-        Optionally ``return_fit_info`` (bool) and ``dataset_kwargs`` (dict).
+        minimum ``new_hf_data`` (a Hugging Face ``Dataset`` of raw sequences).
+        Optionally ``sequence_column``, ``label_column``, ``n_examples_for_eval``,
+        ``eval_metric``, ``return_fit_info`` (bool) and ``dataset_kwargs`` (dict).
     seed:
         Random seed for reproducibility.
     output_model_path:
@@ -191,7 +194,7 @@ class FineTunePipeline:
         .. code-block:: yaml
 
             finetune_dataset_path: data/finetuning.parquet
-            base_model_name: Prosit_2020_intensity_HCD
+            base_model_name: my-org/prosit-intensity  # Hugging Face Hub repo id
             epochs: 20
             learning_rate: 0.0003
             output_model_path: models/my_finetuned
@@ -290,11 +293,22 @@ class FineTunePipeline:
 
     def _prepare_dataset(self) -> None:
         logger.info("Loading dataset from '%s' …", self.finetune_dataset_path)
+        dataset_kwargs = dict(self.dataset_kwargs)
+        if self.new_model_vocab is not None:
+            # encode the data with the model's vocabulary; a dataset left to learn
+            # its own alphabet would assign other indices to the same tokens
+            given = dataset_kwargs.setdefault("alphabet", self.new_model_vocab)
+            if dict(given) != dict(self.new_model_vocab):
+                raise ValueError(
+                    "dataset_kwargs['alphabet'] differs from new_model_vocab; the "
+                    "dataset must be encoded with the model's vocabulary. Pass only "
+                    "new_model_vocab."
+                )
         self.dataset = FragmentIonIntensityDataset(
             data_format="parquet",
             data_source=self.finetune_dataset_path,
             batch_size=self.batch_size,
-            **self.dataset_kwargs,
+            **dataset_kwargs,
         )
 
     def _resolve_vocab(self) -> None:

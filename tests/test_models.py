@@ -38,6 +38,7 @@ def test_prosit_intensity_model():
         input_keys={
             "SEQUENCE_KEY": "sequence",
         },
+        use_meta_data=True,
         meta_data_keys=["collision_energy", "precursor_charge"],
     )
 
@@ -56,11 +57,19 @@ def test_prosit_intensity_model():
     assert model is not None
 
 
+def test_prosit_intensity_warns_when_metadata_keys_are_ignored():
+    # without use_meta_data=True the model has no metadata encoder and silently
+    # ignored these inputs
+    with pytest.warns(UserWarning, match="use_meta_data=False"):
+        PrositIntensityPredictor(meta_data_keys=["collision_energy"])
+
+
 def test_prosit_intensity_model_ptm_on_input():
     model = PrositIntensityPredictor(
         input_keys={
             "SEQUENCE_KEY": "sequence",
         },
+        use_meta_data=True,
         meta_data_keys=["collision_energy", "precursor_charge", "fragmentation_type"],
         use_prosit_ptm_features=True,
     )

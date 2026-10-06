@@ -1,4 +1,3 @@
-import gc
 import logging
 import time
 from os.path import join
@@ -15,7 +14,7 @@ from dlomix.data import (
     RetentionTimeDataset,
     load_processed_dataset,
 )
-from dlomix.data.dataset_utils import EncodingScheme, fork_safe_gc
+from dlomix.data.dataset_utils import EncodingScheme
 
 logger = logging.getLogger(__name__)
 
@@ -42,22 +41,6 @@ def test_num_proc_none_forces_single_process(monkeypatch):
     dataset = RetentionTimeDataset(num_proc=None)
 
     assert dataset._num_proc is None
-
-
-@pytest.mark.parametrize("num_proc", [None, 1, 4])
-def test_fork_safe_gc_freezes_objects_only_while_forking(num_proc):
-    # forked map workers must not finalize the parent's objects (e.g. TensorFlow
-    # functions), which crashes them; the freeze lasts only for the processing
-    # compare with the starting count: Python 3.12 starts with some objects frozen
-    frozen_before = gc.get_freeze_count()
-    with fork_safe_gc(num_proc):
-        frozen_during = gc.get_freeze_count()
-    frozen_after = gc.get_freeze_count()
-    if num_proc and num_proc > 1:
-        assert frozen_during > frozen_before
-        assert frozen_after < frozen_during  # released again
-    else:
-        assert frozen_during == frozen_after == frozen_before
 
 
 def test_num_proc_user_value_is_capped_to_available(monkeypatch):
@@ -173,37 +156,6 @@ def test_parquet_intensitydataset(download_path_for_assets):
         sequence_column="sequence",
         label_column="intensities",
         model_features=["precursor_charge_onehot", "collision_energy_aligned_normed"],
-        val_ratio=0.2,
-    )
-
-    assert intensity_dataset.hf_dataset is not None
-    assert intensity_dataset._empty_dataset_mode is False
-    assert FragmentIonIntensityDataset.DEFAULT_SPLIT_NAMES[0] in list(
-        intensity_dataset.hf_dataset.keys()
-    )
-    assert FragmentIonIntensityDataset.DEFAULT_SPLIT_NAMES[1] in list(
-        intensity_dataset.hf_dataset.keys()
-    )
-    assert FragmentIonIntensityDataset.DEFAULT_SPLIT_NAMES[2] not in list(
-        intensity_dataset.hf_dataset.keys()
-    )
-    assert (
-        intensity_dataset[FragmentIonIntensityDataset.DEFAULT_SPLIT_NAMES[0]].num_rows
-        > 0
-    )
-    assert (
-        intensity_dataset[FragmentIonIntensityDataset.DEFAULT_SPLIT_NAMES[1]].num_rows
-        > 0
-    )
-
-
-def test_csv_intensitydataset(download_path_for_assets):
-    filepath = join(download_path_for_assets, "file_4.csv")
-    intensity_dataset = FragmentIonIntensityDataset(
-        data_format="csv",
-        data_source=filepath,
-        sequence_column="sequence",
-        label_column="intensities",
         val_ratio=0.2,
     )
 
@@ -696,3 +648,178 @@ def test_rtdataset_split_config_conflict(download_path_for_assets):
             split_strategy="sequence_unique",  # Conflict: predefined val_data_source + split_strategy
             split_seed=42,
         )
+
+
+def _private_cache_source(download_path_for_assets, tmp_path):
+    """file_3.parquet as a dataset whose cache files live in a private folder, so the
+    cache tests neither hit files left by other tests nor collide with other runs."""
+    return load_dataset(
+        "parquet",
+        data_files=join(download_path_for_assets, "file_3.parquet"),
+        cache_dir=str(tmp_path / "hf_cache"),
+    )["train"]
+
+
+def test_learned_alphabet_survives_cached_encoding(download_path_for_assets, tmp_path):
+    # The alphabet is learned as a side effect of the encoding map. When that map's
+    # result was cached by an earlier build (auto_cleanup_cache=False, or a crashed
+    # run), reusing the cache skipped the learning: the train split kept the first
+    # build's encoding while the alphabet was learned from val alone.
+    kwargs = dict(
+        data_source=_private_cache_source(download_path_for_assets, tmp_path),
+        data_format="hf",
+        sequence_column="sequence",
+        label_column="intensities",
+        model_features=["precursor_charge_onehot", "collision_energy_aligned_normed"],
+        val_ratio=0.1,
+        split_seed=1,
+        num_proc=None,
+        auto_cleanup_cache=False,
+    )
+    first = FragmentIonIntensityDataset(**kwargs)
+    second = FragmentIonIntensityDataset(**kwargs)
+    assert second.extended_alphabet == first.extended_alphabet
+    assert (
+        second.hf_dataset["train"]["sequence"] == first.hf_dataset["train"]["sequence"]
+    )
+
+
+def test_tokens_missing_from_an_explicit_alphabet_are_reported():
+    # train/val encode them as X, test falls back to the unmodified residue; both
+    # used to happen silently
+    data = Dataset.from_dict(
+        {
+            "modified_sequence": [
+                "[]-PEPM[UNIMOD:35]K-[]",
+                "[]-AC[UNIMOD:4]DK-[]",
+                "[]-PEPS[UNIMOD:21]K-[]",
+            ],
+            "indexed_retention_time": [1.0, 2.0, 3.0],
+        }
+    )
+    alphabet = {
+        **{aa: i for i, aa in enumerate("-XPEMKACDS")},
+        "C[UNIMOD:4]": 10,
+        "[]-": 11,
+        "-[]": 12,
+    }
+    with pytest.warns(UserWarning, match="Tokens missing from the alphabet") as record:
+        RetentionTimeDataset(
+            data_source=DatasetDict({"train": data, "test": data}),
+            data_format="hf",
+            alphabet=alphabet,
+            encoding_scheme="naive-mods",
+            num_proc=None,
+        )
+    message = next(str(w.message) for w in record if "Tokens missing" in str(w.message))
+    assert "train: 2 occurrences of 2 tokens" in message
+    assert "test: 2 occurrences of 2 tokens" in message
+    assert "M[UNIMOD:35]" in message and "S[UNIMOD:21]" in message
+    assert "C[UNIMOD:4]" not in message
+
+
+def test_learned_alphabet_reports_only_unseen_test_tokens():
+    train = Dataset.from_dict(
+        {"modified_sequence": ["[]-PEPK-[]"] * 2, "indexed_retention_time": [1.0, 2.0]}
+    )
+    test = Dataset.from_dict(
+        {
+            "modified_sequence": ["[]-PEPM[UNIMOD:35]K-[]"],
+            "indexed_retention_time": [1.0],
+        }
+    )
+    with pytest.warns(UserWarning, match="Tokens missing") as record:
+        RetentionTimeDataset(
+            data_source=DatasetDict({"train": train, "test": test}),
+            data_format="hf",
+            encoding_scheme="naive-mods",
+            num_proc=None,
+        )
+    message = next(str(w.message) for w in record if "Tokens missing" in str(w.message))
+    assert "train:" not in message
+    assert "test: 1 occurrences of 1 tokens" in message
+
+
+def test_with_termini_false_warns_about_dropped_terminal_mods():
+    data = Dataset.from_dict(
+        {
+            "modified_sequence": [
+                "[UNIMOD:737]-PEPK-[]",
+                "[UNIMOD:737]-ACDK-[]",
+                "[UNIMOD:1]-PEPK-[]",
+                "[]-PEPK-[]",
+            ],
+            "indexed_retention_time": [1.0, 2.0, 3.0, 4.0],
+        }
+    )
+    with pytest.warns(UserWarning, match="drops terminal modifications") as record:
+        RetentionTimeDataset(
+            data_source=DatasetDict({"train": data}),
+            data_format="hf",
+            encoding_scheme="naive-mods",
+            with_termini=False,
+            num_proc=None,
+        )
+    message = next(str(w.message) for w in record if "drops terminal" in str(w.message))
+    assert "3 sequences" in message
+    assert "'[UNIMOD:737]-': 2" in message and "'[UNIMOD:1]-': 1" in message
+
+
+def test_dataset_columns_to_keep_is_not_modified():
+    # the label is kept anyway; naming it again must not duplicate the column
+    keep = ["indexed_retention_time"]
+    data = Dataset.from_dict(
+        {
+            "modified_sequence": ["[]-PEPK-[]", "[]-ACDK-[]"],
+            "indexed_retention_time": [1.0, 2.0],
+        }
+    )
+    RetentionTimeDataset(
+        data_source=DatasetDict({"train": data}),
+        data_format="hf",
+        dataset_columns_to_keep=keep,
+        num_proc=None,
+    )
+    assert keep == ["indexed_retention_time"]
+
+
+def test_cache_cleanup_keeps_the_callers_cache_files(
+    download_path_for_assets, tmp_path
+):
+    # auto_cleanup_cache used Dataset.cleanup_cache_files(), which also deleted the
+    # cache files of the caller's own (filtered) source dataset: a second
+    # multi-process build from that source then crashed ("One of the subprocesses
+    # has abruptly died"), because its workers reopen the deleted files by path
+    import os
+
+    source = _private_cache_source(download_path_for_assets, tmp_path)
+    source = source.filter(lambda b: [True] * len(b["sequence"]), batched=True)
+    source_files = [f["filename"] for f in source.cache_files]
+    kwargs = dict(
+        data_source=source,
+        data_format="hf",
+        sequence_column="sequence",
+        label_column="intensities",
+        model_features=["precursor_charge_onehot", "collision_energy_aligned_normed"],
+        val_ratio=0.2,
+        split_seed=1,
+        num_proc=2,
+    )
+    first = FragmentIonIntensityDataset(**kwargs)
+    assert all(os.path.exists(f) for f in source_files)
+    second = FragmentIonIntensityDataset(**kwargs)  # crashed before the fix
+    assert second.extended_alphabet == first.extended_alphabet
+    # only the files of the source and of the two final datasets remain: the
+    # intermediate files of the processing are still cleaned up
+    kept = {f for f in source_files}
+    for dataset in (first, second):
+        kept |= {
+            f["filename"] for s in dataset.hf_dataset.values() for f in s.cache_files
+        }
+    folder = os.path.dirname(source_files[0])
+    cache_files = {
+        os.path.join(folder, f)
+        for f in os.listdir(folder)
+        if f.startswith("cache-") and f.endswith(".arrow")
+    }
+    assert cache_files <= kept

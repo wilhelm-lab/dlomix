@@ -64,6 +64,12 @@ Submodules
    :undoc-members:
 
 
+.. automodule:: dlomix.models.model_utils
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+
 .. automodule:: dlomix.models.prosit
    :members:
    :show-inheritance:

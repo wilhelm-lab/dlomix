@@ -175,9 +175,9 @@ The table below summarises all combinations of data sources and split parameters
      - no
      - Splits used as-is; warns that no auto-split occurs
    * - Test-only source
-     - ``test_data_source="test.csv"``
+     - ``test_data_source="test.csv", alphabet=...``
      - no
-     - Test data used as-is; warns that no auto-split occurs
+     - Test data used as-is; warns that no auto-split occurs. Requires an ``alphabet`` (``ValueError`` without one)
    * - Test-only source
      - ``test_data_source="test.csv", val_ratio=0.2``
      - yes
@@ -406,12 +406,21 @@ If a pre-defined split is provided, the alphabet is learned from the training an
    # Access the learned alphabet after the class is initialized and the processing is done
    print(dataset.extended_alphabet)
 
+A dataset given only test data has nothing to learn an alphabet from, so it requires one and raises a ``ValueError`` without it. Pass the alphabet the model was trained with:
+
+.. code-block:: python
+
+   test_dataset = RetentionTimeDataset(
+       test_data_source="test.csv",
+       alphabet=train_dataset.extended_alphabet,
+   )
+
 
 
 Tensor Datasets for Model Training
 ==================================
 
-The tensor datasets can be accessed via the ``train_data``, ``val_data``, and ``test_data`` attributes of the dataset class. They are ready to be fed into TensorFlow or PyTorch models depending on the selected ``dataset_type``.
+The tensor datasets can be accessed via the ``tensor_train_data``, ``tensor_val_data``, and ``tensor_test_data`` attributes of the dataset class. They are ready to be fed into TensorFlow or PyTorch models depending on the selected ``dataset_type``.
 
 .. code-block:: python
 
@@ -423,8 +432,8 @@ The tensor datasets can be accessed via the ``train_data``, ``val_data``, and ``
    # model initialization, compilation, etc..
 
    # pass to model.fit() in Keras
-   model.fit(dataset.train_data,
-            validation_data=dataset.val_data,
+   model.fit(dataset.tensor_train_data,
+            validation_data=dataset.tensor_val_data,
             epochs=10,
             **kwargs)
 
@@ -498,8 +507,9 @@ model with the wrong preprocessor:
 
 * the model's embedding vocabulary size must match the preprocessor's alphabet size
 * for architectures that expose ``raw_seq_length``/``with_termini`` (e.g.
-  ``PrositIntensityPredictor``), the model's expected sequence length (adjusted for
-  ``with_termini``) must match the preprocessor's ``max_seq_len``
+  ``PrositIntensityPredictor``), the model's expected padded sequence length must match
+  the width the preprocessor produces (``padded_seq_len``: ``max_seq_len``, plus 2 for the
+  terminal tokens when ``with_termini`` is set)
 
 Both checks are skipped for models/attributes they don't apply to (e.g. architectures
 without an ``embedding`` attribute, or without ``raw_seq_length``/``with_termini``). The
@@ -586,7 +596,7 @@ Save processed datasets to disk to avoid reprocessing:
    dataset = load_processed_dataset("processed_datasets/rt_dataset")
 
    # Access tensor data immediately
-   train_data = dataset.train_data
+   train_data = dataset.tensor_train_data
 
 This saves configuration, processed HuggingFace datasets, and metadata.
 
@@ -614,8 +624,8 @@ Returns ``tf.data.Dataset`` objects (the default under a TensorFlow backend):
    )
 
    # Returns batched tf.data.Dataset
-   train_data = dataset.train_data
-   val_data = dataset.val_data
+   train_data = dataset.tensor_train_data
+   val_data = dataset.tensor_val_data
 
    # Use directly with Keras
    model.fit(train_data, validation_data=val_data, epochs=10)
@@ -640,8 +650,8 @@ Use ``dataset_type="pt"`` for PyTorch DataLoaders. Since PyTorch DataLoaders mus
    )
 
    # Returns PyTorch DataLoader
-   train_loader = dataset.train_data
-   val_loader = dataset.val_data
+   train_loader = dataset.tensor_train_data
+   val_loader = dataset.tensor_val_data
 
    # Training loop
    for batch, label in train_loader:

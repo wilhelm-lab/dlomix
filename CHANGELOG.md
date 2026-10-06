@@ -5,7 +5,78 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.3.1] - 2026-10-06
+
+### Changed
+- Removed the `gc.freeze` handling around multi-process dataset processing added in
+  0.3.0. The crash it guarded against came from garbage accumulated across the test
+  suite; the test suite now collects garbage before each test instead.
+- GitHub release notes are taken from this changelog.
+- Packaging: SPDX license expression instead of the deprecated license classifier.
+- CI: the PyTorch job also runs `tests/test_backend_equivalence.py`,
+  `tests/test_postprocessing.py` and `tests/test_inference_pipeline.py`.
+- `PrositIntensityPredictor` warns when `meta_data_keys` are given without
+  `use_meta_data=True`. The model has no metadata encoder then and ignores those
+  inputs, which used to happen silently.
+- The warning that the unknown token `X` is already in the alphabet only appears
+  when its index differs from the default; an alphabet learned by a dataset, passed
+  back in, no longer triggers it. Best-fit initialization no longer repeats the
+  warnings of the temporary datasets it builds for each candidate token.
+- Datasets warn when `with_termini=False` drops terminal modifications: without
+  termini, `[UNIMOD:737]-PEPTIDE` and `PEPTIDE` encode to the same tensor. The
+  behaviour is unchanged.
+- Datasets warn once, per split, about tokens missing from the alphabet, naming the
+  most frequent ones. Train/val encode them as the unknown token `X`, test as their
+  unmodified residue; that behaviour is unchanged, but used to be silent.
+
+### Fixed
+- Documentation: installation and backend guides updated for Keras 3; dataset guide
+  examples use `tensor_train_data` / `tensor_val_data` / `tensor_test_data`.
+- **A learned alphabet could disagree with the encoded data.** The alphabet is learned
+  while the encoding runs; when Hugging Face reused that step's cached result from an
+  earlier build (`auto_cleanup_cache=False`, or a crashed run), learning was skipped
+  for the train split. The alphabet then came from val alone, while train kept the
+  earlier build's indices. The learning step is now always recomputed.
+- `normalize_intensity_predictions` took the peptide length as `len()` of the
+  sequence column, so a raw sequence such as `[]-LFC[UNIMOD:4]R-[]` counted
+  characters. It now counts residues for raw strings too, and rejects
+  integer-encoded sequences. Lengths were also looked up by index label, so a
+  filtered DataFrame raised `KeyError` and a reordered one silently misaligned
+  them; rows are now matched by position.
+- Best-fit embedding initialization: options missing from `best_fit_kwargs`
+  (`n_examples_for_eval`, `eval_metric`, column names) crashed instead of taking
+  their defaults (`eval_metric` now defaults to `masked_spectral_distance`). The
+  padding and unknown tokens are no longer candidates.
+- `FineTunePipeline(base_model_name=...)` always failed: it now downloads
+  `model.keras` from that Hugging Face Hub repo, as written by
+  `InferencePipeline.push_to_hub` on TensorFlow.
+- `FineTunePipeline` encoded the dataset with its own learned alphabet even when
+  `new_model_vocab` was given, so the model and the data could map tokens to
+  different indices. The dataset now uses `new_model_vocab`.
+- `SequenceUniqueSplitter` grouped `PEPTIDE` and `[]-PEPTIDE-[]` as different
+  peptides, so the same peptide could land in several splits when sequence formats
+  were mixed. Terminal separators are now stripped before grouping.
+- **Building a dataset deleted the cache files of the caller's own datasets.** With
+  the default `auto_cleanup_cache=True`, dlomix called `Dataset.cleanup_cache_files()`,
+  which removes every cache file in the folder that the new dataset does not use,
+  including those of a filtered or mapped Hub dataset passed as `data_source`. A
+  second multi-process build from that source then failed with "One of the
+  subprocesses has abruptly died during map operation", because the worker
+  processes reopen the deleted files. Only the intermediate files of dlomix's own
+  processing are deleted now.
+- Datasets appended their parsed columns to the caller's `dataset_columns_to_keep`
+  list, so reusing that list (e.g. to select columns afterwards, or for a second
+  dataset) duplicated columns. Listing a column there that is already kept (the
+  label or a model feature) failed with "Field ... exists 2 times in schema".
+- The `unmod` encoding scheme kept the mods of the first and last residues when
+  `with_termini=False`, which then became separate tokens.
+- **An N-terminal modification written without its hyphen was split into
+  characters.** `[UNIMOD:737]PEPTIDE` was parsed as the residues
+  `U N I M O D : 7 3 7 P E P ...`, several of them valid amino acids, and silently
+  encoded a different peptide. Such sequences now raise a `ValueError` asking for
+  `[UNIMOD:737]-PEPTIDE`. So does `[]-PEPTIDE` (an empty N-terminal token without a
+  C-terminal one), which was parsed as an empty peptide with the C-terminal token
+  `-PEPTIDE`.
 
 ## [0.3.0] - 2026-10-05
 
