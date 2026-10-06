@@ -1,4 +1,5 @@
 import logging
+import warnings
 from collections.abc import Sequence
 
 import keras
@@ -304,6 +305,13 @@ class PrositIntensityPredictor(tf.keras.Model):
         if self.use_meta_data and not self.meta_data_keys:
             raise ValueError(
                 "use_meta_data=True requires meta_data_keys to be provided as a list of keys."
+            )
+        if self.meta_data_keys and not self.use_meta_data:
+            warnings.warn(
+                f"meta_data_keys {self.meta_data_keys} are given but use_meta_data=False, "
+                "so the model ignores these inputs. Pass use_meta_data=True to use them.",
+                UserWarning,
+                stacklevel=3,
             )
 
         if (

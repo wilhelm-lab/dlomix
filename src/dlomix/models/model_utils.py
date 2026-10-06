@@ -6,6 +6,7 @@ particularly when vocabularies/alphabets differ between training and fine-tuning
 """
 
 import logging
+import warnings
 from typing import Dict, Literal, Optional
 
 import numpy as np
@@ -59,13 +60,17 @@ def load_and_adapt_pretrained_model(
         - new_hf_data: Hugging Face
             Dataset containing sequences with new tokens for evaluation.
         - sequence_column: str
-            Name of the column in new_hf_data containing the sequences.
+            Name of the column in new_hf_data containing the sequences
+            (default: "modified_sequence").
         - label_column: str
-            Name of the column in new_hf_data containing the labels for evaluation.
+            Name of the column in new_hf_data containing the labels for evaluation
+            (default: "intensities_raw").
         - n_examples_for_eval: int
-            Number of examples to use for evaluating each old token fit.
+            Number of examples to use for evaluating each old token fit (default: 100).
         - eval_metric: Callable
-            Evaluation metric function that takes (labels, predictions) and returns a score.
+            Loss function that takes (labels, predictions) and returns one value per
+            sample; the fit is scored as 1 - its median (default:
+            ``masked_spectral_distance``).
         - return_fit_info: bool
             Whether to return detailed fit information for each new token (default: False).
         - dataset_kwargs: Dict
@@ -135,20 +140,28 @@ def load_and_adapt_pretrained_model(
     if initialization_strategy == "best-fit":
         old_model = _load_model_with_custom_objects(model_path, custom_objects)
 
+        # forward only the options given, so the search's defaults apply otherwise
+        search_kwargs = {
+            key: best_fit_kwargs[key]
+            for key in (
+                "sequence_column",
+                "label_column",
+                "n_examples_for_eval",
+                "eval_metric",
+            )
+            if best_fit_kwargs.get(key) is not None
+        }
         best_fit_dict = _find_best_fit_tokens_for_new_tokens(
             new_hf_data=best_fit_kwargs.get("new_hf_data"),
-            sequence_column=best_fit_kwargs.get("sequence_column"),
-            label_column=best_fit_kwargs.get("label_column"),
             alphabet_old=old_alphabet,
             alphabet_new=new_alphabet,
             old_model=old_model,
-            n_examples_for_eval=best_fit_kwargs.get("n_examples_for_eval"),
-            eval_metric=best_fit_kwargs.get("eval_metric"),
+            **search_kwargs,
             **best_fit_kwargs.get("dataset_kwargs", {}),
         )
 
         # best fit dict has the format
-        # {'M[UNIMOD:35]': {'eval': 0.9156792, 'old_token': 'V', 'old_token_idx': 6}, 'C[UNIMOD:4]': {'eval': 0.9577802, 'old_token': '-', 'old_token_idx': 0}}
+        # {'M[UNIMOD:35]': {'eval': 0.9156792, 'old_token': 'V', 'old_token_idx': 6}, 'C[UNIMOD:4]': {'eval': 0.9577802, 'old_token': 'C', 'old_token_idx': 2}}
 
         old_weights = _get_embedding_layer(
             old_model, embedding_layer_name
@@ -526,18 +539,33 @@ def _load_model_with_custom_objects(
     return model
 
 
+# Never candidates for best-fit: the padding and unknown tokens carry no residue
+# information, and their embeddings are not trained like a residue's.
+_BEST_FIT_EXCLUDED_TOKENS = ("-", "X")
+
+
 def _find_best_fit_tokens_for_new_tokens(
     new_hf_data,
-    sequence_column,
-    label_column,
     alphabet_old,
     alphabet_new,
     old_model,
+    sequence_column="modified_sequence",
+    label_column="intensities_raw",
     n_examples_for_eval=100,
     eval_metric=None,
     **dataset_kwargs,
 ):
+    if eval_metric is None:
+        from dlomix.losses import masked_spectral_distance
+
+        eval_metric = masked_spectral_distance
+
     new_tokens = list(alphabet_new.keys() - alphabet_old.keys())
+    candidates = {
+        token: idx
+        for token, idx in alphabet_old.items()
+        if token not in _BEST_FIT_EXCLUDED_TOKENS
+    }
     best_fit_dict = {}
     best_sa = 0
 
@@ -561,23 +589,27 @@ def _find_best_fit_tokens_for_new_tokens(
         else:
             example_data = filtered_data.take(n_examples_for_eval)
 
-        for current_old_token, current_old_token_idx in alphabet_old.items():
+        for current_old_token, current_old_token_idx in candidates.items():
             temp_alphabet = alphabet_old.copy()
             temp_alphabet.update({new: current_old_token_idx})
-            test_data_current_token = FragmentIonIntensityDataset(
-                data_format="hf",
-                test_data_source=example_data,
-                sequence_column=sequence_column,
-                label_column=label_column,
-                alphabet=temp_alphabet,
-                **dataset_kwargs,
-            )
+            # throwaway datasets, built once per candidate: their warnings (e.g. the
+            # other new tokens missing from temp_alphabet) only repeat noise
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore", UserWarning)
+                test_data_current_token = FragmentIonIntensityDataset(
+                    data_format="hf",
+                    test_data_source=example_data,
+                    sequence_column=sequence_column,
+                    label_column=label_column,
+                    alphabet=temp_alphabet,
+                    **dataset_kwargs,
+                )
 
             sa = []
             for inputs, labels in test_data_current_token.tensor_test_data:
                 preds = old_model.predict(inputs, verbose=0)
-                current_sa = 1 - eval_metric(labels, preds)
-                sa.extend(current_sa)
+                current_sa = 1 - np.asarray(eval_metric(labels, preds))
+                sa.extend(current_sa.reshape(-1))
             sa = np.median(sa)
             if sa > best_sa:
                 best_sa = sa
@@ -590,8 +622,41 @@ def _find_best_fit_tokens_for_new_tokens(
     return best_fit_dict
 
 
-def download_remote_model_weights(model_name):
-    # Download the model weights from a remote source (e.g., Hugging Face Hub, PRIDE, etc.)
-    raise NotImplementedError(
-        "Downloading remote model weights is not implemented yet."
-    )
+def download_remote_model_weights(
+    model_name: str, revision: Optional[str] = None
+) -> str:
+    """Download a TensorFlow model from the Hugging Face Hub and return its local path.
+
+    ``model_name`` is the repo id of a DLOmix inference bundle, as written by
+    :meth:`~dlomix.pipelines.InferencePipeline.push_to_hub` on the TensorFlow
+    backend; its ``model.keras`` file is downloaded (and cached by
+    ``huggingface_hub``).
+
+    Parameters
+    ----------
+    model_name : str
+        Hub repo id, e.g. ``"my-org/prosit-intensity"``.
+    revision : str, optional
+        Branch, tag or commit to download. Defaults to the main branch.
+
+    Returns
+    -------
+    str
+        Local path of the downloaded ``model.keras`` file, which
+        :func:`load_and_adapt_pretrained_model` accepts as ``model_path``.
+    """
+    from huggingface_hub import hf_hub_download
+
+    # the file name InferencePipeline.save writes for TensorFlow models
+    # (dlomix.pipelines.predictor.TF_MODEL_FILE; not imported, pipelines imports models)
+    try:
+        return hf_hub_download(
+            repo_id=model_name, filename="model.keras", revision=revision
+        )
+    except Exception as e:
+        raise ValueError(
+            f"Could not download 'model.keras' from the Hugging Face Hub repo "
+            f"'{model_name}'. base_model_name must be the repo id of a DLOmix "
+            f"inference bundle saved on the TensorFlow backend "
+            f"(InferencePipeline.push_to_hub): {e}"
+        ) from e
