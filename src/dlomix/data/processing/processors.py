@@ -132,6 +132,16 @@ class SequenceParsingProcessor(PeptideDatasetBaseProcessor):
             self._assign_sequence_column = self.__update_sequence_column_without_termini
 
     def _parse_proforma_sequence(self, sequence_string):
+        # A modification at the very start without its hyphen ("[UNIMOD:737]PEPTIDE")
+        # would be split into characters, several of them valid residues
+        # (U N I M O D ...), and encode a different peptide. Refuse it rather than
+        # guess: the data should be fixed at its source.
+        if re.match(r"^\[[^\]]*\][A-Za-z]", sequence_string):
+            raise ValueError(
+                f"Invalid sequence format: {sequence_string}. An N-terminal "
+                "modification needs a hyphen before the first residue, e.g. "
+                "'[UNIMOD:737]-PEPTIDE' (ProForma)."
+            )
         splitted = sequence_string.split("-")
         seq = ""
 
@@ -140,6 +150,14 @@ class SequenceParsingProcessor(PeptideDatasetBaseProcessor):
         elif len(splitted) == 2:
             if splitted[0].startswith("[UNIMOD:"):
                 n_term, seq, c_term = splitted[0] + "-", splitted[1], "-[]"
+            elif splitted[0].startswith("["):
+                # e.g. "[]-PEPTIDE": would otherwise be read as an empty peptide
+                # with the C-terminal token "-PEPTIDE"
+                raise ValueError(
+                    f"Invalid sequence format: {sequence_string}. Expected "
+                    "'[N-term]-SEQUENCE-[C-term]' (e.g. '[]-PEPTIDE-[]') or a bare "
+                    "'PEPTIDE'."
+                )
             else:
                 n_term, seq, c_term = "[]-", splitted[0], "-" + splitted[1]
         elif len(splitted) == 3:
@@ -320,6 +338,10 @@ class SequenceEncodingProcessor(PeptideDatasetBaseProcessor):
                 batched=self.batched,
                 batch_size=ctx.batch_size,
                 num_proc=None if single_process else ctx.num_proc,
+                # learning happens as a side effect of running the map: a cached
+                # result would skip it and leave the alphabet without this split's
+                # tokens, although the cached data was encoded with them
+                load_from_cache_file=not self.extend_alphabet,
             )
             ctx.alphabet = self.alphabet.copy()
             return result
@@ -373,10 +395,13 @@ class SequenceEncodingProcessor(PeptideDatasetBaseProcessor):
 
         # check if unknown token is already in the alphabet
         unk_token_in_alphabet = self.alphabet.get(self.unknown_token, None)
-        if unk_token_in_alphabet:
-            warnings.warn(
-                f"The unknown token '{self.unknown_token}' is already present in the provided alphabet with index {unk_token_in_alphabet}. If you prefer the default behavior, consider removing it from the alphabet and it will have the default index of {self.unknown_token_index}."
-            )
+        if unk_token_in_alphabet is not None:
+            # e.g. an alphabet learned by an earlier dataset; only a non-default
+            # index is worth a warning
+            if unk_token_in_alphabet != self.unknown_token_index:
+                warnings.warn(
+                    f"The unknown token '{self.unknown_token}' is already present in the provided alphabet with index {unk_token_in_alphabet}. If you prefer the default behavior, consider removing it from the alphabet and it will have the default index of {self.unknown_token_index}."
+                )
             self.unknown_token_index = unk_token_in_alphabet
         else:
             if self.unknown_token_index in self.alphabet.values():
@@ -479,11 +504,14 @@ class SequencePTMRemovalProcessor(PeptideDatasetBaseProcessor):
     def _remove_ptms(self, sequence):
         if not isinstance(sequence, list):
             raise ValueError("Sequence must be a list of amino acids")
-        n_terms = sequence[0]
-        c_terms = sequence[-1]
-        aa_sequence = sequence[1:-1]
-        ptm_filtered_sequence = re.sub(r"\[UNIMOD:\d+\]", "", "".join(aa_sequence))
-        return [n_terms] + list(ptm_filtered_sequence) + [c_terms]
+        # terminal tokens ("[]-", "[UNIMOD:1]-", "-[]") are kept as they are; every
+        # residue token loses its mods. Telling them apart by the "-" rather than by
+        # position also works without termini (with_termini=False), where the first
+        # and last tokens are residues.
+        return [
+            token if "-" in token else re.sub(r"\[UNIMOD:\d+\]", "", token)
+            for token in sequence
+        ]
 
 
 class FunctionProcessor(PeptideDatasetBaseProcessor):

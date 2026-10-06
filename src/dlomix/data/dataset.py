@@ -1,4 +1,5 @@
 import logging
+import re
 import warnings
 from typing import Optional, Union
 
@@ -9,6 +10,7 @@ from .dataset_splitter import SplitConfig, create_splitter
 from .dataset_utils import EncodingScheme, get_num_processors, resolve_num_proc
 from .loading import DataSourceLoader, _DatasetSplitMode
 from .processing.pipeline import PipelineContext, ProcessingPipeline
+from .processing.processors import SequenceParsingProcessor
 from .serialization import save_dataset
 from .tensor_conversion import (
     cast_feature_columns_to_float,
@@ -152,6 +154,8 @@ class PeptideDataset:
                 self._remove_unnecessary_columns()
                 self._split_dataset()
                 self._run_processing_pipeline()
+                self._warn_about_unknown_tokens()
+                self._warn_about_dropped_terminal_mods()
                 if (
                     self.model_features is not None
                     or len(self._extracted_features_columns) > 0
@@ -277,6 +281,95 @@ class PeptideDataset:
         self.hf_dataset = pipeline.apply(self.hf_dataset, ctx)
         # the encoding processor learns/extends the alphabet during the run
         self.extended_alphabet = ctx.alphabet
+
+    def _warn_about_dropped_terminal_mods(self):
+        """Warn once when ``with_termini=False`` drops terminal modifications.
+
+        Without termini, ``[UNIMOD:737]-PEPTIDE`` and ``PEPTIDE`` encode to the same
+        tensor. That is what the option means, but a modified terminus losing its
+        modification is easy to miss.
+        """
+        if self.with_termini:
+            return
+        import pyarrow.compute as pc
+
+        parsed = SequenceParsingProcessor.PARSED_COL_NAMES
+        counts = {}
+        for split in self.hf_dataset.keys():
+            table = self.hf_dataset[split].data
+            for column, empty in ((parsed["n_term"], "[]-"), (parsed["c_term"], "-[]")):
+                for tokens in pc.value_counts(table.column(column)).to_pylist():
+                    if tokens["values"] != empty:
+                        counts[tokens["values"]] = (
+                            counts.get(tokens["values"], 0) + tokens["counts"]
+                        )
+        if counts:
+            top = dict(sorted(counts.items(), key=lambda kv: -kv[1])[:10])
+            warnings.warn(
+                f"with_termini=False drops terminal modifications: "
+                f"{sum(counts.values())} sequences carry one (most frequent: {top}), "
+                "and encode as if unmodified at that terminus. Use with_termini=True "
+                "to keep them.",
+                UserWarning,
+                stacklevel=3,
+            )
+
+    def _warn_about_unknown_tokens(self):
+        """Warn once, naming the tokens the alphabet does not cover, per split.
+
+        Train/val encode such a token as the unknown token ``X``; the other splits
+        fall back to its unmodified residue. When the alphabet is learned, train/val
+        cover every token by construction, so only the other splits are checked.
+        """
+        import pyarrow.compute as pc
+
+        parsed = SequenceParsingProcessor.PARSED_COL_NAMES
+        fit_splits = PeptideDataset.DEFAULT_SPLIT_NAMES[0:2]
+        unmod = self.encoding_scheme == EncodingScheme.UNMOD
+        report = []
+        for split in self.hf_dataset.keys():
+            if self.learning_alphabet_mode and split in fit_splits:
+                continue
+            table = self.hf_dataset[split].data
+            counts = {}
+            # token counts in C++, so this stays fast on millions of rows
+            for tokens in pc.value_counts(
+                pc.list_flatten(table.column(parsed["seq"]))
+            ).to_pylist():
+                token, count = tokens["values"], tokens["counts"]
+                # the encoder sees what the unmod scheme leaves: residues without mods
+                for t in re.sub(r"\[UNIMOD:\d+\]", "", token) if unmod else [token]:
+                    counts[t] = counts.get(t, 0) + count
+            if self.with_termini:
+                for column in (parsed["n_term"], parsed["c_term"]):
+                    for tokens in pc.value_counts(table.column(column)).to_pylist():
+                        counts[tokens["values"]] = (
+                            counts.get(tokens["values"], 0) + tokens["counts"]
+                        )
+            unknown = {
+                t: c for t, c in counts.items() if t not in self.extended_alphabet
+            }
+            if unknown:
+                top = sorted(unknown.items(), key=lambda kv: -kv[1])[:10]
+                encoded_as = (
+                    "the unknown token 'X'"
+                    if split in fit_splits
+                    else "their unmodified residue"
+                )
+                report.append(
+                    f"{split}: {sum(unknown.values())} occurrences of "
+                    f"{len(unknown)} tokens, encoded as {encoded_as} "
+                    f"(most frequent: {dict(top)})"
+                )
+        if report:
+            warnings.warn(
+                "Tokens missing from the alphabet: "
+                + "; ".join(report)
+                + ". Pass an alphabet that covers them, or expand the model's "
+                "vocabulary, if they should be learned.",
+                UserWarning,
+                stacklevel=3,
+            )
 
     def _cast_model_feature_types_to_float(self):
         features_to_cast = set().union(
