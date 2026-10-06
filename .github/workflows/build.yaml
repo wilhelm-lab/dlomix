@@ -114,8 +114,8 @@ jobs:
       - name: Test the shared and torch-native code paths
         env:
           DLOMIX_BACKEND: pytorch
-        # dlomix.pipelines and the TensorFlow-only model utilities are excluded:
-        # they are TensorFlow-only today, and are covered by the job above.
+        # The fine-tuning pipeline and the model utilities are excluded: they are
+        # TensorFlow-only today, and are covered by the job above.
         run: |
           python -m pytest \
             tests/test_torch_models.py \
@@ -130,6 +130,7 @@ jobs:
             tests/test_environment_report.py \
             tests/test_backend_equivalence.py \
             tests/test_postprocessing.py \
+            tests/test_inference_pipeline.py \
             -v
 
   resolve-extras:
