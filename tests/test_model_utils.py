@@ -15,7 +15,6 @@ import tensorflow as tf
 from datasets import Dataset
 
 from dlomix.constants import ALPHABET_UNMOD
-from dlomix.losses import masked_spectral_distance
 from dlomix.models import PrositIntensityPredictor, PrositRetentionTimePredictor
 from dlomix.models.model_utils import (
     expand_embedding_vocabulary,
@@ -24,6 +23,12 @@ from dlomix.models.model_utils import (
 )
 
 logger = logging.getLogger(__name__)
+
+DUMMY_INPUT = {
+    "sequence": tf.zeros((2, 10), dtype=tf.int32),
+    "collision_energy": tf.ones((2, 1)),
+    "precursor_charge": tf.ones((2, 1)),
+}
 
 
 @pytest.fixture
@@ -54,102 +59,42 @@ def intensity_model(base_alphabet):
         seq_length=10,
         alphabet=base_alphabet,
         dropout_rate=0.1,
-        meta_data_keys=["collision_energy", "precursor_charge"],
+        # no meta_data_keys: these tests only exercise the embedding, and the
+        # extra metadata inputs are ignored
     )
-    # Build the model
-    dummy_input = {
-        "sequence": tf.zeros((2, 10), dtype=tf.int32),
-        "collision_energy": tf.ones((2, 1)),
-        "precursor_charge": tf.ones((2, 1)),
-    }
-    _ = model(dummy_input)
+    model(DUMMY_INPUT)
     return model
 
 
-@pytest.fixture
-def hf_dataset_with_mods():
-    """Fixture to provide a Hugging Face dataset with modified sequences."""
-
-    data = {
-        "sequence": ["AM[UNIMOD:1]CDEF", "ES[UNIMOD:2]CDEF", "CT[UNIMOD:3]CDEF"],
-        "collision_energy": [
-            np.zeros((2, 1), dtype=np.float32),
-            np.ones((2, 1), dtype=np.float32),
-            np.full((2, 1), 2, dtype=np.float32),
-        ],
-        "precursor_charge": [
-            np.zeros((2, 1), dtype=np.float32),
-            np.ones((2, 1), dtype=np.float32),
-            np.full((2, 1), 3, dtype=np.float32),
-        ],
-        "label": [
-            [0.1, 0.2, 0.3] * 9 * 2,  # (sequence length - 1) * 2 ions
-            [0.4, 0.5, 0.6] * 9 * 2,
-            [0.7, 0.8, 0.9] * 9 * 2,
-        ],
-    }
-
-    # Create dataset
-    ds = Dataset.from_dict(data)
-    return ds
+def assert_shared_rows_preserved(old_model, new_model, old_alphabet, new_alphabet):
+    old = old_model.embedding.get_weights()[0]
+    new = new_model.embedding.get_weights()[0]
+    for token, idx in old_alphabet.items():
+        np.testing.assert_array_equal(new[new_alphabet[token]], old[idx], err_msg=token)
 
 
 class TestExpandEmbeddingVocabulary:
     """Tests for expand_embedding_vocabulary function."""
 
-    def test_basic_expansion(self, intensity_model, base_alphabet, expanded_alphabet):
-        """Test basic vocabulary expansion with default random initialization."""
-        old_vocab_size = intensity_model.embedding.input_dim
-        old_embedding_dim = intensity_model.embedding.output_dim
-
-        # Expand vocabulary
-        adapted_model = expand_embedding_vocabulary(
+    def test_expansion(self, intensity_model, base_alphabet, expanded_alphabet):
+        """The embedding grows to the new alphabet, keeps the rows of the shared
+        tokens, updates alphabet and embeddings_count, and the model still runs."""
+        adapted = expand_embedding_vocabulary(
             model=intensity_model,
             new_alphabet=expanded_alphabet,
-            old_alphabet=base_alphabet,
+            old_alphabet=None,  # extracted from the model
             initialization_strategy="random",
             random_seed=42,
         )
 
-        # Check new vocabulary size
-        expected_new_vocab_size = len(expanded_alphabet)
-        assert adapted_model.embedding.input_dim == expected_new_vocab_size
-        assert adapted_model.embedding.output_dim == old_embedding_dim
-
-        # Verify size increased
-        assert adapted_model.embedding.input_dim > old_vocab_size
-
-    def test_embedding_transfer_preservation(
-        self, intensity_model, base_alphabet, expanded_alphabet
-    ):
-        """Test that common token embeddings are preserved after expansion."""
-        # Get original embeddings
-        old_weights = intensity_model.embedding.get_weights()[0]
-
-        # Expand vocabulary
-        adapted_model = expand_embedding_vocabulary(
-            model=intensity_model,
-            new_alphabet=expanded_alphabet,
-            old_alphabet=base_alphabet,
-            initialization_strategy="random",
-            random_seed=42,
+        assert adapted.embedding.input_dim == len(expanded_alphabet)
+        assert adapted.embedding.output_dim == intensity_model.embedding.output_dim
+        assert adapted.alphabet == expanded_alphabet
+        assert adapted.embeddings_count == len(expanded_alphabet)
+        assert_shared_rows_preserved(
+            intensity_model, adapted, base_alphabet, expanded_alphabet
         )
-
-        new_weights = adapted_model.embedding.get_weights()[0]
-
-        # Check that common amino acid embeddings were preserved
-        for token, old_idx in base_alphabet.items():
-            # In embedding matrix: +1 for padding token at index 0
-            old_embedding_idx = old_idx + 1
-            new_idx = expanded_alphabet[token]
-            new_embedding_idx = new_idx + 1
-
-            # Only check if the index is valid in the old weights
-            if old_embedding_idx < old_weights.shape[0]:
-                # Embeddings should be identical
-                assert np.allclose(
-                    old_weights[old_embedding_idx], new_weights[new_embedding_idx]
-                ), f"Embedding for token '{token}' was not preserved"
+        assert adapted(DUMMY_INPUT) is not None
 
     def test_mean_initialization(
         self, intensity_model, base_alphabet, expanded_alphabet
@@ -217,46 +162,6 @@ class TestExpandEmbeddingVocabulary:
                 weights1[new_idx], weights2[new_idx]
             ), f"Random initialization with seed should be reproducible for '{token}'"
 
-    def test_alphabet_attribute_updated(
-        self, intensity_model, base_alphabet, expanded_alphabet
-    ):
-        """Test that model's alphabet attribute is updated after expansion."""
-        adapted_model = expand_embedding_vocabulary(
-            model=intensity_model,
-            new_alphabet=expanded_alphabet,
-            old_alphabet=base_alphabet,
-        )
-
-        # Check alphabet was updated
-        assert hasattr(adapted_model, "alphabet")
-        assert adapted_model.alphabet == expanded_alphabet
-
-    def test_embeddings_count_updated(
-        self, intensity_model, base_alphabet, expanded_alphabet
-    ):
-        """Test that model's embeddings_count attribute is updated."""
-        adapted_model = expand_embedding_vocabulary(
-            model=intensity_model,
-            new_alphabet=expanded_alphabet,
-            old_alphabet=base_alphabet,
-        )
-
-        expected_count = len(expanded_alphabet)
-        assert hasattr(adapted_model, "embeddings_count")
-        assert adapted_model.embeddings_count == expected_count
-
-    def test_auto_extract_alphabet_from_model(self, intensity_model, expanded_alphabet):
-        """Test that old_alphabet can be auto-extracted from model."""
-        # Don't provide old_alphabet - should be extracted automatically
-        adapted_model = expand_embedding_vocabulary(
-            model=intensity_model,
-            new_alphabet=expanded_alphabet,
-            old_alphabet=None,  # Should auto-extract
-        )
-
-        assert adapted_model is not None
-        assert adapted_model.embedding.input_dim == len(expanded_alphabet)
-
     def test_invalid_embedding_layer_name(
         self, intensity_model, base_alphabet, expanded_alphabet
     ):
@@ -281,46 +186,38 @@ class TestExpandEmbeddingVocabulary:
                 initialization_strategy="invalid_strategy",
             )
 
-    def test_intensity_model_expansion(
-        self, intensity_model, base_alphabet, expanded_alphabet
-    ):
-        """Test vocabulary expansion on PrositIntensityPredictor."""
+    def test_retention_time_model_with_real_alphabet(self):
+        """Expansion of a PrositRetentionTimePredictor built on ALPHABET_UNMOD."""
+        model = PrositRetentionTimePredictor(
+            embedding_output_dim=16,
+            seq_length=30,
+            alphabet=ALPHABET_UNMOD,
+        )
+        _ = model(tf.zeros((2, 30), dtype=tf.int32))
+        next_idx = len(ALPHABET_UNMOD)
+        expanded_alphabet = {
+            **ALPHABET_UNMOD,
+            "M[UNIMOD:1]": next_idx,
+            "S[UNIMOD:2]": next_idx + 1,
+            "C[UNIMOD:3]": next_idx + 2,
+        }
+
         adapted_model = expand_embedding_vocabulary(
-            model=intensity_model,
+            model=model,
             new_alphabet=expanded_alphabet,
-            old_alphabet=base_alphabet,
+            old_alphabet=ALPHABET_UNMOD,
             initialization_strategy="mean",
+            embedding_layer_name="embedding",
         )
 
-        # Verify model still works with expanded vocabulary
-        assert adapted_model is not None
         assert adapted_model.embedding.input_dim == len(expanded_alphabet)
-
-        # Test forward pass still works
-        dummy_input = {
-            "sequence": tf.zeros((2, 10), dtype=tf.int32),
-            "collision_energy": tf.ones((2, 1)),
-            "precursor_charge": tf.ones((2, 1)),
-        }
-        output = adapted_model(dummy_input)
-        assert output is not None
 
 
 class TestGetAlphabetFromModel:
     """Tests for get_alphabet_from_model function."""
 
-    def test_extract_from_model_attribute(self, intensity_model):
-        """Test extracting alphabet from model.alphabet attribute."""
-        alphabet = get_alphabet_from_model(intensity_model)
-        assert alphabet is not None
-        assert isinstance(alphabet, dict)
-        assert len(alphabet) > 0
-
-    def test_extract_from_intensity_model(self, intensity_model):
-        """Test extracting alphabet from PrositIntensityPredictor."""
-        alphabet = get_alphabet_from_model(intensity_model)
-        assert alphabet is not None
-        assert isinstance(alphabet, dict)
+    def test_extract_from_model(self, intensity_model, base_alphabet):
+        assert get_alphabet_from_model(intensity_model) == base_alphabet
 
     def test_model_without_alphabet(self):
         """Test that models without alphabet return None."""
@@ -339,70 +236,30 @@ class TestGetAlphabetFromModel:
 class TestLoadAndAdaptPretrainedModel:
     """Tests for load_and_adapt_pretrained_model function."""
 
-    def test_full_workflow(self, intensity_model, base_alphabet, expanded_alphabet):
-        """Test complete workflow: save, load, and adapt model."""
+    @pytest.mark.parametrize("explicit_old_alphabet", [False, True])
+    def test_save_load_adapt(
+        self, intensity_model, base_alphabet, expanded_alphabet, explicit_old_alphabet
+    ):
+        """Save, then load and adapt: the shared rows survive and the model runs,
+        whether the old alphabet is given or read from the saved model."""
         with tempfile.TemporaryDirectory() as tmpdir:
-            # Save the model
             model_path = Path(tmpdir) / "test_model.keras"
             intensity_model.save(model_path)
 
-            # Load and adapt
-            adapted_model = load_and_adapt_pretrained_model(
+            adapted = load_and_adapt_pretrained_model(
                 model_path=str(model_path),
                 new_alphabet=expanded_alphabet,
-                old_alphabet=None,
+                old_alphabet=base_alphabet if explicit_old_alphabet else None,
                 initialization_strategy="mean",
                 random_seed=42,
             )
 
-            # Verify adaptation
-            assert adapted_model is not None
-            assert adapted_model.embedding.input_dim == len(expanded_alphabet)
-
-    def test_with_explicit_old_alphabet(
-        self, intensity_model, base_alphabet, expanded_alphabet
-    ):
-        """Test workflow with explicitly provided old_alphabet."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            model_path = Path(tmpdir) / "test_model.keras"
-            intensity_model.save(model_path)
-
-            adapted_model = load_and_adapt_pretrained_model(
-                model_path=str(model_path),
-                new_alphabet=expanded_alphabet,
-                old_alphabet=base_alphabet,
-                initialization_strategy="mean",
-            )
-
-            assert adapted_model.embedding.input_dim == len(expanded_alphabet)
-
-    def test_embeddings_preserved_through_save_load(
-        self, intensity_model, base_alphabet, expanded_alphabet
-    ):
-        """Test that embeddings are preserved through save/load/adapt cycle."""
-        # Get original embeddings for a common token
-        old_weights = intensity_model.embedding.get_weights()[0]
-        token = "A"
-        original_embedding = old_weights[base_alphabet[token]].copy()
-
-        with tempfile.TemporaryDirectory() as tmpdir:
-            model_path = Path(tmpdir) / "test_model.keras"
-            intensity_model.save(model_path)
-
-            adapted_model = load_and_adapt_pretrained_model(
-                model_path=str(model_path),
-                new_alphabet=expanded_alphabet,
-                initialization_strategy="random",
-                random_seed=42,
-            )
-
-            # Check that common token embedding was preserved
-            new_weights = adapted_model.embedding.get_weights()[0]
-            new_embedding = new_weights[expanded_alphabet[token]]
-
-            assert np.allclose(
-                original_embedding, new_embedding
-            ), "Embedding should be preserved through save/load/adapt"
+        assert adapted.embedding.input_dim == len(expanded_alphabet)
+        assert adapted.alphabet == expanded_alphabet
+        assert_shared_rows_preserved(
+            intensity_model, adapted, base_alphabet, expanded_alphabet
+        )
+        assert adapted(DUMMY_INPUT) is not None
 
     def test_invalid_model_path(self, expanded_alphabet):
         """Test that invalid model path raises error."""
@@ -412,150 +269,63 @@ class TestLoadAndAdaptPretrainedModel:
                 new_alphabet=expanded_alphabet,
             )
 
-    def test_intensity_model_full_workflow(
-        self, intensity_model, base_alphabet, expanded_alphabet
-    ):
-        """Test full workflow with PrositIntensityPredictor."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            model_path = Path(tmpdir) / "intensity_model.keras"
-            intensity_model.save(model_path)
 
-            adapted_model = load_and_adapt_pretrained_model(
-                model_path=str(model_path),
-                new_alphabet=expanded_alphabet,
-                initialization_strategy="mean",
-            )
-
-            # Verify model still works
-            dummy_input = {
-                "sequence": tf.zeros((2, 10), dtype=tf.int32),
-                "collision_energy": tf.ones((2, 1)),
-                "precursor_charge": tf.ones((2, 1)),
-            }
-            output = adapted_model(dummy_input)
-            assert output is not None
-
-    def test_intensity_model_best_fit_initialization_workflow(
-        self, intensity_model, base_alphabet, expanded_alphabet, hf_dataset_with_mods
-    ):
-        """Test full workflow with PrositIntensityPredictor."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            model_path = Path(tmpdir) / "intensity_model.keras"
-            intensity_model.save(model_path)
-
-            adapted_model, fit_info = load_and_adapt_pretrained_model(
-                model_path=str(model_path),
-                new_alphabet=expanded_alphabet,
-                old_alphabet=base_alphabet,
-                initialization_strategy="best-fit",
-                best_fit_kwargs={
-                    "new_hf_data": hf_dataset_with_mods,  # Use the dataset fixture with modified sequences
-                    "sequence_column": "sequence",
-                    "label_column": "label",
-                    "n_examples_for_eval": 1,
-                    "eval_metric": masked_spectral_distance,
-                    "return_fit_info": True,
-                    "dataset_kwargs": {
-                        "encoding_scheme": "naive-mods",
-                        "max_seq_len": 10,
-                        "with_termini": False,
-                        "model_features": ["collision_energy", "precursor_charge"],
-                    },
+def test_best_fit_copies_the_chosen_rows_and_never_picks_padding_or_unknown():
+    """Best-fit runs on its defaults (n_examples_for_eval, eval_metric), copies the
+    chosen pretrained row into each new token, and never picks the padding or
+    unknown token."""
+    rng = np.random.default_rng(0)
+    data = Dataset.from_dict(
+        {
+            "sequence": ["AM[UNIMOD:1]CDEF", "ES[UNIMOD:2]CDEF", "CT[UNIMOD:3]CDEF"],
+            "collision_energy": [0.25, 0.3, 0.35],
+            "precursor_charge": [1.0, 2.0, 3.0],
+            "label": rng.random((3, 54)).tolist(),  # (10 - 1) positions x 2 x 3
+        }
+    )
+    old_alphabet = {"-": 0, "X": 1, "A": 2, "C": 3, "D": 4, "E": 5, "F": 6}
+    new_alphabet = {
+        **old_alphabet,
+        "M[UNIMOD:1]": 7,
+        "S[UNIMOD:2]": 8,
+        "T[UNIMOD:3]": 9,
+    }
+    model = PrositIntensityPredictor(
+        embedding_output_dim=8,
+        seq_length=10,
+        alphabet=old_alphabet,
+        use_meta_data=True,
+        meta_data_keys=["collision_energy", "precursor_charge"],
+    )
+    model(DUMMY_INPUT)
+    with tempfile.TemporaryDirectory() as tmpdir:
+        model_path = Path(tmpdir) / "intensity_model.keras"
+        model.save(model_path)
+        adapted, fit_info = load_and_adapt_pretrained_model(
+            model_path=str(model_path),
+            new_alphabet=new_alphabet,
+            initialization_strategy="best-fit",
+            best_fit_kwargs={
+                "new_hf_data": data,
+                "sequence_column": "sequence",
+                "label_column": "label",
+                "return_fit_info": True,
+                "dataset_kwargs": {
+                    "encoding_scheme": "naive-mods",
+                    "max_seq_len": 10,
+                    "with_termini": False,
+                    "num_proc": None,
+                    "model_features": ["collision_energy", "precursor_charge"],
                 },
-            )
-
-            # Verify model still works
-            dummy_input = {
-                "sequence": tf.zeros((2, 10), dtype=tf.int32),
-                "collision_energy": tf.ones((2, 1)),
-                "precursor_charge": tf.ones((2, 1)),
-            }
-            output = adapted_model(dummy_input)
-            assert output is not None
-
-            logger.info(fit_info)
-
-            assert fit_info is not None
-
-            old_weights = intensity_model.get_layer("embedding").get_weights()[0]
-            new_weights = adapted_model.get_layer("embedding").get_weights()[0]
-
-            for new_token, fit_info in fit_info.items():
-                new_idx = expanded_alphabet[new_token]
-                assert np.allclose(
-                    old_weights[fit_info["old_token_idx"]], new_weights[new_idx]
-                ), f"Best-fit initialization failed for token '{new_token}'"
-
-
-class TestIntegrationWithRealAlphabet:
-    """Integration tests using real ALPHABET_UNMOD."""
-
-    def test_expand_with_real_alphabet(self):
-        """Test expansion with actual ALPHABET_UNMOD."""
-        # Create model with real alphabet
-        model = PrositRetentionTimePredictor(
-            embedding_output_dim=16,
-            seq_length=30,
-            alphabet=ALPHABET_UNMOD,
-        )
-        _ = model(tf.zeros((2, 30), dtype=tf.int32))
-
-        # Create expanded alphabet with PTMs
-        expanded_alphabet = dict(ALPHABET_UNMOD)
-        next_idx = len(expanded_alphabet)
-        expanded_alphabet.update(
-            {
-                "M[UNIMOD:1]": next_idx,
-                "S[UNIMOD:2]": next_idx + 1,
-                "C[UNIMOD:3]": next_idx + 2,
-            }
+            },
         )
 
-        # Expand vocabulary
-        adapted_model = expand_embedding_vocabulary(
-            model=model,
-            new_alphabet=expanded_alphabet,
-            old_alphabet=ALPHABET_UNMOD,
-            initialization_strategy="mean",
-            embedding_layer_name="embedding",
+    old_weights = model.embedding.get_weights()[0]
+    new_weights = adapted.embedding.get_weights()[0]
+    assert set(fit_info) == {"M[UNIMOD:1]", "S[UNIMOD:2]", "T[UNIMOD:3]"}
+    for token, info in fit_info.items():
+        assert info, "every new token has examples, so each must get a fit"
+        assert info["old_token"] not in ("-", "X")
+        np.testing.assert_array_equal(
+            new_weights[new_alphabet[token]], old_weights[info["old_token_idx"]]
         )
-
-        assert adapted_model.embedding.input_dim == len(expanded_alphabet)
-
-    def test_real_model_save_load_adapt(self):
-        """Test complete workflow with real alphabet and model saving."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            # Create and save model
-            model = PrositIntensityPredictor(
-                embedding_output_dim=16,
-                seq_length=30,
-                alphabet=ALPHABET_UNMOD,
-            )
-            dummy_input = {
-                "sequence": tf.zeros((2, 30), dtype=tf.int32),
-                "collision_energy": tf.ones((2, 1)),
-                "precursor_charge": tf.ones((2, 1)),
-            }
-            _ = model(dummy_input)
-
-            model_path = Path(tmpdir) / "real_model.keras"
-            model.save(model_path)
-
-            # Create expanded alphabet
-            expanded_alphabet = dict(ALPHABET_UNMOD)
-            next_idx = len(expanded_alphabet)
-            expanded_alphabet["M[UNIMOD:1]"] = next_idx
-            expanded_alphabet["S[UNIMOD:2]"] = next_idx + 1
-
-            # Load and adapt
-            adapted_model = load_and_adapt_pretrained_model(
-                model_path=str(model_path),
-                new_alphabet=expanded_alphabet,
-                initialization_strategy="random",
-                random_seed=42,
-            )
-
-            # Verify functionality
-            output = adapted_model(dummy_input)
-            assert output is not None
-            assert adapted_model.alphabet == expanded_alphabet

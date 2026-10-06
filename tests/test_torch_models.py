@@ -83,3 +83,10 @@ def test_attention_length_taken_from_first_input_torch(model_cls):
 def test_intensity_model_torch():
     model = PrositIntensityPredictorTorch()
     basic_model_existence_test_torch(model)
+
+
+def test_prosit_intensity_torch_warns_when_metadata_keys_are_ignored():
+    # without use_meta_data=True the model has no metadata encoder and silently
+    # ignored these inputs
+    with pytest.warns(UserWarning, match="use_meta_data=False"):
+        PrositIntensityPredictorTorch(meta_data_keys=["collision_energy"])

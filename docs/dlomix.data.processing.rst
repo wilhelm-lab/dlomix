@@ -12,8 +12,8 @@ Submodules
 
 .. automodule:: dlomix.data.processing.chain
    :members:
-   :undoc-members:
    :show-inheritance:
+   :undoc-members:
 
 
 .. automodule:: dlomix.data.processing.feature_extractors
@@ -30,8 +30,8 @@ Submodules
 
 .. automodule:: dlomix.data.processing.pipeline
    :members:
-   :undoc-members:
    :show-inheritance:
+   :undoc-members:
 
 
 .. automodule:: dlomix.data.processing.processors
