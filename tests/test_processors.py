@@ -358,36 +358,28 @@ def test_sequence_encoding_processor_single_vs_batched_consistency(basic_alphabe
 # ============================================================================
 
 
-def test_sequence_ptm_removal_processor_basic():
-    """Test basic PTM removal from sequence."""
+@pytest.mark.parametrize(
+    "sequence, expected",
+    [
+        (["[]-", "C[UNIMOD:4]", "V", "D", "-[]"], ["[]-", "C", "V", "D", "-[]"]),
+        (
+            ["[UNIMOD:737]-", "C[UNIMOD:4]", "K[UNIMOD:737]", "S", "-[]"],
+            ["[UNIMOD:737]-", "C", "K", "S", "-[]"],
+        ),
+        (["[]-", "D", "E", "L", "-[]"], ["[]-", "D", "E", "L", "-[]"]),
+        # terminal modifications are kept
+        (
+            ["[UNIMOD:737]-", "C[UNIMOD:4]", "-[UNIMOD:1]"],
+            ["[UNIMOD:737]-", "C", "-[UNIMOD:1]"],
+        ),
+        # without termini (with_termini=False) the first and last tokens are
+        # residues, and lose their mods like every other residue
+        (["M[UNIMOD:35]", "C[UNIMOD:4]", "D", "K[UNIMOD:737]"], ["M", "C", "D", "K"]),
+    ],
+)
+def test_sequence_ptm_removal_processor(sequence, expected):
     p = SequencePTMRemovalProcessor(sequence_column_name=SEQ_COLUMN)
-
-    input_data = {SEQ_COLUMN: ["[]-", "C[UNIMOD:4]", "V", "D", "-[]"]}
-    result = p(input_data)
-
-    assert result[SEQ_COLUMN] == ["[]-", "C", "V", "D", "-[]"]
-
-
-def test_sequence_ptm_removal_processor_multiple_ptms():
-    """Test removal of multiple PTMs from same sequence."""
-    p = SequencePTMRemovalProcessor(sequence_column_name=SEQ_COLUMN)
-
-    input_data = {
-        SEQ_COLUMN: ["[UNIMOD:737]-", "C[UNIMOD:4]", "K[UNIMOD:737]", "S", "-[]"]
-    }
-    result = p(input_data)
-
-    assert result[SEQ_COLUMN] == ["[UNIMOD:737]-", "C", "K", "S", "-[]"]
-
-
-def test_sequence_ptm_removal_processor_no_ptms():
-    """Test sequence without PTMs is unchanged."""
-    p = SequencePTMRemovalProcessor(sequence_column_name=SEQ_COLUMN)
-
-    input_data = {SEQ_COLUMN: ["[]-", "D", "E", "L", "-[]"]}
-    result = p(input_data)
-
-    assert result[SEQ_COLUMN] == ["[]-", "D", "E", "L", "-[]"]
+    assert p({SEQ_COLUMN: sequence})[SEQ_COLUMN] == expected
 
 
 def test_sequence_ptm_removal_processor_batched():
@@ -404,29 +396,6 @@ def test_sequence_ptm_removal_processor_batched():
 
     assert result[SEQ_COLUMN][0] == ["[]-", "C", "V", "-[]"]
     assert result[SEQ_COLUMN][1] == ["[]-", "K", "D", "-[]"]
-
-
-def test_sequence_ptm_removal_processor_preserves_terminals():
-    """Test that terminal modifications are preserved."""
-    p = SequencePTMRemovalProcessor(sequence_column_name=SEQ_COLUMN)
-
-    input_data = {SEQ_COLUMN: ["[UNIMOD:737]-", "C[UNIMOD:4]", "-[UNIMOD:1]"]}
-    result = p(input_data)
-
-    # Terminals should be unchanged
-    assert result[SEQ_COLUMN][0] == "[UNIMOD:737]-"
-    assert result[SEQ_COLUMN][-1] == "-[UNIMOD:1]"
-
-
-def test_sequence_ptm_removal_processor_without_termini():
-    """Without termini (with_termini=False) the first and last tokens are residues,
-    and lose their mods like every other residue."""
-    p = SequencePTMRemovalProcessor(sequence_column_name=SEQ_COLUMN)
-
-    input_data = {SEQ_COLUMN: ["M[UNIMOD:35]", "C[UNIMOD:4]", "D", "K[UNIMOD:737]"]}
-    result = p(input_data)
-
-    assert result[SEQ_COLUMN] == ["M", "C", "D", "K"]
 
 
 def test_sequence_ptm_removal_processor_non_list_input_raises_error():

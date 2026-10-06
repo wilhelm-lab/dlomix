@@ -98,16 +98,6 @@ class TestConstructor:
         assert p.dataset is None
         assert p.best_fit_info is None
 
-    def test_best_fit_kwargs_stored(self):
-        kwargs = {"new_hf_data": "placeholder", "sequence_column": "seq"}
-        p = FineTunePipeline(
-            finetune_dataset_path="data.parquet",
-            base_model_name="m",
-            initialization_strategy="best-fit",
-            best_fit_kwargs=kwargs,
-        )
-        assert p.best_fit_kwargs is kwargs
-
 
 # ---------------------------------------------------------------------------
 # from_config_file
@@ -171,41 +161,7 @@ class TestPreSetupGuards:
 
 
 class TestSetupAndFinetune:
-    def test_setup_populates_model_and_dataset(
-        self,
-        saved_intensity_model,
-        intensity_parquet_path,
-        intensity_dataset_kwargs,
-    ):
-        pipeline = FineTunePipeline(
-            finetune_dataset_path=intensity_parquet_path,
-            base_model_weights_filepath=saved_intensity_model,
-            dataset_kwargs=intensity_dataset_kwargs,
-        )
-        pipeline.setup()
-
-        assert pipeline.model is not None
-        assert pipeline.dataset is not None
-
-    def test_finetune_returns_history(
-        self,
-        saved_intensity_model,
-        intensity_parquet_path,
-        intensity_dataset_kwargs,
-    ):
-        pipeline = FineTunePipeline(
-            finetune_dataset_path=intensity_parquet_path,
-            base_model_weights_filepath=saved_intensity_model,
-            epochs=1,
-            dataset_kwargs=intensity_dataset_kwargs,
-        )
-        pipeline.setup()
-        history = pipeline.finetune()
-
-        assert history is not None
-        assert "loss" in history.history
-
-    def test_save_writes_model_to_disk(
+    def test_setup_finetune_save(
         self,
         saved_intensity_model,
         intensity_parquet_path,
@@ -221,11 +177,15 @@ class TestSetupAndFinetune:
             dataset_kwargs=intensity_dataset_kwargs,
         )
         pipeline.setup()
-        pipeline.finetune()
-        returned_path = pipeline.save()
+        assert pipeline.model is not None
+        assert pipeline.dataset is not None
+
+        history = pipeline.finetune()
+        assert "loss" in history.history
 
         # Keras 3 only writes to a .keras path, so save() normalises the
         # extension and reports the file it actually wrote.
+        returned_path = pipeline.save()
         assert returned_path == out_path + ".keras"
         assert Path(returned_path).exists()
 

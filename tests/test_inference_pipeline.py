@@ -70,7 +70,7 @@ RAW_SEQUENCES = [
 ]
 
 
-@pytest.fixture
+@pytest.fixture(scope="module")  # read-only in every test
 def rt_dataset():
     seqs = RAW_SEQUENCES * 4
     data = {
@@ -91,7 +91,7 @@ def rt_dataset():
         )
 
 
-@pytest.fixture
+@pytest.fixture(scope="module")  # read-only in every test
 def rt_model(rt_dataset):
     model = PrositRetentionTimePredictor(
         seq_length=22, alphabet=rt_dataset.extended_alphabet

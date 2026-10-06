@@ -26,7 +26,7 @@ RAW_SEQUENCES = [
 ]
 
 
-@pytest.fixture
+@pytest.fixture(scope="module")  # read-only in every test
 def rt_dataset():
     seqs = RAW_SEQUENCES * 4
     data = {

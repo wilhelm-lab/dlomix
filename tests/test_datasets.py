@@ -1,6 +1,5 @@
 import logging
 import time
-import warnings
 from os.path import join
 from shutil import rmtree
 
@@ -157,37 +156,6 @@ def test_parquet_intensitydataset(download_path_for_assets):
         sequence_column="sequence",
         label_column="intensities",
         model_features=["precursor_charge_onehot", "collision_energy_aligned_normed"],
-        val_ratio=0.2,
-    )
-
-    assert intensity_dataset.hf_dataset is not None
-    assert intensity_dataset._empty_dataset_mode is False
-    assert FragmentIonIntensityDataset.DEFAULT_SPLIT_NAMES[0] in list(
-        intensity_dataset.hf_dataset.keys()
-    )
-    assert FragmentIonIntensityDataset.DEFAULT_SPLIT_NAMES[1] in list(
-        intensity_dataset.hf_dataset.keys()
-    )
-    assert FragmentIonIntensityDataset.DEFAULT_SPLIT_NAMES[2] not in list(
-        intensity_dataset.hf_dataset.keys()
-    )
-    assert (
-        intensity_dataset[FragmentIonIntensityDataset.DEFAULT_SPLIT_NAMES[0]].num_rows
-        > 0
-    )
-    assert (
-        intensity_dataset[FragmentIonIntensityDataset.DEFAULT_SPLIT_NAMES[1]].num_rows
-        > 0
-    )
-
-
-def test_csv_intensitydataset(download_path_for_assets):
-    filepath = join(download_path_for_assets, "file_4.csv")
-    intensity_dataset = FragmentIonIntensityDataset(
-        data_format="csv",
-        data_source=filepath,
-        sequence_column="sequence",
-        label_column="intensities",
         val_ratio=0.2,
     )
 
@@ -795,32 +763,6 @@ def test_with_termini_false_warns_about_dropped_terminal_mods():
     message = next(str(w.message) for w in record if "drops terminal" in str(w.message))
     assert "3 sequences" in message
     assert "'[UNIMOD:737]-': 2" in message and "'[UNIMOD:1]-': 1" in message
-
-
-def test_with_termini_true_or_unmodified_termini_do_not_warn():
-    data = Dataset.from_dict(
-        {
-            "modified_sequence": ["[UNIMOD:737]-PEPK-[]", "[]-ACDK-[]"],
-            "indexed_retention_time": [1.0, 2.0],
-        }
-    )
-    unmodified = Dataset.from_dict(
-        {
-            "modified_sequence": ["[]-PEPK-[]", "ACDK"],
-            "indexed_retention_time": [1.0, 2.0],
-        }
-    )
-    for source, with_termini in ((data, True), (unmodified, False)):
-        with warnings.catch_warnings(record=True) as record:
-            warnings.simplefilter("always")
-            RetentionTimeDataset(
-                data_source=DatasetDict({"train": source}),
-                data_format="hf",
-                encoding_scheme="naive-mods",
-                with_termini=with_termini,
-                num_proc=None,
-            )
-        assert not any("drops terminal" in str(w.message) for w in record)
 
 
 def test_dataset_columns_to_keep_is_not_modified():

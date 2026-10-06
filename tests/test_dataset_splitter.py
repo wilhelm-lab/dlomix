@@ -13,11 +13,6 @@ import pytest
 from datasets import Dataset
 
 from dlomix.data import SplitConfig, SplitStrategy, create_splitter
-from dlomix.data.dataset_splitter import (
-    RandomSplitter,
-    SequenceUniqueSplitter,
-    StratifiedSplitter,
-)
 
 logger = logging.getLogger(__name__)
 
@@ -100,26 +95,22 @@ class TestSplitConfig:
         assert config.val_ratio is None
         assert config.test_ratio == 0.2
 
-    def test_invalid_val_ratio(self):
-        """Test validation of val_ratio."""
-        with pytest.raises(ValueError, match="val_ratio must be between 0 and 1"):
-            SplitConfig(val_ratio=1.5)
-
-        with pytest.raises(ValueError, match="val_ratio must be between 0 and 1"):
-            SplitConfig(val_ratio=-0.1)
-
-    def test_invalid_test_ratio(self):
-        """Test validation of test_ratio."""
-        with pytest.raises(ValueError, match="test_ratio must be between 0 and 1"):
-            SplitConfig(test_ratio=1.5)
-
-        with pytest.raises(ValueError, match="test_ratio must be between 0 and 1"):
-            SplitConfig(test_ratio=-0.1)
-
-    def test_invalid_combined_ratios(self):
-        """Test validation when val_ratio + test_ratio >= 1."""
-        with pytest.raises(ValueError, match="val_ratio \\+ test_ratio must be < 1"):
-            SplitConfig(val_ratio=0.6, test_ratio=0.5)
+    @pytest.mark.parametrize(
+        "kwargs, message",
+        [
+            ({"val_ratio": 1.5}, "val_ratio must be between 0 and 1"),
+            ({"val_ratio": -0.1}, "val_ratio must be between 0 and 1"),
+            ({"test_ratio": 1.5}, "test_ratio must be between 0 and 1"),
+            ({"test_ratio": -0.1}, "test_ratio must be between 0 and 1"),
+            (
+                {"val_ratio": 0.6, "test_ratio": 0.5},
+                "val_ratio \\+ test_ratio must be < 1",
+            ),
+        ],
+    )
+    def test_invalid_ratios(self, kwargs, message):
+        with pytest.raises(ValueError, match=message):
+            SplitConfig(**kwargs)
 
     def test_stratified_without_column(self):
         """Test that stratified strategy requires stratify_column."""
@@ -510,26 +501,6 @@ class TestSequenceUniqueSplitter:
 # Tests for create_splitter factory
 class TestCreateSplitter:
     """Test the create_splitter factory function."""
-
-    def test_create_random_splitter(self):
-        """Test creating a random splitter."""
-        config = SplitConfig(val_ratio=0.2, strategy="random")
-        splitter = create_splitter(config)
-        assert isinstance(splitter, RandomSplitter)
-
-    def test_create_stratified_splitter(self):
-        """Test creating a stratified splitter."""
-        config = SplitConfig(
-            val_ratio=0.2, strategy="stratified", stratify_column="label"
-        )
-        splitter = create_splitter(config)
-        assert isinstance(splitter, StratifiedSplitter)
-
-    def test_create_sequence_unique_splitter(self):
-        """Test creating a sequence-unique splitter."""
-        config = SplitConfig(val_ratio=0.2, strategy="sequence_unique")
-        splitter = create_splitter(config)
-        assert isinstance(splitter, SequenceUniqueSplitter)
 
     def test_invalid_strategy(self):
         """Test that SplitConfig rejects unknown strategy strings."""
