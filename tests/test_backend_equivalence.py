@@ -184,11 +184,13 @@ def test_deeplc_tf_torch_same_function_with_one_hot_sequence():
 
 
 def test_deeplc_torch_trains():
+    torch.manual_seed(0)
     inputs = {k: _to_torch(v) for k, v in _deeplc_inputs(True).items()}
     model = DeepLCRetentionTimePredictorTorch(use_global_features=True)
-    model(inputs)
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-4)
-    target = torch.ones(4, 1)
+    # one unit away from the initial prediction: a fixed target can lie close to a
+    # random initialization, leaving nothing to learn (the loss then went up in CI)
+    target = model(inputs).detach() + 1.0
 
     losses = []
     for _ in range(20):

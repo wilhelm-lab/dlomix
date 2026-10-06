@@ -1,4 +1,6 @@
+import glob
 import logging
+import os
 import re
 import warnings
 from typing import Optional, Union
@@ -153,6 +155,9 @@ class PeptideDataset:
             self._extracted_features_columns = []
 
             if not self._empty_dataset_mode:
+                # cache files that exist before processing belong to the caller (e.g.
+                # a filtered Hub dataset passed in) and must survive the cleanup
+                self._cache_files_before = self._cache_files()
                 self._remove_unnecessary_columns()
                 self._split_dataset()
                 self._run_processing_pipeline()
@@ -391,10 +396,44 @@ class PeptideDataset:
                 batch_size=self.batch_processing_size,
             )
 
+    def _cache_files(self):
+        """All ``cache-*.arrow`` files in the cache directories of ``hf_dataset``."""
+        splits = (
+            self.hf_dataset.values()
+            if isinstance(self.hf_dataset, DatasetDict)
+            else [self.hf_dataset]
+        )
+        folders = {
+            os.path.dirname(f["filename"])
+            for split in splits
+            for f in split.cache_files
+        }
+        return {
+            path
+            for folder in folders
+            for path in glob.glob(os.path.join(folder, "cache-*.arrow"))
+        }
+
     def _cleanup_temp_dataset_cache_files(self):
-        if self.auto_cleanup_cache:
-            cleaned_up = self.hf_dataset.cleanup_cache_files()
-            logger.info("Cleaned up cache files: %s.", cleaned_up)
+        """Delete the intermediate cache files this dataset's processing created.
+
+        Not ``Dataset.cleanup_cache_files()``: it deletes every cache file in the
+        folder that the final dataset does not use, including those of the caller's
+        own datasets (e.g. a filtered Hub dataset passed as ``data_source``). Their
+        memory-mapped data then disappears; a later multi-process ``map`` on them
+        fails because the worker processes reopen the files by path.
+        """
+        if not self.auto_cleanup_cache:
+            return
+        used = {
+            f["filename"]
+            for split in self.hf_dataset.values()
+            for f in split.cache_files
+        }
+        created = self._cache_files() - self._cache_files_before - used
+        for path in created:
+            os.remove(path)
+        logger.info("Cleaned up %d intermediate cache files.", len(created))
 
     def save_to_disk(self, path: str, overwrite: bool = False) -> bool:
         """Save the dataset (config, runtime state, and HF data) to ``path``."""

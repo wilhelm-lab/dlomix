@@ -56,6 +56,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `SequenceUniqueSplitter` grouped `PEPTIDE` and `[]-PEPTIDE-[]` as different
   peptides, so the same peptide could land in several splits when sequence formats
   were mixed. Terminal separators are now stripped before grouping.
+- **Building a dataset deleted the cache files of the caller's own datasets.** With
+  the default `auto_cleanup_cache=True`, dlomix called `Dataset.cleanup_cache_files()`,
+  which removes every cache file in the folder that the new dataset does not use,
+  including those of a filtered or mapped Hub dataset passed as `data_source`. A
+  second multi-process build from that source then failed with "One of the
+  subprocesses has abruptly died during map operation", because the worker
+  processes reopen the deleted files. Only the intermediate files of dlomix's own
+  processing are deleted now.
 - Datasets appended their parsed columns to the caller's `dataset_columns_to_keep`
   list, so reusing that list (e.g. to select columns afterwards, or for a second
   dataset) duplicated columns. Listing a column there that is already kept (the

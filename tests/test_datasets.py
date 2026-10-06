@@ -682,14 +682,24 @@ def test_rtdataset_split_config_conflict(download_path_for_assets):
         )
 
 
-def test_learned_alphabet_survives_cached_encoding(download_path_for_assets):
+def _private_cache_source(download_path_for_assets, tmp_path):
+    """file_3.parquet as a dataset whose cache files live in a private folder, so the
+    cache tests neither hit files left by other tests nor collide with other runs."""
+    return load_dataset(
+        "parquet",
+        data_files=join(download_path_for_assets, "file_3.parquet"),
+        cache_dir=str(tmp_path / "hf_cache"),
+    )["train"]
+
+
+def test_learned_alphabet_survives_cached_encoding(download_path_for_assets, tmp_path):
     # The alphabet is learned as a side effect of the encoding map. When that map's
     # result was cached by an earlier build (auto_cleanup_cache=False, or a crashed
     # run), reusing the cache skipped the learning: the train split kept the first
     # build's encoding while the alphabet was learned from val alone.
     kwargs = dict(
-        data_format="parquet",
-        data_source=join(download_path_for_assets, "file_3.parquet"),
+        data_source=_private_cache_source(download_path_for_assets, tmp_path),
+        data_format="hf",
         sequence_column="sequence",
         label_column="intensities",
         model_features=["precursor_charge_onehot", "collision_energy_aligned_normed"],
@@ -700,14 +710,10 @@ def test_learned_alphabet_survives_cached_encoding(download_path_for_assets):
     )
     first = FragmentIonIntensityDataset(**kwargs)
     second = FragmentIonIntensityDataset(**kwargs)
-    try:
-        assert second.extended_alphabet == first.extended_alphabet
-        assert (
-            second.hf_dataset["train"]["sequence"]
-            == first.hf_dataset["train"]["sequence"]
-        )
-    finally:
-        second.hf_dataset.cleanup_cache_files()
+    assert second.extended_alphabet == first.extended_alphabet
+    assert (
+        second.hf_dataset["train"]["sequence"] == first.hf_dataset["train"]["sequence"]
+    )
 
 
 def test_tokens_missing_from_an_explicit_alphabet_are_reported():
@@ -833,3 +839,45 @@ def test_dataset_columns_to_keep_is_not_modified():
         num_proc=None,
     )
     assert keep == ["indexed_retention_time"]
+
+
+def test_cache_cleanup_keeps_the_callers_cache_files(
+    download_path_for_assets, tmp_path
+):
+    # auto_cleanup_cache used Dataset.cleanup_cache_files(), which also deleted the
+    # cache files of the caller's own (filtered) source dataset: a second
+    # multi-process build from that source then crashed ("One of the subprocesses
+    # has abruptly died"), because its workers reopen the deleted files by path
+    import os
+
+    source = _private_cache_source(download_path_for_assets, tmp_path)
+    source = source.filter(lambda b: [True] * len(b["sequence"]), batched=True)
+    source_files = [f["filename"] for f in source.cache_files]
+    kwargs = dict(
+        data_source=source,
+        data_format="hf",
+        sequence_column="sequence",
+        label_column="intensities",
+        model_features=["precursor_charge_onehot", "collision_energy_aligned_normed"],
+        val_ratio=0.2,
+        split_seed=1,
+        num_proc=2,
+    )
+    first = FragmentIonIntensityDataset(**kwargs)
+    assert all(os.path.exists(f) for f in source_files)
+    second = FragmentIonIntensityDataset(**kwargs)  # crashed before the fix
+    assert second.extended_alphabet == first.extended_alphabet
+    # only the files of the source and of the two final datasets remain: the
+    # intermediate files of the processing are still cleaned up
+    kept = {f for f in source_files}
+    for dataset in (first, second):
+        kept |= {
+            f["filename"] for s in dataset.hf_dataset.values() for f in s.cache_files
+        }
+    folder = os.path.dirname(source_files[0])
+    cache_files = {
+        os.path.join(folder, f)
+        for f in os.listdir(folder)
+        if f.startswith("cache-") and f.endswith(".arrow")
+    }
+    assert cache_files <= kept
