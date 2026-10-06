@@ -56,6 +56,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `SequenceUniqueSplitter` grouped `PEPTIDE` and `[]-PEPTIDE-[]` as different
   peptides, so the same peptide could land in several splits when sequence formats
   were mixed. Terminal separators are now stripped before grouping.
+- Datasets appended their parsed columns to the caller's `dataset_columns_to_keep`
+  list, so reusing that list (e.g. to select columns afterwards, or for a second
+  dataset) duplicated columns. Listing a column there that is already kept (the
+  label or a model feature) failed with "Field ... exists 2 times in schema".
 - The `unmod` encoding scheme kept the mods of the first and last residues when
   `with_termini=False`, which then became separate tokens.
 - **An N-terminal modification written without its hyphen was split into

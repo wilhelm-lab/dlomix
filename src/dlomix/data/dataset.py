@@ -112,7 +112,9 @@ class PeptideDataset:
         if dataset_config.dataset_columns_to_keep is None:
             self.dataset_columns_to_keep = []
         else:
-            self.dataset_columns_to_keep = dataset_config.dataset_columns_to_keep
+            # a copy: the parsed columns are appended to it later, which must not
+            # change the caller's list
+            self.dataset_columns_to_keep = list(dataset_config.dataset_columns_to_keep)
 
         self.encoding_scheme = EncodingScheme(dataset_config.encoding_scheme)
 
@@ -188,6 +190,10 @@ class PeptideDataset:
         if self.dataset_columns_to_keep is not None:
             # additional columns to keep in the hugging face dataset only and not return as tensors
             self._relevant_columns.extend(self.dataset_columns_to_keep)
+
+        # a column named twice (e.g. a model feature also listed to keep) would make
+        # the column selection fail
+        self._relevant_columns = list(dict.fromkeys(self._relevant_columns))
 
         # Preserve stratify_by_column through splitting; track if it needs removal afterward
         self._temp_stratify_column: Optional[str] = None

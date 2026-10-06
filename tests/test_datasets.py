@@ -815,3 +815,21 @@ def test_with_termini_true_or_unmodified_termini_do_not_warn():
                 num_proc=None,
             )
         assert not any("drops terminal" in str(w.message) for w in record)
+
+
+def test_dataset_columns_to_keep_is_not_modified():
+    # the label is kept anyway; naming it again must not duplicate the column
+    keep = ["indexed_retention_time"]
+    data = Dataset.from_dict(
+        {
+            "modified_sequence": ["[]-PEPK-[]", "[]-ACDK-[]"],
+            "indexed_retention_time": [1.0, 2.0],
+        }
+    )
+    RetentionTimeDataset(
+        data_source=DatasetDict({"train": data}),
+        data_format="hf",
+        dataset_columns_to_keep=keep,
+        num_proc=None,
+    )
+    assert keep == ["indexed_retention_time"]
