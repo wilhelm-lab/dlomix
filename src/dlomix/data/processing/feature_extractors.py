@@ -134,7 +134,7 @@ FEATURE_EXTRACTORS_PARAMETERS = {
         "feature_default_value": [0] * 6,
         "feature_value_offset": 1,
         "lookup_table": PTM_LOSS_LOOKUP,
-        "description": "Loss of atoms due to PTM.",
+        "description": "Atoms lost due to PTM, as counts of [H, C, N, O, P, S].",
     },
     "delta_mass": {
         # Default value is 0 for the whole sequence
@@ -147,14 +147,14 @@ FEATURE_EXTRACTORS_PARAMETERS = {
         "feature_default_value": [0] * 6,
         "feature_value_offset": 1,
         "lookup_table": PTM_GAIN_LOOKUP,
-        "description": "Gain of atoms due to PTM.",
+        "description": "Atoms gained due to PTM, as counts of [H, C, N, O, P, S].",
     },
     "atom_count": {
         # True default is 0; see the mod_loss comment above.
         "feature_default_value": [0] * 6,
         "feature_value_offset": 1,
         "lookup_table": PTM_ATOM_COUNT_LOOKUP,
-        "description": "Atom count of PTM.",
+        "description": "Change in atom counts due to PTM, as [H, C, N, O, P, S].",
     },
     "red_smiles": {
         # Default value is 0 for the whole PTM smiles representation (currently 60)
