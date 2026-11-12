@@ -80,6 +80,54 @@ class PeptideDatasetBaseProcessor(abc.ABC):
         pass
 
 
+def parse_proforma_sequence(sequence_string):
+    """Split a ProForma sequence into its N-terminal token, its residue tokens
+    (each with its modifications) and its C-terminal token.
+
+    >>> parse_proforma_sequence("[UNIMOD:1]-AC[UNIMOD:4]K")
+    ('[UNIMOD:1]-', ['A', 'C[UNIMOD:4]', 'K'], '-[]')
+    """
+    # A modification at the very start without its hyphen ("[UNIMOD:737]PEPTIDE")
+    # would be split into characters, several of them valid residues
+    # (U N I M O D ...), and encode a different peptide. Refuse it rather than
+    # guess: the data should be fixed at its source.
+    if re.match(r"^\[[^\]]*\][A-Za-z]", sequence_string):
+        raise ValueError(
+            f"Invalid sequence format: {sequence_string}. An N-terminal "
+            "modification needs a hyphen before the first residue, e.g. "
+            "'[UNIMOD:737]-PEPTIDE' (ProForma)."
+        )
+    splitted = sequence_string.split("-")
+    seq = ""
+
+    if len(splitted) == 1:
+        n_term, seq, c_term = "[]-", splitted[0], "-[]"
+    elif len(splitted) == 2:
+        if splitted[0].startswith("[UNIMOD:"):
+            n_term, seq, c_term = splitted[0] + "-", splitted[1], "-[]"
+        elif splitted[0].startswith("["):
+            # e.g. "[]-PEPTIDE": would otherwise be read as an empty peptide
+            # with the C-terminal token "-PEPTIDE"
+            raise ValueError(
+                f"Invalid sequence format: {sequence_string}. Expected "
+                "'[N-term]-SEQUENCE-[C-term]' (e.g. '[]-PEPTIDE-[]') or a bare "
+                "'PEPTIDE'."
+            )
+        else:
+            n_term, seq, c_term = "[]-", splitted[0], "-" + splitted[1]
+    elif len(splitted) == 3:
+        n_term, seq, c_term = splitted
+        n_term += "-"
+        c_term = "-" + c_term
+    else:
+        raise ValueError(
+            f"Invalid sequence format: {sequence_string}. Expected format: [N-term]-[sequence]-[C-term]."
+        )
+
+    seq = re.findall(r"[A-Za-z](?:\[UNIMOD:\d+\])*|[^\[\]]", seq)
+    return n_term, seq, c_term
+
+
 class SequenceParsingProcessor(PeptideDatasetBaseProcessor):
     """
     Processor for parsing peptide sequences in ProForma format.
@@ -132,45 +180,7 @@ class SequenceParsingProcessor(PeptideDatasetBaseProcessor):
             self._assign_sequence_column = self.__update_sequence_column_without_termini
 
     def _parse_proforma_sequence(self, sequence_string):
-        # A modification at the very start without its hyphen ("[UNIMOD:737]PEPTIDE")
-        # would be split into characters, several of them valid residues
-        # (U N I M O D ...), and encode a different peptide. Refuse it rather than
-        # guess: the data should be fixed at its source.
-        if re.match(r"^\[[^\]]*\][A-Za-z]", sequence_string):
-            raise ValueError(
-                f"Invalid sequence format: {sequence_string}. An N-terminal "
-                "modification needs a hyphen before the first residue, e.g. "
-                "'[UNIMOD:737]-PEPTIDE' (ProForma)."
-            )
-        splitted = sequence_string.split("-")
-        seq = ""
-
-        if len(splitted) == 1:
-            n_term, seq, c_term = "[]-", splitted[0], "-[]"
-        elif len(splitted) == 2:
-            if splitted[0].startswith("[UNIMOD:"):
-                n_term, seq, c_term = splitted[0] + "-", splitted[1], "-[]"
-            elif splitted[0].startswith("["):
-                # e.g. "[]-PEPTIDE": would otherwise be read as an empty peptide
-                # with the C-terminal token "-PEPTIDE"
-                raise ValueError(
-                    f"Invalid sequence format: {sequence_string}. Expected "
-                    "'[N-term]-SEQUENCE-[C-term]' (e.g. '[]-PEPTIDE-[]') or a bare "
-                    "'PEPTIDE'."
-                )
-            else:
-                n_term, seq, c_term = "[]-", splitted[0], "-" + splitted[1]
-        elif len(splitted) == 3:
-            n_term, seq, c_term = splitted
-            n_term += "-"
-            c_term = "-" + c_term
-        else:
-            raise ValueError(
-                f"Invalid sequence format: {sequence_string}. Expected format: [N-term]-[sequence]-[C-term]."
-            )
-
-        seq = re.findall(r"[A-Za-z](?:\[UNIMOD:\d+\])*|[^\[\]]", seq)
-        return n_term, seq, c_term
+        return parse_proforma_sequence(sequence_string)
 
     def __update_sequence_column_with_termini(self, n_terms, seq, c_terms):
         return [n_terms] + seq + [c_terms]

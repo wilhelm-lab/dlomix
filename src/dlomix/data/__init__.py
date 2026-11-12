@@ -8,6 +8,7 @@ from .ion_mobility import IonMobilityDataset
 from .processing.feature_extractors import available_feature_extractors
 from .retention_time import RetentionTimeDataset
 from .serialization import load_processed_dataset
+from .tokens import extend_alphabet, find_new_tokens, sequence_tokens
 
 __all__ = [
     "RetentionTimeDataset",
@@ -22,4 +23,7 @@ __all__ = [
     "create_splitter",
     "PeptidePreprocessor",
     "available_feature_extractors",
+    "sequence_tokens",
+    "find_new_tokens",
+    "extend_alphabet",
 ]

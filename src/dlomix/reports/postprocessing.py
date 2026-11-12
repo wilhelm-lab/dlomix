@@ -2,7 +2,7 @@ import functools
 
 import numpy as np
 
-from ..data.processing.processors import SequenceParsingProcessor
+from ..data.processing.processors import parse_proforma_sequence
 from ..losses import masked_spectral_distance
 
 
@@ -43,9 +43,7 @@ def peptide_length(sequence):
     modifications are not counted as residues.
     """
     if isinstance(sequence, str):
-        _, residues, _ = SequenceParsingProcessor(None)._parse_proforma_sequence(
-            sequence
-        )
+        _, residues, _ = parse_proforma_sequence(sequence)
         return len(residues)
     if len(sequence) > 0 and isinstance(sequence[0], (int, np.integer)):
         raise ValueError(
