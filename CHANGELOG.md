@@ -17,6 +17,95 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (`dropout_rate`, `latent_dropout_rate`); the defaults are above 0. To reproduce
   results obtained with 0.3.1 or earlier, set the dropout rates to 0. Inference
   (`predict`, `evaluate`, saved models) is unchanged.
+- **Training batches are reshuffled every epoch** (TensorFlow datasets,
+  `tensor_train_data`). With a global seed set (`keras.utils.set_random_seed`), every
+  epoch repeated the batch order of the first; now each epoch has a new order, and
+  the sequence of orders is reproducible from the seed. Results of seeded training
+  runs change. Every row is still visited once per epoch, and validation and test
+  data keep the split's row order.
+- **`enable_tf_dataset_cache=True` now means "keep the split in memory"**: the
+  split's tensor columns are loaded into RAM once and batches are gathered from
+  there (in a synthetic benchmark, about 15x the rate of reading from disk), for
+  the train, val and test splits. Before, it called `.cache()` after shuffling and
+  batching, which replayed the first epoch's batches in every later epoch. The
+  splits used must fit in memory; streaming is not supported.
+- **`initialization_strategy="mean"` averages residue embeddings only.** The mean
+  included the rows of the padding token (`-`) and the unknown token (`X`), which
+  carry no residue information. New tokens (and the `"best-fit"` fallback for tokens
+  without examples) therefore start from a slightly different embedding than in
+  0.3.1. Rows and indices of known tokens are unchanged.
+- **Best-fit initialization with several new tokens** scores the candidates for a
+  new token on the spectra in which it is the only new token. Before, it used every
+  spectrum containing the token, with the other new tokens encoded as the unknown
+  token `X`, so candidates were scored on damaged inputs. With fewer than
+  `min_examples_for_eval` such spectra (a new `best_fit_kwargs` option, default 20),
+  all spectra with the token are used and the other new tokens are encoded as their
+  unmodified residue (`R[UNIMOD:7]` as `R`). Picks can change for datasets with
+  several new tokens; with one new token they are the same as in 0.3.1.
+- **Best-fit samples its examples**: of more than `n_examples_for_eval` spectra it
+  takes a random sample seeded with `random_seed`, instead of the first rows of the
+  dataset. Pass `random_seed` for a reproducible pick.
+- **`FineTunePipeline.finetune()` keeps the starting model when fine-tuning does not
+  improve it.** It evaluates the validation loss before training and, when no epoch
+  has a lower one, restores the starting weights (with little data, every epoch can
+  be worse, and `EarlyStopping(restore_best_weights=True)` only returns the best
+  trained epoch). The returned history says which model was kept (`kept_model`:
+  `"starting"` or `"trained"`) and has the `starting_val_loss`. This costs one extra
+  pass over the validation data; `keep_starting_model=False` turns it off.
+
+### Added
+- `FineTunePipeline.finetune(trainable="all" | "embedding" | "new_tokens")`, also a
+  constructor argument and YAML key (default `"all"`, as before). `"embedding"`
+  trains only the token embedding; `"new_tokens"` trains only the embedding rows of
+  the tokens added by the vocabulary expansion, leaving every other weight,
+  including the known tokens' rows, exactly as it was, so predictions for peptides
+  without the new tokens do not change. With `from_dataset_and_model`, name the
+  tokens with `new_tokens=[...]`. In Keras 3, `model.trainable = False` followed by
+  `model.embedding.trainable = True` leaves no trainable weights; the pipeline
+  freezes the other layers individually and restores their flags after training.
+  The same is available for custom training loops as
+  `dlomix.models.model_utils.embedding_only_training(model, rows=None)`.
+- `dlomix.reports.evaluate_intensity(model, dataset, split="test")`: predicts a
+  split, post-processes the predictions as Prosit does and adds the spectral angle.
+  Returns a DataFrame with one row per spectrum, in the order of the split. For
+  Keras models. Example in the intensity walkthrough notebook.
+- `PrositIntensityPredictor.from_dataset(dataset, **kwargs)` (both backends) builds
+  the model with the arguments that must agree with the dataset taken from it:
+  `alphabet`, `seq_length`, `with_termini`, the sequence column in `input_keys`, and
+  `meta_data_keys` / `use_meta_data` from the dataset's `model_features`. Other
+  arguments, such as the layer sizes, are passed as keyword arguments; one that
+  contradicts the dataset raises.
+
+### Changed
+- dlomix builds its TensorFlow datasets itself, from a shuffled row index, instead of
+  calling Hugging Face's `to_tf_dataset`. Tensor names, dtypes and shapes are
+  unchanged; reading batches from disk (the default) is faster than before.
+- `return_fit_info` returns the whole best-fit search per new token: every
+  candidate's score (`scores`), the spectra with the token, left out and searched
+  (`n_with_token`, `n_left_out`, `n_searched`), which examples were used (`examples`)
+  and the `initialization` that applied. A token without examples now has an entry
+  saying it kept the mean initialization (`old_token` is None) instead of an empty
+  dict.
+- `load_processed_dataset` gives the tensors of the active backend (`DLOMIX_BACKEND`),
+  whichever backend the dataset was saved on; before, a dataset saved on TensorFlow
+  kept `dataset_type="tf"` on PyTorch until overridden by hand. Pass `dataset_type=`
+  to choose explicitly.
+- The warning for a preprocessor that does not match the one a pipeline was saved
+  with names the settings that changed (`InferencePipeline.load`). Bundles record
+  these settings from this release on; for older bundles the warning says so.
+- Docs: for the PyTorch backend, `torch_dataloader_kwargs={"num_workers": N}` loads
+  batches in parallel.
+
+### Deprecated
+- `PrositIntensityPredictor(latent_dropout_rate=...)` (both backends): the argument
+  was documented, stored and serialised, but never used by any layer. It is still
+  accepted and saved, so existing models and configs load unchanged; a value other
+  than the default warns, and the argument will be removed in a future release.
+
+### Fixed
+- `PrositIntensityPredictor` docstrings: `regressor_layer_size` is the width of the
+  decoder GRU, not of a dense layer; `recurrent_layers_sizes[1]` is also the width of
+  the latent vector and of the meta data dense layer.
 
 ## [0.3.1] - 2026-10-06
 
