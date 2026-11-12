@@ -98,6 +98,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `load_and_adapt_pretrained_model` after loading, for a model in memory) and
   `from_dataset_and_model`. The existing constructor, `setup()` and
   `load_and_adapt_pretrained_model` are unchanged.
+- The feature lookup tables are documented (#103) in
+  `dlomix.data.processing.feature_dicts`: what each JSON file holds, and the atom
+  order `[H, C, N, O, P, S]` of `atom_count`, `mod_loss` and `mod_gain`, also
+  available as `dlomix.data.processing.feature_tables.PTM_ATOMS` and named in
+  `available_feature_extractors()`.
 
 ### Changed
 - dlomix builds its TensorFlow datasets itself, from a shuffled row index, instead of
@@ -129,6 +134,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `PrositIntensityPredictor` docstrings: `regressor_layer_size` is the width of the
   decoder GRU, not of a dense layer; `recurrent_layers_sizes[1]` is also the width of
   the latent vector and of the meta data dense layer.
+- Building the package no longer warns that
+  `dlomix.data.processing.feature_dicts` "would be ignored": the folder of the
+  feature lookup tables is now a package with its JSON files as package data.
 
 ## [0.3.1] - 2026-10-06
 

@@ -22,6 +22,9 @@ Submodules
    :undoc-members:
 
 
+.. automodule:: dlomix.data.processing.feature_dicts
+
+
 .. automodule:: dlomix.data.processing.feature_tables
    :members:
    :show-inheritance:

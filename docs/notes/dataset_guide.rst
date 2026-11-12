@@ -306,11 +306,15 @@ There are two options to use feature extractors; (1) dlomix built-in feature ext
 
 Available features in the framework as lookup python dicts are:
 
-* ``mod_loss``
-* ``delta_mass``
-* ``mod_gain``
-* ``atom_count``
-* ``red_smiles``
+* ``mod_loss``: atoms lost due to the modification
+* ``delta_mass``: mass shift of the modification
+* ``mod_gain``: atoms gained due to the modification
+* ``atom_count``: change in atom counts due to the modification
+* ``red_smiles``: reduced SMILES of the modified residue
+
+The three atom features are six counts per residue, in the order ``[H, C, N, O, P, S]``
+(``dlomix.data.processing.feature_tables.PTM_ATOMS``). The lookup tables behind the
+features are described in ``dlomix.data.processing.feature_dicts``.
 
 Custom feature extractors can either:
     (1) use the `FeatureExtractor` class or

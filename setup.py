@@ -68,7 +68,9 @@ setuptools.setup(
     packages=setuptools.find_packages(where="src"),
     package_dir={"": "src"},
     include_package_data=True,
-    package_data={"": ["data/processing/feature_dicts/*"]},
+    # feature_dicts is a package (it has an __init__.py that documents the tables),
+    # so find_packages picks it up and its JSON files are its package data
+    package_data={"dlomix.data.processing.feature_dicts": ["*.json"]},
     python_requires=">=3.11",
     install_requires=[
         "datasets>=4.0.0",
