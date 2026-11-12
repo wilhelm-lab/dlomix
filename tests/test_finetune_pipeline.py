@@ -232,9 +232,7 @@ class TestSetupAndFinetune:
     ):
         """An explicit new_model_vocab must also encode the data; a dataset left
         to learn its own alphabet would give the same tokens other indices."""
-        from dlomix.data import (
-            FragmentIonIntensityDataset,
-        )
+        from dlomix.data import FragmentIonIntensityDataset
 
         learned = FragmentIonIntensityDataset(
             data_format="parquet",
