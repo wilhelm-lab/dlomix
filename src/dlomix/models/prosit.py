@@ -11,6 +11,7 @@ from ..data.processing.feature_extractors import FEATURE_EXTRACTORS_PARAMETERS
 from ..layers.attention import AttentionLayer, DecoderAttentionLayer
 from ..layers.gru_kernel import gru_kernel_kwargs
 from ._alphabet import validate_alphabet_size
+from ._from_dataset import prosit_intensity_arguments
 
 logger = logging.getLogger("dlomix.models.prosit")
 
@@ -270,6 +271,27 @@ class PrositIntensityPredictor(tf.keras.Model):
         self.attention = AttentionLayer(name="encoder_att")
         self._build_meta_data_fusion_layer()
         self._build_regressor()
+
+    @classmethod
+    def from_dataset(cls, dataset, **kwargs):
+        """Build the model for a :class:`~dlomix.data.FragmentIonIntensityDataset`.
+
+        The arguments that must agree with the dataset are taken from it:
+        ``alphabet`` (its ``extended_alphabet``), ``seq_length`` (its
+        ``max_seq_len``), ``with_termini``, the sequence column in ``input_keys``,
+        and ``meta_data_keys`` / ``use_meta_data`` (its ``model_features``). Pass
+        everything else, e.g. the layer sizes, as keyword arguments::
+
+            model = PrositIntensityPredictor.from_dataset(
+                dataset, recurrent_layers_sizes=(128, 256)
+            )
+
+        Raises
+        ------
+        ValueError
+            If a keyword argument contradicts the dataset.
+        """
+        return cls(**prosit_intensity_arguments(dataset, kwargs))
 
     def _handle_alphabet_and_keys(self, alphabet, input_keys, meta_data_keys):
         # Handle alphabet

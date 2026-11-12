@@ -4,8 +4,10 @@ import logging
 import keras
 import pytest
 import tensorflow as tf
+from datasets import Dataset
 
 from dlomix.constants import ALPHABET_UNMOD, PTMS_ALPHABET
+from dlomix.data import FragmentIonIntensityDataset
 from dlomix.models.chargestate import ChargeStatePredictor
 from dlomix.models.deepLC import DeepLCRetentionTimePredictor
 from dlomix.models.prosit import PrositIntensityPredictor, PrositRetentionTimePredictor
@@ -364,3 +366,47 @@ def test_fit_applies_dropout(model_class):
 
     fit_loss, eval_loss = _fit_and_evaluate_loss(model_class, dropout_rate=0.0)
     assert fit_loss == pytest.approx(eval_loss, rel=1e-6, abs=1e-12)
+
+
+def test_prosit_intensity_from_dataset():
+    features = ["collision_energy", "precursor_charge"]
+    dataset = FragmentIonIntensityDataset(
+        data_format="hf",
+        data_source=Dataset.from_dict(
+            {
+                "peptide": ["AC[UNIMOD:4]DEF", "FEDCA", "AACCD", "DDEEF"],
+                "collision_energy": [0.3] * 4,
+                "precursor_charge": [2.0] * 4,
+                "label": [[0.5] * 54] * 4,
+            }
+        ),
+        sequence_column="peptide",
+        label_column="label",
+        model_features=features,
+        max_seq_len=10,
+        with_termini=False,
+        val_ratio=0.5,
+        num_proc=None,
+    )
+    sizes = {"recurrent_layers_sizes": (8, 16), "regressor_layer_size": 16}
+
+    model = PrositIntensityPredictor.from_dataset(dataset, **sizes)
+
+    explicit = PrositIntensityPredictor(
+        input_keys={"SEQUENCE_KEY": "peptide"},
+        alphabet=dataset.extended_alphabet,
+        seq_length=10,
+        with_termini=False,
+        use_meta_data=True,
+        meta_data_keys=features,
+        **sizes,
+    )
+    config, explicit_config = model.get_config(), explicit.get_config()
+    config.pop("name"), explicit_config.pop("name")
+    assert config == explicit_config
+    # the model takes the dataset's batches as they are
+    inputs, _ = next(iter(dataset.tensor_train_data))
+    assert model(inputs).shape == (2, 54)
+
+    with pytest.raises(ValueError, match="seq_length=30 but the dataset has 10"):
+        PrositIntensityPredictor.from_dataset(dataset, seq_length=30)

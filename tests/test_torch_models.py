@@ -90,3 +90,26 @@ def test_prosit_intensity_torch_warns_when_metadata_keys_are_ignored():
     # ignored these inputs
     with pytest.warns(UserWarning, match="use_meta_data=False"):
         PrositIntensityPredictorTorch(meta_data_keys=["collision_energy"])
+
+
+def test_intensity_model_torch_from_dataset():
+    from types import SimpleNamespace
+
+    alphabet = {"-": 0, "X": 1, "A": 2, "C": 3}
+    dataset = SimpleNamespace(  # the attributes from_dataset reads
+        sequence_column="peptide",
+        extended_alphabet=alphabet,
+        max_seq_len=10,
+        with_termini=False,
+        model_features=["collision_energy"],
+    )
+
+    model = PrositIntensityPredictorTorch.from_dataset(
+        dataset, recurrent_layers_sizes=(8, 16)
+    )
+
+    assert model.alphabet == alphabet
+    assert (model.raw_seq_length, model.with_termini) == (10, False)
+    assert model.input_keys == {"SEQUENCE_KEY": "peptide"}
+    assert (model.use_meta_data, model.meta_data_keys) == (True, ["collision_energy"])
+    assert model.recurrent_layers_sizes == (8, 16)
