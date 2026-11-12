@@ -25,6 +25,7 @@ Typical usage
 
 from __future__ import annotations
 
+import contextlib
 import logging
 from pathlib import Path
 from typing import Any
@@ -47,6 +48,8 @@ if _IS_TORCH:
 else:
     from ..models import download_remote_model_weights, load_and_adapt_pretrained_model
 
+TRAINABLE_MODES = ("all", "embedding", "new_tokens")
+
 
 def _require_tensorflow(operation: str) -> None:
     """Raise :exc:`NotImplementedError` for ``operation`` on the PyTorch backend."""
@@ -55,6 +58,14 @@ def _require_tensorflow(operation: str) -> None:
             f"FineTunePipeline.{operation}() currently supports TensorFlow only. "
             "Set DLOMIX_BACKEND=tensorflow before importing dlomix."
         )
+
+
+def _validated_trainable(trainable: str) -> str:
+    if trainable not in TRAINABLE_MODES:
+        raise ValueError(
+            f"Unknown trainable mode {trainable!r}, expected one of {TRAINABLE_MODES}."
+        )
+    return trainable
 
 
 _KERAS_MODEL_SUFFIXES = (".keras", ".h5")
@@ -110,6 +121,9 @@ class FineTunePipeline:
         ``eval_metric``, ``return_fit_info`` (bool) and ``dataset_kwargs`` (dict).
     seed:
         Random seed for reproducibility.
+    trainable:
+        What :meth:`finetune` trains: ``"all"`` (default), ``"embedding"`` or
+        ``"new_tokens"``; see :meth:`finetune`.
     output_model_path:
         Directory where the fine-tuned model will be saved after training.
     epochs:
@@ -138,6 +152,7 @@ class FineTunePipeline:
         batch_size: int = 64,
         learning_rate: float = 1e-4,
         dataset_kwargs: dict | None = None,
+        trainable: str = "all",
     ) -> None:
         if not base_model_name and not base_model_weights_filepath:
             raise ValueError(
@@ -154,6 +169,8 @@ class FineTunePipeline:
         self.initialization_strategy = initialization_strategy
         self.best_fit_kwargs = best_fit_kwargs
         self.seed = seed
+        self.trainable = _validated_trainable(trainable)
+        self.new_tokens: list | None = None
 
         self.output_model_path = output_model_path
 
@@ -197,6 +214,7 @@ class FineTunePipeline:
             base_model_name: my-org/prosit-intensity  # Hugging Face Hub repo id
             epochs: 20
             learning_rate: 0.0003
+            trainable: new_tokens  # all (default), embedding or new_tokens
             output_model_path: models/my_finetuned
         """
         path = Path(config_path)
@@ -227,6 +245,8 @@ class FineTunePipeline:
         output_model_path: str = "./finetuned_model",
         epochs: int = 10,
         learning_rate: float = 1e-4,
+        trainable: str = "all",
+        new_tokens: list | None = None,
     ) -> "FineTunePipeline":
         """Create a ready-to-use pipeline from an already-built dataset and model.
 
@@ -247,6 +267,13 @@ class FineTunePipeline:
             Number of training epochs passed to :meth:`finetune`.
         learning_rate:
             Initial learning rate for the default Adam optimiser.
+        trainable:
+            What :meth:`finetune` trains: ``"all"`` (default), ``"embedding"`` or
+            ``"new_tokens"``.
+        new_tokens:
+            The tokens added to the model's vocabulary, whose embedding rows
+            ``trainable="new_tokens"`` trains. Required for that mode here, because
+            the pipeline did not expand the vocabulary itself.
         """
         instance = cls.__new__(cls)
         # Config attributes — None/defaults since dataset + model are pre-built
@@ -258,6 +285,8 @@ class FineTunePipeline:
         instance.initialization_strategy = None
         instance.best_fit_kwargs = None
         instance.seed = None
+        instance.trainable = _validated_trainable(trainable)
+        instance.new_tokens = list(new_tokens) if new_tokens is not None else None
         instance.output_model_path = output_model_path
         instance.epochs = epochs
         instance.batch_size = getattr(dataset, "batch_size", 64)
@@ -379,6 +408,7 @@ class FineTunePipeline:
         metrics: list | None = None,
         callbacks: list | None = None,
         optimizer=None,
+        trainable: str | None = None,
     ):
         """Compile and fine-tune the model.
 
@@ -394,6 +424,17 @@ class FineTunePipeline:
         optimizer:
             A Keras optimiser instance.  Defaults to ``Adam`` with the
             pipeline's ``learning_rate``.
+        trainable:
+            Which weights train; defaults to the pipeline's ``trainable``.
+
+            - ``"all"``: the model as it is, i.e. every layer that is trainable.
+            - ``"embedding"``: only the token embedding, all of its rows.
+            - ``"new_tokens"``: only the embedding rows of the tokens added by the
+              vocabulary expansion. Every other weight, including the rows of the
+              known tokens, is exactly the same after training, so predictions
+              for peptides without the new tokens do not change.
+
+            The model's ``trainable`` flags are the same after training as before.
 
         Returns
         -------
@@ -422,21 +463,59 @@ class FineTunePipeline:
             getattr(resolved_loss, "__name__", repr(resolved_loss)),
         )
 
-        self.model.compile(
-            optimizer=resolved_optimizer,
-            loss=resolved_loss,
-            metrics=metrics or [],
-        )
+        with self._trainable_weights(trainable or self.trainable):
+            self.model.compile(
+                optimizer=resolved_optimizer,
+                loss=resolved_loss,
+                metrics=metrics or [],
+            )
 
-        history = self.model.fit(
-            self.dataset.tensor_train_data,
-            epochs=self.epochs,
-            validation_data=self.dataset.tensor_val_data,
-            callbacks=callbacks or [],
-        )
+            history = self.model.fit(
+                self.dataset.tensor_train_data,
+                epochs=self.epochs,
+                validation_data=self.dataset.tensor_val_data,
+                callbacks=callbacks or [],
+            )
 
         logger.info("Fine-tuning complete.")
         return history
+
+    def _trainable_weights(self, trainable: str):
+        """Context in which only the weights of the ``trainable`` mode can train."""
+        if _validated_trainable(trainable) == "all":
+            return contextlib.nullcontext()
+
+        from ..models.model_utils import embedding_only_training
+
+        rows = None
+        if trainable == "new_tokens":
+            rows = [self.model.alphabet[token] for token in self._resolve_new_tokens()]
+        return embedding_only_training(self.model, rows=rows)
+
+    def _resolve_new_tokens(self) -> list:
+        """The tokens the vocabulary expansion added to the pretrained model's."""
+        if self.new_tokens is None:
+            if self.base_model_weights_filepath is None:
+                raise ValueError(
+                    "trainable='new_tokens' needs the tokens that are new to the "
+                    "model: pass new_tokens=[...] to from_dataset_and_model()."
+                )
+            old_vocab = self.old_model_vocab
+            if old_vocab is None:
+                import tensorflow as tf
+
+                from ..models.model_utils import get_alphabet_from_model
+
+                old_vocab = get_alphabet_from_model(
+                    tf.keras.models.load_model(self.base_model_weights_filepath)
+                )
+            self.new_tokens = [t for t in self.model.alphabet if t not in old_vocab]
+        if not self.new_tokens:
+            raise ValueError(
+                "trainable='new_tokens': the model's vocabulary has no new tokens, "
+                "so nothing would be trained."
+            )
+        return self.new_tokens
 
     # ------------------------------------------------------------------
     # Saving

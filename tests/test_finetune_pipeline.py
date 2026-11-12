@@ -9,12 +9,15 @@ from os.path import join
 from pathlib import Path
 from unittest.mock import patch
 
+import numpy as np
 import pytest
 import tensorflow as tf
 import yaml
+from datasets import Dataset
 
 from dlomix.constants import ALPHABET_UNMOD
-from dlomix.models import PrositIntensityPredictor
+from dlomix.data import FragmentIonIntensityDataset
+from dlomix.models import PrositIntensityPredictor, load_and_adapt_pretrained_model
 from dlomix.pipelines import InferencePipeline
 from dlomix.pipelines.finetune import FineTunePipeline
 
@@ -414,3 +417,146 @@ class TestToInferencePipeline:
         assert (
             pipe.preprocessor.sequence_column == ready_pipeline.dataset.sequence_column
         )
+
+
+# ---------------------------------------------------------------------------
+# What finetune() trains
+# ---------------------------------------------------------------------------
+
+OLD_VOCAB = {"-": 0, "X": 1, "A": 2, "C": 3, "D": 4, "E": 5, "F": 6}
+NEW_TOKEN = "C[UNIMOD:4]"
+NEW_VOCAB = {**OLD_VOCAB, NEW_TOKEN: 7}
+FEATURES = ["collision_energy", "precursor_charge"]
+
+
+def _small_dataset(sequences):
+    rng = np.random.default_rng(0)
+    return FragmentIonIntensityDataset(
+        data_format="hf",
+        data_source=Dataset.from_dict(
+            {
+                "sequence": sequences,
+                "collision_energy": [0.3] * len(sequences),
+                "precursor_charge": [2.0] * len(sequences),
+                "label": rng.random((len(sequences), 54)).tolist(),
+            }
+        ),
+        sequence_column="sequence",
+        label_column="label",
+        model_features=FEATURES,
+        alphabet=NEW_VOCAB,
+        max_seq_len=10,
+        with_termini=False,
+        val_ratio=0.25,
+        batch_size=4,
+        num_proc=None,
+    )
+
+
+@pytest.fixture
+def base_model_path(tmp_path):
+    model = PrositIntensityPredictor(
+        embedding_output_dim=8,
+        seq_length=10,
+        alphabet=OLD_VOCAB,
+        with_termini=False,
+        use_meta_data=True,
+        meta_data_keys=FEATURES,
+        recurrent_layers_sizes=(8, 16),
+        regressor_layer_size=16,
+    )
+    model(
+        {
+            "sequence": tf.zeros((2, 10), dtype=tf.int32),
+            "collision_energy": tf.ones((2, 1)),
+            "precursor_charge": tf.ones((2, 1)),
+        }
+    )
+    path = str(tmp_path / "base.keras")
+    model.save(path)
+    return path
+
+
+@pytest.fixture
+def new_token_pipeline(base_model_path):
+    """A model whose vocabulary gained NEW_TOKEN, and data to fine-tune it on."""
+    tf.keras.utils.set_random_seed(0)
+    model = load_and_adapt_pretrained_model(
+        base_model_path, NEW_VOCAB, initialization_strategy="mean"
+    )
+    dataset = _small_dataset([f"A{NEW_TOKEN}{rest}" for rest in "ACDEF"] * 4)
+    return FineTunePipeline.from_dataset_and_model(
+        dataset, model, epochs=2, learning_rate=1e-2, new_tokens=[NEW_TOKEN]
+    )
+
+
+def _weights(model):
+    """(embedding rows of the known tokens, row of the new token, all other weights)"""
+    embedding = model.embedding.get_weights()[0]
+    body = [w.numpy() for w in model.weights if w is not model.embedding.embeddings]
+    return embedding[:7], embedding[7], body
+
+
+def _changed(before, after):
+    return not all(np.array_equal(b, a) for b, a in zip(before, after, strict=True))
+
+
+class TestTrainable:
+    @pytest.mark.parametrize(
+        "trainable, changes",  # known tokens' rows, new token's row, other weights
+        [
+            ("all", (True, True, True)),
+            ("embedding", (True, True, False)),
+            ("new_tokens", (False, True, False)),
+        ],
+    )
+    def test_only_the_weights_of_the_mode_change(
+        self, new_token_pipeline, trainable, changes
+    ):
+        model = new_token_pipeline.model
+        before = _weights(model)
+        n_trainable = len(model.trainable_weights)
+
+        new_token_pipeline.finetune(trainable=trainable)
+
+        after = _weights(model)
+        assert _changed(before[0], after[0]) == changes[0]
+        assert _changed(before[1], after[1]) == changes[1]
+        assert _changed(before[2], after[2]) == changes[2]
+        # the model is not left frozen
+        assert len(model.trainable_weights) == n_trainable
+
+    def test_new_tokens_keeps_predictions_for_known_peptides_also_after_saving(
+        self, new_token_pipeline, tmp_path
+    ):
+        known_peptides = _small_dataset(["ACDEF", "FEDCA", "AACCD", "DDEEF"])
+        model = new_token_pipeline.model
+        before = model.predict(known_peptides.tensor_train_data, verbose=0)
+
+        new_token_pipeline.finetune(trainable="new_tokens")
+
+        reloaded = tf.keras.models.load_model(
+            new_token_pipeline.save(str(tmp_path / "finetuned.keras"))
+        )
+        for finetuned in (model, reloaded):
+            after = finetuned.predict(known_peptides.tensor_train_data, verbose=0)
+            np.testing.assert_array_equal(after, before)
+        np.testing.assert_array_equal(
+            reloaded.embedding.get_weights()[0], model.embedding.get_weights()[0]
+        )
+
+    def test_new_tokens_are_found_from_the_base_model(self, base_model_path):
+        pipeline = FineTunePipeline(
+            finetune_dataset_path="unused.parquet",
+            base_model_weights_filepath=base_model_path,
+            trainable="new_tokens",
+        )
+        pipeline.model = load_and_adapt_pretrained_model(base_model_path, NEW_VOCAB)
+
+        assert pipeline._resolve_new_tokens() == [NEW_TOKEN]
+
+    def test_unknown_mode_raises(self):
+        with pytest.raises(ValueError, match="trainable"):
+            FineTunePipeline(
+                finetune_dataset_path="x", base_model_name="m", trainable="body"
+            )

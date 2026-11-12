@@ -5,6 +5,21 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- `FineTunePipeline.finetune(trainable="all" | "embedding" | "new_tokens")`, also a
+  constructor argument and YAML key (default `"all"`, as before). `"embedding"`
+  trains only the token embedding; `"new_tokens"` trains only the embedding rows of
+  the tokens added by the vocabulary expansion, leaving every other weight,
+  including the known tokens' rows, exactly as it was, so predictions for peptides
+  without the new tokens do not change. With `from_dataset_and_model`, name the
+  tokens with `new_tokens=[...]`. In Keras 3, `model.trainable = False` followed by
+  `model.embedding.trainable = True` leaves no trainable weights; the pipeline
+  freezes the other layers individually and restores their flags after training.
+  The same is available for custom training loops as
+  `dlomix.models.model_utils.embedding_only_training(model, rows=None)`.
+
 ## [0.3.1] - 2026-10-06
 
 ### Changed

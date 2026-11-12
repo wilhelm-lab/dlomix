@@ -5,10 +5,12 @@ This module provides utilities for adapting pre-trained models to new datasets,
 particularly when vocabularies/alphabets differ between training and fine-tuning.
 """
 
+import contextlib
 import logging
 import warnings
-from typing import Dict, Literal, Optional
+from typing import Dict, Literal, Optional, Sequence
 
+import keras
 import numpy as np
 import tensorflow as tf
 
@@ -520,6 +522,61 @@ def _get_embedding_layer(
             f"Embedding layer '{embedding_layer_name}' not found in model. "
             f"Available layers: {[layer.name for layer in model.layers]}"
         ) from e
+
+
+class _KeepRows(keras.constraints.Constraint):
+    """Applied after every optimizer step: all rows but ``trainable_rows`` go back
+    to their ``start`` values, so only these rows learn."""
+
+    def __init__(self, start: np.ndarray, trainable_rows: Sequence[int]):
+        self.start = np.array(start)
+        self.trainable = np.zeros((len(self.start), 1), dtype=bool)
+        self.trainable[list(trainable_rows)] = True
+
+    def __call__(self, w):
+        return keras.ops.where(self.trainable, w, self.start)
+
+
+@contextlib.contextmanager
+def embedding_only_training(
+    model: tf.keras.Model,
+    rows: Optional[Sequence[int]] = None,
+    embedding_layer_name: str = "embedding",
+):
+    """Within this context, only the model's token embedding is trainable.
+
+    Every other layer is frozen individually; in Keras 3, ``model.trainable = False``
+    followed by ``model.embedding.trainable = True`` would leave no trainable weights
+    at all. With ``rows``, only these rows of the embedding change during training
+    (e.g. the rows of tokens added by a vocabulary expansion); all other rows keep
+    their values exactly. Compile the model inside the context. On exit the layers'
+    ``trainable`` flags are as they were before.
+    """
+    if not model.trainable:
+        raise ValueError(
+            "The model itself is frozen (model.trainable is False), so none of its "
+            "layers can train. Set model.trainable = True first."
+        )
+    embedding = _get_embedding_layer(model, embedding_layer_name)
+    if rows is not None and len(rows) == 0:
+        raise ValueError("`rows` is empty: no embedding row would be trained.")
+
+    # all nested layers, parents before their children, so that restoring each
+    # layer's own flag in this order gives back the exact previous state
+    flags = [(layer, layer.trainable) for layer in model._flatten_layers(False)]
+    try:
+        for layer in model.layers:
+            layer.trainable = layer is embedding
+        if rows is not None:
+            # on the variable, not the layer: it is not saved with the model
+            embedding.embeddings.constraint = _KeepRows(
+                embedding.embeddings.numpy(), rows
+            )
+        yield
+    finally:
+        embedding.embeddings.constraint = None
+        for layer, trainable in flags:
+            layer.trainable = trainable
 
 
 def _load_model_with_custom_objects(
