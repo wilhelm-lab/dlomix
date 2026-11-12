@@ -85,6 +85,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   them with every known token at its index. Fine-tuning code needed the private
   `SequenceParsingProcessor._parse_proforma_sequence` for this; the parser is now
   the public `dlomix.data.processing.processors.parse_proforma_sequence`.
+- `FineTunePipeline.from_pretrained(base, data)`: a ready pipeline from a pretrained
+  inference bundle (object, path or Hub repo id) and Hugging Face data. The bundle's
+  preprocessing settings build the dataset, the tokens new to the model are found
+  and appended to its vocabulary, and their embeddings are initialized by
+  `initialization_strategy`; `new_tokens` and `best_fit_info` are set. It composes
+  public steps that remain available one by one: `find_new_tokens`,
+  `extend_alphabet`, the dataset class with the new
+  `PeptidePreprocessor.dataset_settings`, the new
+  `dlomix.models.adapt_pretrained_model(model, new_alphabet, ...)` (the part of
+  `load_and_adapt_pretrained_model` after loading, for a model in memory) and
+  `from_dataset_and_model`. The existing constructor, `setup()` and
+  `load_and_adapt_pretrained_model` are unchanged.
 
 ### Changed
 - dlomix builds its TensorFlow datasets itself, from a shuffled row index, instead of
