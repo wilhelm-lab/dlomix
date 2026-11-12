@@ -30,12 +30,12 @@ class RetentionTimeDataset(PeptideDataset):
         with_termini (bool): Whether to add the N- and C-termini in the sequence column, even if they do not exist. Defaults to True.
         encoding_scheme (Union[str, EncodingScheme]): The encoding scheme to use for sequences. Defaults to EncodingScheme.NAIVE_MODS.
         processed (bool): Whether the dataset has been preprocessed. Defaults to False.
-        enable_tf_dataset_cache (bool): Flag to indicate whether to enable TensorFlow Dataset caching (call `.cache()` on the generated TF Datasets).
+        enable_tf_dataset_cache (bool): Whether to keep the splits in memory for the TensorFlow datasets: batches are then gathered from RAM instead of being read from disk (much faster, same batches). The splits used must fit in memory. Default is False.
         disable_cache (bool): Whether to disable Hugging Face datasets caching. Default is False.
         auto_cleanup_cache (bool): Whether to automatically clean up the cache. Default is True.
         num_proc (Optional[int]): Number of processes to use for dataset processing. Use -1 for all available processors, None for single-process mode, or a positive integer. Default is -1.
         batch_processing_size (int): Size of batches for processing. Default is 1000.
-        torch_dataloader_kwargs (Optional[Dict]): Additional keyword arguments to pass to PyTorch DataLoader. Default is None.
+        torch_dataloader_kwargs (Optional[Dict]): Additional keyword arguments to pass to PyTorch DataLoader, e.g. ``{"num_workers": 4}`` to load batches in parallel worker processes (faster for large datasets). Default is None.
         split_strategy (Optional[str]): Strategy for splitting the dataset. Options: 'random', 'sequence_unique', 'stratified'. Default is 'random'.
         split_seed (Optional[int]): Random seed for reproducible splits. Default is None.
         test_ratio (Optional[float]): Ratio of test data for three-way splits. If None, only train/val split is performed. Default is None.
