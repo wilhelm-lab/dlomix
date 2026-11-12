@@ -67,6 +67,7 @@ def load_and_adapt_pretrained_model(
         Defaults to None.
     best_fit_kwargs : Dict, optional
         Additional arguments for best-fit initialization strategy. Required if initialization_strategy is 'best-fit'. Should include:
+
         - new_hf_data: Hugging Face
             Dataset containing sequences with new tokens for evaluation.
         - sequence_column: str

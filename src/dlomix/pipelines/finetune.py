@@ -2,8 +2,8 @@
 FineTunePipeline
 ================
 
-Typical usage
--------------
+Typical usage::
+
     # Option A — constructor directly
     pipeline = FineTunePipeline(
         finetune_dataset_path="data/finetuning.parquet",
