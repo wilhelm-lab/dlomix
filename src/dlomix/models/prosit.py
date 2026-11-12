@@ -102,11 +102,11 @@ class PrositRetentionTimePredictor(tf.keras.Model):
             ]
         )
 
-    def call(self, inputs, **kwargs):
+    def call(self, inputs, training=None, **kwargs):
         x = self.embedding(inputs)
-        x = self.encoder(x)
+        x = self.encoder(x, training=training)
         x = self.attention(x)
-        x = self.regressor(x)
+        x = self.regressor(x, training=training)
         x = self.output_layer(x)
         return x
 
@@ -459,25 +459,25 @@ class PrositIntensityPredictor(tf.keras.Model):
                     f"At least one PTM input feature is required when use_prosit_ptm_features=True. Missing all of: {self.PTM_INPUT_KEYS}"
                 )
 
-    def call(self, inputs, **kwargs):
+    def call(self, inputs, training=None, **kwargs):
         # Handle dict input, complex case: multiple inputs
         if isinstance(inputs, dict):
-            return self._forward_dict(inputs, **kwargs)
+            return self._forward_dict(inputs, training=training)
 
         # Handle single input, simple case: sequence only
         peptides_in = inputs
-        return self._forward_sequence_only(peptides_in, **kwargs)
+        return self._forward_sequence_only(peptides_in, training=training)
 
-    def _forward_sequence_only(self, peptides_in, **kwargs):
+    def _forward_sequence_only(self, peptides_in, training=None):
         x = self.embedding(peptides_in)
-        x = self.sequence_encoder(x)
+        x = self.sequence_encoder(x, training=training)
         x = self.attention(x)
         x = tf.expand_dims(x, axis=1)  # add meta data dimension
-        x = self.decoder(x)
+        x = self.decoder(x, training=training)
         x = self.regressor(x)
         return x
 
-    def _forward_dict(self, inputs, **kwargs):
+    def _forward_dict(self, inputs, training=None):
         self._validate_input_keys(inputs)
 
         meta_data = []
@@ -508,20 +508,20 @@ class PrositIntensityPredictor(tf.keras.Model):
 
         # encode and fuse PTM features (before going into the GRU sequence encoder)
         if self.use_prosit_ptm_features:
-            encoded_ptm = self.ptm_input_encoder(ptm_ac_features)
+            encoded_ptm = self.ptm_input_encoder(ptm_ac_features, training=training)
             x = self.ptm_aa_fusion([x, encoded_ptm])
 
-        x = self.sequence_encoder(x)
+        x = self.sequence_encoder(x, training=training)
         x = self.attention(x)
 
         if self.use_meta_data:
-            encoded_meta = self.meta_encoder(meta_data)
+            encoded_meta = self.meta_encoder(meta_data, training=training)
             x = self.meta_data_fusion_layer([x, encoded_meta])
         else:
             # no metadata -> add a dimension to comply with the shape
             x = tf.expand_dims(x, axis=1)
 
-        x = self.decoder(x)
+        x = self.decoder(x, training=training)
         x = self.regressor(x)
 
         return x

@@ -82,11 +82,11 @@ class RetentionTimePredictor(tf.keras.Model):
                 ]
             )
 
-    def call(self, inputs, **kwargs):
+    def call(self, inputs, training=None, **kwargs):
         x = self.embedding(inputs)
-        x = self.encoder(x)
+        x = self.encoder(x, training=training)
         x = self.flatten(x)
-        x = self.regressor(x)
+        x = self.regressor(x, training=training)
         x = self.output_layer(x)
 
         return x

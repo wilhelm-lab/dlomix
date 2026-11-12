@@ -1,3 +1,4 @@
+import inspect
 import logging
 
 import keras
@@ -310,3 +311,56 @@ def test_alphabet_carrying_padding_and_unknown_is_accepted():
 
     assert model.embeddings_count == len(extended)
     assert model.embeddings_count > max(extended.values())
+
+
+# ----------------------- training flag reaches the layers ----------------------
+
+
+def _keras_model_catalogue():
+    import dlomix.models as catalogue
+
+    exported = (getattr(catalogue, name) for name in catalogue.__all__)
+    return [
+        obj
+        for obj in exported
+        if isinstance(obj, type) and issubclass(obj, keras.Model)
+    ]
+
+
+@pytest.mark.parametrize("model_class", _keras_model_catalogue())
+def test_catalogue_model_call_declares_training(model_class):
+    # Keras 3's fit passes training=True only to a call() that declares it;
+    # without it the model trains in inference mode (dropout off), silently.
+    assert "training" in inspect.signature(model_class.call).parameters
+
+
+def _fit_and_evaluate_loss(model_class, dropout_rate):
+    """Loss of one batch as ``fit`` and as ``evaluate`` report it, weights frozen.
+
+    The targets are the model's own inference-mode predictions, so ``evaluate``
+    gives zero and ``fit`` differs only if it runs the model in training mode.
+    """
+    keras.utils.set_random_seed(0)
+    model = model_class(
+        dropout_rate=dropout_rate,
+        latent_dropout_rate=dropout_rate,
+        recurrent_layers_sizes=(8, 8),
+        regressor_layer_size=8,
+    )
+    x = tf.random.uniform((64, 32), maxval=len(ALPHABET_UNMOD), dtype=tf.int32)
+    y = model.predict(x, batch_size=64, verbose=0)
+    model.compile(optimizer=keras.optimizers.SGD(learning_rate=0.0), loss="mse")
+    fit_loss = model.fit(x, y, batch_size=64, epochs=1, verbose=0).history["loss"][0]
+    return fit_loss, model.evaluate(x, y, batch_size=64, verbose=0)
+
+
+@pytest.mark.parametrize(
+    "model_class",
+    [PrositRetentionTimePredictor, PrositIntensityPredictor, ChargeStatePredictor],
+)
+def test_fit_applies_dropout(model_class):
+    fit_loss, eval_loss = _fit_and_evaluate_loss(model_class, dropout_rate=0.5)
+    assert fit_loss != pytest.approx(eval_loss, rel=1e-3, abs=1e-12)
+
+    fit_loss, eval_loss = _fit_and_evaluate_loss(model_class, dropout_rate=0.0)
+    assert fit_loss == pytest.approx(eval_loss, rel=1e-6, abs=1e-12)

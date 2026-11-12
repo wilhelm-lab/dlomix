@@ -128,11 +128,11 @@ class ChargeStatePredictor(tf.keras.Model):
             ]
         )
 
-    def call(self, inputs):
+    def call(self, inputs, training=None):
         x = self.embedding(inputs)
-        x = self.encoder(x)
+        x = self.encoder(x, training=training)
         x = self.attention(x)
-        x = self.regressor(x)
+        x = self.regressor(x, training=training)
         x = self.output_layer(x)
         return x
 

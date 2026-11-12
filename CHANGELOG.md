@@ -5,6 +5,19 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Behaviour changes
+- **Dropout is now applied during `fit`** (TensorFlow/Keras backend). The `call` of
+  `PrositIntensityPredictor`, `PrositRetentionTimePredictor`, `ChargeStatePredictor`,
+  `RetentionTimePredictor` and `DetectabilityModel` did not declare `training`, and
+  Keras 3 passes `training=True` only to a `call` that declares it, so these models
+  trained in inference mode: every `Dropout` layer was off, without error or warning.
+  Training results change for every model trained with a dropout rate above 0
+  (`dropout_rate`, `latent_dropout_rate`); the defaults are above 0. To reproduce
+  results obtained with 0.3.1 or earlier, set the dropout rates to 0. Inference
+  (`predict`, `evaluate`, saved models) is unchanged.
+
 ## [0.3.1] - 2026-10-06
 
 ### Changed

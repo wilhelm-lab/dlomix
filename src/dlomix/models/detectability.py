@@ -57,9 +57,11 @@ class DetectabilityModel(tf.keras.Model):
         )
         super().build(input_shape)
 
-    def call(self, inputs):
+    def call(self, inputs, training=None):
         onehot_inputs = tf.one_hot(tf.cast(inputs, "int32"), depth=self.alphabet_size)
-        enc_outputs, enc_state_f, enc_state_b = self.encoder(onehot_inputs)
+        enc_outputs, enc_state_f, enc_state_b = self.encoder(
+            onehot_inputs, training=training
+        )
 
         dec_outputs = tf.concat([enc_state_f, enc_state_b], axis=-1)
 
@@ -70,7 +72,7 @@ class DetectabilityModel(tf.keras.Model):
             "encoder_outputs": enc_outputs,
         }
 
-        decoder_output = self.decoder(decoder_inputs)
+        decoder_output = self.decoder(decoder_inputs, training=training)
 
         return decoder_output
 
