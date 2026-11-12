@@ -5,6 +5,29 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Behaviour changes
+- **Training batches are reshuffled every epoch** (TensorFlow datasets,
+  `tensor_train_data`). With a global seed set (`keras.utils.set_random_seed`), every
+  epoch repeated the batch order of the first; now each epoch has a new order, and
+  the sequence of orders is reproducible from the seed. Results of seeded training
+  runs change. Every row is still visited once per epoch, and validation and test
+  data keep the split's row order.
+- **`enable_tf_dataset_cache=True` now means "keep the split in memory"**: the
+  split's tensor columns are loaded into RAM once and batches are gathered from
+  there (in a synthetic benchmark, about 15x the rate of reading from disk), for
+  the train, val and test splits. Before, it called `.cache()` after shuffling and
+  batching, which replayed the first epoch's batches in every later epoch. The
+  splits used must fit in memory; streaming is not supported.
+
+### Changed
+- dlomix builds its TensorFlow datasets itself, from a shuffled row index, instead of
+  calling Hugging Face's `to_tf_dataset`. Tensor names, dtypes and shapes are
+  unchanged; reading batches from disk (the default) is faster than before.
+- Docs: for the PyTorch backend, `torch_dataloader_kwargs={"num_workers": N}` loads
+  batches in parallel.
+
 ## [0.3.1] - 2026-10-06
 
 ### Changed

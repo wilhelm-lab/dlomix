@@ -33,10 +33,10 @@ class IonMobilityDataset(PeptideDataset):
         with_termini (bool): Whether to add the N- and C-termini in the sequence column, even if they do not exist. Defaults to True.
         encoding_scheme (Union[str, EncodingScheme]): The encoding scheme to use for sequences. Defaults to EncodingScheme.UNMOD.
         processed (bool): Whether the dataset has been preprocessed. Defaults to False.
-        enable_tf_dataset_cache (bool): Flag to indicate whether to enable TensorFlow Dataset caching (call `.cache()` on the generated TF Datasets).
+        enable_tf_dataset_cache (bool): Whether to keep the splits in memory for the TensorFlow datasets: batches are then gathered from RAM instead of being read from disk (much faster, same batches). The splits used must fit in memory. Default is False.
         disable_cache (bool): Whether to disable Hugging Face datasets caching. Default is False.
         num_proc (Optional[int]): Number of processes to use for dataset processing. Use -1 for all available processors, None for single-process mode, or a positive integer. Default is -1.
-        torch_dataloader_kwargs (Optional[Dict]): Additional keyword arguments to pass to PyTorch DataLoader. Default is None.
+        torch_dataloader_kwargs (Optional[Dict]): Additional keyword arguments to pass to PyTorch DataLoader, e.g. ``{"num_workers": 4}`` to load batches in parallel worker processes (faster for large datasets). Default is None.
     """
 
     def __init__(

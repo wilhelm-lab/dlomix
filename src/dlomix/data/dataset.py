@@ -16,6 +16,7 @@ from .processing.processors import SequenceParsingProcessor
 from .serialization import save_dataset
 from .tensor_conversion import (
     cast_feature_columns_to_float,
+    load_tf_columns_in_memory,
     to_tf_tensor_dataset,
     to_torch_dataloader,
 )
@@ -70,7 +71,10 @@ class PeptideDataset:
     processed : bool
         Flag to indicate whether the dataset has been processed or not.
     enable_tf_dataset_cache : bool
-        Flag to indicate whether to enable TensorFlow Dataset caching (call `.cache()` on the generated TF Datasets).
+        Flag to indicate whether to keep the splits in memory for the TensorFlow datasets: each split's tensor
+        columns are loaded into RAM the first time its tensor dataset is requested, and batches are gathered
+        from there instead of being read from disk, which is much faster. The batches are the same. The splits
+        used must fit in memory (about their size on disk); there is no streaming. Default is False.
     disable_cache : bool
         Flag to indicate whether to disable Hugging Face Datasets caching. Default is False.
     auto_cleanup_cache : bool
@@ -488,14 +492,7 @@ class PeptideDataset:
         if self.dataset_type == "pt":
             return self._get_split_torch_dataset(PeptideDataset.DEFAULT_SPLIT_NAMES[0])
         else:
-            tf_dataset = self._get_split_tf_dataset(
-                PeptideDataset.DEFAULT_SPLIT_NAMES[0]
-            )
-
-            if self.enable_tf_dataset_cache:
-                tf_dataset = tf_dataset.cache()
-
-            return tf_dataset
+            return self._get_split_tf_dataset(PeptideDataset.DEFAULT_SPLIT_NAMES[0])
 
     @property
     def tensor_val_data(self):
@@ -503,14 +500,7 @@ class PeptideDataset:
         if self.dataset_type == "pt":
             return self._get_split_torch_dataset(PeptideDataset.DEFAULT_SPLIT_NAMES[1])
         else:
-            tf_dataset = self._get_split_tf_dataset(
-                PeptideDataset.DEFAULT_SPLIT_NAMES[1]
-            )
-
-            if self.enable_tf_dataset_cache:
-                tf_dataset = tf_dataset.cache()
-
-            return tf_dataset
+            return self._get_split_tf_dataset(PeptideDataset.DEFAULT_SPLIT_NAMES[1])
 
     @property
     def tensor_test_data(self):
@@ -518,11 +508,7 @@ class PeptideDataset:
         if self.dataset_type == "pt":
             return self._get_split_torch_dataset(PeptideDataset.DEFAULT_SPLIT_NAMES[2])
         else:
-            tf_dataset = self._get_split_tf_dataset(
-                PeptideDataset.DEFAULT_SPLIT_NAMES[2]
-            )
-
-            return tf_dataset
+            return self._get_split_tf_dataset(PeptideDataset.DEFAULT_SPLIT_NAMES[2])
 
     def get_preprocessor(self):
         """Return a :class:`PeptidePreprocessor` capturing this dataset's recipe.
@@ -545,10 +531,17 @@ class PeptideDataset:
 
     def _get_split_tf_dataset(self, split_name: str):
         self._check_if_split_exists(split_name)
+        input_columns = self._get_input_tensor_column_names()
+
+        in_memory_columns = None
+        if self.enable_tf_dataset_cache:
+            in_memory_columns = self._split_columns_in_memory(
+                split_name, [*input_columns, *self.label_column]
+            )
 
         return to_tf_tensor_dataset(
             self.hf_dataset[split_name],
-            input_columns=self._get_input_tensor_column_names(),
+            input_columns=input_columns,
             batch_size=self.batch_size,
             label_cols=self.label_column,
             shuffle=(
@@ -556,7 +549,20 @@ class PeptideDataset:
                 if split_name == PeptideDataset.DEFAULT_SPLIT_NAMES[0]
                 else False
             ),
+            in_memory_columns=in_memory_columns,
         )
+
+    def _split_columns_in_memory(self, split_name: str, columns: list):
+        """The split's tensor columns, loaded into memory on first use and kept, so
+        every tensor dataset of the split shares one copy."""
+        loaded = self.__dict__.setdefault("_in_memory_splits", {})
+        split = self.hf_dataset[split_name]
+        cached = loaded.get(split_name)
+        # reload if the split's data or the columns changed since
+        if cached is None or cached[0] is not split or set(cached[1]) != set(columns):
+            cached = (split, load_tf_columns_in_memory(split, columns))
+            loaded[split_name] = cached
+        return cached[1]
 
     def _get_split_torch_dataset(self, split_name: str):
         self._check_if_split_exists(split_name)
