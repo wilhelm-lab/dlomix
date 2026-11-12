@@ -5,6 +5,7 @@ import torch.nn.functional as F
 
 from ..constants import CLASSES_LABELS, padding_char
 from ..layers.keras_initializers_torch import KerasLazyLinear, init_like_keras
+from ._from_dataset import detectability_torch_arguments, from_dataset_method
 
 
 class DetectabilityModel(nn.Module):
@@ -43,6 +44,8 @@ class DetectabilityModel(nn.Module):
         # Create mask where padding_idx tokens are 1 and others are 0
         mask = x == self.padding_idx
         return mask
+
+    from_dataset = from_dataset_method(detectability_torch_arguments)
 
     def forward(self, x):
         # Create padding mask

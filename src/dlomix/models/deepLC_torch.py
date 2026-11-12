@@ -8,6 +8,7 @@ from ..layers.keras_initializers_torch import (
     KerasLazyLinear,
     init_like_keras,
 )
+from ._from_dataset import deeplc_arguments, from_dataset_method
 
 
 class DeepLCRetentionTimePredictor(nn.Module):
@@ -112,6 +113,8 @@ class DeepLCRetentionTimePredictor(nn.Module):
 
         # initialize like the Keras layers (lazy layers do so when they are created)
         init_like_keras(self)
+
+    from_dataset = from_dataset_method(deeplc_arguments)
 
     def forward(self, inputs: dict) -> torch.Tensor:
         """

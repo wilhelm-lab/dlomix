@@ -3,6 +3,7 @@ import tensorflow as tf
 
 from ..constants import ALPHABET_UNMOD
 from ._alphabet import validate_alphabet_size
+from ._from_dataset import from_dataset_method, sequence_model_arguments
 
 
 @keras.saving.register_keras_serializable(package="dlomix")
@@ -81,6 +82,8 @@ class RetentionTimePredictor(tf.keras.Model):
                     tf.keras.layers.LSTM(256),
                 ]
             )
+
+    from_dataset = from_dataset_method(sequence_model_arguments)
 
     def call(self, inputs, **kwargs):
         x = self.embedding(inputs)

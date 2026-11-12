@@ -356,3 +356,131 @@ def test_prosit_intensity_from_dataset():
 
     with pytest.raises(ValueError, match="seq_length=30 but the dataset has 10"):
         PrositIntensityPredictor.from_dataset(dataset, seq_length=30)
+
+
+def _from_dataset_cases():
+    """Dataset class and arguments, model class and arguments, and the constructor
+    arguments ``from_dataset`` must derive from the dataset."""
+    from dlomix.constants import aa_to_int_dict
+    from dlomix.data import (
+        ChargeStateDataset,
+        DetectabilityDataset,
+        IonMobilityDataset,
+        RetentionTimeDataset,
+    )
+    from dlomix.models.base import RetentionTimePredictor
+    from dlomix.models.detectability import DetectabilityModel
+    from dlomix.models.ionmob import Ionmob
+
+    small = {"recurrent_layers_sizes": (8, 8), "regressor_layer_size": 8}
+    label = {"label_column": "label"}
+
+    def padded_width(dataset):  # max_seq_len=10 and the two termini
+        return {"alphabet": dataset.extended_alphabet, "seq_length": 12}
+
+    def one_hot_padding(dataset):
+        # its padding token "0" has index 0; the alphabet also has the unknown token
+        return {"padding_char": [1.0] + [0.0] * (len(dataset.extended_alphabet) - 1)}
+
+    def tokens_and_key(dataset):
+        return {"num_tokens": len(dataset.extended_alphabet), "sequence_key": "peptide"}
+
+    detectability = {
+        "with_termini": False,
+        "alphabet": aa_to_int_dict,
+        "dataset_columns_to_keep": None,
+    }
+    return [
+        (
+            RetentionTimeDataset,
+            label,
+            PrositRetentionTimePredictor,
+            small,
+            padded_width,
+        ),
+        (RetentionTimeDataset, label, RetentionTimePredictor, {}, padded_width),
+        (ChargeStateDataset, label, ChargeStatePredictor, small, padded_width),
+        (
+            DetectabilityDataset,
+            {**label, **detectability, "padding_value": "0"},
+            DetectabilityModel,
+            {"num_units": 8},
+            one_hot_padding,
+        ),
+        (
+            IonMobilityDataset,
+            {"label_column": ["label", "ccs_std"]},
+            Ionmob,
+            {"gru_1": 8, "gru_2": 8},
+            tokens_and_key,
+        ),
+    ]
+
+
+@pytest.mark.parametrize(
+    "dataset_class, dataset_arguments, model_class, model_arguments, derived",
+    _from_dataset_cases(),
+    ids=lambda value: getattr(value, "__name__", ""),
+)
+def test_from_dataset_builds_the_model_the_dataset_needs(
+    dataset_class, dataset_arguments, model_class, model_arguments, derived
+):
+    dataset = dataset_class(
+        data_format="hf",
+        data_source=Dataset.from_dict(
+            {
+                "peptide": ["ACDEF", "FEDCA", "AACCD", "DDEEF"],
+                "label": [1.0, 2.0, 3.0, 0.0],
+                "ccs_std": [1.0] * 4,
+                "charge": [1, 2, 3, 2],
+                "mz": [400.0, 500.0, 600.0, 700.0],
+            }
+        ),
+        sequence_column="peptide",
+        max_seq_len=10,
+        val_ratio=0.5,
+        batch_size=2,
+        num_proc=None,
+        **dataset_arguments,
+    )
+
+    model = model_class.from_dataset(dataset, **model_arguments)
+
+    config = model.get_config()
+    expected = derived(dataset)
+    assert {name: config[name] for name in expected} == expected
+    # the model takes the dataset's batches as they are
+    inputs, _ = next(iter(dataset.tensor_train_data))
+    outputs = model(inputs)
+    first = outputs[0] if isinstance(outputs, (tuple, list)) else outputs
+    assert first.shape[0] == 2
+
+
+def test_from_dataset_rejects_an_argument_that_contradicts_the_dataset():
+    from types import SimpleNamespace
+
+    dataset = SimpleNamespace(
+        extended_alphabet=dict(ALPHABET_UNMOD), max_seq_len=10, with_termini=True
+    )
+
+    with pytest.raises(ValueError, match="seq_length=30 but the dataset has 12"):
+        PrositRetentionTimePredictor.from_dataset(dataset, seq_length=30)
+    # an argument that agrees with the dataset is fine
+    assert PrositRetentionTimePredictor.from_dataset(dataset, seq_length=12)
+
+
+def test_deeplc_from_dataset():
+    # no dlomix dataset computes DeepLC's count features: only the settings are checked
+    from types import SimpleNamespace
+
+    dataset = SimpleNamespace(
+        extended_alphabet=dict(ALPHABET_UNMOD),
+        max_seq_len=58,
+        with_termini=True,
+        sequence_column="peptide",
+    )
+
+    model = DeepLCRetentionTimePredictor.from_dataset(dataset)
+
+    assert (model.seq_length, model.sequence_input_key) == (60, "peptide")
+    assert model.alphabet == ALPHABET_UNMOD

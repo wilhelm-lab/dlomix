@@ -13,7 +13,11 @@ from ..layers.attention_torch import AttentionLayer
 from ..layers.bi_gru_seq_encoder_torch import BiGRUSequentialEncoder
 from ..layers.gru_seq_decoder_torch import GRUSequentialDecoder
 from ..layers.keras_initializers_torch import KerasLazyLinear, init_like_keras
-from ._from_dataset import prosit_intensity_arguments
+from ._from_dataset import (
+    from_dataset_method,
+    prosit_intensity_arguments,
+    sequence_model_arguments,
+)
 
 logger = logging.getLogger("dlomix.models.prosit_torch")
 
@@ -100,6 +104,8 @@ class PrositRetentionTimePredictor(nn.Module):
 
         # start from the same weight distribution as the Keras model
         init_like_keras(self)
+
+    from_dataset = from_dataset_method(sequence_model_arguments)
 
     def forward(self, inputs, **kwargs):
         x = self.embedding(inputs)
@@ -257,26 +263,7 @@ class PrositIntensityPredictor(nn.Module):
         # initialized like Keras when they are created on the first forward pass)
         init_like_keras(self)
 
-    @classmethod
-    def from_dataset(cls, dataset, **kwargs):
-        """Build the model for a :class:`~dlomix.data.FragmentIonIntensityDataset`.
-
-        The arguments that must agree with the dataset are taken from it:
-        ``alphabet`` (its ``extended_alphabet``), ``seq_length`` (its
-        ``max_seq_len``), ``with_termini``, the sequence column in ``input_keys``,
-        and ``meta_data_keys`` / ``use_meta_data`` (its ``model_features``). Pass
-        everything else, e.g. the layer sizes, as keyword arguments::
-
-            model = PrositIntensityPredictor.from_dataset(
-                dataset, recurrent_layers_sizes=(128, 256)
-            )
-
-        Raises
-        ------
-        ValueError
-            If a keyword argument contradicts the dataset.
-        """
-        return cls(**prosit_intensity_arguments(dataset, kwargs))
+    from_dataset = from_dataset_method(prosit_intensity_arguments)
 
     def _handle_alphabet_and_keys(self, alphabet, input_keys, meta_data_keys):
         # Handle alphabet

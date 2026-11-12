@@ -2,6 +2,7 @@ import keras
 import tensorflow as tf
 
 from ..constants import ALPHABET_UNMOD
+from ._from_dataset import deeplc_arguments, from_dataset_method
 
 
 @keras.saving.register_keras_serializable(package="dlomix")
@@ -129,6 +130,8 @@ class DeepLCRetentionTimePredictor(tf.keras.Model):
             regressor_layers += [tf.keras.layers.Dense(128), leaky()]
         self.regressor = tf.keras.Sequential(regressor_layers, name="regressor")
         self.output_layer = tf.keras.layers.Dense(1, name="rt_output")
+
+    from_dataset = from_dataset_method(deeplc_arguments)
 
     def call(self, inputs: dict[str, tf.Tensor], training=False) -> tf.Tensor:
         """
