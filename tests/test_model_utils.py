@@ -435,3 +435,56 @@ def test_best_fit_samples_examples_with_the_seed(best_fit_model_path):
 
     assert scores(seed=0) == scores(seed=0)
     assert any(scores(seed) != scores(seed=0) for seed in (1, 2, 3))
+
+
+def test_best_fit_enough_examples_is_capped_by_the_number_searched(
+    best_fit_model_path,
+):
+    # three spectra with A[UNIMOD:1] alone are all that a search of three would
+    # use: asking for more of them does not bring in the spectra with D[UNIMOD:2]
+    sole_a = ["CA[UNIMOD:1]CDEF", "EA[UNIMOD:1]CDEF", "CA[UNIMOD:1]CAAF"]
+    a_and_b = ["CA[UNIMOD:1]CD[UNIMOD:2]F", "FA[UNIMOD:1]D[UNIMOD:2]EF"]
+    data = _spectra(sole_a + a_and_b)
+
+    model, _, fit_info = _best_fit(
+        best_fit_model_path,
+        data,
+        ["A[UNIMOD:1]", "D[UNIMOD:2]"],
+        n_examples_for_eval=3,
+        min_examples_for_eval=20,
+    )
+
+    info = fit_info["A[UNIMOD:1]"]
+    assert (info["examples"], info["n_searched"]) == ("sole-token", 3)
+    expected = _scores_by_substitution(model, data.select(range(3)), "A[UNIMOD:1]")
+    assert info["scores"] == pytest.approx(expected, abs=1e-6)
+
+
+def test_best_fit_fallback_keeps_the_spectra_with_the_token_alone(
+    best_fit_model_path,
+):
+    sole_a = ["CA[UNIMOD:1]CDEF", "EA[UNIMOD:1]CDEF"]
+    a_and_b = ["CA[UNIMOD:1]CD[UNIMOD:2]F", "FA[UNIMOD:1]D[UNIMOD:2]EF"]
+    a_and_b.append("EA[UNIMOD:1]D[UNIMOD:2]CF")
+    data = _spectra(sole_a + a_and_b)
+
+    # too few alone (2 < 3): both are searched, plus one of the three others
+    model = tf.keras.models.load_model(best_fit_model_path)
+    possible = [
+        _scores_by_substitution(
+            model, data.select([0, 1, other]), "A[UNIMOD:1]", {"D[UNIMOD:2]": "D"}
+        )
+        for other in (2, 3, 4)
+    ]
+    for seed in range(4):
+        _, _, fit_info = _best_fit(
+            best_fit_model_path,
+            data,
+            ["A[UNIMOD:1]", "D[UNIMOD:2]"],
+            random_seed=seed,
+            n_examples_for_eval=3,
+            min_examples_for_eval=3,
+        )
+        info = fit_info["A[UNIMOD:1]"]
+        assert (info["examples"], info["n_searched"]) == ("unmodified-fallback", 3)
+        assert any(info["scores"] == pytest.approx(p, abs=1e-6) for p in possible)

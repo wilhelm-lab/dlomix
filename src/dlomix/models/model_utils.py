@@ -76,12 +76,14 @@ def load_and_adapt_pretrained_model(
             Name of the column in new_hf_data containing the labels for evaluation
             (default: "intensities_raw").
         - n_examples_for_eval: int
-            Number of examples to use for evaluating each old token fit (default: 100).
-            Of more examples, a random sample is taken, seeded with ``random_seed``.
+            The most spectra searched per new token (default: 100). Of more, a
+            random sample is taken, seeded with ``random_seed``.
         - min_examples_for_eval: int
-            A new token is fitted on the spectra in which it is the only new token.
-            With fewer than this many (default: 20), all spectra with the token are
-            used, the other new tokens encoded as their unmodified residue.
+            How many spectra with the token as their only new token are enough to
+            search on those alone (default: 20; at most ``n_examples_for_eval``).
+            With fewer, spectra that also carry other new tokens are added, up to
+            ``n_examples_for_eval`` in total, the other new tokens encoded as their
+            unmodified residue. 0 never adds them.
         - eval_metric: Callable
             Loss function that takes (labels, predictions) and returns one value per
             sample; the fit is scored as 1 - its median (default:
@@ -668,12 +670,17 @@ def _find_best_fit_tokens_for_new_tokens(
     Every pretrained token but padding and unknown is a candidate; the first of
     equal scores wins.
 
-    The examples of a new token are the spectra in which it is the only new token,
-    so that no candidate is scored on inputs with other, still unknown tokens. If
-    there are fewer than ``min_examples_for_eval`` of them, all spectra with the
-    token are used instead, the other new tokens encoded as their unmodified residue
-    (as the inference preprocessor encodes unseen modifications). Of more than
-    ``n_examples_for_eval`` examples, a random sample (``random_seed``) is searched.
+    Two numbers decide which spectra a new token is searched on:
+
+    - ``n_examples_for_eval`` is the most spectra searched; of more, a random sample
+      (``random_seed``) is taken.
+    - ``min_examples_for_eval`` is how many spectra with the token as their only new
+      token are enough (at most ``n_examples_for_eval``, which is all the search
+      would use). With that many, only such spectra are searched, so that no
+      candidate is scored on inputs with other, still unknown tokens. With fewer,
+      all of them are kept and spectra that also carry other new tokens fill up to
+      ``n_examples_for_eval``, the other new tokens encoded as their unmodified
+      residue (as the inference preprocessor encodes unseen modifications).
 
     Returns one dict per new token:
 
@@ -689,6 +696,19 @@ def _find_best_fit_tokens_for_new_tokens(
 
     if not isinstance(new_hf_data, datasets.Dataset):
         raise ValueError("new_hf_data must be a Hugging Face Dataset object.")
+    if n_examples_for_eval < 1 or min_examples_for_eval < 0:
+        raise ValueError(
+            "n_examples_for_eval must be at least 1 and min_examples_for_eval at "
+            f"least 0, got {n_examples_for_eval} and {min_examples_for_eval}."
+        )
+    enough_sole_token = min(min_examples_for_eval, n_examples_for_eval)
+
+    def sample(rows, size):
+        # the rows Dataset.shuffle(seed=random_seed) would put first
+        if len(rows) <= size:
+            return rows
+        order = np.random.default_rng(random_seed).permutation(len(rows))
+        return [rows[i] for i in order[:size]]
 
     if eval_metric is None:
         from dlomix.losses import masked_spectral_distance
@@ -738,18 +758,19 @@ def _find_best_fit_tokens_for_new_tokens(
         for new in new_tokens:
             with_token = [i for i, row in enumerate(new_tokens_per_row) if new in row]
             sole_token = [i for i in with_token if new_tokens_per_row[i] == {new}]
+            with_others = [i for i in with_token if new_tokens_per_row[i] != {new}]
 
-            use_fallback = len(sole_token) < min(min_examples_for_eval, len(with_token))
-            rows = with_token if use_fallback else sole_token
+            use_fallback = bool(with_others) and len(sole_token) < enough_sole_token
             base_alphabet = dict(alphabet_old)
             if use_fallback:
-                base_alphabet.update(unmodified_fallback)
-
-            examples = new_hf_data.select(rows)
-            if len(examples) > n_examples_for_eval:
-                examples = examples.shuffle(seed=random_seed).select(
-                    range(n_examples_for_eval)
+                # every spectrum with the token alone, filled up with the others
+                rows = sole_token + sample(
+                    with_others, n_examples_for_eval - len(sole_token)
                 )
+                base_alphabet.update(unmodified_fallback)
+            else:
+                rows = sample(sole_token, n_examples_for_eval)
+            examples = new_hf_data.select(sorted(rows))
 
             scores = {}
             if len(examples) > 0:
@@ -772,7 +793,7 @@ def _find_best_fit_tokens_for_new_tokens(
                     else "unmodified-fallback" if use_fallback else "sole-token"
                 ),
                 "n_with_token": len(with_token),
-                "n_left_out": len(with_token) - len(rows),
+                "n_left_out": 0 if use_fallback else len(with_others),
                 "n_searched": len(examples),
             }
     finally:
