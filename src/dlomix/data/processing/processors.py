@@ -302,6 +302,16 @@ class SequencePaddingProcessor(PeptideDatasetBaseProcessor):
             return sequence[: self.max_length], False
 
 
+def unmodified_token(token: str) -> str:
+    """The token of the same residue or terminus without its modification, e.g.
+    ``R[UNIMOD:7]`` -> ``R``, ``[UNIMOD:1]-`` -> ``[]-``, ``-[UNIMOD:2]`` -> ``-[]``."""
+    if token.startswith("["):
+        return "[]-"
+    if token.startswith("-["):
+        return "-[]"
+    return token[0]
+
+
 class SequenceEncodingProcessor(PeptideDatasetBaseProcessor):
     """
     Processor for encoding peptide sequences using an alphabet.
@@ -460,12 +470,7 @@ class SequenceEncodingProcessor(PeptideDatasetBaseProcessor):
         encoded = []
         for amino_acid in sequence:
             if amino_acid not in self.alphabet:
-                if amino_acid.startswith(("[")):
-                    amino_acid = "[]-"
-                elif amino_acid.startswith(("-[")):
-                    amino_acid = "-[]"
-                else:
-                    amino_acid = amino_acid[0]
+                amino_acid = unmodified_token(amino_acid)
 
             encoded.append(self.alphabet.get(amino_acid, self.unknown_token_index))
 

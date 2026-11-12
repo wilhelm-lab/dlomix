@@ -15,6 +15,7 @@ import tensorflow as tf
 from datasets import Dataset
 
 from dlomix.constants import ALPHABET_UNMOD
+from dlomix.data import FragmentIonIntensityDataset
 from dlomix.models import PrositIntensityPredictor, PrositRetentionTimePredictor
 from dlomix.models.model_utils import (
     expand_embedding_vocabulary,
@@ -96,30 +97,27 @@ class TestExpandEmbeddingVocabulary:
         )
         assert adapted(DUMMY_INPUT) is not None
 
-    def test_mean_initialization(
-        self, intensity_model, base_alphabet, expanded_alphabet
-    ):
-        """Test that new tokens are initialized with mean when strategy='mean'."""
-        old_weights = intensity_model.embedding.get_weights()[0]
-        mean_embedding = np.mean(old_weights, axis=0)
+    def test_mean_initialization_averages_residue_rows_only(self):
+        """Padding and the unknown token carry no residue information."""
+        old_alphabet = {"-": 0, "X": 1, "A": 2, "C": 3, "D": 4}
+        new_alphabet = {**old_alphabet, "M[UNIMOD:35]": 5}
+        model = PrositIntensityPredictor(
+            embedding_output_dim=8, seq_length=10, alphabet=old_alphabet
+        )
+        model(DUMMY_INPUT)
+        old_weights = model.embedding.get_weights()[0]
 
-        adapted_model = expand_embedding_vocabulary(
-            model=intensity_model,
-            new_alphabet=expanded_alphabet,
-            old_alphabet=base_alphabet,
+        adapted = expand_embedding_vocabulary(
+            model=model,
+            new_alphabet=new_alphabet,
+            old_alphabet=old_alphabet,
             initialization_strategy="mean",
         )
 
-        new_weights = adapted_model.embedding.get_weights()[0]
-
-        # Check that new tokens have mean embeddings
-        new_tokens = set(expanded_alphabet.keys()) - set(base_alphabet.keys())
-        for token in new_tokens:
-            new_idx = expanded_alphabet[token]
-            embedding = new_weights[new_idx]
-            assert np.allclose(
-                embedding, mean_embedding, atol=1e-5
-            ), f"New token '{token}' should have mean embedding"
+        np.testing.assert_allclose(
+            adapted.embedding.get_weights()[0][5], old_weights[2:].mean(axis=0)
+        )
+        assert_shared_rows_preserved(model, adapted, old_alphabet, new_alphabet)
 
     def test_random_initialization_with_seed(
         self, intensity_model, base_alphabet, expanded_alphabet
@@ -270,62 +268,170 @@ class TestLoadAndAdaptPretrainedModel:
             )
 
 
-def test_best_fit_copies_the_chosen_rows_and_never_picks_padding_or_unknown():
-    """Best-fit runs on its defaults (n_examples_for_eval, eval_metric), copies the
-    chosen pretrained row into each new token, and never picks the padding or
-    unknown token."""
+# --------------------------------- best-fit -----------------------------------
+
+BEST_FIT_OLD_ALPHABET = {"-": 0, "X": 1, "A": 2, "C": 3, "D": 4, "E": 5, "F": 6}
+BEST_FIT_DATASET_KWARGS = {
+    "encoding_scheme": "naive-mods",
+    "max_seq_len": 10,
+    "with_termini": False,
+    "num_proc": None,
+    "model_features": ["collision_energy", "precursor_charge"],
+}
+
+
+def _spectra(sequences):
     rng = np.random.default_rng(0)
-    data = Dataset.from_dict(
+    return Dataset.from_dict(
         {
-            "sequence": ["AM[UNIMOD:1]CDEF", "ES[UNIMOD:2]CDEF", "CT[UNIMOD:3]CDEF"],
-            "collision_energy": [0.25, 0.3, 0.35],
-            "precursor_charge": [1.0, 2.0, 3.0],
-            "label": rng.random((3, 54)).tolist(),  # (10 - 1) positions x 2 x 3
+            "sequence": sequences,
+            "collision_energy": [0.3] * len(sequences),
+            "precursor_charge": [2.0] * len(sequences),
+            # (10 - 1) positions x 2 x 3
+            "label": rng.random((len(sequences), 54)).tolist(),
         }
     )
-    old_alphabet = {"-": 0, "X": 1, "A": 2, "C": 3, "D": 4, "E": 5, "F": 6}
-    new_alphabet = {
-        **old_alphabet,
-        "M[UNIMOD:1]": 7,
-        "S[UNIMOD:2]": 8,
-        "T[UNIMOD:3]": 9,
-    }
+
+
+@pytest.fixture(scope="module")
+def best_fit_model_path(tmp_path_factory):
     model = PrositIntensityPredictor(
         embedding_output_dim=8,
         seq_length=10,
-        alphabet=old_alphabet,
+        alphabet=BEST_FIT_OLD_ALPHABET,
         use_meta_data=True,
         meta_data_keys=["collision_energy", "precursor_charge"],
     )
     model(DUMMY_INPUT)
-    with tempfile.TemporaryDirectory() as tmpdir:
-        model_path = Path(tmpdir) / "intensity_model.keras"
-        model.save(model_path)
-        adapted, fit_info = load_and_adapt_pretrained_model(
-            model_path=str(model_path),
-            new_alphabet=new_alphabet,
-            initialization_strategy="best-fit",
-            best_fit_kwargs={
-                "new_hf_data": data,
-                "sequence_column": "sequence",
-                "label_column": "label",
-                "return_fit_info": True,
-                "dataset_kwargs": {
-                    "encoding_scheme": "naive-mods",
-                    "max_seq_len": 10,
-                    "with_termini": False,
-                    "num_proc": None,
-                    "model_features": ["collision_energy", "precursor_charge"],
-                },
-            },
-        )
+    path = tmp_path_factory.mktemp("best_fit") / "intensity_model.keras"
+    model.save(path)
+    return str(path)
 
-    old_weights = model.embedding.get_weights()[0]
-    new_weights = adapted.embedding.get_weights()[0]
-    assert set(fit_info) == {"M[UNIMOD:1]", "S[UNIMOD:2]", "T[UNIMOD:3]"}
-    for token, info in fit_info.items():
-        assert info, "every new token has examples, so each must get a fit"
-        assert info["old_token"] not in ("-", "X")
-        np.testing.assert_array_equal(
-            new_weights[new_alphabet[token]], old_weights[info["old_token_idx"]]
+
+def _best_fit(model_path, data, new_tokens, random_seed=None, **options):
+    """Adapt the model to ``new_tokens`` by best-fit: (old model, new model, info)."""
+    new_alphabet = dict(BEST_FIT_OLD_ALPHABET)
+    for token in new_tokens:
+        new_alphabet[token] = len(new_alphabet)
+    adapted, fit_info = load_and_adapt_pretrained_model(
+        model_path=model_path,
+        new_alphabet=new_alphabet,
+        initialization_strategy="best-fit",
+        random_seed=random_seed,
+        best_fit_kwargs={
+            "new_hf_data": data,
+            "sequence_column": "sequence",
+            "label_column": "label",
+            "return_fit_info": True,
+            "dataset_kwargs": BEST_FIT_DATASET_KWARGS,
+            **options,
+        },
+    )
+    return tf.keras.models.load_model(model_path), adapted, fit_info
+
+
+def _scores_by_substitution(model, data, token, substitutions=None):
+    """What the search must find: per candidate, the pretrained model's median
+    spectral angle on the sequences with ``token`` written as the candidate."""
+    from dlomix.losses import masked_spectral_distance
+
+    scores = {}
+    for candidate in BEST_FIT_OLD_ALPHABET.keys() - {"-", "X"}:
+        replacements = {token: candidate, **(substitutions or {})}
+
+        def substitute(row):
+            for old, new in replacements.items():
+                row["sequence"] = row["sequence"].replace(old, new)
+            return row
+
+        dataset = FragmentIonIntensityDataset(
+            data_format="hf",
+            test_data_source=data.map(substitute),
+            sequence_column="sequence",
+            label_column="label",
+            alphabet=BEST_FIT_OLD_ALPHABET,
+            **BEST_FIT_DATASET_KWARGS,
         )
+        inputs, labels = next(iter(dataset.tensor_test_data))
+        distance = masked_spectral_distance(labels, model.predict(inputs, verbose=0))
+        scores[candidate] = float(np.median(1 - np.asarray(distance)))
+    return scores
+
+
+def test_best_fit_picks_the_candidate_that_predicts_the_token_best(
+    best_fit_model_path,
+):
+    data = _spectra(["AM[UNIMOD:1]CDEF", "EM[UNIMOD:1]CDEF", "CM[UNIMOD:1]CAAF"])
+
+    model, adapted, fit_info = _best_fit(best_fit_model_path, data, ["M[UNIMOD:1]"])
+
+    info = fit_info["M[UNIMOD:1]"]
+    expected = _scores_by_substitution(model, data, "M[UNIMOD:1]")
+    assert info["scores"] == pytest.approx(expected, abs=1e-6)
+    assert info["old_token"] == max(info["scores"], key=info["scores"].get)
+    assert info["eval"] == info["scores"][info["old_token"]]
+    assert (info["initialization"], info["examples"]) == ("best-fit", "sole-token")
+    np.testing.assert_array_equal(
+        adapted.embedding.get_weights()[0][7],
+        model.embedding.get_weights()[0][info["old_token_idx"]],
+    )
+
+
+def test_best_fit_with_several_new_tokens(best_fit_model_path):
+    sole_a = ["CA[UNIMOD:1]CDEF", "EA[UNIMOD:1]CDEF", "CA[UNIMOD:1]CAAF"]
+    a_and_b = ["CA[UNIMOD:1]CD[UNIMOD:2]F", "FA[UNIMOD:1]D[UNIMOD:2]EF"]
+    sole_b = ["ACD[UNIMOD:2]EF"]
+    data = _spectra(sole_a + a_and_b + sole_b)
+
+    model, adapted, fit_info = _best_fit(
+        best_fit_model_path,
+        data,
+        ["A[UNIMOD:1]", "D[UNIMOD:2]", "T[UNIMOD:3]"],
+        min_examples_for_eval=2,
+    )
+
+    # enough spectra with A[UNIMOD:1] alone: those with D[UNIMOD:2] are left out
+    info = fit_info["A[UNIMOD:1]"]
+    assert info["examples"] == "sole-token"
+    assert (info["n_with_token"], info["n_left_out"], info["n_searched"]) == (5, 2, 3)
+    expected = _scores_by_substitution(model, data.select(range(3)), "A[UNIMOD:1]")
+    assert info["scores"] == pytest.approx(expected, abs=1e-6)
+
+    # too few with D[UNIMOD:2] alone: all its spectra, A[UNIMOD:1] encoded as A
+    info = fit_info["D[UNIMOD:2]"]
+    assert info["examples"] == "unmodified-fallback"
+    assert (info["n_with_token"], info["n_left_out"], info["n_searched"]) == (3, 0, 3)
+    expected = _scores_by_substitution(
+        model, data.select(range(3, 6)), "D[UNIMOD:2]", {"A[UNIMOD:1]": "A"}
+    )
+    assert info["scores"] == pytest.approx(expected, abs=1e-6)
+
+    # no spectra: the mean initialization stays, and the fit info says so
+    info = fit_info["T[UNIMOD:3]"]
+    assert (info["initialization"], info["old_token"]) == ("mean", None)
+    assert (info["scores"], info["n_searched"]) == ({}, 0)
+    np.testing.assert_allclose(
+        adapted.embedding.get_weights()[0][9],
+        model.embedding.get_weights()[0][2:].mean(axis=0),
+        rtol=1e-6,
+    )
+
+
+def test_best_fit_samples_examples_with_the_seed(best_fit_model_path):
+    data = _spectra(
+        [f"{first}M[UNIMOD:1]CD{last}" for first in "ACDEF" for last in "AF"]
+    )
+
+    def scores(seed):
+        _, _, fit_info = _best_fit(
+            best_fit_model_path,
+            data,
+            ["M[UNIMOD:1]"],
+            random_seed=seed,
+            n_examples_for_eval=2,
+        )
+        assert fit_info["M[UNIMOD:1]"]["n_searched"] == 2
+        return fit_info["M[UNIMOD:1]"]["scores"]
+
+    assert scores(seed=0) == scores(seed=0)
+    assert any(scores(seed) != scores(seed=0) for seed in (1, 2, 3))

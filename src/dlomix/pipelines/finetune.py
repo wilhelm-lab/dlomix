@@ -107,7 +107,8 @@ class FineTunePipeline:
         verbatim to :func:`load_and_adapt_pretrained_model`.  Must contain at
         minimum ``new_hf_data`` (a Hugging Face ``Dataset`` of raw sequences).
         Optionally ``sequence_column``, ``label_column``, ``n_examples_for_eval``,
-        ``eval_metric``, ``return_fit_info`` (bool) and ``dataset_kwargs`` (dict).
+        ``min_examples_for_eval``, ``eval_metric``, ``return_fit_info`` (bool) and
+        ``dataset_kwargs`` (dict).
     seed:
         Random seed for reproducibility.
     output_model_path:

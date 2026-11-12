@@ -13,8 +13,18 @@ import numpy as np
 import tensorflow as tf
 
 from dlomix.data import FragmentIonIntensityDataset
+from dlomix.data.processing.processors import (
+    SequenceParsingProcessor,
+    unmodified_token,
+)
 
 logger = logging.getLogger(__name__)
+
+
+# The padding and unknown tokens carry no residue information, and their embeddings
+# are not trained like a residue's: they never initialize a new token, neither as a
+# best-fit candidate nor as part of the mean.
+_NON_RESIDUE_TOKENS = ("-", "X")
 
 
 def load_and_adapt_pretrained_model(
@@ -47,7 +57,8 @@ def load_and_adapt_pretrained_model(
         Name of the embedding layer to expand. Defaults to "embedding".
     initialization_strategy : {'random', 'mean', 'best-fit'}, optional
         Strategy for initializing new token embeddings: Glorot-uniform random
-        values, the mean of the pretrained embeddings, or ('best-fit') the
+        values, the mean of the pretrained residue embeddings (the padding and
+        unknown tokens are left out), or ('best-fit') the
         embedding of the pretrained token whose substitution predicts the new
         token's spectra best (requires ``best_fit_kwargs``). Defaults to 'random'.
     random_seed : int, optional
@@ -67,12 +78,20 @@ def load_and_adapt_pretrained_model(
             (default: "intensities_raw").
         - n_examples_for_eval: int
             Number of examples to use for evaluating each old token fit (default: 100).
+            Of more examples, a random sample is taken, seeded with ``random_seed``.
+        - min_examples_for_eval: int
+            A new token is fitted on the spectra in which it is the only new token.
+            With fewer than this many (default: 20), all spectra with the token are
+            used, the other new tokens encoded as their unmodified residue.
         - eval_metric: Callable
             Loss function that takes (labels, predictions) and returns one value per
             sample; the fit is scored as 1 - its median (default:
             ``masked_spectral_distance``).
         - return_fit_info: bool
-            Whether to return detailed fit information for each new token (default: False).
+            Whether to also return the search per new token (default: False): the
+            pick, every candidate's score, the number of spectra searched and left
+            out, which examples were used, and whether the token fell back to the
+            mean initialization for lack of examples.
         - dataset_kwargs: Dict
             Additional keyword arguments to pass when creating the FragmentIonIntensityDataset for evaluation.
 
@@ -147,6 +166,7 @@ def load_and_adapt_pretrained_model(
                 "sequence_column",
                 "label_column",
                 "n_examples_for_eval",
+                "min_examples_for_eval",
                 "eval_metric",
             )
             if best_fit_kwargs.get(key) is not None
@@ -156,12 +176,10 @@ def load_and_adapt_pretrained_model(
             alphabet_old=old_alphabet,
             alphabet_new=new_alphabet,
             old_model=old_model,
+            random_seed=random_seed,
             **search_kwargs,
             **best_fit_kwargs.get("dataset_kwargs", {}),
         )
-
-        # best fit dict has the format
-        # {'M[UNIMOD:35]': {'eval': 0.9156792, 'old_token': 'V', 'old_token_idx': 6}, 'C[UNIMOD:4]': {'eval': 0.9577802, 'old_token': 'C', 'old_token_idx': 2}}
 
         old_weights = _get_embedding_layer(
             old_model, embedding_layer_name
@@ -171,9 +189,7 @@ def load_and_adapt_pretrained_model(
         )
 
         for new_token, fit_info in best_fit_dict.items():
-            if (
-                not fit_info
-            ):  # no examples found for this token — keep mean-init fallback
+            if fit_info["old_token"] is None:  # no examples: keep the mean fallback
                 logger.warning(
                     "No evaluation examples found for new token '%s'; "
                     "keeping mean-initialization fallback.",
@@ -228,7 +244,8 @@ def expand_embedding_vocabulary(
         Name of the embedding layer to expand. Defaults to "embedding".
     initialization_strategy : {'random', 'mean'}, optional
         Strategy for initializing new token embeddings: Glorot-uniform random
-        values or the mean of the existing embeddings. Defaults to 'random'.
+        values or the mean of the existing residue embeddings (the padding and
+        unknown tokens are left out). Defaults to 'random'.
         ('best-fit' is available through :func:`load_and_adapt_pretrained_model`.)
     random_seed : int, optional
         Random seed for reproducible initialization. Defaults to None.
@@ -432,9 +449,21 @@ def _create_expanded_embedding_weights(
 
     # Initialize new embeddings
     if initialization_strategy == "mean":
-        mean_embedding = np.mean(old_weights, axis=0)
+        residue_rows = [
+            idx
+            for token, idx in old_alphabet.items()
+            if token not in _NON_RESIDUE_TOKENS
+        ]
+        if not residue_rows:
+            raise ValueError(
+                "initialization_strategy='mean' needs at least one token other than "
+                f"{_NON_RESIDUE_TOKENS} in the old alphabet to average."
+            )
+        mean_embedding = np.mean(old_weights[residue_rows], axis=0)
         new_weights = np.tile(mean_embedding, (new_vocab_size, 1))
-        logger.info("Initialized new embeddings with mean of existing embeddings")
+        logger.info(
+            "Initialized new embeddings with the mean of the residue embeddings"
+        )
     elif initialization_strategy == "random":
         limit = np.sqrt(6.0 / (new_vocab_size + embedding_dim))
         new_weights = np.random.uniform(
@@ -539,11 +568,6 @@ def _load_model_with_custom_objects(
     return model
 
 
-# Never candidates for best-fit: the padding and unknown tokens carry no residue
-# information, and their embeddings are not trained like a residue's.
-_BEST_FIT_EXCLUDED_TOKENS = ("-", "X")
-
-
 def _find_best_fit_tokens_for_new_tokens(
     new_hf_data,
     alphabet_old,
@@ -552,9 +576,40 @@ def _find_best_fit_tokens_for_new_tokens(
     sequence_column="modified_sequence",
     label_column="intensities_raw",
     n_examples_for_eval=100,
+    min_examples_for_eval=20,
     eval_metric=None,
+    random_seed=None,
     **dataset_kwargs,
 ):
+    """Search, for every new token, the pretrained token that predicts its spectra best.
+
+    A candidate is scored by encoding the new token as the candidate and taking
+    ``1 - median(eval_metric)`` of the pretrained model over the token's examples.
+    Every pretrained token but padding and unknown is a candidate; the first of
+    equal scores wins.
+
+    The examples of a new token are the spectra in which it is the only new token,
+    so that no candidate is scored on inputs with other, still unknown tokens. If
+    there are fewer than ``min_examples_for_eval`` of them, all spectra with the
+    token are used instead, the other new tokens encoded as their unmodified residue
+    (as the inference preprocessor encodes unseen modifications). Of more than
+    ``n_examples_for_eval`` examples, a random sample (``random_seed``) is searched.
+
+    Returns one dict per new token:
+
+    - ``old_token``, ``old_token_idx``, ``eval``: the pick and its score, or None
+      when the token has no examples; it then keeps its mean initialization.
+    - ``initialization``: ``"best-fit"`` or ``"mean"``.
+    - ``scores``: every candidate's score.
+    - ``examples``: ``"sole-token"``, ``"unmodified-fallback"`` or None.
+    - ``n_with_token``: spectra containing the token; ``n_left_out``: those of them
+      excluded for carrying other new tokens; ``n_searched``: spectra scored.
+    """
+    import datasets
+
+    if not isinstance(new_hf_data, datasets.Dataset):
+        raise ValueError("new_hf_data must be a Hugging Face Dataset object.")
+
     if eval_metric is None:
         from dlomix.losses import masked_spectral_distance
 
@@ -564,62 +619,88 @@ def _find_best_fit_tokens_for_new_tokens(
     candidates = {
         token: idx
         for token, idx in alphabet_old.items()
-        if token not in _BEST_FIT_EXCLUDED_TOKENS
+        if token not in _NON_RESIDUE_TOKENS
     }
-    best_fit_dict = {}
-    best_sa = 0
 
-    import datasets
+    # the other new tokens as their unmodified residue, where the model knows it
+    unmodified_fallback = {
+        token: alphabet_old[unmodified_token(token)]
+        for token in new_tokens
+        if unmodified_token(token) in alphabet_old
+    }
+
+    parser = SequenceParsingProcessor(sequence_column)
+    new_tokens_per_row = [
+        set(parser.single_process({sequence_column: sequence})[sequence_column])
+        & set(new_tokens)
+        for sequence in new_hf_data[sequence_column]
+    ]
+
+    def score(examples, alphabet):
+        # throwaway dataset, built once per candidate: its warnings only repeat noise
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", UserWarning)
+            data = FragmentIonIntensityDataset(
+                data_format="hf",
+                test_data_source=examples,
+                sequence_column=sequence_column,
+                label_column=label_column,
+                alphabet=alphabet,
+                **dataset_kwargs,
+            )
+        per_spectrum = [
+            1 - np.asarray(eval_metric(labels, old_model.predict(inputs, verbose=0)))
+            for inputs, labels in data.tensor_test_data
+        ]
+        return float(np.median(np.concatenate([s.reshape(-1) for s in per_spectrum])))
 
     datasets.disable_progress_bar()
+    try:
+        fit_info = {}
+        for new in new_tokens:
+            with_token = [i for i, row in enumerate(new_tokens_per_row) if new in row]
+            sole_token = [i for i in with_token if new_tokens_per_row[i] == {new}]
 
-    if not isinstance(new_hf_data, datasets.Dataset):
-        raise ValueError("new_hf_data must be a Hugging Face Dataset object.")
+            use_fallback = len(sole_token) < min(min_examples_for_eval, len(with_token))
+            rows = with_token if use_fallback else sole_token
+            base_alphabet = dict(alphabet_old)
+            if use_fallback:
+                base_alphabet.update(unmodified_fallback)
 
-    for new in new_tokens:
-        best_fit_dict[new] = {}
-        best_sa = -np.inf  # ensure the first valid SA (even negative) is recorded
-
-        filtered_data = new_hf_data.filter(lambda x: new in x[sequence_column])
-
-        if len(filtered_data) == 0:
-            continue
-        if len(filtered_data) <= n_examples_for_eval:
-            example_data = filtered_data
-        else:
-            example_data = filtered_data.take(n_examples_for_eval)
-
-        for current_old_token, current_old_token_idx in candidates.items():
-            temp_alphabet = alphabet_old.copy()
-            temp_alphabet.update({new: current_old_token_idx})
-            # throwaway datasets, built once per candidate: their warnings (e.g. the
-            # other new tokens missing from temp_alphabet) only repeat noise
-            with warnings.catch_warnings():
-                warnings.simplefilter("ignore", UserWarning)
-                test_data_current_token = FragmentIonIntensityDataset(
-                    data_format="hf",
-                    test_data_source=example_data,
-                    sequence_column=sequence_column,
-                    label_column=label_column,
-                    alphabet=temp_alphabet,
-                    **dataset_kwargs,
+            examples = new_hf_data.select(rows)
+            if len(examples) > n_examples_for_eval:
+                examples = examples.shuffle(seed=random_seed).select(
+                    range(n_examples_for_eval)
                 )
 
-            sa = []
-            for inputs, labels in test_data_current_token.tensor_test_data:
-                preds = old_model.predict(inputs, verbose=0)
-                current_sa = 1 - np.asarray(eval_metric(labels, preds))
-                sa.extend(current_sa.reshape(-1))
-            sa = np.median(sa)
-            if sa > best_sa:
-                best_sa = sa
-                best_fit_dict[new]["eval"] = sa
-                best_fit_dict[new]["old_token"] = current_old_token
-                best_fit_dict[new]["old_token_idx"] = current_old_token_idx
+            scores = {}
+            if len(examples) > 0:
+                scores = {
+                    candidate: score(examples, {**base_alphabet, new: candidate_idx})
+                    for candidate, candidate_idx in candidates.items()
+                }
+            # max returns the first of equal scores
+            best = max(scores, key=scores.get) if scores else None
 
-    datasets.enable_progress_bar()
+            fit_info[new] = {
+                "old_token": best,
+                "old_token_idx": candidates[best] if best else None,
+                "eval": scores[best] if best else None,
+                "initialization": "best-fit" if best else "mean",
+                "scores": scores,
+                "examples": (
+                    None
+                    if not scores
+                    else "unmodified-fallback" if use_fallback else "sole-token"
+                ),
+                "n_with_token": len(with_token),
+                "n_left_out": len(with_token) - len(rows),
+                "n_searched": len(examples),
+            }
+    finally:
+        datasets.enable_progress_bar()
 
-    return best_fit_dict
+    return fit_info
 
 
 def download_remote_model_weights(
