@@ -383,3 +383,19 @@ def test_model_card_notes_extracted_ptm_features(tmp_path):
     assert '"delta_mass"' not in card
     assert "computed from the sequence automatically" in card
     assert "`mod_loss`, `delta_mass`" in card
+
+
+def test_load_warning_names_the_changed_preprocessing_settings(
+    rt_dataset, rt_model, tmp_path
+):
+    import json
+
+    save_dir = tmp_path / "bundle"
+    InferencePipeline.from_model_and_dataset(rt_model, rt_dataset).save(str(save_dir))
+    artifact = save_dir / "dlomix_preprocessor.json"
+    settings = json.loads(artifact.read_text())
+    settings["sequence_column"] = "peptide"
+    artifact.write_text(json.dumps(settings))
+
+    with pytest.warns(UserWarning, match="changed settings: sequence_column"):
+        InferencePipeline.load(str(save_dir))

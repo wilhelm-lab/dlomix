@@ -5,6 +5,17 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+- `load_processed_dataset` gives the tensors of the active backend (`DLOMIX_BACKEND`),
+  whichever backend the dataset was saved on; before, a dataset saved on TensorFlow
+  kept `dataset_type="tf"` on PyTorch until overridden by hand. Pass `dataset_type=`
+  to choose explicitly.
+- The warning for a preprocessor that does not match the one a pipeline was saved
+  with names the settings that changed (`InferencePipeline.load`). Bundles record
+  these settings from this release on; for older bundles the warning says so.
+
 ## [0.3.1] - 2026-10-06
 
 ### Changed
