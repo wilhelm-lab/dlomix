@@ -126,8 +126,34 @@ def load_and_adapt_pretrained_model(
     """
     logger.info(f"Loading pre-trained model from: {model_path}")
 
-    model = _load_model_with_custom_objects(model_path, custom_objects)
+    return adapt_pretrained_model(
+        _load_model_with_custom_objects(model_path, custom_objects),
+        new_alphabet=new_alphabet,
+        old_alphabet=old_alphabet,
+        embedding_layer_name=embedding_layer_name,
+        initialization_strategy=initialization_strategy,
+        random_seed=random_seed,
+        best_fit_kwargs=best_fit_kwargs,
+    )
 
+
+def adapt_pretrained_model(
+    model: tf.keras.Model,
+    new_alphabet: Dict[str, int],
+    old_alphabet: Optional[Dict[str, int]] = None,
+    embedding_layer_name: str = "embedding",
+    initialization_strategy: Literal["random", "mean", "best-fit"] = "random",
+    random_seed: Optional[int] = None,
+    best_fit_kwargs: Optional[Dict] = None,
+) -> tf.keras.Model:
+    """
+    Adapt a loaded pre-trained model to a new vocabulary.
+
+    The step of :func:`load_and_adapt_pretrained_model` after loading, for a model
+    that is already in memory, e.g. ``InferencePipeline.from_pretrained(...).model``.
+    ``model`` is left unchanged; a new model is returned. The arguments and the
+    return value are those of :func:`load_and_adapt_pretrained_model`.
+    """
     # Extract old alphabet if not provided
     if old_alphabet is None:
         old_alphabet = get_alphabet_from_model(model)
@@ -146,7 +172,7 @@ def load_and_adapt_pretrained_model(
         first_initialization_strategy = "mean"  # Fallback to mean for new tokens
 
     # Expand the vocabulary
-    model = expand_embedding_vocabulary(
+    adapted = expand_embedding_vocabulary(
         model=model,
         new_alphabet=new_alphabet,
         old_alphabet=old_alphabet,
@@ -156,7 +182,7 @@ def load_and_adapt_pretrained_model(
     )
 
     if initialization_strategy == "best-fit":
-        old_model = _load_model_with_custom_objects(model_path, custom_objects)
+        old_model = model  # unchanged: the expansion builds a new model
 
         # forward only the options given, so the search's defaults apply otherwise
         search_kwargs = {
@@ -184,7 +210,7 @@ def load_and_adapt_pretrained_model(
             old_model, embedding_layer_name
         ).get_weights()[0]
         new_weights = (
-            _get_embedding_layer(model, embedding_layer_name).get_weights()[0].copy()
+            _get_embedding_layer(adapted, embedding_layer_name).get_weights()[0].copy()
         )
 
         for new_token, fit_info in best_fit_dict.items():
@@ -206,12 +232,12 @@ def load_and_adapt_pretrained_model(
             )
 
         # set the embedding weights one final time to apply all updates
-        _get_embedding_layer(model, embedding_layer_name).set_weights([new_weights])
+        _get_embedding_layer(adapted, embedding_layer_name).set_weights([new_weights])
 
         if best_fit_kwargs.get("return_fit_info", False):
-            return model, best_fit_dict
+            return adapted, best_fit_dict
 
-    return model
+    return adapted
 
 
 def expand_embedding_vocabulary(

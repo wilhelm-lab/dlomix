@@ -21,6 +21,27 @@ Typical usage
 
     # Option C — chained one-liner
     history = FineTunePipeline(...).setup().finetune()
+
+    # Option D — from a pretrained inference bundle and Hugging Face data: the
+    # bundle's preprocessing settings build the dataset, the tokens new to the
+    # model are found in the data and added to its vocabulary
+    pipeline = FineTunePipeline.from_pretrained(
+        "my-org/prosit-intensity", data, initialization_strategy="best-fit"
+    )
+    history = pipeline.finetune()
+
+    # Option E — every step of option D by hand, to change any of them
+    base = InferencePipeline.from_pretrained("my-org/prosit-intensity")
+    alphabet = extend_alphabet(
+        base.model.alphabet,
+        find_new_tokens(data["train"]["modified_sequence"], base.model.alphabet),
+    )
+    dataset = FragmentIonIntensityDataset(
+        data_source=data, data_format="hf", alphabet=alphabet,
+        **base.preprocessor.dataset_settings,
+    )
+    model = adapt_pretrained_model(base.model, alphabet, initialization_strategy="mean")
+    pipeline = FineTunePipeline.from_dataset_and_model(dataset, model)
 """
 
 from __future__ import annotations
@@ -31,7 +52,12 @@ from pathlib import Path
 from typing import Any
 
 from ..config import _BACKEND, PYTORCH_BACKEND
-from ..data import FragmentIonIntensityDataset, PeptideDataset
+from ..data import (
+    FragmentIonIntensityDataset,
+    PeptideDataset,
+    extend_alphabet,
+    find_new_tokens,
+)
 from ..losses import masked_spectral_distance
 
 logger = logging.getLogger(__name__)
@@ -43,10 +69,15 @@ _IS_TORCH = _BACKEND in PYTORCH_BACKEND
 # backend. Fine-tuning is TensorFlow-only for now: the methods that need these
 # helpers call ``_require_tensorflow`` first.
 if _IS_TORCH:
+    adapt_pretrained_model = None
     download_remote_model_weights = None
     load_and_adapt_pretrained_model = None
 else:
-    from ..models import download_remote_model_weights, load_and_adapt_pretrained_model
+    from ..models import (
+        adapt_pretrained_model,
+        download_remote_model_weights,
+        load_and_adapt_pretrained_model,
+    )
 
 TRAINABLE_MODES = ("all", "embedding", "new_tokens")
 
@@ -297,6 +328,160 @@ class FineTunePipeline:
         instance.dataset = dataset
         instance.model = model
         instance.best_fit_info = None
+        return instance
+
+    @classmethod
+    def from_pretrained(
+        cls,
+        base,
+        data,
+        label_column: str = "intensities_raw",
+        initialization_strategy: str = "random",
+        best_fit_kwargs: dict | None = None,
+        trainable: str = "all",
+        seed: int = 42,
+        output_model_path: str = "./finetuned_model",
+        epochs: int = 10,
+        batch_size: int = 64,
+        learning_rate: float = 1e-4,
+        revision: str | None = None,
+        dataset_kwargs: dict | None = None,
+    ) -> "FineTunePipeline":
+        """Create a ready-to-use pipeline from a pretrained bundle and new data.
+
+        The bundle's preprocessing settings (sequence column, sequence length,
+        termini, features) build the dataset; the tokens of the data that the model
+        does not know are added to its vocabulary, after the known ones; and their
+        embeddings are initialized by ``initialization_strategy``. :meth:`setup`
+        does not need to be called.
+
+        This composes public steps, which can be called one by one to change any of
+        them: :func:`~dlomix.data.find_new_tokens`,
+        :func:`~dlomix.data.extend_alphabet`, the dataset class with
+        ``base.preprocessor.dataset_settings``,
+        :func:`~dlomix.models.adapt_pretrained_model` and
+        :meth:`from_dataset_and_model`.
+
+        Parameters
+        ----------
+        base:
+            The pretrained model with its preprocessing: an
+            :class:`~dlomix.pipelines.InferencePipeline`, the path of a saved one,
+            or the Hugging Face Hub repo id of one (see ``revision``).
+        data:
+            The fine-tuning data: a Hugging Face ``DatasetDict`` with a ``train``
+            split (and ``val`` / ``test``), or a single ``Dataset`` to be split with
+            ``dataset_kwargs`` (e.g. ``{"val_ratio": 0.1}``). It needs the bundle's
+            sequence and feature columns and ``label_column``.
+        label_column:
+            Column with the observed intensities.
+        initialization_strategy:
+            ``"random"``, ``"mean"`` or ``"best-fit"``, as in
+            :func:`~dlomix.models.load_and_adapt_pretrained_model`.
+        best_fit_kwargs:
+            Options of the best-fit search, e.g. ``n_examples_for_eval``. The
+            examples (the training split, or every row of a single ``Dataset``),
+            the columns, the dataset settings and
+            ``return_fit_info`` default to this pipeline's; the search is stored in
+            ``best_fit_info``.
+        trainable:
+            What :meth:`finetune` trains: ``"all"`` (default), ``"embedding"`` or
+            ``"new_tokens"``.
+        seed:
+            Seed of the embedding initialization and the best-fit sample.
+        output_model_path, epochs, batch_size, learning_rate:
+            As in the constructor.
+        revision:
+            Commit, branch or tag of the Hub repo, when ``base`` is a repo id.
+        dataset_kwargs:
+            Further arguments of :class:`~dlomix.data.FragmentIonIntensityDataset`,
+            e.g. ``val_ratio``, ``dataset_columns_to_keep`` or ``shuffle``. The
+            bundle's settings and the alphabet cannot be changed here.
+
+        Attributes set: ``dataset``, ``model``, ``new_tokens``, ``best_fit_info``.
+        """
+        _require_tensorflow("from_pretrained")
+        from .predictor import InferencePipeline
+
+        if isinstance(base, (str, Path)):
+            base = (
+                InferencePipeline.load(str(base))
+                if Path(base).exists()
+                else InferencePipeline.from_pretrained(str(base), revision=revision)
+            )
+        settings = base.preprocessor.dataset_settings
+        dataset_kwargs = dict(dataset_kwargs or {})
+        fixed = sorted({"alphabet", "data_source", "data_format", *settings})
+        if clash := sorted(set(fixed) & dataset_kwargs.keys()):
+            raise ValueError(
+                f"dataset_kwargs sets {clash}, which come from the pretrained bundle "
+                "and the data. To change them, build the dataset and the model "
+                "yourself and use from_dataset_and_model()."
+            )
+
+        # the alphabet is learned from the training and validation data only
+        splits = (
+            [data[name] for name in ("train", "val") if name in data]
+            if isinstance(data, dict)
+            else [data]
+        )
+        sequence_column = settings["sequence_column"]
+        base_alphabet = dict(base.model.alphabet)
+        new_tokens = find_new_tokens(
+            (sequence for split in splits for sequence in split[sequence_column]),
+            base_alphabet,
+            with_termini=settings["with_termini"],
+        )
+        alphabet = extend_alphabet(base_alphabet, new_tokens)
+
+        dataset = FragmentIonIntensityDataset(
+            data_source=data,
+            data_format="hf",
+            label_column=label_column,
+            alphabet=alphabet,
+            batch_size=batch_size,
+            **settings,
+            **dataset_kwargs,
+        )
+
+        best_fit_info = None
+        if initialization_strategy == "best-fit":
+            search_settings = {
+                key: value
+                for key, value in settings.items()
+                if key != "sequence_column"
+            }
+            best_fit_kwargs = {
+                "new_hf_data": splits[0],
+                "sequence_column": sequence_column,
+                "label_column": label_column,
+                "dataset_kwargs": search_settings,
+                **(best_fit_kwargs or {}),
+                "return_fit_info": True,
+            }
+        model = adapt_pretrained_model(
+            base.model,
+            new_alphabet=alphabet,
+            initialization_strategy=initialization_strategy,
+            random_seed=seed,
+            best_fit_kwargs=best_fit_kwargs,
+        )
+        if isinstance(model, tuple):
+            model, best_fit_info = model
+
+        instance = cls.from_dataset_and_model(
+            dataset,
+            model,
+            output_model_path=output_model_path,
+            epochs=epochs,
+            learning_rate=learning_rate,
+            trainable=trainable,
+            new_tokens=new_tokens,
+        )
+        instance.initialization_strategy = initialization_strategy
+        instance.best_fit_kwargs = best_fit_kwargs
+        instance.best_fit_info = best_fit_info
+        instance.seed = seed
         return instance
 
     # ------------------------------------------------------------------

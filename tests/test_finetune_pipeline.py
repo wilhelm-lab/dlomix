@@ -16,8 +16,17 @@ import yaml
 from datasets import Dataset
 
 from dlomix.constants import ALPHABET_UNMOD
-from dlomix.data import FragmentIonIntensityDataset
-from dlomix.models import PrositIntensityPredictor, load_and_adapt_pretrained_model
+from dlomix.data import (
+    FragmentIonIntensityDataset,
+    PeptidePreprocessor,
+    extend_alphabet,
+    find_new_tokens,
+)
+from dlomix.models import (
+    PrositIntensityPredictor,
+    adapt_pretrained_model,
+    load_and_adapt_pretrained_model,
+)
 from dlomix.pipelines import InferencePipeline
 from dlomix.pipelines.finetune import FineTunePipeline
 
@@ -223,7 +232,9 @@ class TestSetupAndFinetune:
     ):
         """An explicit new_model_vocab must also encode the data; a dataset left
         to learn its own alphabet would give the same tokens other indices."""
-        from dlomix.data import FragmentIonIntensityDataset
+        from dlomix.data import (
+            FragmentIonIntensityDataset,
+        )
 
         learned = FragmentIonIntensityDataset(
             data_format="parquet",
@@ -429,18 +440,22 @@ NEW_VOCAB = {**OLD_VOCAB, NEW_TOKEN: 7}
 FEATURES = ["collision_energy", "precursor_charge"]
 
 
-def _small_dataset(sequences):
+def _raw_data(sequences):
     rng = np.random.default_rng(0)
+    return Dataset.from_dict(
+        {
+            "sequence": sequences,
+            "collision_energy": [0.3] * len(sequences),
+            "precursor_charge": [2.0] * len(sequences),
+            "label": rng.random((len(sequences), 54)).tolist(),
+        }
+    )
+
+
+def _small_dataset(sequences):
     return FragmentIonIntensityDataset(
         data_format="hf",
-        data_source=Dataset.from_dict(
-            {
-                "sequence": sequences,
-                "collision_energy": [0.3] * len(sequences),
-                "precursor_charge": [2.0] * len(sequences),
-                "label": rng.random((len(sequences), 54)).tolist(),
-            }
-        ),
+        data_source=_raw_data(sequences),
         sequence_column="sequence",
         label_column="label",
         model_features=FEATURES,
@@ -592,3 +607,83 @@ class TestKeepStartingModel:
 
         assert not hasattr(history, "kept_model")
         assert _changed(before, new_token_pipeline.model.get_weights())
+
+
+class TestFromPretrained:
+    """A pipeline from a pretrained bundle and raw data, and the same by hand."""
+
+    DATASET_KWARGS = {"val_ratio": 0.25, "num_proc": None}
+
+    @pytest.fixture
+    def base(self, base_model_path):
+        preprocessor = PeptidePreprocessor(
+            alphabet=OLD_VOCAB,
+            sequence_column="sequence",
+            max_seq_len=10,
+            with_termini=False,
+            model_features=FEATURES,
+        )
+        return InferencePipeline(
+            tf.keras.models.load_model(base_model_path), preprocessor
+        )
+
+    @pytest.mark.parametrize("strategy", ["mean", "best-fit"])
+    def test_equals_the_public_steps_done_by_hand(self, base, strategy):
+        data = _raw_data([f"A{NEW_TOKEN}{rest}" for rest in "ACDEF"] * 4)
+
+        pipeline = FineTunePipeline.from_pretrained(
+            base,
+            data,
+            label_column="label",
+            initialization_strategy=strategy,
+            trainable="new_tokens",
+            seed=0,
+            epochs=1,
+            batch_size=4,
+            dataset_kwargs=self.DATASET_KWARGS,
+        )
+
+        settings = base.preprocessor.dataset_settings
+        alphabet = extend_alphabet(
+            OLD_VOCAB, find_new_tokens(data["sequence"], OLD_VOCAB, with_termini=False)
+        )
+        by_hand = adapt_pretrained_model(
+            base.model,
+            alphabet,
+            initialization_strategy=strategy,
+            random_seed=0,
+            best_fit_kwargs={
+                "new_hf_data": data,
+                "sequence_column": "sequence",
+                "label_column": "label",
+                "dataset_kwargs": {
+                    k: v for k, v in settings.items() if k != "sequence_column"
+                },
+            },
+        )
+
+        assert pipeline.new_tokens == [NEW_TOKEN]
+        assert pipeline.dataset.extended_alphabet == alphabet == NEW_VOCAB
+        for ours, theirs in zip(
+            pipeline.model.get_weights(), by_hand.get_weights(), strict=True
+        ):
+            np.testing.assert_array_equal(ours, theirs)
+        if strategy == "best-fit":
+            assert pipeline.best_fit_info[NEW_TOKEN]["old_token"] in OLD_VOCAB
+        # the pretrained model is left as it was
+        assert base.model.alphabet == OLD_VOCAB
+        assert base.model.embedding.get_weights()[0].shape[0] == len(OLD_VOCAB)
+
+        # ready to train, and the new tokens are known without naming them
+        known, new, body = _weights(pipeline.model)
+        pipeline.finetune(keep_starting_model=False)
+        known_after, new_after, body_after = _weights(pipeline.model)
+        np.testing.assert_array_equal(known_after, known)
+        assert not _changed(body, body_after)
+        assert not np.array_equal(new_after, new)
+
+    def test_settings_of_the_bundle_cannot_be_overridden(self, base):
+        with pytest.raises(ValueError, match="max_seq_len"):
+            FineTunePipeline.from_pretrained(
+                base, _raw_data(["ACD"]), dataset_kwargs={"max_seq_len": 5}
+            )
