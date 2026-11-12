@@ -122,18 +122,14 @@ def from_dataset_method(derive):
     def from_dataset(cls, dataset, **kwargs):
         return cls(**dataset_arguments(derive, dataset, kwargs))
 
-    from_dataset.__doc__ = f"""Build the model for a dlomix dataset.
-
-        The arguments that must agree with the dataset are taken from it:
-        {derive.__doc__}
-
-        Pass everything else, e.g. the layer sizes, as keyword arguments::
-
-            model = Model.from_dataset(dataset, **other_arguments)
-
-        Raises
-        ------
-        ValueError
-            If a keyword argument contradicts the dataset.
-        """
+    taken = " ".join(derive.__doc__.split())
+    from_dataset.__doc__ = (
+        "Build the model for a dlomix dataset.\n\n"
+        "The arguments that must agree with the dataset are taken from it: "
+        f"{taken}\n\n"
+        "Pass everything else, e.g. the layer sizes, as keyword arguments::\n\n"
+        "    model = Model.from_dataset(dataset, **other_arguments)\n\n"
+        "Raises\n------\nValueError\n"
+        "    If a keyword argument contradicts the dataset.\n"
+    )
     return classmethod(from_dataset)
