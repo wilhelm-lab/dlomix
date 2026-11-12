@@ -15,6 +15,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The warning for a preprocessor that does not match the one a pipeline was saved
   with names the settings that changed (`InferencePipeline.load`). Bundles record
   these settings from this release on; for older bundles the warning says so.
+- Release workflow: `pypa/gh-action-pypi-publish` 1.14.3, which fixes the security
+  advisory GHSA-5xjx-3w67-w9x9.
 
 ## [0.3.1] - 2026-10-06
 
