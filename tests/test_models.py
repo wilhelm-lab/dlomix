@@ -1,10 +1,14 @@
+import inspect
 import logging
+import warnings
 
 import keras
 import pytest
 import tensorflow as tf
+from datasets import Dataset
 
 from dlomix.constants import ALPHABET_UNMOD, PTMS_ALPHABET
+from dlomix.data import FragmentIonIntensityDataset
 from dlomix.models.chargestate import ChargeStatePredictor
 from dlomix.models.deepLC import DeepLCRetentionTimePredictor
 from dlomix.models.prosit import PrositIntensityPredictor, PrositRetentionTimePredictor
@@ -310,3 +314,241 @@ def test_alphabet_carrying_padding_and_unknown_is_accepted():
 
     assert model.embeddings_count == len(extended)
     assert model.embeddings_count > max(extended.values())
+
+
+# ----------------------- training flag reaches the layers ----------------------
+
+
+def _keras_model_catalogue():
+    import dlomix.models as catalogue
+
+    exported = (getattr(catalogue, name) for name in catalogue.__all__)
+    return [
+        obj
+        for obj in exported
+        if isinstance(obj, type) and issubclass(obj, keras.Model)
+    ]
+
+
+@pytest.mark.parametrize("model_class", _keras_model_catalogue())
+def test_catalogue_model_call_declares_training(model_class):
+    # Keras 3's fit passes training=True only to a call() that declares it;
+    # without it the model trains in inference mode (dropout off), silently.
+    assert "training" in inspect.signature(model_class.call).parameters
+
+
+def _fit_and_evaluate_loss(model_class, dropout_rate):
+    """Loss of one batch as ``fit`` and as ``evaluate`` report it, weights frozen.
+
+    The targets are the model's own inference-mode predictions, so ``evaluate``
+    gives zero and ``fit`` differs only if it runs the model in training mode.
+    """
+    keras.utils.set_random_seed(0)
+    model = model_class(
+        dropout_rate=dropout_rate,
+        latent_dropout_rate=dropout_rate,
+        recurrent_layers_sizes=(8, 8),
+        regressor_layer_size=8,
+    )
+    x = tf.random.uniform((64, 32), maxval=len(ALPHABET_UNMOD), dtype=tf.int32)
+    y = model.predict(x, batch_size=64, verbose=0)
+    model.compile(optimizer=keras.optimizers.SGD(learning_rate=0.0), loss="mse")
+    fit_loss = model.fit(x, y, batch_size=64, epochs=1, verbose=0).history["loss"][0]
+    return fit_loss, model.evaluate(x, y, batch_size=64, verbose=0)
+
+
+@pytest.mark.parametrize(
+    "model_class",
+    [PrositRetentionTimePredictor, PrositIntensityPredictor, ChargeStatePredictor],
+)
+def test_fit_applies_dropout(model_class):
+    fit_loss, eval_loss = _fit_and_evaluate_loss(model_class, dropout_rate=0.5)
+    assert fit_loss != pytest.approx(eval_loss, rel=1e-3, abs=1e-12)
+
+    fit_loss, eval_loss = _fit_and_evaluate_loss(model_class, dropout_rate=0.0)
+    assert fit_loss == pytest.approx(eval_loss, rel=1e-6, abs=1e-12)
+
+
+def test_prosit_intensity_from_dataset():
+    features = ["collision_energy", "precursor_charge"]
+    dataset = FragmentIonIntensityDataset(
+        data_format="hf",
+        data_source=Dataset.from_dict(
+            {
+                "peptide": ["AC[UNIMOD:4]DEF", "FEDCA", "AACCD", "DDEEF"],
+                "collision_energy": [0.3] * 4,
+                "precursor_charge": [2.0] * 4,
+                "label": [[0.5] * 54] * 4,
+            }
+        ),
+        sequence_column="peptide",
+        label_column="label",
+        model_features=features,
+        max_seq_len=10,
+        with_termini=False,
+        val_ratio=0.5,
+        num_proc=None,
+    )
+    sizes = {"recurrent_layers_sizes": (8, 16), "regressor_layer_size": 16}
+
+    model = PrositIntensityPredictor.from_dataset(dataset, **sizes)
+
+    explicit = PrositIntensityPredictor(
+        input_keys={"SEQUENCE_KEY": "peptide"},
+        alphabet=dataset.extended_alphabet,
+        seq_length=10,
+        with_termini=False,
+        use_meta_data=True,
+        meta_data_keys=features,
+        **sizes,
+    )
+    config, explicit_config = model.get_config(), explicit.get_config()
+    config.pop("name"), explicit_config.pop("name")
+    assert config == explicit_config
+    # the model takes the dataset's batches as they are
+    inputs, _ = next(iter(dataset.tensor_train_data))
+    assert model(inputs).shape == (2, 54)
+
+    with pytest.raises(ValueError, match="seq_length=30 but the dataset has 10"):
+        PrositIntensityPredictor.from_dataset(dataset, seq_length=30)
+
+
+def test_prosit_intensity_latent_dropout_rate_is_accepted_but_unused():
+    # configs saved by 0.3.1 carry the default value: they load without a warning
+    config = PrositIntensityPredictor().get_config()
+    assert config["latent_dropout_rate"] == 0.1
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        PrositIntensityPredictor.from_config(config)
+
+    with pytest.warns(FutureWarning, match="latent_dropout_rate is not used"):
+        model = PrositIntensityPredictor(latent_dropout_rate=0.3)
+    assert model.get_config()["latent_dropout_rate"] == 0.3
+
+
+def _from_dataset_cases():
+    """Dataset class and arguments, model class and arguments, and the constructor
+    arguments ``from_dataset`` must derive from the dataset."""
+    from dlomix.constants import aa_to_int_dict
+    from dlomix.data import (
+        ChargeStateDataset,
+        DetectabilityDataset,
+        IonMobilityDataset,
+        RetentionTimeDataset,
+    )
+    from dlomix.models.base import RetentionTimePredictor
+    from dlomix.models.detectability import DetectabilityModel
+    from dlomix.models.ionmob import Ionmob
+
+    small = {"recurrent_layers_sizes": (8, 8), "regressor_layer_size": 8}
+    label = {"label_column": "label"}
+
+    def padded_width(dataset):  # max_seq_len=10 and the two termini
+        return {"alphabet": dataset.extended_alphabet, "seq_length": 12}
+
+    def one_hot_padding(dataset):
+        # its padding token "0" has index 0; the alphabet also has the unknown token
+        return {"padding_char": [1.0] + [0.0] * (len(dataset.extended_alphabet) - 1)}
+
+    def tokens_and_key(dataset):
+        return {"num_tokens": len(dataset.extended_alphabet), "sequence_key": "peptide"}
+
+    detectability = {
+        "with_termini": False,
+        "alphabet": aa_to_int_dict,
+        "dataset_columns_to_keep": None,
+    }
+    return [
+        (
+            RetentionTimeDataset,
+            label,
+            PrositRetentionTimePredictor,
+            small,
+            padded_width,
+        ),
+        (RetentionTimeDataset, label, RetentionTimePredictor, {}, padded_width),
+        (ChargeStateDataset, label, ChargeStatePredictor, small, padded_width),
+        (
+            DetectabilityDataset,
+            {**label, **detectability, "padding_value": "0"},
+            DetectabilityModel,
+            {"num_units": 8},
+            one_hot_padding,
+        ),
+        (
+            IonMobilityDataset,
+            {"label_column": ["label", "ccs_std"]},
+            Ionmob,
+            {"gru_1": 8, "gru_2": 8},
+            tokens_and_key,
+        ),
+    ]
+
+
+@pytest.mark.parametrize(
+    "dataset_class, dataset_arguments, model_class, model_arguments, derived",
+    _from_dataset_cases(),
+    ids=lambda value: getattr(value, "__name__", ""),
+)
+def test_from_dataset_builds_the_model_the_dataset_needs(
+    dataset_class, dataset_arguments, model_class, model_arguments, derived
+):
+    dataset = dataset_class(
+        data_format="hf",
+        data_source=Dataset.from_dict(
+            {
+                "peptide": ["ACDEF", "FEDCA", "AACCD", "DDEEF"],
+                "label": [1.0, 2.0, 3.0, 0.0],
+                "ccs_std": [1.0] * 4,
+                "charge": [1, 2, 3, 2],
+                "mz": [400.0, 500.0, 600.0, 700.0],
+            }
+        ),
+        sequence_column="peptide",
+        max_seq_len=10,
+        val_ratio=0.5,
+        batch_size=2,
+        num_proc=None,
+        **dataset_arguments,
+    )
+
+    model = model_class.from_dataset(dataset, **model_arguments)
+
+    config = model.get_config()
+    expected = derived(dataset)
+    assert {name: config[name] for name in expected} == expected
+    # the model takes the dataset's batches as they are
+    inputs, _ = next(iter(dataset.tensor_train_data))
+    outputs = model(inputs)
+    first = outputs[0] if isinstance(outputs, (tuple, list)) else outputs
+    assert first.shape[0] == 2
+
+
+def test_from_dataset_rejects_an_argument_that_contradicts_the_dataset():
+    from types import SimpleNamespace
+
+    dataset = SimpleNamespace(
+        extended_alphabet=dict(ALPHABET_UNMOD), max_seq_len=10, with_termini=True
+    )
+
+    with pytest.raises(ValueError, match="seq_length=30 but the dataset has 12"):
+        PrositRetentionTimePredictor.from_dataset(dataset, seq_length=30)
+    # an argument that agrees with the dataset is fine
+    assert PrositRetentionTimePredictor.from_dataset(dataset, seq_length=12)
+
+
+def test_deeplc_from_dataset():
+    # no dlomix dataset computes DeepLC's count features: only the settings are checked
+    from types import SimpleNamespace
+
+    dataset = SimpleNamespace(
+        extended_alphabet=dict(ALPHABET_UNMOD),
+        max_seq_len=58,
+        with_termini=True,
+        sequence_column="peptide",
+    )
+
+    model = DeepLCRetentionTimePredictor.from_dataset(dataset)
+
+    assert (model.seq_length, model.sequence_input_key) == (60, "peptide")
+    assert model.alphabet == ALPHABET_UNMOD

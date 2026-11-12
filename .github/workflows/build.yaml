@@ -131,6 +131,7 @@ jobs:
             tests/test_backend_equivalence.py \
             tests/test_postprocessing.py \
             tests/test_inference_pipeline.py \
+            tests/test_tokens.py \
             -v
 
   resolve-extras:

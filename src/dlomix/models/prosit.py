@@ -11,6 +11,11 @@ from ..data.processing.feature_extractors import FEATURE_EXTRACTORS_PARAMETERS
 from ..layers.attention import AttentionLayer, DecoderAttentionLayer
 from ..layers.gru_kernel import gru_kernel_kwargs
 from ._alphabet import validate_alphabet_size
+from ._from_dataset import (
+    from_dataset_method,
+    prosit_intensity_arguments,
+    sequence_model_arguments,
+)
 
 logger = logging.getLogger("dlomix.models.prosit")
 
@@ -102,11 +107,13 @@ class PrositRetentionTimePredictor(tf.keras.Model):
             ]
         )
 
-    def call(self, inputs, **kwargs):
+    from_dataset = from_dataset_method(sequence_model_arguments)
+
+    def call(self, inputs, training=None, **kwargs):
         x = self.embedding(inputs)
-        x = self.encoder(x)
+        x = self.encoder(x, training=training)
         x = self.attention(x)
-        x = self.regressor(x)
+        x = self.regressor(x, training=training)
         x = self.output_layer(x)
         return x
 
@@ -158,11 +165,18 @@ class PrositIntensityPredictor(tf.keras.Model):
     dropout_rate : float, optional
         Probability to use for dropout layers in the encoder. Defaults to 0.2.
     latent_dropout_rate : float, optional
-        Probability to use for dropout layers in the regressor layers after encoding. Defaults to 0.1.
+        Deprecated and not used: this model has no dropout after the encoder. It is
+        still accepted and stored in the config, so that saved models load; a value
+        other than the default 0.1 warns. It will be removed in a future release.
     recurrent_layers_sizes : tuple, optional
-        A tuple of 2 values for the sizes of the two GRU layers in the encoder. Defaults to (256, 512).
+        A tuple of 2 values for the sizes of the two GRU layers in the encoder. The
+        second value is also the width of the latent vector the encoder produces and
+        of the dense layer that encodes the meta data, which is multiplied with it.
+        Defaults to (256, 512).
     regressor_layer_size : int, optional
-        Size of the dense layer in the regressor after the encoder. Defaults to 512.
+        Width of the decoder GRU (not of a dense layer; the regressor's dense layer
+        has ``len_fragment_ion`` units). Half of it is also the width of the first
+        dense layer for the PTM features. Defaults to 512.
     use_meta_data : bool, optional
         Whether to use meta data inputs. Defaults to False.
     use_prosit_ptm_features : bool, optional
@@ -241,9 +255,18 @@ class PrositIntensityPredictor(tf.keras.Model):
     ):
         super(PrositIntensityPredictor, self).__init__(**kwargs)
 
+        if latent_dropout_rate != 0.1:
+            warnings.warn(
+                "latent_dropout_rate is not used by PrositIntensityPredictor and will "
+                "be removed in a future release; the model has no dropout after the "
+                "encoder. Use dropout_rate for the dropout in the encoder and decoder.",
+                FutureWarning,
+                stacklevel=2,
+            )
+
         # Store all configuration parameters
         self.dropout_rate = dropout_rate
-        self.latent_dropout_rate = latent_dropout_rate
+        self.latent_dropout_rate = latent_dropout_rate  # unused, kept for saved configs
         self.regressor_layer_size = regressor_layer_size
         self.recurrent_layers_sizes = tuple(recurrent_layers_sizes)
         self.embedding_output_dim = embedding_output_dim
@@ -270,6 +293,8 @@ class PrositIntensityPredictor(tf.keras.Model):
         self.attention = AttentionLayer(name="encoder_att")
         self._build_meta_data_fusion_layer()
         self._build_regressor()
+
+    from_dataset = from_dataset_method(prosit_intensity_arguments)
 
     def _handle_alphabet_and_keys(self, alphabet, input_keys, meta_data_keys):
         # Handle alphabet
@@ -459,25 +484,25 @@ class PrositIntensityPredictor(tf.keras.Model):
                     f"At least one PTM input feature is required when use_prosit_ptm_features=True. Missing all of: {self.PTM_INPUT_KEYS}"
                 )
 
-    def call(self, inputs, **kwargs):
+    def call(self, inputs, training=None, **kwargs):
         # Handle dict input, complex case: multiple inputs
         if isinstance(inputs, dict):
-            return self._forward_dict(inputs, **kwargs)
+            return self._forward_dict(inputs, training=training)
 
         # Handle single input, simple case: sequence only
         peptides_in = inputs
-        return self._forward_sequence_only(peptides_in, **kwargs)
+        return self._forward_sequence_only(peptides_in, training=training)
 
-    def _forward_sequence_only(self, peptides_in, **kwargs):
+    def _forward_sequence_only(self, peptides_in, training=None):
         x = self.embedding(peptides_in)
-        x = self.sequence_encoder(x)
+        x = self.sequence_encoder(x, training=training)
         x = self.attention(x)
         x = tf.expand_dims(x, axis=1)  # add meta data dimension
-        x = self.decoder(x)
+        x = self.decoder(x, training=training)
         x = self.regressor(x)
         return x
 
-    def _forward_dict(self, inputs, **kwargs):
+    def _forward_dict(self, inputs, training=None):
         self._validate_input_keys(inputs)
 
         meta_data = []
@@ -508,20 +533,20 @@ class PrositIntensityPredictor(tf.keras.Model):
 
         # encode and fuse PTM features (before going into the GRU sequence encoder)
         if self.use_prosit_ptm_features:
-            encoded_ptm = self.ptm_input_encoder(ptm_ac_features)
+            encoded_ptm = self.ptm_input_encoder(ptm_ac_features, training=training)
             x = self.ptm_aa_fusion([x, encoded_ptm])
 
-        x = self.sequence_encoder(x)
+        x = self.sequence_encoder(x, training=training)
         x = self.attention(x)
 
         if self.use_meta_data:
-            encoded_meta = self.meta_encoder(meta_data)
+            encoded_meta = self.meta_encoder(meta_data, training=training)
             x = self.meta_data_fusion_layer([x, encoded_meta])
         else:
             # no metadata -> add a dimension to comply with the shape
             x = tf.expand_dims(x, axis=1)
 
-        x = self.decoder(x)
+        x = self.decoder(x, training=training)
         x = self.regressor(x)
 
         return x

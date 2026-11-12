@@ -9,8 +9,9 @@ carries no hard import of the dataset class (``load_processed_dataset`` imports 
 import importlib
 import json
 from pathlib import Path
+from typing import Optional
 
-from .dataset_config import DatasetConfig
+from .dataset_config import DatasetConfig, default_dataset_type
 
 # Transient / non-reconstructable attributes excluded from the saved state.
 _STATE_EXCLUDE = {
@@ -90,7 +91,9 @@ def validate_loaded_state(dataset) -> None:
                 )
 
 
-def load_processed_dataset(path: str, validate: bool = True):
+def load_processed_dataset(
+    path: str, validate: bool = True, dataset_type: Optional[str] = None
+):
     """
     Load a processed peptide dataset from a given path.
 
@@ -98,6 +101,10 @@ def load_processed_dataset(path: str, validate: bool = True):
     ----------
     path : str
         Path to the peptide dataset.
+    dataset_type : str, optional
+        Tensor format of the loaded dataset, ``"tf"`` or ``"pt"``. By default that of
+        the active backend (``DLOMIX_BACKEND``), whichever the dataset was saved
+        with: the processed data is the same for both.
     validate : bool, optional
         Whether to validate the loaded dataset state, by default True.
 
@@ -147,6 +154,10 @@ def load_processed_dataset(path: str, validate: bool = True):
         from datasets import load_from_disk
 
         instance.hf_dataset = load_from_disk(str(hf_dataset_path))
+
+    # after the saved state, which carries the format the dataset was saved with
+    instance.dataset_type = dataset_type or default_dataset_type()
+    instance._config.dataset_type = instance.dataset_type
 
     if validate:
         validate_loaded_state(instance)

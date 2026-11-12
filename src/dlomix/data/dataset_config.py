@@ -7,6 +7,11 @@ from ..config import _BACKEND, PYTORCH_BACKEND
 from .dataset_utils import EncodingScheme, validate_num_proc_value
 
 
+def default_dataset_type() -> str:
+    """The tensor format of the active backend: ``"pt"`` or ``"tf"``."""
+    return "pt" if _BACKEND in PYTORCH_BACKEND else "tf"
+
+
 @dataclass
 class DatasetConfig:
     """
@@ -64,7 +69,7 @@ class DatasetConfig:
     # validate input parameters
     def __post_init__(self):
         if self.dataset_type is None:
-            self.dataset_type = "pt" if _BACKEND in PYTORCH_BACKEND else "tf"
+            self.dataset_type = default_dataset_type()
 
         # sequence length validation
         if self.max_seq_len <= 0:

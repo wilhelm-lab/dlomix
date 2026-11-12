@@ -3,6 +3,7 @@ import torch
 import torch.nn as nn
 
 from ..layers.keras_initializers_torch import init_like_keras
+from ._from_dataset import from_dataset_method, ionmob_torch_arguments
 
 
 class SquareRootProjectionLayer(nn.Module):
@@ -94,6 +95,8 @@ class Ionmob(nn.Module):
         # PyTorch's default initializers the model overfits earlier and its test
         # error is about 7% higher
         init_like_keras(self)
+
+    from_dataset = from_dataset_method(ionmob_torch_arguments)
 
     def forward(self, seq, mz, charge):
         """

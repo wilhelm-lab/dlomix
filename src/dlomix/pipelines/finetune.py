@@ -2,8 +2,8 @@
 FineTunePipeline
 ================
 
-Typical usage
--------------
+Typical usage::
+
     # Option A — constructor directly
     pipeline = FineTunePipeline(
         finetune_dataset_path="data/finetuning.parquet",
@@ -21,16 +21,43 @@ Typical usage
 
     # Option C — chained one-liner
     history = FineTunePipeline(...).setup().finetune()
+
+    # Option D — from a pretrained inference bundle and Hugging Face data: the
+    # bundle's preprocessing settings build the dataset, the tokens new to the
+    # model are found in the data and added to its vocabulary
+    pipeline = FineTunePipeline.from_pretrained(
+        "my-org/prosit-intensity", data, initialization_strategy="best-fit"
+    )
+    history = pipeline.finetune()
+
+    # Option E — every step of option D by hand, to change any of them
+    base = InferencePipeline.from_pretrained("my-org/prosit-intensity")
+    alphabet = extend_alphabet(
+        base.model.alphabet,
+        find_new_tokens(data["train"]["modified_sequence"], base.model.alphabet),
+    )
+    dataset = FragmentIonIntensityDataset(
+        data_source=data, data_format="hf", alphabet=alphabet,
+        **base.preprocessor.dataset_settings,
+    )
+    model = adapt_pretrained_model(base.model, alphabet, initialization_strategy="mean")
+    pipeline = FineTunePipeline.from_dataset_and_model(dataset, model)
 """
 
 from __future__ import annotations
 
+import contextlib
 import logging
 from pathlib import Path
 from typing import Any
 
 from ..config import _BACKEND, PYTORCH_BACKEND
-from ..data import FragmentIonIntensityDataset, PeptideDataset
+from ..data import (
+    FragmentIonIntensityDataset,
+    PeptideDataset,
+    extend_alphabet,
+    find_new_tokens,
+)
 from ..losses import masked_spectral_distance
 
 logger = logging.getLogger(__name__)
@@ -42,10 +69,17 @@ _IS_TORCH = _BACKEND in PYTORCH_BACKEND
 # backend. Fine-tuning is TensorFlow-only for now: the methods that need these
 # helpers call ``_require_tensorflow`` first.
 if _IS_TORCH:
+    adapt_pretrained_model = None
     download_remote_model_weights = None
     load_and_adapt_pretrained_model = None
 else:
-    from ..models import download_remote_model_weights, load_and_adapt_pretrained_model
+    from ..models import (
+        adapt_pretrained_model,
+        download_remote_model_weights,
+        load_and_adapt_pretrained_model,
+    )
+
+TRAINABLE_MODES = ("all", "embedding", "new_tokens")
 
 
 def _require_tensorflow(operation: str) -> None:
@@ -55,6 +89,14 @@ def _require_tensorflow(operation: str) -> None:
             f"FineTunePipeline.{operation}() currently supports TensorFlow only. "
             "Set DLOMIX_BACKEND=tensorflow before importing dlomix."
         )
+
+
+def _validated_trainable(trainable: str) -> str:
+    if trainable not in TRAINABLE_MODES:
+        raise ValueError(
+            f"Unknown trainable mode {trainable!r}, expected one of {TRAINABLE_MODES}."
+        )
+    return trainable
 
 
 _KERAS_MODEL_SUFFIXES = (".keras", ".h5")
@@ -107,9 +149,13 @@ class FineTunePipeline:
         verbatim to :func:`load_and_adapt_pretrained_model`.  Must contain at
         minimum ``new_hf_data`` (a Hugging Face ``Dataset`` of raw sequences).
         Optionally ``sequence_column``, ``label_column``, ``n_examples_for_eval``,
-        ``eval_metric``, ``return_fit_info`` (bool) and ``dataset_kwargs`` (dict).
+        ``min_examples_for_eval``, ``eval_metric``, ``return_fit_info`` (bool) and
+        ``dataset_kwargs`` (dict).
     seed:
         Random seed for reproducibility.
+    trainable:
+        What :meth:`finetune` trains: ``"all"`` (default), ``"embedding"`` or
+        ``"new_tokens"``; see :meth:`finetune`.
     output_model_path:
         Directory where the fine-tuned model will be saved after training.
     epochs:
@@ -138,6 +184,7 @@ class FineTunePipeline:
         batch_size: int = 64,
         learning_rate: float = 1e-4,
         dataset_kwargs: dict | None = None,
+        trainable: str = "all",
     ) -> None:
         if not base_model_name and not base_model_weights_filepath:
             raise ValueError(
@@ -154,6 +201,8 @@ class FineTunePipeline:
         self.initialization_strategy = initialization_strategy
         self.best_fit_kwargs = best_fit_kwargs
         self.seed = seed
+        self.trainable = _validated_trainable(trainable)
+        self.new_tokens: list | None = None
 
         self.output_model_path = output_model_path
 
@@ -197,6 +246,7 @@ class FineTunePipeline:
             base_model_name: my-org/prosit-intensity  # Hugging Face Hub repo id
             epochs: 20
             learning_rate: 0.0003
+            trainable: new_tokens  # all (default), embedding or new_tokens
             output_model_path: models/my_finetuned
         """
         path = Path(config_path)
@@ -227,6 +277,8 @@ class FineTunePipeline:
         output_model_path: str = "./finetuned_model",
         epochs: int = 10,
         learning_rate: float = 1e-4,
+        trainable: str = "all",
+        new_tokens: list | None = None,
     ) -> "FineTunePipeline":
         """Create a ready-to-use pipeline from an already-built dataset and model.
 
@@ -247,6 +299,13 @@ class FineTunePipeline:
             Number of training epochs passed to :meth:`finetune`.
         learning_rate:
             Initial learning rate for the default Adam optimiser.
+        trainable:
+            What :meth:`finetune` trains: ``"all"`` (default), ``"embedding"`` or
+            ``"new_tokens"``.
+        new_tokens:
+            The tokens added to the model's vocabulary, whose embedding rows
+            ``trainable="new_tokens"`` trains. Required for that mode here, because
+            the pipeline did not expand the vocabulary itself.
         """
         instance = cls.__new__(cls)
         # Config attributes — None/defaults since dataset + model are pre-built
@@ -258,6 +317,8 @@ class FineTunePipeline:
         instance.initialization_strategy = None
         instance.best_fit_kwargs = None
         instance.seed = None
+        instance.trainable = _validated_trainable(trainable)
+        instance.new_tokens = list(new_tokens) if new_tokens is not None else None
         instance.output_model_path = output_model_path
         instance.epochs = epochs
         instance.batch_size = getattr(dataset, "batch_size", 64)
@@ -267,6 +328,160 @@ class FineTunePipeline:
         instance.dataset = dataset
         instance.model = model
         instance.best_fit_info = None
+        return instance
+
+    @classmethod
+    def from_pretrained(
+        cls,
+        base,
+        data,
+        label_column: str = "intensities_raw",
+        initialization_strategy: str = "random",
+        best_fit_kwargs: dict | None = None,
+        trainable: str = "all",
+        seed: int = 42,
+        output_model_path: str = "./finetuned_model",
+        epochs: int = 10,
+        batch_size: int = 64,
+        learning_rate: float = 1e-4,
+        revision: str | None = None,
+        dataset_kwargs: dict | None = None,
+    ) -> "FineTunePipeline":
+        """Create a ready-to-use pipeline from a pretrained bundle and new data.
+
+        The bundle's preprocessing settings (sequence column, sequence length,
+        termini, features) build the dataset; the tokens of the data that the model
+        does not know are added to its vocabulary, after the known ones; and their
+        embeddings are initialized by ``initialization_strategy``. :meth:`setup`
+        does not need to be called.
+
+        This composes public steps, which can be called one by one to change any of
+        them: :func:`~dlomix.data.find_new_tokens`,
+        :func:`~dlomix.data.extend_alphabet`, the dataset class with
+        ``base.preprocessor.dataset_settings``,
+        :func:`~dlomix.models.adapt_pretrained_model` and
+        :meth:`from_dataset_and_model`.
+
+        Parameters
+        ----------
+        base:
+            The pretrained model with its preprocessing: an
+            :class:`~dlomix.pipelines.InferencePipeline`, the path of a saved one,
+            or the Hugging Face Hub repo id of one (see ``revision``).
+        data:
+            The fine-tuning data: a Hugging Face ``DatasetDict`` with a ``train``
+            split (and ``val`` / ``test``), or a single ``Dataset`` to be split with
+            ``dataset_kwargs`` (e.g. ``{"val_ratio": 0.1}``). It needs the bundle's
+            sequence and feature columns and ``label_column``.
+        label_column:
+            Column with the observed intensities.
+        initialization_strategy:
+            ``"random"``, ``"mean"`` or ``"best-fit"``, as in
+            :func:`~dlomix.models.load_and_adapt_pretrained_model`.
+        best_fit_kwargs:
+            Options of the best-fit search, e.g. ``n_examples_for_eval``. The
+            examples (the training split, or every row of a single ``Dataset``),
+            the columns, the dataset settings and
+            ``return_fit_info`` default to this pipeline's; the search is stored in
+            ``best_fit_info``.
+        trainable:
+            What :meth:`finetune` trains: ``"all"`` (default), ``"embedding"`` or
+            ``"new_tokens"``.
+        seed:
+            Seed of the embedding initialization and the best-fit sample.
+        output_model_path, epochs, batch_size, learning_rate:
+            As in the constructor.
+        revision:
+            Commit, branch or tag of the Hub repo, when ``base`` is a repo id.
+        dataset_kwargs:
+            Further arguments of :class:`~dlomix.data.FragmentIonIntensityDataset`,
+            e.g. ``val_ratio``, ``dataset_columns_to_keep`` or ``shuffle``. The
+            bundle's settings and the alphabet cannot be changed here.
+
+        Attributes set: ``dataset``, ``model``, ``new_tokens``, ``best_fit_info``.
+        """
+        _require_tensorflow("from_pretrained")
+        from .predictor import InferencePipeline
+
+        if isinstance(base, (str, Path)):
+            base = (
+                InferencePipeline.load(str(base))
+                if Path(base).exists()
+                else InferencePipeline.from_pretrained(str(base), revision=revision)
+            )
+        settings = base.preprocessor.dataset_settings
+        dataset_kwargs = dict(dataset_kwargs or {})
+        fixed = sorted({"alphabet", "data_source", "data_format", *settings})
+        if clash := sorted(set(fixed) & dataset_kwargs.keys()):
+            raise ValueError(
+                f"dataset_kwargs sets {clash}, which come from the pretrained bundle "
+                "and the data. To change them, build the dataset and the model "
+                "yourself and use from_dataset_and_model()."
+            )
+
+        # the alphabet is learned from the training and validation data only
+        splits = (
+            [data[name] for name in ("train", "val") if name in data]
+            if isinstance(data, dict)
+            else [data]
+        )
+        sequence_column = settings["sequence_column"]
+        base_alphabet = dict(base.model.alphabet)
+        new_tokens = find_new_tokens(
+            (sequence for split in splits for sequence in split[sequence_column]),
+            base_alphabet,
+            with_termini=settings["with_termini"],
+        )
+        alphabet = extend_alphabet(base_alphabet, new_tokens)
+
+        dataset = FragmentIonIntensityDataset(
+            data_source=data,
+            data_format="hf",
+            label_column=label_column,
+            alphabet=alphabet,
+            batch_size=batch_size,
+            **settings,
+            **dataset_kwargs,
+        )
+
+        best_fit_info = None
+        if initialization_strategy == "best-fit":
+            search_settings = {
+                key: value
+                for key, value in settings.items()
+                if key != "sequence_column"
+            }
+            best_fit_kwargs = {
+                "new_hf_data": splits[0],
+                "sequence_column": sequence_column,
+                "label_column": label_column,
+                "dataset_kwargs": search_settings,
+                **(best_fit_kwargs or {}),
+                "return_fit_info": True,
+            }
+        model = adapt_pretrained_model(
+            base.model,
+            new_alphabet=alphabet,
+            initialization_strategy=initialization_strategy,
+            random_seed=seed,
+            best_fit_kwargs=best_fit_kwargs,
+        )
+        if isinstance(model, tuple):
+            model, best_fit_info = model
+
+        instance = cls.from_dataset_and_model(
+            dataset,
+            model,
+            output_model_path=output_model_path,
+            epochs=epochs,
+            learning_rate=learning_rate,
+            trainable=trainable,
+            new_tokens=new_tokens,
+        )
+        instance.initialization_strategy = initialization_strategy
+        instance.best_fit_kwargs = best_fit_kwargs
+        instance.best_fit_info = best_fit_info
+        instance.seed = seed
         return instance
 
     # ------------------------------------------------------------------
@@ -379,6 +594,8 @@ class FineTunePipeline:
         metrics: list | None = None,
         callbacks: list | None = None,
         optimizer=None,
+        trainable: str | None = None,
+        keep_starting_model: bool = True,
     ):
         """Compile and fine-tune the model.
 
@@ -394,11 +611,31 @@ class FineTunePipeline:
         optimizer:
             A Keras optimiser instance.  Defaults to ``Adam`` with the
             pipeline's ``learning_rate``.
+        trainable:
+            Which weights train; defaults to the pipeline's ``trainable``.
+
+            - ``"all"``: the model as it is, i.e. every layer that is trainable.
+            - ``"embedding"``: only the token embedding, all of its rows.
+            - ``"new_tokens"``: only the embedding rows of the tokens added by the
+              vocabulary expansion. Every other weight, including the rows of the
+              known tokens, is exactly the same after training, so predictions
+              for peptides without the new tokens do not change.
+
+            The model's ``trainable`` flags are the same after training as before.
+        keep_starting_model:
+            If True (default), the validation loss of the model before training is
+            recorded, and when no epoch has a lower one, the starting weights are
+            restored: with little data, every epoch can be worse than the model
+            fine-tuning started from, and ``EarlyStopping(restore_best_weights=True)``
+            only returns the best trained epoch.
 
         Returns
         -------
         keras.callbacks.History
-            The Keras training history object returned by ``model.fit``.
+            The Keras training history object returned by ``model.fit``. With
+            ``keep_starting_model`` it also has ``starting_val_loss`` and
+            ``kept_model``: ``"starting"`` if the starting weights were restored,
+            else ``"trained"``.
 
         Raises
         ------
@@ -422,21 +659,78 @@ class FineTunePipeline:
             getattr(resolved_loss, "__name__", repr(resolved_loss)),
         )
 
-        self.model.compile(
-            optimizer=resolved_optimizer,
-            loss=resolved_loss,
-            metrics=metrics or [],
-        )
+        with self._trainable_weights(trainable or self.trainable):
+            self.model.compile(
+                optimizer=resolved_optimizer,
+                loss=resolved_loss,
+                metrics=metrics or [],
+            )
 
-        history = self.model.fit(
-            self.dataset.tensor_train_data,
-            epochs=self.epochs,
-            validation_data=self.dataset.tensor_val_data,
-            callbacks=callbacks or [],
-        )
+            if keep_starting_model:
+                starting_weights = self.model.get_weights()
+                starting_val_loss = self.model.evaluate(
+                    self.dataset.tensor_val_data, verbose=0, return_dict=True
+                )["loss"]
+
+            history = self.model.fit(
+                self.dataset.tensor_train_data,
+                epochs=self.epochs,
+                validation_data=self.dataset.tensor_val_data,
+                callbacks=callbacks or [],
+            )
+
+        if keep_starting_model:
+            history.starting_val_loss = starting_val_loss
+            history.kept_model = "trained"
+            # also when the loss became NaN: no epoch beat the starting model
+            if not min(history.history["val_loss"]) < starting_val_loss:
+                self.model.set_weights(starting_weights)
+                history.kept_model = "starting"
+                logger.warning(
+                    "No epoch had a lower validation loss than the starting model "
+                    "(%.6f): its weights were restored.",
+                    starting_val_loss,
+                )
 
         logger.info("Fine-tuning complete.")
         return history
+
+    def _trainable_weights(self, trainable: str):
+        """Context in which only the weights of the ``trainable`` mode can train."""
+        if _validated_trainable(trainable) == "all":
+            return contextlib.nullcontext()
+
+        from ..models.model_utils import embedding_only_training
+
+        rows = None
+        if trainable == "new_tokens":
+            rows = [self.model.alphabet[token] for token in self._resolve_new_tokens()]
+        return embedding_only_training(self.model, rows=rows)
+
+    def _resolve_new_tokens(self) -> list:
+        """The tokens the vocabulary expansion added to the pretrained model's."""
+        if self.new_tokens is None:
+            if self.base_model_weights_filepath is None:
+                raise ValueError(
+                    "trainable='new_tokens' needs the tokens that are new to the "
+                    "model: pass new_tokens=[...] to from_dataset_and_model()."
+                )
+            old_vocab = self.old_model_vocab
+            if old_vocab is None:
+                import tensorflow as tf
+
+                from ..models.model_utils import get_alphabet_from_model
+
+                old_vocab = get_alphabet_from_model(
+                    tf.keras.models.load_model(self.base_model_weights_filepath)
+                )
+            self.new_tokens = [t for t in self.model.alphabet if t not in old_vocab]
+        if not self.new_tokens:
+            raise ValueError(
+                "trainable='new_tokens': the model's vocabulary has no new tokens, "
+                "so nothing would be trained."
+            )
+        return self.new_tokens
 
     # ------------------------------------------------------------------
     # Saving

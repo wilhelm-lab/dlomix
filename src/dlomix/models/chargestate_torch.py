@@ -7,6 +7,7 @@ from ..layers.attention_torch import AttentionLayer
 from ..layers.bi_gru_seq_encoder_torch import BiGRUSequentialEncoder
 from ..layers.keras_initializers_torch import init_like_keras
 from ._alphabet import validate_alphabet_size
+from ._from_dataset import from_dataset_method, sequence_model_arguments
 
 """
 This module contains a deep learning model for precursor charge state prediction, inspired by Prosit's architecture.
@@ -129,6 +130,8 @@ class ChargeStatePredictor(nn.Module):
 
         # start from the same weight distribution as the Keras model
         init_like_keras(self)
+
+    from_dataset = from_dataset_method(sequence_model_arguments)
 
     def forward(self, inputs):
         """

@@ -10,7 +10,12 @@ from dlomix.data.processing.feature_extractors import (
     MissingModifiedAminoAcidError,
     MissingModifiedAminoAcidWarning,
 )
-from dlomix.data.processing.feature_tables import PTM_GAIN_LOOKUP, PTM_LOSS_LOOKUP
+from dlomix.data.processing.feature_tables import (
+    PTM_ATOM_COUNT_LOOKUP,
+    PTM_ATOMS,
+    PTM_GAIN_LOOKUP,
+    PTM_LOSS_LOOKUP,
+)
 from dlomix.data.processing.pipeline import PipelineContext
 
 logger = logging.getLogger(__name__)
@@ -301,3 +306,19 @@ def test_mod_loss_gain_atom_count_extractors_preserve_original_values():
         # unmodified amino acids also default to the original (1-shifted) baseline
         default_feature = feature_extractor._extract_feature(["A"])
         assert default_feature[0].tolist() == [1.0] * 6
+
+
+def test_ptm_atoms_names_the_order_of_the_atom_counts():
+    # the counts, read in the documented order, give the modification's UNIMOD mass
+    monoisotopic = dict(
+        H=1.007825, C=12.0, N=14.003074, O=15.994915, P=30.973762, S=31.972071
+    )
+    unimod_mass = {
+        "M[UNIMOD:35]": 15.994915,  # oxidation
+        "S[UNIMOD:21]": 79.966331,  # phosphorylation
+        "C[UNIMOD:4]": 57.021464,  # carbamidomethylation
+    }
+    for token, expected in unimod_mass.items():
+        counts = PTM_ATOM_COUNT_LOOKUP[token]
+        mass = sum(n * monoisotopic[atom] for atom, n in zip(PTM_ATOMS, counts))
+        assert mass == pytest.approx(expected, abs=1e-3)

@@ -9,6 +9,7 @@ if _BACKEND in TENSORFLOW_BACKEND:
     from .detectability import DetectabilityModel
     from .ionmob import Ionmob
     from .model_utils import (
+        adapt_pretrained_model,
         download_remote_model_weights,
         load_and_adapt_pretrained_model,
     )
@@ -19,6 +20,7 @@ if _BACKEND in TENSORFLOW_BACKEND:
 
     # TensorFlow utility functions
     __all__.append("load_and_adapt_pretrained_model")
+    __all__.append("adapt_pretrained_model")
     __all__.append("download_remote_model_weights")
 
 
