@@ -70,12 +70,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   split, post-processes the predictions as Prosit does and adds the spectral angle.
   Returns a DataFrame with one row per spectrum, in the order of the split. For
   Keras models. Example in the intensity walkthrough notebook.
-- `PrositIntensityPredictor.from_dataset(dataset, **kwargs)` (both backends) builds
-  the model with the arguments that must agree with the dataset taken from it:
-  `alphabet`, `seq_length`, `with_termini`, the sequence column in `input_keys`, and
-  `meta_data_keys` / `use_meta_data` from the dataset's `model_features`. Other
-  arguments, such as the layer sizes, are passed as keyword arguments; one that
-  contradicts the dataset raises.
+- `Model.from_dataset(dataset, **kwargs)` on every model (both backends) builds the
+  model with the arguments that must agree with the dataset taken from it; other
+  arguments, such as the layer sizes, are passed as keyword arguments, and one that
+  contradicts the dataset raises. Taken from the dataset:
+  `PrositIntensityPredictor`: `alphabet`, `seq_length`, `with_termini`, the sequence
+  column in `input_keys`, and `meta_data_keys` / `use_meta_data` from its
+  `model_features`; `PrositRetentionTimePredictor`, `RetentionTimePredictor`,
+  `ChargeStatePredictor`: `alphabet` and `seq_length` (the encoded width, with the
+  termini); `DeepLCRetentionTimePredictor`: the same and `sequence_input_key`;
+  `DetectabilityModel`: the alphabet size and padding token; `Ionmob`: `num_tokens`
+  (and `sequence_key` on TensorFlow).
 - `dlomix.reports.score_intensity_predictions(predictions, dataset, split="test")`:
   the scoring of `evaluate_intensity` for predictions made elsewhere (an
   `InferencePipeline` on the raw rows, a PyTorch model, another tool), so their
