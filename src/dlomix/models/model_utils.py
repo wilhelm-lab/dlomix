@@ -17,6 +17,12 @@ from dlomix.data import FragmentIonIntensityDataset
 logger = logging.getLogger(__name__)
 
 
+# The padding and unknown tokens carry no residue information, and their embeddings
+# are not trained like a residue's: they never initialize a new token, neither as a
+# best-fit candidate nor as part of the mean.
+_NON_RESIDUE_TOKENS = ("-", "X")
+
+
 def load_and_adapt_pretrained_model(
     model_path: str,
     new_alphabet: Dict[str, int],
@@ -47,7 +53,8 @@ def load_and_adapt_pretrained_model(
         Name of the embedding layer to expand. Defaults to "embedding".
     initialization_strategy : {'random', 'mean', 'best-fit'}, optional
         Strategy for initializing new token embeddings: Glorot-uniform random
-        values, the mean of the pretrained embeddings, or ('best-fit') the
+        values, the mean of the pretrained residue embeddings (the padding and
+        unknown tokens are left out), or ('best-fit') the
         embedding of the pretrained token whose substitution predicts the new
         token's spectra best (requires ``best_fit_kwargs``). Defaults to 'random'.
     random_seed : int, optional
@@ -228,7 +235,8 @@ def expand_embedding_vocabulary(
         Name of the embedding layer to expand. Defaults to "embedding".
     initialization_strategy : {'random', 'mean'}, optional
         Strategy for initializing new token embeddings: Glorot-uniform random
-        values or the mean of the existing embeddings. Defaults to 'random'.
+        values or the mean of the existing residue embeddings (the padding and
+        unknown tokens are left out). Defaults to 'random'.
         ('best-fit' is available through :func:`load_and_adapt_pretrained_model`.)
     random_seed : int, optional
         Random seed for reproducible initialization. Defaults to None.
@@ -432,9 +440,21 @@ def _create_expanded_embedding_weights(
 
     # Initialize new embeddings
     if initialization_strategy == "mean":
-        mean_embedding = np.mean(old_weights, axis=0)
+        residue_rows = [
+            idx
+            for token, idx in old_alphabet.items()
+            if token not in _NON_RESIDUE_TOKENS
+        ]
+        if not residue_rows:
+            raise ValueError(
+                "initialization_strategy='mean' needs at least one token other than "
+                f"{_NON_RESIDUE_TOKENS} in the old alphabet to average."
+            )
+        mean_embedding = np.mean(old_weights[residue_rows], axis=0)
         new_weights = np.tile(mean_embedding, (new_vocab_size, 1))
-        logger.info("Initialized new embeddings with mean of existing embeddings")
+        logger.info(
+            "Initialized new embeddings with the mean of the residue embeddings"
+        )
     elif initialization_strategy == "random":
         limit = np.sqrt(6.0 / (new_vocab_size + embedding_dim))
         new_weights = np.random.uniform(
@@ -539,11 +559,6 @@ def _load_model_with_custom_objects(
     return model
 
 
-# Never candidates for best-fit: the padding and unknown tokens carry no residue
-# information, and their embeddings are not trained like a residue's.
-_BEST_FIT_EXCLUDED_TOKENS = ("-", "X")
-
-
 def _find_best_fit_tokens_for_new_tokens(
     new_hf_data,
     alphabet_old,
@@ -564,7 +579,7 @@ def _find_best_fit_tokens_for_new_tokens(
     candidates = {
         token: idx
         for token, idx in alphabet_old.items()
-        if token not in _BEST_FIT_EXCLUDED_TOKENS
+        if token not in _NON_RESIDUE_TOKENS
     }
     best_fit_dict = {}
     best_sa = 0

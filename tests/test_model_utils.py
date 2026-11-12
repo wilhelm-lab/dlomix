@@ -96,30 +96,27 @@ class TestExpandEmbeddingVocabulary:
         )
         assert adapted(DUMMY_INPUT) is not None
 
-    def test_mean_initialization(
-        self, intensity_model, base_alphabet, expanded_alphabet
-    ):
-        """Test that new tokens are initialized with mean when strategy='mean'."""
-        old_weights = intensity_model.embedding.get_weights()[0]
-        mean_embedding = np.mean(old_weights, axis=0)
+    def test_mean_initialization_averages_residue_rows_only(self):
+        """Padding and the unknown token carry no residue information."""
+        old_alphabet = {"-": 0, "X": 1, "A": 2, "C": 3, "D": 4}
+        new_alphabet = {**old_alphabet, "M[UNIMOD:35]": 5}
+        model = PrositIntensityPredictor(
+            embedding_output_dim=8, seq_length=10, alphabet=old_alphabet
+        )
+        model(DUMMY_INPUT)
+        old_weights = model.embedding.get_weights()[0]
 
-        adapted_model = expand_embedding_vocabulary(
-            model=intensity_model,
-            new_alphabet=expanded_alphabet,
-            old_alphabet=base_alphabet,
+        adapted = expand_embedding_vocabulary(
+            model=model,
+            new_alphabet=new_alphabet,
+            old_alphabet=old_alphabet,
             initialization_strategy="mean",
         )
 
-        new_weights = adapted_model.embedding.get_weights()[0]
-
-        # Check that new tokens have mean embeddings
-        new_tokens = set(expanded_alphabet.keys()) - set(base_alphabet.keys())
-        for token in new_tokens:
-            new_idx = expanded_alphabet[token]
-            embedding = new_weights[new_idx]
-            assert np.allclose(
-                embedding, mean_embedding, atol=1e-5
-            ), f"New token '{token}' should have mean embedding"
+        np.testing.assert_allclose(
+            adapted.embedding.get_weights()[0][5], old_weights[2:].mean(axis=0)
+        )
+        assert_shared_rows_preserved(model, adapted, old_alphabet, new_alphabet)
 
     def test_random_initialization_with_seed(
         self, intensity_model, base_alphabet, expanded_alphabet

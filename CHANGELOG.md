@@ -5,6 +5,15 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Behaviour changes
+- **`initialization_strategy="mean"` averages residue embeddings only.** The mean
+  included the rows of the padding token (`-`) and the unknown token (`X`), which
+  carry no residue information. New tokens (and the `"best-fit"` fallback for tokens
+  without examples) therefore start from a slightly different embedding than in
+  0.3.1. Rows and indices of known tokens are unchanged.
+
 ## [0.3.1] - 2026-10-06
 
 ### Changed
