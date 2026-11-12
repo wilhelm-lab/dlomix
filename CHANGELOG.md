@@ -5,6 +5,16 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- `PrositIntensityPredictor.from_dataset(dataset, **kwargs)` (both backends) builds
+  the model with the arguments that must agree with the dataset taken from it:
+  `alphabet`, `seq_length`, `with_termini`, the sequence column in `input_keys`, and
+  `meta_data_keys` / `use_meta_data` from the dataset's `model_features`. Other
+  arguments, such as the layer sizes, are passed as keyword arguments; one that
+  contradicts the dataset raises.
+
 ## [0.3.1] - 2026-10-06
 
 ### Changed
