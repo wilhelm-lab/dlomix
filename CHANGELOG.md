@@ -5,6 +5,16 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- `dlomix.data.sequence_tokens`, `find_new_tokens` and `extend_alphabet`: the tokens
+  of a ProForma sequence as the datasets encode it, the tokens of new data that an
+  alphabet (e.g. a pretrained model's) does not have, and the alphabet extended by
+  them with every known token at its index. Fine-tuning code needed the private
+  `SequenceParsingProcessor._parse_proforma_sequence` for this; the parser is now
+  the public `dlomix.data.processing.processors.parse_proforma_sequence`.
+
 ## [0.3.1] - 2026-10-06
 
 ### Changed
