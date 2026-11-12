@@ -12,6 +12,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   split, post-processes the predictions as Prosit does and adds the spectral angle.
   Returns a DataFrame with one row per spectrum, in the order of the split. For
   Keras models. Example in the intensity walkthrough notebook.
+- `dlomix.reports.score_intensity_predictions(predictions, dataset, split="test")`:
+  the scoring of `evaluate_intensity` for predictions made elsewhere (an
+  `InferencePipeline` on the raw rows, a PyTorch model, another tool), so their
+  spectral angles are comparable. `evaluate_intensity` is now predict, then this.
 
 ## [0.3.1] - 2026-10-06
 

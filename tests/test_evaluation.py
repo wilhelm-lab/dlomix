@@ -5,7 +5,7 @@ import numpy as np
 import pytest
 
 from dlomix.data import FragmentIonIntensityDataset
-from dlomix.reports import evaluate_intensity
+from dlomix.reports import evaluate_intensity, score_intensity_predictions
 from dlomix.reports.postprocessing import normalize_intensity_predictions
 
 pytestmark = pytest.mark.skipif(
@@ -16,12 +16,9 @@ pytestmark = pytest.mark.skipif(
 FEATURES = ["precursor_charge_onehot", "collision_energy_aligned_normed"]
 
 
-def test_evaluate_intensity_scores_every_spectrum_in_split_order(
-    download_path_for_assets,
-):
-    from dlomix.models.prosit import PrositIntensityPredictor
-
-    dataset = FragmentIonIntensityDataset(
+@pytest.fixture(scope="module")
+def dataset(download_path_for_assets):
+    return FragmentIonIntensityDataset(
         data_format="parquet",
         data_source=join(download_path_for_assets, "file_3.parquet"),
         sequence_column="sequence",
@@ -33,6 +30,11 @@ def test_evaluate_intensity_scores_every_spectrum_in_split_order(
         shuffle=True,  # the training split's batches are shuffled; the result is not
         dataset_type="tf",
     )
+
+
+def test_evaluate_intensity_scores_every_spectrum_in_split_order(dataset):
+    from dlomix.models.prosit import PrositIntensityPredictor
+
     model = PrositIntensityPredictor(
         seq_length=30,
         alphabet=dataset.extended_alphabet,
@@ -70,3 +72,19 @@ def test_evaluate_intensity_scores_every_spectrum_in_split_order(
     )
     # ions the peptides cannot produce are masked, as in Prosit's post-processing
     assert (predictions == -1).any()
+
+
+def test_score_intensity_predictions_scores_predictions_made_elsewhere(dataset):
+    split = dataset.hf_dataset["val"]
+    observed = np.array(split["intensities"], dtype="float32")
+    predictions = np.where(observed < 0, 0.0, observed)  # the observed spectra
+    predictions[0] = predictions[0, ::-1]  # one wrong prediction, in the first row
+
+    result = score_intensity_predictions(predictions, dataset, split="val")
+
+    assert len(result) == len(split)
+    np.testing.assert_allclose(result["spectral_angle"][1:], 1.0, atol=1e-3)
+    assert result["spectral_angle"][0] < 0.9
+
+    with pytest.raises(ValueError, match="one prediction per row"):
+        score_intensity_predictions(predictions[:-1], dataset, split="val")
