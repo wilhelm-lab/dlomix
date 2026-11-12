@@ -1,4 +1,5 @@
 import logging
+import warnings
 
 import keras
 import pytest
@@ -310,3 +311,16 @@ def test_alphabet_carrying_padding_and_unknown_is_accepted():
 
     assert model.embeddings_count == len(extended)
     assert model.embeddings_count > max(extended.values())
+
+
+def test_prosit_intensity_latent_dropout_rate_is_accepted_but_unused():
+    # configs saved by 0.3.1 carry the default value: they load without a warning
+    config = PrositIntensityPredictor().get_config()
+    assert config["latent_dropout_rate"] == 0.1
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        PrositIntensityPredictor.from_config(config)
+
+    with pytest.warns(FutureWarning, match="latent_dropout_rate is not used"):
+        model = PrositIntensityPredictor(latent_dropout_rate=0.3)
+    assert model.get_config()["latent_dropout_rate"] == 0.3

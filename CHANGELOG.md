@@ -5,6 +5,19 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Deprecated
+- `PrositIntensityPredictor(latent_dropout_rate=...)` (both backends): the argument
+  was documented, stored and serialised, but never used by any layer. It is still
+  accepted and saved, so existing models and configs load unchanged; a value other
+  than the default warns, and the argument will be removed in a future release.
+
+### Fixed
+- `PrositIntensityPredictor` docstrings: `regressor_layer_size` is the width of the
+  decoder GRU, not of a dense layer; `recurrent_layers_sizes[1]` is also the width of
+  the latent vector and of the meta data dense layer.
+
 ## [0.3.1] - 2026-10-06
 
 ### Changed
