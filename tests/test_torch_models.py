@@ -90,3 +90,63 @@ def test_prosit_intensity_torch_warns_when_metadata_keys_are_ignored():
     # ignored these inputs
     with pytest.warns(UserWarning, match="use_meta_data=False"):
         PrositIntensityPredictorTorch(meta_data_keys=["collision_energy"])
+
+
+def test_intensity_model_torch_from_dataset():
+    from types import SimpleNamespace
+
+    alphabet = {"-": 0, "X": 1, "A": 2, "C": 3}
+    dataset = SimpleNamespace(  # the attributes from_dataset reads
+        sequence_column="peptide",
+        extended_alphabet=alphabet,
+        max_seq_len=10,
+        with_termini=False,
+        model_features=["collision_energy"],
+    )
+
+    model = PrositIntensityPredictorTorch.from_dataset(
+        dataset, recurrent_layers_sizes=(8, 16)
+    )
+
+    assert model.alphabet == alphabet
+    assert (model.raw_seq_length, model.with_termini) == (10, False)
+    assert model.input_keys == {"SEQUENCE_KEY": "peptide"}
+    assert (model.use_meta_data, model.meta_data_keys) == (True, ["collision_energy"])
+    assert model.recurrent_layers_sizes == (8, 16)
+
+
+def test_torch_models_from_dataset():
+    from types import SimpleNamespace
+
+    from dlomix.models.deepLC_torch import DeepLCRetentionTimePredictor
+    from dlomix.models.detectability_torch import DetectabilityModel
+    from dlomix.models.ionmob_torch import Ionmob
+
+    alphabet = {"-": 0, "X": 1, "A": 2, "C": 3}
+    dataset = SimpleNamespace(  # the attributes from_dataset reads
+        sequence_column="peptide",
+        extended_alphabet=alphabet,
+        max_seq_len=10,
+        with_termini=True,
+        padding_value="-",
+    )
+    small = {"recurrent_layers_sizes": (8, 8), "regressor_layer_size": 8}
+
+    for model_class in (PrositRetentionTimePredictorTorch, ChargeStatePredictorTorch):
+        model = model_class.from_dataset(dataset, **small)
+        assert (model.embeddings_count, model.seq_length) == (4, 12)
+        assert model(torch.zeros((2, 12), dtype=torch.long)).shape[0] == 2
+
+    model = DeepLCRetentionTimePredictor.from_dataset(dataset)
+    assert (model.alphabet, model.seq_length) == (alphabet, 12)
+    assert model.sequence_input_key == "peptide"
+
+    model = DetectabilityModel.from_dataset(dataset, num_units=8)
+    assert model(torch.full((2, 12), 2)).shape == (2, 4)
+    assert (model.alphabet_size, model.padding_idx) == (4, 0)
+
+    model = Ionmob.from_dataset(dataset, gru_1=8, gru_2=8)
+    assert model.emb.num_embeddings == 4
+
+    with pytest.raises(ValueError, match="num_tokens=9 but the dataset has 4"):
+        Ionmob.from_dataset(dataset, num_tokens=9)

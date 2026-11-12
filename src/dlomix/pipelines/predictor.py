@@ -146,6 +146,8 @@ class InferencePipeline:
             "backend": "pytorch" if _IS_TORCH else "tensorflow",
             "model_class": type(self.model).__name__,
             "fingerprint": self.preprocessor.fingerprint,
+            # the settings behind the fingerprint, to name what changed on a mismatch
+            "recipe": self.preprocessor.recipe,
             "vocab_size": self.preprocessor.vocab_size,
         }
         (path_obj / PIPELINE_META_NAME).write_text(
@@ -171,9 +173,20 @@ class InferencePipeline:
         preprocessor = PeptidePreprocessor.load(str(path_obj))
 
         if meta.get("fingerprint") and meta["fingerprint"] != preprocessor.fingerprint:
+            saved, loaded = meta.get("recipe"), preprocessor.recipe
+            if saved is None:  # bundles saved before the recipe was recorded
+                changed = "which settings changed is not recorded in this bundle"
+            else:
+                keys = sorted(
+                    key
+                    for key in saved.keys() | loaded.keys()
+                    if saved.get(key) != loaded.get(key)
+                )
+                changed = f"changed settings: {', '.join(keys)}"
             warnings.warn(
                 "Loaded preprocessor fingerprint does not match the one recorded when "
-                "the pipeline was saved; preprocessing may differ from training."
+                "the pipeline was saved; preprocessing may differ from training "
+                f"({changed})."
             )
 
         if _IS_TORCH:

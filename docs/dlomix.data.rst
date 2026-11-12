@@ -94,3 +94,9 @@ Submodules
    :members:
    :show-inheritance:
    :undoc-members:
+
+
+.. automodule:: dlomix.data.tokens
+   :members:
+   :show-inheritance:
+   :undoc-members:

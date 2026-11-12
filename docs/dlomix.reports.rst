@@ -46,6 +46,12 @@ Submodules
    :undoc-members:
 
 
+.. automodule:: dlomix.reports.evaluation
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+
 .. automodule:: dlomix.reports.postprocessing
    :members:
    :show-inheritance:

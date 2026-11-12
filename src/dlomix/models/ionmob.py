@@ -4,6 +4,7 @@ import tensorflow as tf
 
 from ..layers.gru_kernel import gru_kernel_kwargs
 from ..losses.ionmob import MaskedIonmobLoss
+from ._from_dataset import from_dataset_method, ionmob_arguments
 
 
 @keras.saving.register_keras_serializable(package="dlomix")
@@ -148,6 +149,8 @@ class Ionmob(tf.keras.Model):
             )
         seq, mz, charge = inputs
         return seq, mz, charge
+
+    from_dataset = from_dataset_method(ionmob_arguments)
 
     def call(self, inputs, training=False):
         """

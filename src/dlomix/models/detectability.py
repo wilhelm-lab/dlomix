@@ -4,6 +4,7 @@ import tensorflow as tf
 
 from ..constants import CLASSES_LABELS, padding_char
 from ..layers.gru_kernel import gru_kernel_kwargs
+from ._from_dataset import detectability_arguments, from_dataset_method
 
 
 @keras.saving.register_keras_serializable(package="dlomix")
@@ -27,6 +28,8 @@ class DetectabilityModel(tf.keras.Model):
         self.alphabet_size = self.padding_char.shape[0]
         self.encoder = Encoder(self.num_units, padding_char=self.padding_char)
         self.decoder = Decoder(self.num_units, self.num_classes)
+
+    from_dataset = from_dataset_method(detectability_arguments)
 
     def build(self, input_shape):
         """Instantiate the sub-layer weights from the sequence input shape.
@@ -57,9 +60,11 @@ class DetectabilityModel(tf.keras.Model):
         )
         super().build(input_shape)
 
-    def call(self, inputs):
+    def call(self, inputs, training=None):
         onehot_inputs = tf.one_hot(tf.cast(inputs, "int32"), depth=self.alphabet_size)
-        enc_outputs, enc_state_f, enc_state_b = self.encoder(onehot_inputs)
+        enc_outputs, enc_state_f, enc_state_b = self.encoder(
+            onehot_inputs, training=training
+        )
 
         dec_outputs = tf.concat([enc_state_f, enc_state_b], axis=-1)
 
@@ -70,7 +75,7 @@ class DetectabilityModel(tf.keras.Model):
             "encoder_outputs": enc_outputs,
         }
 
-        decoder_output = self.decoder(decoder_inputs)
+        decoder_output = self.decoder(decoder_inputs, training=training)
 
         return decoder_output
 

@@ -823,3 +823,26 @@ def test_cache_cleanup_keeps_the_callers_cache_files(
         if f.startswith("cache-") and f.endswith(".arrow")
     }
     assert cache_files <= kept
+
+
+def test_loaded_dataset_follows_the_active_backend(tmp_path):
+    from dlomix.data.dataset_config import default_dataset_type
+
+    active = default_dataset_type()
+    other = "pt" if active == "tf" else "tf"
+    dataset = RetentionTimeDataset(
+        data_source=Dataset.from_dict(
+            {"sequence": ["AAK", "CDE", "FGH", "IKL"], "irt": [1.0, 2.0, 3.0, 4.0]}
+        ),
+        data_format="hf",
+        sequence_column="sequence",
+        label_column="irt",
+        max_seq_len=5,
+        val_ratio=0.5,
+        dataset_type=other,  # e.g. saved on the other backend
+    )
+    path = str(tmp_path / "processed")
+    dataset.save_to_disk(path)
+
+    assert load_processed_dataset(path).dataset_type == active
+    assert load_processed_dataset(path, dataset_type=other).dataset_type == other

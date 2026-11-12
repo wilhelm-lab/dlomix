@@ -5,6 +5,7 @@ from ..constants import ALPHABET_UNMOD
 from ..layers.attention import AttentionLayer
 from ..layers.gru_kernel import gru_kernel_kwargs
 from ._alphabet import validate_alphabet_size
+from ._from_dataset import from_dataset_method, sequence_model_arguments
 
 """
 This module contains a deep learning model for precursor charge state prediction, inspired by Prosit's architecture.
@@ -128,11 +129,13 @@ class ChargeStatePredictor(tf.keras.Model):
             ]
         )
 
-    def call(self, inputs):
+    from_dataset = from_dataset_method(sequence_model_arguments)
+
+    def call(self, inputs, training=None):
         x = self.embedding(inputs)
-        x = self.encoder(x)
+        x = self.encoder(x, training=training)
         x = self.attention(x)
-        x = self.regressor(x)
+        x = self.regressor(x, training=training)
         x = self.output_layer(x)
         return x
 

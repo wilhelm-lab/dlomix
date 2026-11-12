@@ -13,6 +13,11 @@ from ..layers.attention_torch import AttentionLayer
 from ..layers.bi_gru_seq_encoder_torch import BiGRUSequentialEncoder
 from ..layers.gru_seq_decoder_torch import GRUSequentialDecoder
 from ..layers.keras_initializers_torch import KerasLazyLinear, init_like_keras
+from ._from_dataset import (
+    from_dataset_method,
+    prosit_intensity_arguments,
+    sequence_model_arguments,
+)
 
 logger = logging.getLogger("dlomix.models.prosit_torch")
 
@@ -100,6 +105,8 @@ class PrositRetentionTimePredictor(nn.Module):
         # start from the same weight distribution as the Keras model
         init_like_keras(self)
 
+    from_dataset = from_dataset_method(sequence_model_arguments)
+
     def forward(self, inputs, **kwargs):
         x = self.embedding(inputs)
         x = self.encoder(x)
@@ -132,11 +139,18 @@ class PrositIntensityPredictor(nn.Module):
     dropout_rate : float, optional
         Probability to use for dropout layers in the encoder. Defaults to 0.2.
     latent_dropout_rate : float, optional
-        Probability to use for dropout layers in the regressor layers after encoding. Defaults to 0.1.
+        Deprecated and not used: this model has no dropout after the encoder. It is
+        still accepted and stored in the config, so that saved models load; a value
+        other than the default 0.1 warns. It will be removed in a future release.
     recurrent_layers_sizes : tuple, optional
-        A tuple of 2 values for the sizes of the two GRU layers in the encoder. Defaults to (256, 512).
+        A tuple of 2 values for the sizes of the two GRU layers in the encoder. The
+        second value is also the width of the latent vector the encoder produces and
+        of the dense layer that encodes the meta data, which is multiplied with it.
+        Defaults to (256, 512).
     regressor_layer_size : int, optional
-        Size of the dense layer in the regressor after the encoder. Defaults to 512.
+        Width of the decoder GRU (not of a dense layer; the regressor's dense layer
+        has ``len_fragment_ion`` units). Half of it is also the width of the first
+        dense layer for the PTM features. Defaults to 512.
     use_meta_data : bool, optional
         Whether to use meta data inputs. Defaults to False.
     use_prosit_ptm_features : bool, optional
@@ -219,9 +233,18 @@ class PrositIntensityPredictor(nn.Module):
     ):
         super(PrositIntensityPredictor, self).__init__(**kwargs)
 
+        if latent_dropout_rate != 0.1:
+            warnings.warn(
+                "latent_dropout_rate is not used by PrositIntensityPredictor and will "
+                "be removed in a future release; the model has no dropout after the "
+                "encoder. Use dropout_rate for the dropout in the encoder and decoder.",
+                FutureWarning,
+                stacklevel=2,
+            )
+
         # Store all configuration parameters
         self.dropout_rate = dropout_rate
-        self.latent_dropout_rate = latent_dropout_rate
+        self.latent_dropout_rate = latent_dropout_rate  # unused, kept for saved configs
         self.regressor_layer_size = regressor_layer_size
         self.recurrent_layers_sizes = tuple(recurrent_layers_sizes)
         self.embedding_output_dim = embedding_output_dim
@@ -255,6 +278,8 @@ class PrositIntensityPredictor(nn.Module):
         # start from the same weight distribution as the Keras model (lazy layers are
         # initialized like Keras when they are created on the first forward pass)
         init_like_keras(self)
+
+    from_dataset = from_dataset_method(prosit_intensity_arguments)
 
     def _handle_alphabet_and_keys(self, alphabet, input_keys, meta_data_keys):
         # Handle alphabet

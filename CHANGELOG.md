@@ -5,6 +5,146 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0] - 2026-11-12
+
+### Behaviour changes
+- **Dropout is now applied during `fit`** (TensorFlow/Keras backend). The `call` of
+  `PrositIntensityPredictor`, `PrositRetentionTimePredictor`, `ChargeStatePredictor`,
+  `RetentionTimePredictor` and `DetectabilityModel` did not declare `training`, and
+  Keras 3 passes `training=True` only to a `call` that declares it, so these models
+  trained in inference mode: every `Dropout` layer was off, without error or warning.
+  Training results change for every model trained with a dropout rate above 0
+  (`dropout_rate`, `latent_dropout_rate`); the defaults are above 0. To reproduce
+  results obtained with 0.3.1 or earlier, set the dropout rates to 0. Inference
+  (`predict`, `evaluate`, saved models) is unchanged.
+- **Training batches are reshuffled every epoch** (TensorFlow datasets,
+  `tensor_train_data`). With a global seed set (`keras.utils.set_random_seed`), every
+  epoch repeated the batch order of the first; now each epoch has a new order, and
+  the sequence of orders is reproducible from the seed. Results of seeded training
+  runs change. Every row is still visited once per epoch, and validation and test
+  data keep the split's row order.
+- **`enable_tf_dataset_cache=True` now means "keep the split in memory"**: the
+  split's tensor columns are loaded into RAM once and batches are gathered from
+  there (in a synthetic benchmark, about 15x the rate of reading from disk), for
+  the train, val and test splits. Before, it called `.cache()` after shuffling and
+  batching, which replayed the first epoch's batches in every later epoch. The
+  splits used must fit in memory; streaming is not supported.
+- **`initialization_strategy="mean"` averages residue embeddings only.** The mean
+  included the rows of the padding token (`-`) and the unknown token (`X`), which
+  carry no residue information. New tokens (and the `"best-fit"` fallback for tokens
+  without examples) therefore start from a slightly different embedding than in
+  0.3.1. Rows and indices of known tokens are unchanged.
+- **Best-fit initialization with several new tokens** scores the candidates for a
+  new token on the spectra in which it is the only new token. Before, it used every
+  spectrum containing the token, with the other new tokens encoded as the unknown
+  token `X`, so candidates were scored on damaged inputs. With fewer than
+  `min_examples_for_eval` such spectra (a new `best_fit_kwargs` option, default 20,
+  at most `n_examples_for_eval`), spectra that also carry other new tokens are added
+  up to `n_examples_for_eval`, with the other new tokens encoded as their
+  unmodified residue (`R[UNIMOD:7]` as `R`). Picks can change for datasets with
+  several new tokens; with one new token they are the same as in 0.3.1.
+- **Best-fit samples its examples**: of more than `n_examples_for_eval` spectra it
+  takes a random sample seeded with `random_seed`, instead of the first rows of the
+  dataset. Pass `random_seed` for a reproducible pick.
+- **`FineTunePipeline.finetune()` keeps the starting model when fine-tuning does not
+  improve it.** It evaluates the validation loss before training and, when no epoch
+  has a lower one, restores the starting weights (with little data, every epoch can
+  be worse, and `EarlyStopping(restore_best_weights=True)` only returns the best
+  trained epoch). The returned history says which model was kept (`kept_model`:
+  `"starting"` or `"trained"`) and has the `starting_val_loss`. This costs one extra
+  pass over the validation data; `keep_starting_model=False` turns it off.
+
+### Added
+- `FineTunePipeline.finetune(trainable="all" | "embedding" | "new_tokens")`, also a
+  constructor argument and YAML key (default `"all"`, as before). `"embedding"`
+  trains only the token embedding; `"new_tokens"` trains only the embedding rows of
+  the tokens added by the vocabulary expansion, leaving every other weight,
+  including the known tokens' rows, exactly as it was, so predictions for peptides
+  without the new tokens do not change. With `from_dataset_and_model`, name the
+  tokens with `new_tokens=[...]`. In Keras 3, `model.trainable = False` followed by
+  `model.embedding.trainable = True` leaves no trainable weights; the pipeline
+  freezes the other layers individually and restores their flags after training.
+  The same is available for custom training loops as
+  `dlomix.models.model_utils.embedding_only_training(model, rows=None)`.
+- `dlomix.reports.evaluate_intensity(model, dataset, split="test")`: predicts a
+  split, post-processes the predictions as Prosit does and adds the spectral angle.
+  Returns a DataFrame with one row per spectrum, in the order of the split. For
+  Keras models. Example in the intensity walkthrough notebook.
+- `Model.from_dataset(dataset, **kwargs)` on every model (both backends) builds the
+  model with the arguments that must agree with the dataset taken from it; other
+  arguments, such as the layer sizes, are passed as keyword arguments, and one that
+  contradicts the dataset raises. Taken from the dataset:
+  `PrositIntensityPredictor`: `alphabet`, `seq_length`, `with_termini`, the sequence
+  column in `input_keys`, and `meta_data_keys` / `use_meta_data` from its
+  `model_features`; `PrositRetentionTimePredictor`, `RetentionTimePredictor`,
+  `ChargeStatePredictor`: `alphabet` and `seq_length` (the encoded width, with the
+  termini); `DeepLCRetentionTimePredictor`: the same and `sequence_input_key`;
+  `DetectabilityModel`: the alphabet size and padding token; `Ionmob`: `num_tokens`
+  (and `sequence_key` on TensorFlow).
+- `dlomix.reports.score_intensity_predictions(predictions, dataset, split="test")`:
+  the scoring of `evaluate_intensity` for predictions made elsewhere (an
+  `InferencePipeline` on the raw rows, a PyTorch model, another tool), so their
+  spectral angles are comparable. `evaluate_intensity` is now predict, then this.
+- `dlomix.data.sequence_tokens`, `find_new_tokens` and `extend_alphabet`: the tokens
+  of a ProForma sequence as the datasets encode it, the tokens of new data that an
+  alphabet (e.g. a pretrained model's) does not have, and the alphabet extended by
+  them with every known token at its index. Fine-tuning code needed the private
+  `SequenceParsingProcessor._parse_proforma_sequence` for this; the parser is now
+  the public `dlomix.data.processing.processors.parse_proforma_sequence`.
+- `FineTunePipeline.from_pretrained(base, data)`: a ready pipeline from a pretrained
+  inference bundle (object, path or Hub repo id) and Hugging Face data. The bundle's
+  preprocessing settings build the dataset, the tokens new to the model are found
+  and appended to its vocabulary, and their embeddings are initialized by
+  `initialization_strategy`; `new_tokens` and `best_fit_info` are set. It composes
+  public steps that remain available one by one: `find_new_tokens`,
+  `extend_alphabet`, the dataset class with the new
+  `PeptidePreprocessor.dataset_settings`, the new
+  `dlomix.models.adapt_pretrained_model(model, new_alphabet, ...)` (the part of
+  `load_and_adapt_pretrained_model` after loading, for a model in memory) and
+  `from_dataset_and_model`. The existing constructor, `setup()` and
+  `load_and_adapt_pretrained_model` are unchanged.
+- The feature lookup tables are documented (#103) in
+  `dlomix.data.processing.feature_dicts`: what each JSON file holds, and the atom
+  order `[H, C, N, O, P, S]` of `atom_count`, `mod_loss` and `mod_gain`, also
+  available as `dlomix.data.processing.feature_tables.PTM_ATOMS` and named in
+  `available_feature_extractors()`.
+
+### Changed
+- dlomix builds its TensorFlow datasets itself, from a shuffled row index, instead of
+  calling Hugging Face's `to_tf_dataset`. Tensor names, dtypes and shapes are
+  unchanged; reading batches from disk (the default) is faster than before.
+- `return_fit_info` returns the whole best-fit search per new token: every
+  candidate's score (`scores`), the spectra with the token, left out and searched
+  (`n_with_token`, `n_left_out`, `n_searched`), which examples were used (`examples`)
+  and the `initialization` that applied. A token without examples now has an entry
+  saying it kept the mean initialization (`old_token` is None) instead of an empty
+  dict.
+- `load_processed_dataset` gives the tensors of the active backend (`DLOMIX_BACKEND`),
+  whichever backend the dataset was saved on; before, a dataset saved on TensorFlow
+  kept `dataset_type="tf"` on PyTorch until overridden by hand. Pass `dataset_type=`
+  to choose explicitly.
+- The warning for a preprocessor that does not match the one a pipeline was saved
+  with names the settings that changed (`InferencePipeline.load`). Bundles record
+  these settings from this release on; for older bundles the warning says so.
+- Release workflow: `pypa/gh-action-pypi-publish` 1.14.3, which fixes the security
+  advisory GHSA-5xjx-3w67-w9x9.
+- Docs: for the PyTorch backend, `torch_dataloader_kwargs={"num_workers": N}` loads
+  batches in parallel.
+
+### Deprecated
+- `PrositIntensityPredictor(latent_dropout_rate=...)` (both backends): the argument
+  was documented, stored and serialised, but never used by any layer. It is still
+  accepted and saved, so existing models and configs load unchanged; a value other
+  than the default warns, and the argument will be removed in a future release.
+
+### Fixed
+- `PrositIntensityPredictor` docstrings: `regressor_layer_size` is the width of the
+  decoder GRU, not of a dense layer; `recurrent_layers_sizes[1]` is also the width of
+  the latent vector and of the meta data dense layer.
+- Building the package no longer warns that
+  `dlomix.data.processing.feature_dicts` "would be ignored": the folder of the
+  feature lookup tables is now a package with its JSON files as package data.
+
 ## [0.3.1] - 2026-10-06
 
 ### Changed

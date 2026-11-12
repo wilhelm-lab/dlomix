@@ -149,21 +149,44 @@ class PeptidePreprocessor:
         return list(self._extracted_feature_names)
 
     @property
+    def recipe(self) -> dict:
+        """The settings that determine the tensors a model receives."""
+        return {
+            "alphabet": dict(sorted(self.alphabet.items())),
+            "sequence_column": self.sequence_column,
+            "max_seq_len": self.max_seq_len,
+            "padding_value": self.padding_value,
+            "encoding_scheme": self.encoding_scheme.value,
+            "with_termini": self.with_termini,
+            "model_features": sorted(self.model_features),
+            "features": sorted(self._extracted_feature_names),
+        }
+
+    @property
+    def dataset_settings(self) -> dict:
+        """The recipe as keyword arguments of a dataset class, without the alphabet.
+
+        Builds a dataset that is processed as this preprocessor processes its inputs,
+        e.g. to fine-tune the model it belongs to::
+
+            FragmentIonIntensityDataset(
+                data_source=data, alphabet=alphabet, **preprocessor.dataset_settings
+            )
+        """
+        return {
+            "sequence_column": self.sequence_column,
+            "max_seq_len": self.max_seq_len,
+            "padding_value": self.padding_value,
+            "encoding_scheme": self.encoding_scheme.value,
+            "with_termini": self.with_termini,
+            "model_features": list(self.model_features),
+            "features_to_extract": list(self.features_to_extract),
+        }
+
+    @property
     def fingerprint(self) -> str:
         """Short stable hash of the recipe, used for model/preprocessor consistency."""
-        payload = json.dumps(
-            {
-                "alphabet": dict(sorted(self.alphabet.items())),
-                "sequence_column": self.sequence_column,
-                "max_seq_len": self.max_seq_len,
-                "padding_value": self.padding_value,
-                "encoding_scheme": self.encoding_scheme.value,
-                "with_termini": self.with_termini,
-                "model_features": sorted(self.model_features),
-                "features": sorted(self._extracted_feature_names),
-            },
-            sort_keys=True,
-        )
+        payload = json.dumps(self.recipe, sort_keys=True)
         return hashlib.sha256(payload.encode("utf-8")).hexdigest()[:16]
 
     # --------------------------------------------------------------- constructors

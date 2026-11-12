@@ -1,4 +1,8 @@
-"""Module to load JSON feature dictionaries."""
+"""Module to load JSON feature dictionaries.
+
+The tables and their layout are described in
+:mod:`dlomix.data.processing.feature_dicts`.
+"""
 
 import json
 import os
@@ -6,6 +10,10 @@ from typing import Tuple
 
 MODULE_PATH = os.path.abspath(os.path.dirname(__file__))
 FEATURE_DICTS_BASE_PATH = os.path.join(MODULE_PATH, "feature_dicts")
+
+#: The atoms counted by the six values of ``atom_count``, ``mod_loss`` and
+#: ``mod_gain``, in the order of the values.
+PTM_ATOMS = ("H", "C", "N", "O", "P", "S")
 
 
 def load_feature_dict(json_filename: str):
