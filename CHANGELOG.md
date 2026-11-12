@@ -17,8 +17,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   new token on the spectra in which it is the only new token. Before, it used every
   spectrum containing the token, with the other new tokens encoded as the unknown
   token `X`, so candidates were scored on damaged inputs. With fewer than
-  `min_examples_for_eval` such spectra (a new `best_fit_kwargs` option, default 20),
-  all spectra with the token are used and the other new tokens are encoded as their
+  `min_examples_for_eval` such spectra (a new `best_fit_kwargs` option, default 20,
+  at most `n_examples_for_eval`), spectra that also carry other new tokens are added
+  up to `n_examples_for_eval`, with the other new tokens encoded as their
   unmodified residue (`R[UNIMOD:7]` as `R`). Picks can change for datasets with
   several new tokens; with one new token they are the same as in 0.3.1.
 - **Best-fit samples its examples**: of more than `n_examples_for_eval` spectra it
