@@ -1,5 +1,6 @@
 import inspect
 import logging
+import warnings
 
 import keras
 import pytest
@@ -410,3 +411,16 @@ def test_prosit_intensity_from_dataset():
 
     with pytest.raises(ValueError, match="seq_length=30 but the dataset has 10"):
         PrositIntensityPredictor.from_dataset(dataset, seq_length=30)
+
+
+def test_prosit_intensity_latent_dropout_rate_is_accepted_but_unused():
+    # configs saved by 0.3.1 carry the default value: they load without a warning
+    config = PrositIntensityPredictor().get_config()
+    assert config["latent_dropout_rate"] == 0.1
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        PrositIntensityPredictor.from_config(config)
+
+    with pytest.warns(FutureWarning, match="latent_dropout_rate is not used"):
+        model = PrositIntensityPredictor(latent_dropout_rate=0.3)
+    assert model.get_config()["latent_dropout_rate"] == 0.3
