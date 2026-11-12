@@ -75,6 +75,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `meta_data_keys` / `use_meta_data` from the dataset's `model_features`. Other
   arguments, such as the layer sizes, are passed as keyword arguments; one that
   contradicts the dataset raises.
+- `dlomix.reports.score_intensity_predictions(predictions, dataset, split="test")`:
+  the scoring of `evaluate_intensity` for predictions made elsewhere (an
+  `InferencePipeline` on the raw rows, a PyTorch model, another tool), so their
+  spectral angles are comparable. `evaluate_intensity` is now predict, then this.
+- `dlomix.data.sequence_tokens`, `find_new_tokens` and `extend_alphabet`: the tokens
+  of a ProForma sequence as the datasets encode it, the tokens of new data that an
+  alphabet (e.g. a pretrained model's) does not have, and the alphabet extended by
+  them with every known token at its index. Fine-tuning code needed the private
+  `SequenceParsingProcessor._parse_proforma_sequence` for this; the parser is now
+  the public `dlomix.data.processing.processors.parse_proforma_sequence`.
 
 ### Changed
 - dlomix builds its TensorFlow datasets itself, from a shuffled row index, instead of

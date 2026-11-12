@@ -14,11 +14,8 @@ import keras
 import numpy as np
 import tensorflow as tf
 
-from dlomix.data import FragmentIonIntensityDataset
-from dlomix.data.processing.processors import (
-    SequenceParsingProcessor,
-    unmodified_token,
-)
+from dlomix.data import FragmentIonIntensityDataset, sequence_tokens
+from dlomix.data.processing.processors import unmodified_token
 
 logger = logging.getLogger(__name__)
 
@@ -686,10 +683,8 @@ def _find_best_fit_tokens_for_new_tokens(
         if unmodified_token(token) in alphabet_old
     }
 
-    parser = SequenceParsingProcessor(sequence_column)
     new_tokens_per_row = [
-        set(parser.single_process({sequence_column: sequence})[sequence_column])
-        & set(new_tokens)
+        set(sequence_tokens(sequence)) & set(new_tokens)
         for sequence in new_hf_data[sequence_column]
     ]
 
