@@ -13,6 +13,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   carry no residue information. New tokens (and the `"best-fit"` fallback for tokens
   without examples) therefore start from a slightly different embedding than in
   0.3.1. Rows and indices of known tokens are unchanged.
+- **Best-fit initialization with several new tokens** scores the candidates for a
+  new token on the spectra in which it is the only new token. Before, it used every
+  spectrum containing the token, with the other new tokens encoded as the unknown
+  token `X`, so candidates were scored on damaged inputs. With fewer than
+  `min_examples_for_eval` such spectra (a new `best_fit_kwargs` option, default 20),
+  all spectra with the token are used and the other new tokens are encoded as their
+  unmodified residue (`R[UNIMOD:7]` as `R`). Picks can change for datasets with
+  several new tokens; with one new token they are the same as in 0.3.1.
+- **Best-fit samples its examples**: of more than `n_examples_for_eval` spectra it
+  takes a random sample seeded with `random_seed`, instead of the first rows of the
+  dataset. Pass `random_seed` for a reproducible pick.
+
+### Changed
+- `return_fit_info` returns the whole best-fit search per new token: every
+  candidate's score (`scores`), the spectra with the token, left out and searched
+  (`n_with_token`, `n_left_out`, `n_searched`), which examples were used (`examples`)
+  and the `initialization` that applied. A token without examples now has an entry
+  saying it kept the mean initialization (`old_token` is None) instead of an empty
+  dict.
 
 ## [0.3.1] - 2026-10-06
 
