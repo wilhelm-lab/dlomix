@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Behaviour changes
+- **`FineTunePipeline.finetune()` keeps the starting model when fine-tuning does not
+  improve it.** It evaluates the validation loss before training and, when no epoch
+  has a lower one, restores the starting weights (with little data, every epoch can
+  be worse, and `EarlyStopping(restore_best_weights=True)` only returns the best
+  trained epoch). The returned history says which model was kept (`kept_model`:
+  `"starting"` or `"trained"`) and has the `starting_val_loss`. This costs one extra
+  pass over the validation data; `keep_starting_model=False` turns it off.
+
 ### Added
 - `FineTunePipeline.finetune(trainable="all" | "embedding" | "new_tokens")`, also a
   constructor argument and YAML key (default `"all"`, as before). `"embedding"`

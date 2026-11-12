@@ -409,6 +409,7 @@ class FineTunePipeline:
         callbacks: list | None = None,
         optimizer=None,
         trainable: str | None = None,
+        keep_starting_model: bool = True,
     ):
         """Compile and fine-tune the model.
 
@@ -435,11 +436,20 @@ class FineTunePipeline:
               for peptides without the new tokens do not change.
 
             The model's ``trainable`` flags are the same after training as before.
+        keep_starting_model:
+            If True (default), the validation loss of the model before training is
+            recorded, and when no epoch has a lower one, the starting weights are
+            restored: with little data, every epoch can be worse than the model
+            fine-tuning started from, and ``EarlyStopping(restore_best_weights=True)``
+            only returns the best trained epoch.
 
         Returns
         -------
         keras.callbacks.History
-            The Keras training history object returned by ``model.fit``.
+            The Keras training history object returned by ``model.fit``. With
+            ``keep_starting_model`` it also has ``starting_val_loss`` and
+            ``kept_model``: ``"starting"`` if the starting weights were restored,
+            else ``"trained"``.
 
         Raises
         ------
@@ -470,12 +480,31 @@ class FineTunePipeline:
                 metrics=metrics or [],
             )
 
+            if keep_starting_model:
+                starting_weights = self.model.get_weights()
+                starting_val_loss = self.model.evaluate(
+                    self.dataset.tensor_val_data, verbose=0, return_dict=True
+                )["loss"]
+
             history = self.model.fit(
                 self.dataset.tensor_train_data,
                 epochs=self.epochs,
                 validation_data=self.dataset.tensor_val_data,
                 callbacks=callbacks or [],
             )
+
+        if keep_starting_model:
+            history.starting_val_loss = starting_val_loss
+            history.kept_model = "trained"
+            # also when the loss became NaN: no epoch beat the starting model
+            if not min(history.history["val_loss"]) < starting_val_loss:
+                self.model.set_weights(starting_weights)
+                history.kept_model = "starting"
+                logger.warning(
+                    "No epoch had a lower validation loss than the starting model "
+                    "(%.6f): its weights were restored.",
+                    starting_val_loss,
+                )
 
         logger.info("Fine-tuning complete.")
         return history

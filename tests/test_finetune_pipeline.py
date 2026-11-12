@@ -560,3 +560,35 @@ class TestTrainable:
             FineTunePipeline(
                 finetune_dataset_path="x", base_model_name="m", trainable="body"
             )
+
+
+class TestKeepStartingModel:
+    @pytest.mark.parametrize(
+        "learning_rate, kept_model",
+        [(1e-2, "trained"), (-1e-2, "starting")],  # descent, ascent
+    )
+    def test_starting_weights_return_when_no_epoch_beats_them(
+        self, new_token_pipeline, learning_rate, kept_model
+    ):
+        model = new_token_pipeline.model
+        before = model.get_weights()
+
+        history = new_token_pipeline.finetune(
+            optimizer=tf.keras.optimizers.SGD(learning_rate=learning_rate)
+        )
+
+        improved = min(history.history["val_loss"]) < history.starting_val_loss
+        assert improved == (kept_model == "trained")
+        assert history.kept_model == kept_model
+        assert _changed(before, model.get_weights()) == (kept_model == "trained")
+
+    def test_can_be_turned_off(self, new_token_pipeline):
+        before = new_token_pipeline.model.get_weights()
+
+        history = new_token_pipeline.finetune(
+            optimizer=tf.keras.optimizers.SGD(learning_rate=-1e-2),
+            keep_starting_model=False,
+        )
+
+        assert not hasattr(history, "kept_model")
+        assert _changed(before, new_token_pipeline.model.get_weights())
